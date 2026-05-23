@@ -1,0 +1,7 @@
+skill: skill-lifecycle-governance
+source_repo: <repo-path>
+source_ref: <ref-or-version>
+status: <stable|pilot|local-iteration>
+target: <install-target-path>
+installed_at: <UTC-ISO-8601>
+backport_policy: <review-required|project-only|temporary>
