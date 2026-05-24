@@ -1,0 +1,84 @@
+name: sdd-plus-superpowers
+version: 1
+description: OpenSpec workflow that combines schema-driven artifacts with Superpowers execution discipline
+
+artifacts:
+  - id: brainstorm
+    generates: brainstorm.md
+    description: Explore the problem, constraints, and options
+    template: brainstorm.md
+    instruction: |
+      Create a brainstorming artifact that captures the problem, constraints, alternatives, and recommended direction.
+      Use the Superpowers brainstorming discipline when exploring the space.
+    requires: []
+
+  - id: proposal
+    generates: proposal.md
+    description: Change proposal
+    template: proposal.md
+    instruction: |
+      Create a proposal that explains why this change is needed, what will change, and the impact.
+      Keep the output concise and focus on the decision rationale.
+    requires:
+      - brainstorm
+
+  - id: design
+    generates: design.md
+    description: Technical design
+    template: design.md
+    instruction: |
+      Create a design document that explains how the change will be implemented.
+      Ground the design in the brainstorm and proposal artifacts.
+    requires:
+      - proposal
+
+  - id: specs
+    generates: specs/**/*.md
+    description: Testable requirements
+    template: spec.md
+    instruction: |
+      Create one spec file per capability with testable requirements and scenarios.
+      Use clear SHALL/MUST language and keep requirements behavior-focused.
+    requires:
+      - proposal
+
+  - id: tasks
+    generates: tasks.md
+    description: Implementation checklist
+    template: tasks.md
+    instruction: |
+      Create a small, ordered implementation checklist that can be completed incrementally.
+      Keep tasks actionable and easy to verify.
+    requires:
+      - design
+      - specs
+
+  - id: plan
+    generates: plan.md
+    description: Superpowers execution plan
+    template: plan.md
+    instruction: |
+      Create a pre-apply implementation plan.
+      Reference tasks.md item numbers directly so the coarse OpenSpec tasks and the fine-grained plan stay aligned.
+      Include test-first notes for code-bearing work so apply can follow TDD.
+    requires:
+      - tasks
+
+  - id: verify
+    generates: verify.md
+    description: Verification evidence
+    template: verify.md
+    instruction: |
+      Create a post-apply verification artifact that records evidence, checks, and any follow-up issues before archive.
+      Use the Superpowers verification discipline for review and evidence collection.
+    requires:
+      - plan
+
+apply:
+  requires:
+    - plan
+    - tasks
+  tracks: tasks.md
+  instruction: |
+    Execute the work described by plan.md and tasks.md.
+    For code-bearing work, write or update a failing test before changing behavior, then implement the smallest fix and verify the result.
