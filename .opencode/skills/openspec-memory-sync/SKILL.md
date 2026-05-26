@@ -24,7 +24,7 @@ Capture evidence-backed repository memory after verification and before archive.
 - Verification evidence.
 - Implementation Intelligence Summary with: Design Decisions, New Complexity, Core Modules Touched, Potential Risks, and Known Tradeoffs.
 - Git diff against the base branch.
-- Existing docs paths for ADRs, pitfalls, and module docs.
+- Existing docs paths for ADRs, pitfalls when real blockers occurred, and module docs.
 
 ## Workflow
 
@@ -39,24 +39,26 @@ Capture evidence-backed repository memory after verification and before archive.
 5. Fall back to git diff plus targeted file reads when CodeGraph is unavailable or stale.
 6. Classify the evidence into memory deltas.
 7. Update only the docs that the evidence supports:
-   - `docs/decisions/ADR-*.md`
-   - `docs/pitfalls.md` or `docs/pitfalls/*.md`
-   - `docs/modules/*.md`
+   - `docs/decisions/ADR-*.md` when the current evidence shows a durable design decision changed.
+   - `docs/pitfalls.md` or `docs/pitfalls/*.md` when the current session produced an actual blocker, repeated failed attempt, debugging trap, or non-obvious workaround.
+   - `docs/modules/*.md` when the current evidence shows module responsibility, public behavior, ownership, or integration boundary changed.
 8. Write `openspec/changes/<change-id>/memory-sync.md` with:
-   - changed files
-   - evidence used
-   - residual gaps
-   - confidence notes if fallback analysis was required
+    - changed files
+    - evidence used
+    - residual gaps
+    - confidence notes if fallback analysis was required
 9. Stop before archive if required evidence is missing, unless the user explicitly waives the gate.
 
 ## Guardrails
 
 - Do not rewrite whole docs when a minimal targeted diff will do.
 - Do not invent rationale that is not supported by evidence.
+- Do not create or update ADR, pitfall, or module docs unless the current chat, OpenSpec artifacts, verification evidence, implementation summary, git diff, or changed files prove that memory type changed.
+- If no ADR, pitfall, or module memory applies, still write `memory-sync.md` and explicitly say those doc types are not applicable for this change.
 - Do not expand into V2 memory layers, indexes, or compression systems.
 - Do not bloat `AGENTS.md`; keep long-lived details in the targeted docs instead.
 - Do not allow archive to proceed silently when the implementation intelligence summary is missing.
 
 ## Output
 
-Return a concise memory-sync summary that names the docs updated, the evidence used, and any remaining gaps before archive.
+Return a concise memory-sync summary that names the docs updated, the doc types skipped as not applicable, the evidence used, and any remaining gaps before archive.
