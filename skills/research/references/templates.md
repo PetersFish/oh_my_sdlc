@@ -34,28 +34,55 @@ Use these templates when creating or refreshing research artifacts. Keep existin
 > 调研时间：YYYY-MM-DD  
 > derived_from_run: YYYY-MM-DD-HHmm
 
-## 1. 结论先行
+## 1. One-Sentence Real Question
 
-## 2. 背景与问题定义
+用一句话压缩本次研究真正要回答的问题，并标注问题类型：concept definition、causal mechanism、real-world application、controversy judgment、actionable recommendation。
 
-## 3. 方案总览
+## 2. Elevator Explanation
 
-| 方案 | 类型 | 优势 | 劣势 | 适配性 | 风险 | 推荐度 |
-|---|---|---|---|---|---|---|
+用一到两分钟能讲清楚的话解释结论。默认读者是普通大学生：通俗但不浅薄。
 
-## 4. 现成方案对比
+## 3. Provocative Thesis
 
-## 5. 自实现方案对比
+写一句有冲击力但不夸大的判断。它应该帮助读者重新看待问题，而不是制造标题党。
 
-## 6. 推荐路线
+## 4. Current Scientific Understanding
 
-## 7. 风险与治理
+概括当前科学理解、经典理论、代表人物和关键英文术语。区分强证据、弱证据和合理推测。
 
-## 8. 后续行动
+## 5. Consensus, Controversies, and Misconceptions
 
-## 9. 参考来源
+| Type | Claim | Evidence | Notes |
+|---|---|---|---|
+| Consensus |  |  |  |
+| Controversy |  |  |  |
+| Misconception |  |  |  |
 
-## 10. Knowledge Extraction Candidates
+## 6. Cross-Disciplinary Map
+
+从多个学科连接概念，不做百科式罗列。可选视角：Complex Systems、Information Theory、Evolutionary Theory、Behavioral Economics、Cognitive Science。
+
+| Lens | What It Explains | Key Terms |
+|---|---|---|
+
+## 7. Cases and Applications
+
+用案例说明理论如何进入现实生活、组织、产品、公司、政策或个人决策。
+
+## 8. Deeper Insight
+
+提炼更深层的洞见、类比、格言式表达或可传播金句。保持可辩护，不牺牲准确性。
+
+## 9. Practical Applications
+
+列出可以落地到生活、学习、工作或决策中的应用。说明适用边界。
+
+## 10. Reference Sources
+
+| Source | URL | Type | Reliability | Used For |
+|---|---|---|---|---|
+
+## 11. Knowledge Extraction Candidates
 
 | Candidate | Target Wiki Page | Reason |
 |---|---|---|

@@ -15,7 +15,8 @@ Use this skill to manage local research topics end to end. The filesystem is the
 2. Inspect the relevant topic path before changing files.
 3. Follow `references/topic-protocol.md` for lifecycle and file responsibilities.
 4. Use `references/templates.md` when creating or refreshing topic artifacts.
-5. Apply `references/safety-boundaries.md` whenever external sources, overwrites, archives, or reruns are involved.
+5. Apply `references/research-quality.md` for formal `run` and `rerun` output quality.
+6. Apply `references/safety-boundaries.md` whenever external sources, overwrites, archives, or reruns are involved.
 
 ## Supported Actions
 
@@ -63,6 +64,20 @@ During solution iteration, update the topic root `request.md` only when the user
 - Rerun focus
 
 Do not rewrite `request.md` for cosmetic wording changes only. If syncing drift requires overwriting `request.md`, ask for confirmation first and record the rationale in `dialogue.md`.
+
+## High-Quality Research Runs
+
+For `run` and `rerun`, optimize for high-quality research rather than quick encyclopedia-style summaries.
+
+1. Compress the topic into a one-sentence real question before researching. Identify whether the user needs a concept definition, causal mechanism, real-world application, controversy judgment, or actionable recommendation.
+2. Prefer reliable evidence: peer-reviewed papers, authoritative institution reports, mainstream media reporting, classic theories, and English-language sources when useful.
+3. Separate consensus, controversies, and common misconceptions. Do not flatten active disputes into false certainty.
+4. Write for an ordinary undergraduate: plain language, but not shallow. Preserve original terms and representative thinkers where they matter.
+5. Connect concepts instead of listing facts. When relevant, use lenses such as Complex Systems, Information Theory, Evolutionary Theory, Behavioral Economics, and Cognitive Science.
+6. Include a concise one-to-two-minute explanation, a provocative thesis, current understanding, cases, deeper insight, and practical applications.
+7. Do not fabricate citations, invent papers, or present guesses as facts. If evidence is weak or unavailable, say so.
+
+Use `references/research-quality.md` as the detailed quality contract and `references/templates.md` for the output shape.
 
 ## Confirmation Gates
 
