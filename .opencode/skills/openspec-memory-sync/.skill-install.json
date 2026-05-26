@@ -1,0 +1,9 @@
+{
+  "skill": "openspec-memory-sync",
+  "source_repo": "/Users/yuping/Documents/workspace/oh_my_skills",
+  "source_ref": "4586e17bbe612645d3756df035185bd853fd5b64",
+  "status": "stable",
+  "target": "/Users/yuping/Documents/workspace/oh_my_skills/.opencode/skills/openspec-memory-sync",
+  "installed_at": "2026-05-26T14:47:19.548516Z",
+  "backport_policy": "review-required"
+}
