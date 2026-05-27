@@ -63,3 +63,9 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+
+## Repository Memory
+
+If `.ai-memory/index.json` exists and the task involves planning, editing, reviewing, or continuing work in this repository, load relevant repository memory first using `repository-memory-load`.
+
+Do not load `.ai-memory/sync-history/`, `.ai-memory/sessions/`, `.ai-memory/snapshots/`, `.ai-memory/tmp/`, `.ai-memory/cache/`, or `.ai-memory/review-queue.json` by default.

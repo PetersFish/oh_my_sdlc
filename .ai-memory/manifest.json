@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0",
+  "repository_id": "",
+  "memory_version": 1,
+  "git": {
+    "available": true,
+    "has_commits": true,
+    "head": "e1bd6da11cd786fabd6e9ec1194b27cde5de9def",
+    "last_synced_commit": "e1bd6da11cd786fabd6e9ec1194b27cde5de9def",
+    "worktree_state": "dirty"
+  },
+  "pending_snapshots": [],
+  "last_sync": {
+    "timestamp": "2026-05-27T14:00:00Z",
+    "commit": "e1bd6da11cd786fabd6e9ec1194b27cde5de9def",
+    "snapshot_id": "sync-20260527-002"
+  }
+}

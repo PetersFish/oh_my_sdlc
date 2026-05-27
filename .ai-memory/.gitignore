@@ -1,0 +1,5 @@
+sessions/
+snapshots/
+tmp/
+cache/
+*.local.json
