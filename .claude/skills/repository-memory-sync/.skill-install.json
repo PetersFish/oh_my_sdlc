@@ -1,0 +1,25 @@
+{
+  "skill": "repository-memory-sync",
+  "source_repo": "/Users/yuping/Documents/workspace/oh_my_skills",
+  "source_ref": "HEAD",
+  "source_path": "skills/repository-memory-sync",
+  "target": ".claude/skills/repository-memory-sync",
+  "installed_at": "2026-05-27T12:49:03Z",
+  "status": "stable",
+  "payload_hash": "42a1096e7c174646f15e17d581d3951287952f73fc54ba32d94ae2bd0c8fb091",
+  "files": [
+    "SKILL.md",
+    "schemas/index.schema.json",
+    "schemas/manifest.schema.json",
+    "schemas/memory-frontmatter.schema.json",
+    "schemas/review-queue.schema.json",
+    "scripts/detect_state.py",
+    "scripts/rebuild_index.py",
+    "scripts/reconcile_pending.py",
+    "scripts/update_manifest.py",
+    "scripts/validate_memory.py",
+    "templates/memory-file.md",
+    "templates/sync-history.md"
+  ],
+  "backport_policy": "review-required"
+}

@@ -1,0 +1,21 @@
+{
+  "skill": "repository-memory-load",
+  "source_repo": "/Users/yuping/Documents/workspace/oh_my_skills",
+  "source_ref": "HEAD",
+  "source_path": "skills/repository-memory-load",
+  "target": ".cursor/skills/repository-memory-load",
+  "installed_at": "2026-05-27T12:49:03Z",
+  "status": "stable",
+  "payload_hash": "d29dff734f9bf3d798e5718bd43768ae6b44027f1a2105368ee2000a75324fe3",
+  "files": [
+    "SKILL.md",
+    "schemas/index.schema.json",
+    "schemas/manifest.schema.json",
+    "schemas/memory-frontmatter.schema.json",
+    "schemas/review-queue.schema.json",
+    "scripts/select_memory.py",
+    "scripts/validate_memory.py",
+    "templates/context-pack.md"
+  ],
+  "backport_policy": "review-required"
+}
