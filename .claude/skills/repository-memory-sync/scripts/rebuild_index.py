@@ -54,7 +54,7 @@ def _scan_memory_files(memory_dir: Path) -> list[dict]:
         dir_path = memory_dir / dir_name
         if not dir_path.is_dir():
             continue
-        for md_file in sorted(dir_path.glob("*.md")):
+        for md_file in sorted(dir_path.glob("**/*.md")):
             content = md_file.read_text(encoding="utf-8")
             fm = _parse_frontmatter(content)
             if fm is None:

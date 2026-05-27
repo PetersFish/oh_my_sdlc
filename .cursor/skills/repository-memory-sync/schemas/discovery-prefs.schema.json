@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://repository-memory.dev/schemas/discovery-prefs.schema.json",
+  "title": "DiscoveryPrefs",
+  "description": "User preferences for module discovery during memory sync. Persists which directories are accepted/rejected as modules.",
+  "type": "object",
+  "required": ["schema_version", "exclude_patterns", "scan_paths", "max_depth", "module_map"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "Version of the discovery-prefs schema."
+    },
+    "exclude_patterns": {
+      "type": "array",
+      "description": "Directory names to exclude from discovery scanning.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "scan_paths": {
+      "type": ["array", "null"],
+      "description": "Specific paths to scan (null means scan from root).",
+      "items": {
+        "type": "string"
+      }
+    },
+    "max_depth": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 20,
+      "description": "Maximum directory depth for recursive scanning."
+    },
+    "module_map": {
+      "type": "object",
+      "description": "Map of directory paths to their module classification status.",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^.*$": {
+          "type": "object",
+          "required": ["fs_path", "status"],
+          "additionalProperties": false,
+          "properties": {
+            "fs_path": {
+              "type": "string",
+              "description": "Filesystem path relative to repository root."
+            },
+            "status": {
+              "type": "string",
+              "enum": ["accepted", "rejected", "pending"],
+              "description": "Classification status for this directory."
+            },
+            "memory_id": {
+              "type": "string",
+              "description": "Memory entry ID (required when status is accepted)."
+            },
+            "memory_path": {
+              "type": "string",
+              "description": "Memory file path relative to .ai-memory/ (required when status is accepted)."
+            },
+            "confirmed_at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "ISO 8601 timestamp when the decision was confirmed."
+            },
+            "rejected_at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "ISO 8601 timestamp when the candidate was rejected."
+            },
+            "reason_rejected": {
+              "type": "string",
+              "description": "Reason the candidate was rejected (required when status is rejected)."
+            }
+          }
+        }
+      }
+    }
+  }
+}

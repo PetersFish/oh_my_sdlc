@@ -34,14 +34,31 @@ Synchronize repository memory after changes. Classify evidence into memory types
    - Stable committed range (from last-synced commit to HEAD).
    - Unstable working-tree snapshot (unstaged/uncommitted changes).
    - Optional OpenSpec context (change ID, artifacts, lineage).
-6. **Classify memory candidates by type.** Apply per-type policies (see Per-Type Policy Table below). For each changed path or observation, determine which memory type it maps to and whether it is auto-update or candidate-only.
-7. **Auto-update eligible types.** For sessions, pitfalls, specs, modules, schemas, and evolution: write memory deltas directly.
-8. **Present candidates for user confirmation.** For decisions and architecture types, present each candidate with options:
-   - **Accept** — write to formal memory.
-   - **Skip** — discard this candidate.
-   - **Save as proposed** — write to review queue for later confirmation.
-   - **Other** — user specifies alternative disposition.
-9. **Handle `needs_user_review` items.** Create entries in `.ai-memory/review-queue.json`. Do NOT create formal memory files for these items.
+ 6. **Classify memory candidates by type.** Apply per-type policies (see Per-Type Policy Table below).
+
+    **Module discovery sub-steps:**
+
+    6a. **Run discover_modules.py.** Execute `scripts/discover_modules.py --root <root> --json` to scan the filesystem for module candidates. The script recursively discovers non-hidden directories (default max_depth=5) that satisfy Rule A (≥1 direct file) or Rule B (≥2 direct subdirectories), collecting language-neutral structural metadata (extension histogram, build-file detection, top-level filenames).
+
+    6b. **Cross-reference with discovery-prefs.json.** Compare candidate paths against `.ai-memory/discovery-prefs.json` `module_map` to determine `disposition`: `new` (not in map), `known` (status: accepted), or `previously_rejected` (status: rejected).
+
+    6c. **Classify changed-files modules.** For each changed path or observation from git diff, determine which existing module memory type it maps to and whether it is auto-update or candidate-only (existing behavior).
+
+    6d. **LLM evaluate discovery candidates.** For `new` and `previously_rejected` candidates, analyze structural metadata (file_types, has_build_file, top_level_files, depth, children_count) and recommend: Accept (create independent module memory), Reject (not a module), or Merge (into an existing module).
+
+    6e. **User confirmation for discovery candidates.** Present recommendations to user:
+    - **Accept** — create module memory file with YAML frontmatter, write to `discovery-prefs.json` with `status: accepted`.
+    - **Reject** — write to `discovery-prefs.json` with `status: rejected` and reason.
+    - **Merge** — update existing module memory file, write to `discovery-prefs.json` with `status: accepted` pointing to the existing `memory_id`.
+    Known candidates (from diffs) auto-update without confirmation.
+
+ 7. **Auto-update eligible types.** For sessions, pitfalls, specs, modules (diff-detected), and evolution: write memory deltas directly.
+ 8. **Present candidates for user confirmation.** For decisions and architecture types, present each candidate with options:
+    - **Accept** — write to formal memory.
+    - **Skip** — discard this candidate.
+    - **Save as proposed** — write to review queue for later confirmation.
+    - **Other** — user specifies alternative disposition.
+ 9. **Handle `needs_user_review` items.** Create entries in `.ai-memory/review-queue.json`. Do NOT create formal memory files for these items.
 10. **Validate.** Run `validate_memory.py` to check schema conformance, reference integrity, and policy compliance.
 11. **Rebuild index.** Run `rebuild_index.py`, excluding `needs_user_review` items and restricted paths (`sync-history/`, `sessions/`, `snapshots/`, `tmp/`, `cache/`).
 12. **Update manifest.** Run `update_manifest.py` to record sync timestamp, last-synced commit, and stats.
@@ -51,7 +68,7 @@ Synchronize repository memory after changes. Classify evidence into memory types
     - **Keep pending** — leave in review queue.
     - **Discard** — remove from review queue.
     - **Other** — user specifies.
-15. **Output sync summary.** Report docs updated, types skipped, evidence used, pending items, review queue items, and remaining gaps.
+15. **Output sync summary.** Report docs updated, types skipped, evidence used, pending items, review queue items, discovery stats, and remaining gaps.
 
 ## Per-Type Policy Table
 
@@ -60,7 +77,7 @@ Synchronize repository memory after changes. Classify evidence into memory types
 | `sessions` | Yes | Yes | No | No | Cumulative session log; always local-only |
 | `pitfalls` | Yes (with real failure evidence) | No | No | No | Must have stack trace, failing test, or observed misbehavior |
 | `specs` | Yes (with identified spec/change ID) | No | No | No | Requires OpenSpec change ID or explicit spec reference |
-| `modules` | Yes | No | No | No | Dirty marks `pending_commit`; reconciled on next sync |
+| `modules` | Yes (diff-detected) / Confirm (discovery) | No | Yes (discovery) | No | Diff-detected auto-update (`pending_commit` on dirty); discovery candidates require user confirmation |
 | `decisions` | No | No | Yes | No | Candidate only; user must confirm before formal memory |
 | `architecture` | No | No | Yes | No | Candidate only; user must confirm before formal memory |
 | `evolution` | Yes | No | No | Yes | Only written when a stable commit range is available |
@@ -115,6 +132,8 @@ When multiple active OpenSpec changes form a lineage (change B refines change A)
 - Do NOT overwrite existing memory without evidence (commit, spec, session observation).
 - Do NOT treat `pending_commit` memory as stable fact. It is provisional until reconciled.
 - If `.ai-memory/manifest.json` is missing, direct the user to `repository-memory-init` rather than creating it.
+- Do NOT create module memory for candidates marked as rejected in `discovery-prefs.json` without explicit user re-confirmation.
+- Modules from discovery must use `evidence_mode: discovery` and `linked_sessions` referencing the current session.
 
 ## Output
 

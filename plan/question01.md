@@ -1,0 +1,1 @@
+我还有一个疑问，有些项目的包层级很深，比如java项目的包路径可能是org.appache.common...只有到common这级目录下面，才有真正的子目录和文件。而你好像只扫first-level non-hidden directories，可能覆盖不到我提到的场景吗吧

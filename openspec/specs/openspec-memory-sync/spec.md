@@ -1,44 +1,48 @@
-## ADDED Requirements
+# openspec-memory-sync
+
+OpenSpec adapter for the repository memory system. Wraps `repository-memory-load` and `repository-memory-sync`, preserving the `verify -> memory-sync -> archive` gate while delegating memory operations to the core skills.
+
+## Requirements
+
+### Requirement: OpenSpec memory sync delegates to repository memory system
+`openspec-memory-sync` SHALL use `repository-memory-load` to load relevant repository memory before starting its workflow. It SHALL collect OpenSpec change artifacts (proposal, design, spec, tasks, verify) and pass them as context into the repository memory sync workflow. It SHALL preserve the `verify -> memory-sync -> archive` gate. It SHALL write `openspec/changes/<change-id>/memory-sync.md` as a per-change report.
+
+#### Scenario: OpenSpec change with existing repository memory
+- **WHEN** `openspec-memory-sync` runs for a verified OpenSpec change and `.ai-memory/` exists
+- **THEN** it SHALL first load relevant memory via `repository-memory-load`, then collect OpenSpec artifacts, then delegate memory operations to `repository-memory-sync`, and finally write the per-change `memory-sync.md` report
+
+#### Scenario: OpenSpec change without repository memory
+- **WHEN** `openspec-memory-sync` runs and `.ai-memory/` does not exist
+- **THEN** it SHALL suggest running `repository-memory-init` and then proceed with the sync workflow once initialized
+
+### Requirement: Spec ID detection and lineage
+`openspec-memory-sync` SHALL detect the OpenSpec change ID automatically using the same priority order as `repository-memory-sync`: user explicit specification, current change directory path, active OpenSpec changes, and archive path. When multiple active changes form a lineage, it SHALL map them to a single spec memory with lineage metadata.
+
+#### Scenario: Single active OpenSpec change
+- **WHEN** `openspec-memory-sync` runs and exactly one active OpenSpec change exists
+- **THEN** it SHALL automatically use that change ID as the spec context
+
+#### Scenario: Change B refines change A
+- **WHEN** active change B explicitly refines active change A
+- **THEN** `openspec-memory-sync` SHALL create or update a single spec memory with lineage metadata
 
 ### Requirement: Post-verify memory sync gate
-The `openspec-memory-sync` skill MUST run after a change has been verified and before it is archived, so durable memory can be updated while the change context is still available.
+The `openspec-memory-sync` skill SHALL run after a change has been verified and before it is archived, so durable memory can be updated while the change context is still available.
 
 #### Scenario: Verified change needs memory sync
 - **WHEN** a user asks to archive a verified OpenSpec change
-- **THEN** the skill MUST inspect the change artifacts, verification evidence, and implementation intelligence summary before archive proceeds
-
-### Requirement: Evidence-backed targeted doc updates
-The skill MUST classify change evidence into targeted memory deltas and update only the memory docs whose type is supported by current evidence. ADR, pitfall, and module docs MUST be skipped when the current chat, artifacts, verification evidence, implementation summary, diff, or changed files do not show a corresponding durable memory change.
-
-#### Scenario: Decision change touches one module
-- **WHEN** the change introduces a durable design decision or module-level responsibility change
-- **THEN** the skill MUST update the relevant ADR or module doc instead of rewriting unrelated documentation
-
-#### Scenario: No durable memory change applies
-- **WHEN** the current evidence does not show an ADR, pitfall, or module-doc change
-- **THEN** the skill MUST skip those doc types and explicitly record them as not applicable in `memory-sync.md`
-
-### Requirement: CodeGraph-first structural analysis
-The skill MUST use CodeGraph as the default structural evidence source when it is available, and it MUST fall back to git diff plus targeted file reads when CodeGraph is unavailable.
-
-#### Scenario: CodeGraph is available
-- **WHEN** the local CodeGraph index is available
-- **THEN** the skill MUST use changed symbols, callers, callees, and impact data to support memory classification
-
-#### Scenario: CodeGraph is unavailable
-- **WHEN** the local CodeGraph index is unavailable or stale
-- **THEN** the skill MUST continue with git diff and targeted file reads and clearly note the reduced confidence
+- **THEN** the skill SHALL inspect the change artifacts, verification evidence, and delegate memory operations via `repository-memory-sync` before archive proceeds
 
 ### Requirement: Per-change memory sync report
-The skill MUST write `openspec/changes/<change-id>/memory-sync.md` that records the docs changed, the doc types skipped as not applicable, the evidence used, and any remaining gaps before archive.
+The skill SHALL write `openspec/changes/<change-id>/memory-sync.md` that records the docs changed, the doc types skipped as not applicable, the evidence used, and any remaining gaps before archive.
 
 #### Scenario: Sync completes with updates
 - **WHEN** the skill finishes updating memory docs
-- **THEN** it MUST produce a memory-sync report that lists the changed files and the evidence behind each update
+- **THEN** it SHALL produce a memory-sync report that lists the changed files and the evidence behind each update
 
 ### Requirement: Archive gate on missing evidence
-The skill MUST stop the archive flow when required evidence is missing, unless the user explicitly confirms a waiver.
+The skill SHALL stop the archive flow when required evidence is missing, unless the user explicitly confirms a waiver.
 
-#### Scenario: Intelligence summary is missing
-- **WHEN** the implementation intelligence summary is missing
-- **THEN** the skill MUST not silently continue to archive and MUST report that the archive is blocked unless the user waives the requirement
+#### Scenario: Verification is missing
+- **WHEN** the verification evidence is missing
+- **THEN** the skill SHALL not silently continue to archive and SHALL report that the archive is blocked unless the user waives the requirement

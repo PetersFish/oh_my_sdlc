@@ -8,7 +8,7 @@ from pathlib import Path
 VALID_SYNC_STATUSES = {"synced", "pending_commit", "needs_user_review"}
 INDEX_STATUSES = {"synced", "pending_commit"}
 VALID_MEMORY_TYPES = {"module", "architecture", "decisions", "pitfalls", "specs", "evolution", "sessions"}
-VALID_EVIDENCE_MODES = {"commit", "uncommitted_snapshot", "session_observation", "spec_reference"}
+VALID_EVIDENCE_MODES = {"commit", "uncommitted_snapshot", "session_observation", "spec_reference", "discovery"}
 VALID_CONFIDENCE = {"high", "medium", "low"}
 VALID_WORKTREE_STATES = {"clean", "dirty", "unknown"}
 VALID_QUEUE_STATUSES = {"open", "resolved", "dismissed"}
@@ -200,6 +200,63 @@ def _validate_sync_history_not_in_index(memory_dir: Path, index_path: Path) -> l
     return errors
 
 
+REQUIRED_DISCOVERY_PREFS_FIELDS = {"schema_version", "exclude_patterns", "scan_paths", "max_depth", "module_map"}
+VALID_MAP_STATUSES = {"accepted", "rejected", "pending"}
+REQUIRED_MAP_ACCEPTED_FIELDS = {"fs_path", "status", "memory_id", "memory_path", "confirmed_at"}
+REQUIRED_MAP_REJECTED_FIELDS = {"fs_path", "status", "reason_rejected", "rejected_at"}
+
+
+def _validate_discovery_prefs(prefs_path: Path) -> list[str]:
+    errors: list[str] = []
+    if not prefs_path.exists():
+        return errors
+    try:
+        data = json.loads(prefs_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as e:
+        errors.append(f"discovery-prefs.json is invalid JSON: {e}")
+        return errors
+
+    missing = REQUIRED_DISCOVERY_PREFS_FIELDS - set(data.keys())
+    if missing:
+        errors.append(f"discovery-prefs.json missing required fields: {', '.join(sorted(missing))}")
+
+    if "exclude_patterns" in data and not isinstance(data["exclude_patterns"], list):
+        errors.append("discovery-prefs.json exclude_patterns must be an array")
+
+    if "max_depth" in data and not isinstance(data["max_depth"], int):
+        errors.append("discovery-prefs.json max_depth must be an integer")
+
+    module_map = data.get("module_map", {})
+    if not isinstance(module_map, dict):
+        errors.append("discovery-prefs.json module_map must be an object")
+        return errors
+
+    for key, entry in module_map.items():
+        if not isinstance(entry, dict):
+            errors.append(f"discovery-prefs.json module_map.{key} must be an object")
+            continue
+
+        if "status" not in entry:
+            errors.append(f"discovery-prefs.json module_map.{key} missing required field: status")
+            continue
+
+        status = entry["status"]
+        if status not in VALID_MAP_STATUSES:
+            errors.append(f"discovery-prefs.json module_map.{key} invalid status '{status}' (must be one of: {', '.join(sorted(VALID_MAP_STATUSES))})")
+
+        if status == "accepted":
+            missing_accepted = REQUIRED_MAP_ACCEPTED_FIELDS - set(entry.keys())
+            if missing_accepted:
+                errors.append(f"discovery-prefs.json module_map.{key} (accepted) missing fields: {', '.join(sorted(missing_accepted))}")
+
+        if status == "rejected":
+            missing_rejected = REQUIRED_MAP_REJECTED_FIELDS - set(entry.keys())
+            if missing_rejected:
+                errors.append(f"discovery-prefs.json module_map.{key} (rejected) missing fields: {', '.join(sorted(missing_rejected))}")
+
+    return errors
+
+
 def validate_memory(root: Path) -> dict:
     memory_dir = root / ".ai-memory"
     all_errors: list[str] = []
@@ -219,11 +276,15 @@ def validate_memory(root: Path) -> dict:
     sync_history_errors = _validate_sync_history_not_in_index(memory_dir, memory_dir / "index.json")
     all_errors.extend(sync_history_errors)
 
+    discovery_prefs_errors = _validate_discovery_prefs(memory_dir / "discovery-prefs.json")
+    all_errors.extend(discovery_prefs_errors)
+
     manifest_valid = len(manifest_errors) == 0
     index_valid = len(index_errors) == 0
     queue_valid = len(queue_errors) == 0
     frontmatter_valid = len(frontmatter_errors) == 0
     sync_history_valid = len(sync_history_errors) == 0
+    discovery_prefs_valid = len(discovery_prefs_errors) == 0
 
     return {
         "valid": len(all_errors) == 0,
@@ -234,6 +295,7 @@ def validate_memory(root: Path) -> dict:
             "review_queue": {"valid": queue_valid, "invalid": not queue_valid},
             "frontmatter": {"valid": frontmatter_valid, "invalid": not frontmatter_valid},
             "sync_history": {"valid": sync_history_valid, "invalid": not sync_history_valid},
+            "discovery_prefs": {"valid": discovery_prefs_valid, "invalid": not discovery_prefs_valid},
         },
     }
 

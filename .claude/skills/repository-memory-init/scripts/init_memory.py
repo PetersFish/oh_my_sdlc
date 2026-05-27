@@ -49,10 +49,24 @@ def init_memory(root: Path) -> dict:
         else:
             skipped.append(str(d.relative_to(root)))
 
+    discovery_prefs_content = json.dumps({
+        "schema_version": "1.0",
+        "exclude_patterns": [
+            ".git", ".ai-memory", "node_modules", "__pycache__",
+            ".venv", "venv", ".pytest_cache", ".mypy_cache",
+            ".ruff_cache", ".tox", "dist", "build", "target",
+            ".idea", ".vscode",
+        ],
+        "scan_paths": None,
+        "max_depth": 5,
+        "module_map": {},
+    }, indent=2) + "\n"
+
     template_files = {
         "manifest.json": _load_template("manifest.json"),
         "index.json": _load_template("index.json"),
         "review-queue.json": _load_template("review-queue.json"),
+        "discovery-prefs.json": discovery_prefs_content,
     }
 
     for filename, content in template_files.items():
