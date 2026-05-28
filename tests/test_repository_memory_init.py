@@ -5,7 +5,7 @@ import sys
 import unittest
 from pathlib import Path
 
-SKILL_ROOT = Path(__file__).resolve().parents[1] / "skills" / "repository-memory-init"
+SKILL_ROOT = Path(__file__).resolve().parents[1] / "skills" / "sdlc-repository-memory-init"
 SCRIPTS_DIR = SKILL_ROOT / "scripts"
 sys.path.insert(0, str(SCRIPTS_DIR))
 
@@ -121,7 +121,7 @@ class TestEndToEndIntegration(unittest.TestCase):
         try:
             select_mod = self._load_module(
                 "select_memory_e2e",
-                REPO_ROOT / "skills" / "repository-memory-load" / "scripts" / "select_memory.py",
+                REPO_ROOT / "skills" / "sdlc-repository-memory-load" / "scripts" / "select_memory.py",
             )
             result = select_mod.select_memory(tmp_dir)
             assert result["entries"] == []
@@ -138,7 +138,7 @@ class TestEndToEndIntegration(unittest.TestCase):
         try:
             init_mod = self._load_module(
                 "init_memory_e2e",
-                REPO_ROOT / "skills" / "repository-memory-init" / "scripts" / "init_memory.py",
+                REPO_ROOT / "skills" / "sdlc-repository-memory-init" / "scripts" / "init_memory.py",
             )
             result1 = init_mod.init_memory(tmp_dir)
             memory_dir = tmp_dir / ".ai-memory"
@@ -173,7 +173,7 @@ class TestEndToEndIntegration(unittest.TestCase):
             subprocess.run(["git", "config", "user.name", "Test User"], cwd=str(tmp_dir), capture_output=True, check=True)
             init_mod = self._load_module(
                 "init_memory_reconcile",
-                REPO_ROOT / "skills" / "repository-memory-init" / "scripts" / "init_memory.py",
+                REPO_ROOT / "skills" / "sdlc-repository-memory-init" / "scripts" / "init_memory.py",
             )
             init_mod.init_memory(tmp_dir)
             modules_dir = tmp_dir / ".ai-memory" / "modules"
@@ -198,7 +198,7 @@ class TestEndToEndIntegration(unittest.TestCase):
             subprocess.run(["git", "commit", "-m", "initial"], cwd=str(tmp_dir), capture_output=True, check=True)
             reconcile_mod = self._load_module(
                 "reconcile_pending_e2e",
-                REPO_ROOT / "skills" / "repository-memory-sync" / "scripts" / "reconcile_pending.py",
+                REPO_ROOT / "skills" / "sdlc-repository-memory-sync" / "scripts" / "reconcile_pending.py",
             )
             result = reconcile_mod.reconcile_pending(tmp_dir, write=True)
             assert len(result["reconciled"]) == 1
@@ -267,7 +267,7 @@ class TestSyncHistoryAndReviewQueue:
         )
         (memory_dir / "sync-history" / "sync-2026-01-01-001.md").write_text(sync_history_content, encoding="utf-8")
 
-        rebuild_path = self.REPO_ROOT / "skills" / "repository-memory-sync" / "scripts" / "rebuild_index.py"
+        rebuild_path = self.REPO_ROOT / "skills" / "sdlc-repository-memory-sync" / "scripts" / "rebuild_index.py"
         rebuild_mod = self._load_module(rebuild_path, "rebuild_index_test_8_9")
         result = rebuild_mod.rebuild_index(tmp_path, write=False)
 
@@ -330,7 +330,7 @@ class TestSyncHistoryAndReviewQueue:
         review_queue = {"items": [review_item]}
         (memory_dir / "review-queue.json").write_text(json.dumps(review_queue), encoding="utf-8")
 
-        select_path = self.REPO_ROOT / "skills" / "repository-memory-load" / "scripts" / "select_memory.py"
+        select_path = self.REPO_ROOT / "skills" / "sdlc-repository-memory-load" / "scripts" / "select_memory.py"
         select_mod = self._load_module(select_path, "select_memory_test_8_10")
         result = select_mod.select_memory(tmp_path, query="", max_results=5)
 

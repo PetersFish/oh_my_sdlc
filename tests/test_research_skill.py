@@ -5,9 +5,9 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SKILL_PATH = ROOT / "skills" / "research" / "SKILL.md"
-TEMPLATES_PATH = ROOT / "skills" / "research" / "references" / "templates.md"
-QUALITY_PATH = ROOT / "skills" / "research" / "references" / "research-quality.md"
+SKILL_PATH = ROOT / "skills" / "research-general" / "SKILL.md"
+TEMPLATES_PATH = ROOT / "skills" / "research-general" / "references" / "templates.md"
+QUALITY_PATH = ROOT / "skills" / "research-general" / "references" / "research-quality.md"
 
 
 class ResearchSkillTest(unittest.TestCase):

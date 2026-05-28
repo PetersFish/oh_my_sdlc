@@ -1,0 +1,14 @@
+{
+  "skill": "sdlc-openspec-memory-sync",
+  "source_repo": "/Users/yuping/Documents/workspace/oh_my_skills",
+  "source_ref": "HEAD",
+  "source_path": "skills/sdlc-openspec-memory-sync",
+  "target": ".cursor/skills/sdlc-openspec-memory-sync",
+  "installed_at": "2026-05-28T00:00:00Z",
+  "status": "stable",
+  "backport_policy": "review-required",
+  "payload_hash": "345e7cf6695b7498d6b889652f0ed869bdc235cd2fc7db10d74e3ddf49e06563",
+  "files": [
+    "SKILL.md"
+  ]
+}

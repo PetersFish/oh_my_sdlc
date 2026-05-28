@@ -5,7 +5,7 @@ import sys
 import unittest
 from pathlib import Path
 
-SKILL_ROOT = Path(__file__).resolve().parents[1] / "skills" / "repository-memory-load"
+SKILL_ROOT = Path(__file__).resolve().parents[1] / "skills" / "sdlc-repository-memory-load"
 SCRIPTS_DIR = SKILL_ROOT / "scripts"
 sys.path.insert(0, str(SCRIPTS_DIR))
 

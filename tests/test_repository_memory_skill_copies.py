@@ -11,9 +11,9 @@ CLIENT_DIRS = [
     REPO_ROOT / ".cursor" / "skills",
 ]
 REPO_MEMORY_SKILLS = [
-    "repository-memory-init",
-    "repository-memory-load",
-    "repository-memory-sync",
+    "sdlc-repository-memory-init",
+    "sdlc-repository-memory-load",
+    "sdlc-repository-memory-sync",
 ]
 INSTALL_METADATA_REQUIRED_FIELDS = [
     "skill",
@@ -126,7 +126,7 @@ class TestRepositoryMemorySkillCopies:
 
     def test_openspec_memory_sync_exists_in_all_client_dirs(self):
         for client_dir in CLIENT_DIRS:
-            skill_dir = client_dir / "openspec-memory-sync"
-            assert skill_dir.is_dir(), f"openspec-memory-sync missing in {client_dir.name}"
+            skill_dir = client_dir / "sdlc-openspec-memory-sync"
+            assert skill_dir.is_dir(), f"sdlc-openspec-memory-sync missing in {client_dir.name}"
             skill_md = skill_dir / "SKILL.md"
-            assert skill_md.is_file(), f"openspec-memory-sync SKILL.md missing in {client_dir.name}"
+            assert skill_md.is_file(), f"sdlc-openspec-memory-sync SKILL.md missing in {client_dir.name}"

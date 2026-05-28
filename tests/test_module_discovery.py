@@ -5,8 +5,8 @@ import json
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SYNC_SCRIPTS_DIR = REPO_ROOT / "skills" / "repository-memory-sync" / "scripts"
-INIT_SCRIPTS_DIR = REPO_ROOT / "skills" / "repository-memory-init" / "scripts"
+SYNC_SCRIPTS_DIR = REPO_ROOT / "skills" / "sdlc-repository-memory-sync" / "scripts"
+INIT_SCRIPTS_DIR = REPO_ROOT / "skills" / "sdlc-repository-memory-init" / "scripts"
 
 
 def _load_module(name: str, path: Path):

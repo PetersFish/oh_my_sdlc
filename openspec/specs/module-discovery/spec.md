@@ -88,10 +88,10 @@ The sync workflow SHALL write user decisions (accepted/rejected) for each presen
 - **THEN** workflow SHALL update the existing entry rather than creating a duplicate
 
 ### Requirement: Discovery prefs initialized during memory init
-`repository-memory-init` SHALL create `.ai-memory/discovery-prefs.json` with default `exclude_patterns`, `max_depth: 5`, `scan_paths: null`, and `module_map: {}`.
+`sdlc-repository-memory-init` SHALL create `.ai-memory/discovery-prefs.json` with default `exclude_patterns`, `max_depth: 5`, `scan_paths: null`, and `module_map: {}`.
 
 #### Scenario: First-time init creates discovery prefs
-- **WHEN** `repository-memory-init` creates `.ai-memory/` for the first time
+- **WHEN** `sdlc-repository-memory-init` creates `.ai-memory/` for the first time
 - **THEN** `.ai-memory/discovery-prefs.json` SHALL be created with defaults
 
 #### Scenario: Re-init preserves existing prefs

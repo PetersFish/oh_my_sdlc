@@ -4,14 +4,14 @@ import unittest
 from pathlib import Path
 
 
-SKILL_PATH = Path(__file__).resolve().parents[1] / "skills" / "ocr-router" / "SKILL.md"
+SKILL_PATH = Path(__file__).resolve().parents[1] / "skills" / "media-ocr-router" / "SKILL.md"
 
 
 class ClipboardOcrSkillTest(unittest.TestCase):
     def test_skill_mentions_multimodal_routing_and_fallbacks(self) -> None:
         text = SKILL_PATH.read_text(encoding="utf-8")
 
-        self.assertIn("name: ocr-router", text)
+        self.assertIn("name: media-ocr-router", text)
         self.assertIn("load_image", text)
         self.assertIn("load_markdown_images", text)
         self.assertIn("load_markdown_media", text)
