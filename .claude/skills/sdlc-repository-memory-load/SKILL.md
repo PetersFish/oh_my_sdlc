@@ -28,7 +28,7 @@ Read-only selective context hydration for agents. Loads relevant memory from `.a
 
 1. **Check manifest.** Look for `.ai-memory/manifest.json` at the repository root. If missing, suggest running `sdlc-repository-memory-init` and stop.
 2. **Read index.** Load `.ai-memory/index.json`.
-3. **Score entries.** Rank entries by query keywords, tags, path hints, and memory type.
+3. **Score entries.** Rank entries by query keywords, tags, enriched child-module metadata (`owned_paths`, `path_hints`, `keywords`, `test_paths`, `spec_paths`), and memory type. Prefer a specific matching child module over its broad parent when enriched metadata is more relevant.
 4. **Select top entries.** Take up to `max_results` (default 5).
 5. **Exclude paths.** Never load entries from: `sync-history/`, `sessions/`, `snapshots/`, `tmp/`, `cache/`, `review-queue.json`.
 6. **Load memory files.** Read the selected entry files.

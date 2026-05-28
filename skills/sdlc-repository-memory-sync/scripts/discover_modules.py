@@ -42,6 +42,10 @@ BUILD_FILES = [
     "Dockerfile",
 ]
 
+ENTRY_MARKERS = set(BUILD_FILES) | {"SKILL.md", "spec.md"}
+SUPPORT_DIRS = {"scripts", "schemas", "templates", "references", "tests"}
+FIXTURE_LIKE_NAMES = {"assets", "images", "fixtures", "cache", "tmp"}
+
 
 def _parse_skill_frontmatter(skill_md_path: Path) -> tuple[str | None, str | None]:
     try:
@@ -143,17 +147,101 @@ def _scan_top_level(dir_path: Path) -> list[str]:
 
 def _compute_disposition(path: str, module_map: dict) -> dict:
     for key, entry in module_map.items():
-        if entry.get("fs_path") == path:
+        if entry.get("fs_path") == path or entry.get("path") == path or key == path:
             status = entry.get("status", "pending")
             if status == "accepted":
                 return {"disposition": "known", "reason": None}
             if status == "rejected":
                 return {
                     "disposition": "previously_rejected",
-                    "reason": entry.get("reason_rejected"),
+                    "reason": entry.get("reason_rejected") or entry.get("reason"),
                 }
             return {"disposition": "new", "reason": None}
     return {"disposition": "new", "reason": None}
+
+
+def _confidence_band(score: int) -> str:
+    if score > 7:
+        return "high"
+    if score >= 5:
+        return "medium"
+    return "low"
+
+
+def _score_child_candidate(candidate: dict) -> dict:
+    positive: list[str] = []
+    negative: list[str] = []
+    score = 0
+
+    top_level = set(candidate.get("top_level_files", []))
+    entry_markers = sorted(top_level & ENTRY_MARKERS)
+    if entry_markers:
+        score += 5
+        positive.append("entry_marker:" + ",".join(entry_markers))
+
+    support_dirs = sorted(name[:-1] for name in top_level if name.endswith("/") and name[:-1] in SUPPORT_DIRS)
+    if support_dirs:
+        score += min(3, len(support_dirs))
+        positive.append("support_dirs:" + ",".join(support_dirs))
+
+    file_count = candidate.get("file_count", 0)
+    if file_count >= 3:
+        score += 1
+        positive.append("file_count>=3")
+
+    name = candidate.get("name", "")
+    frontmatter_name = candidate.get("frontmatter_name")
+    if frontmatter_name and frontmatter_name == name:
+        score += 1
+        positive.append("name_matches_frontmatter")
+
+    if name in FIXTURE_LIKE_NAMES:
+        score -= 3
+        negative.append("fixture_like_name")
+
+    if file_count <= 1 and not entry_markers:
+        score -= 1
+        negative.append("low_file_count_without_entry_marker")
+
+    score = max(0, min(10, score))
+    return {
+        "score": score,
+        "confidence_band": _confidence_band(score),
+        "positive_signals": positive,
+        "negative_signals": negative,
+    }
+
+
+def _build_candidate(root: Path, child: Path, depth: int, module_map: dict) -> dict:
+    rel_path = str(child.relative_to(root))
+    file_count = _count_recursive_files(child)
+    file_types = dict(_collect_file_types(child))
+    has_skill_md = (child / "SKILL.md").is_file()
+    fm_name, fm_desc = None, None
+    if has_skill_md:
+        fm_name, fm_desc = _parse_skill_frontmatter(child / "SKILL.md")
+    disp = _compute_disposition(rel_path, module_map)
+    build_file = _detect_build_file(child)
+    top_level = _scan_top_level(child)
+    try:
+        sub_children = [c for c in child.iterdir() if not c.name.startswith(".")]
+    except PermissionError:
+        sub_children = []
+
+    return {
+        "name": child.name,
+        "path": rel_path,
+        "depth": depth,
+        "file_count": file_count,
+        "file_types": file_types,
+        "has_build_file": build_file,
+        "has_skill_md": has_skill_md,
+        "frontmatter_name": fm_name,
+        "frontmatter_description": fm_desc,
+        "top_level_files": top_level,
+        "children_count": len(sub_children),
+        "disposition": disp["disposition"],
+    }
 
 
 def discover_modules(root: Path) -> dict:
@@ -165,6 +253,7 @@ def discover_modules(root: Path) -> dict:
     total_dirs = 0
     excluded = 0
     candidates: list[dict] = []
+    child_candidates: list[dict] = []
 
     root = root.resolve()
 
@@ -197,43 +286,47 @@ def discover_modules(root: Path) -> dict:
             is_candidate = len(direct_files) >= 1 or len(direct_subdirs) >= 2
 
             if is_candidate:
-                rel_path = str(child.relative_to(root))
-                file_count = _count_recursive_files(child)
-                file_types = dict(_collect_file_types(child))
-                has_skill_md = (child / "SKILL.md").is_file()
-                fm_name, fm_desc = None, None
-                if has_skill_md:
-                    fm_name, fm_desc = _parse_skill_frontmatter(child / "SKILL.md")
-                disp = _compute_disposition(rel_path, module_map)
-                build_file = _detect_build_file(child)
-                top_level = _scan_top_level(child)
-                children_count = len(direct_files) + len(direct_subdirs)
-
-                candidates.append({
-                    "name": child.name,
-                    "path": rel_path,
-                    "depth": depth,
-                    "file_count": file_count,
-                    "file_types": file_types,
-                    "has_build_file": build_file,
-                    "has_skill_md": has_skill_md,
-                    "frontmatter_name": fm_name,
-                    "frontmatter_description": fm_desc,
-                    "top_level_files": top_level,
-                    "children_count": children_count,
-                    "disposition": disp["disposition"],
-                })
+                candidates.append(_build_candidate(root, child, depth, module_map))
 
             walk(child, depth + 1)
 
     walk(root, 1)
 
+    for entry in module_map.values():
+        if entry.get("status") != "accepted":
+            continue
+        if entry.get("parent_id"):
+            continue
+        parent_path = entry.get("fs_path") or entry.get("path")
+        if not parent_path:
+            continue
+        parent_dir = root / parent_path
+        if not parent_dir.is_dir():
+            continue
+        try:
+            children = sorted(parent_dir.iterdir(), key=lambda c: c.name)
+        except PermissionError:
+            continue
+        for child in children:
+            if not child.is_dir() or child.name.startswith(".") or child.name in exclude_patterns:
+                continue
+            rel_depth = len(child.relative_to(root).parts)
+            candidate = _build_candidate(root, child, rel_depth, module_map)
+            candidate["parent_id"] = entry.get("memory_id")
+            candidate["parent_path"] = parent_path
+            candidate.update(_score_child_candidate(candidate))
+            child_candidates.append(candidate)
+
     known = [c for c in candidates if c["disposition"] == "known"]
     previously_rejected = [c for c in candidates if c["disposition"] == "previously_rejected"]
     new_candidates = [c for c in candidates if c["disposition"] == "new"]
+    high_children = [c for c in child_candidates if c["confidence_band"] == "high"]
+    medium_children = [c for c in child_candidates if c["confidence_band"] == "medium"]
+    low_children = [c for c in child_candidates if c["confidence_band"] == "low"]
 
     return {
         "candidates": candidates,
+        "child_candidates": child_candidates,
         "stats": {
             "total_dirs": total_dirs,
             "excluded": excluded,
@@ -241,6 +334,10 @@ def discover_modules(root: Path) -> dict:
             "known": len(known),
             "previously_rejected": len(previously_rejected),
             "new": len(new_candidates),
+            "child_candidates": len(child_candidates),
+            "child_high": len(high_children),
+            "child_medium": len(medium_children),
+            "child_low": len(low_children),
         },
     }
 

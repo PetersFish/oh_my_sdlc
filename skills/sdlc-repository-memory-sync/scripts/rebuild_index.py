@@ -2,16 +2,41 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 FORMAL_DIRS = ("modules", "architecture", "decisions", "pitfalls", "specs", "evolution")
 EXCLUDED_DIRS = ("sync-history", "sessions", "snapshots", "tmp", "cache")
+INDEX_OPTIONAL_FIELDS = (
+    "parent_id",
+    "owned_paths",
+    "path_hints",
+    "keywords",
+    "test_paths",
+    "spec_paths",
+)
 
 INDEX_STATUSES = {"synced", "pending_commit"}
 
 FRONTMATTER_DELIMITER = "---"
+
+
+def _tokenize(value: object) -> list[str]:
+    return [t for t in re.split(r"[^a-z0-9_\-]+", str(value).lower()) if t]
+
+
+def _derive_keywords(entry: dict) -> list[str]:
+    keywords: list[str] = []
+    for field in ("title", "path", "parent_id"):
+        keywords.extend(_tokenize(entry.get(field, "")))
+    for field in ("tags", "owned_paths", "path_hints", "test_paths", "spec_paths"):
+        values = entry.get(field, [])
+        if isinstance(values, list):
+            for value in values:
+                keywords.extend(_tokenize(value))
+    return sorted(set(keywords))
 
 
 def _parse_frontmatter(content: str) -> dict | None:
@@ -97,7 +122,7 @@ def _scan_memory_files(memory_dir: Path) -> list[dict]:
             elif not isinstance(tags, list):
                 tags = []
 
-            entries.append({
+            entry = {
                 "id": entry_id,
                 "type": entry_type,
                 "path": relative_path,
@@ -107,7 +132,13 @@ def _scan_memory_files(memory_dir: Path) -> list[dict]:
                 "updated_at": fm.get("updated_at", datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")),
                 "confidence": fm.get("confidence", "medium"),
                 "status": sync_status,
-            })
+            }
+            for field in INDEX_OPTIONAL_FIELDS:
+                if field in fm:
+                    entry[field] = fm[field]
+            if entry.get("type") == "module" and "keywords" not in entry:
+                entry["keywords"] = _derive_keywords(entry)
+            entries.append(entry)
 
     return entries
 

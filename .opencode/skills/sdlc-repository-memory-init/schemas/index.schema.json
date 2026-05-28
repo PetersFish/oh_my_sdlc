@@ -43,6 +43,10 @@
             "type": "string",
             "description": "Brief summary of the memory content."
           },
+          "parent_id": {
+            "type": "string",
+            "description": "Parent module ID for child module entries."
+          },
           "tags": {
             "type": "array",
             "items": {
@@ -63,6 +67,31 @@
             "type": "string",
             "enum": ["synced", "pending_commit"],
             "description": "Sync status of the entry. 'needs_user_review' is NOT a valid index status."
+          },
+          "owned_paths": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Repository paths owned by this memory entry."
+          },
+          "path_hints": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "High-value files or directories for retrieval."
+          },
+          "keywords": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Search keywords for retrieval."
+          },
+          "test_paths": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Tests related to this memory entry."
+          },
+          "spec_paths": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Specs related to this memory entry."
           }
         }
       }

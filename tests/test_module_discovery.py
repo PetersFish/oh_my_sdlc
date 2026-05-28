@@ -219,6 +219,130 @@ class TestDiscoverModules:
         assert stats["known"] == 0
         assert stats["excluded"] >= 1
 
+    def test_child_discovery_scans_accepted_parent_and_reports_linkage(self, tmp_path):
+        parent = tmp_path / "skills"
+        child = parent / "memory-sync"
+        child.mkdir(parents=True)
+        (child / "SKILL.md").write_text(
+            "---\nname: memory-sync\ndescription: Sync memory\n---\n",
+            encoding="utf-8",
+        )
+        (child / "scripts").mkdir()
+        (child / "scripts" / "sync.py").write_text("", encoding="utf-8")
+        ai_memory = tmp_path / ".ai-memory"
+        ai_memory.mkdir()
+        (ai_memory / "discovery-prefs.json").write_text(
+            json.dumps({
+                "schema_version": "1.0",
+                "exclude_patterns": [],
+                "scan_paths": None,
+                "max_depth": 5,
+                "module_map": {
+                    "skills": {
+                        "fs_path": "skills",
+                        "status": "accepted",
+                        "memory_id": "modules/skills",
+                        "memory_path": "modules/skills.md",
+                        "confirmed_at": "2026-01-01T00:00:00Z",
+                    },
+                },
+            }),
+            encoding="utf-8",
+        )
+
+        result = discover_modules(tmp_path)
+        child_candidates = result["child_candidates"]
+        by_path = {c["path"]: c for c in child_candidates}
+
+        assert "skills/memory-sync" in by_path
+        assert by_path["skills/memory-sync"]["parent_id"] == "modules/skills"
+        assert by_path["skills/memory-sync"]["parent_path"] == "skills"
+
+    def test_child_scoring_classifies_high_medium_and_low_confidence(self, tmp_path):
+        parent = tmp_path / "skills"
+        high = parent / "high-skill"
+        medium = parent / "medium-skill"
+        low = parent / "assets"
+        high.mkdir(parents=True)
+        medium.mkdir()
+        low.mkdir()
+        (high / "SKILL.md").write_text("---\nname: high\n---\n", encoding="utf-8")
+        (high / "scripts").mkdir()
+        (high / "scripts" / "run.py").write_text("", encoding="utf-8")
+        (high / "templates").mkdir()
+        (high / "templates" / "t.md").write_text("", encoding="utf-8")
+        (medium / "SKILL.md").write_text("---\nname: medium\n---\n", encoding="utf-8")
+        (low / "image.png").write_text("", encoding="utf-8")
+        ai_memory = tmp_path / ".ai-memory"
+        ai_memory.mkdir()
+        (ai_memory / "discovery-prefs.json").write_text(
+            json.dumps({
+                "schema_version": "1.0",
+                "exclude_patterns": [],
+                "scan_paths": None,
+                "max_depth": 5,
+                "module_map": {
+                    "skills": {
+                        "fs_path": "skills",
+                        "status": "accepted",
+                        "memory_id": "modules/skills",
+                        "memory_path": "modules/skills.md",
+                        "confirmed_at": "2026-01-01T00:00:00Z",
+                    },
+                },
+            }),
+            encoding="utf-8",
+        )
+
+        result = discover_modules(tmp_path)
+        by_path = {c["path"]: c for c in result["child_candidates"]}
+
+        assert by_path["skills/high-skill"]["confidence_band"] == "high"
+        assert by_path["skills/high-skill"]["score"] > 7
+        assert by_path["skills/medium-skill"]["confidence_band"] == "medium"
+        assert 5 <= by_path["skills/medium-skill"]["score"] <= 7
+        assert by_path["skills/assets"]["confidence_band"] == "low"
+        assert by_path["skills/assets"]["score"] < 5
+
+    def test_accepted_child_is_not_scanned_for_grandchildren(self, tmp_path):
+        child = tmp_path / "skills" / "repository-memory"
+        grandchild = child / "scripts"
+        grandchild.mkdir(parents=True)
+        (grandchild / "sync.py").write_text("", encoding="utf-8")
+        ai_memory = tmp_path / ".ai-memory"
+        ai_memory.mkdir()
+        (ai_memory / "discovery-prefs.json").write_text(
+            json.dumps({
+                "schema_version": "1.0",
+                "exclude_patterns": [],
+                "scan_paths": None,
+                "max_depth": 5,
+                "module_map": {
+                    "skills": {
+                        "fs_path": "skills",
+                        "status": "accepted",
+                        "memory_id": "modules/skills",
+                        "memory_path": "modules/skills.md",
+                        "confirmed_at": "2026-01-01T00:00:00Z",
+                    },
+                    "skills/repository-memory": {
+                        "fs_path": "skills/repository-memory",
+                        "status": "accepted",
+                        "memory_id": "modules/skills/repository-memory",
+                        "memory_path": "modules/skills/repository-memory.md",
+                        "parent_id": "modules/skills",
+                        "confirmed_at": "2026-01-01T00:00:00Z",
+                    },
+                },
+            }),
+            encoding="utf-8",
+        )
+
+        result = discover_modules(tmp_path)
+        child_paths = [c["path"] for c in result["child_candidates"]]
+
+        assert "skills/repository-memory/scripts" not in child_paths
+
 
 class TestInitMemoryDiscoveryPrefs:
     def test_init_creates_discovery_prefs_with_defaults(self, tmp_path):
@@ -404,3 +528,28 @@ class TestValidateDiscoveryPrefsSchema:
 
         result = validate_memory(tmp_path)
         assert result["valid"] is False
+
+    def test_legacy_discovery_prefs_path_and_reason_validate(self, tmp_path):
+        memory_dir = tmp_path / ".ai-memory"
+        self._write_manifest(memory_dir)
+        (memory_dir / "index.json").write_text(
+            json.dumps({"schema_version": "1.0", "generated_at": "2026-01-01T00:00:00Z", "entries": []}) + "\n",
+            encoding="utf-8",
+        )
+        (memory_dir / "discovery-prefs.json").write_text(
+            json.dumps({
+                "schema_version": "1.0",
+                "exclude_patterns": [],
+                "scan_paths": None,
+                "max_depth": 5,
+                "module_map": {
+                    "accepted": {"path": "skills", "status": "accepted", "memory_id": "modules/skills"},
+                    "rejected": {"path": "skills/old", "status": "rejected", "reason": "contained"},
+                },
+            }) + "\n",
+            encoding="utf-8",
+        )
+
+        result = validate_memory(tmp_path)
+
+        assert result["valid"] is True

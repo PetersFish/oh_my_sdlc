@@ -10,7 +10,7 @@ VALID_MEMORY_TYPES = {"module", "architecture", "decisions", "pitfalls", "specs"
 
 FORMAL_DIRS = {"modules", "architecture", "decisions", "pitfalls", "specs", "evolution"}
 
-REQUIRED_INDEX_FIELDS = {"title", "summary", "path", "type", "sync_status", "tags"}
+REQUIRED_INDEX_FIELDS = {"title", "summary", "path", "type", "tags"}
 REQUIRED_MANIFEST_FIELDS = {"schema_version", "memory_version", "git"}
 REQUIRED_QUEUE_ITEM_FIELDS = {"id", "path", "action", "status"}
 
@@ -54,8 +54,11 @@ def _validate_index(index_path: Path) -> list[str]:
         missing = REQUIRED_INDEX_FIELDS - set(entry.keys())
         if missing:
             errors.append(f"index.json entry {i} missing fields: {', '.join(sorted(missing))}")
-        if "sync_status" in entry and entry["sync_status"] not in VALID_SYNC_STATUSES:
-            errors.append(f"index.json entry {i} invalid sync_status: {entry['sync_status']}")
+        status = entry.get("status", entry.get("sync_status"))
+        if status is None:
+            errors.append(f"index.json entry {i} missing fields: status")
+        elif status not in VALID_SYNC_STATUSES:
+            errors.append(f"index.json entry {i} invalid status: {status}")
         if "type" in entry and entry["type"] not in VALID_MEMORY_TYPES:
             errors.append(f"index.json entry {i} invalid type: {entry['type']}")
     return errors
@@ -109,7 +112,7 @@ def _validate_memory_files(memory_dir: Path) -> list[str]:
         dir_path = memory_dir / formal_dir
         if not dir_path.is_dir():
             continue
-        for md_file in sorted(dir_path.glob("*.md")):
+        for md_file in sorted(dir_path.glob("**/*.md")):
             content = md_file.read_text(encoding="utf-8")
             if not content.startswith(FRONTMATTER_DELIMITER):
                 errors.append(f"{md_file.relative_to(memory_dir)}: missing opening frontmatter delimiter")

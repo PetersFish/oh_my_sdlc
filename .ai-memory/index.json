@@ -1,0 +1,91 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-05-28T16:30:21.613792Z",
+  "entries": [
+    {
+      "id": "modules/docs",
+      "type": "module",
+      "path": "modules/docs.md",
+      "title": "Documentation",
+      "summary": "Supporting documentation organized into decisions/, modules/, and superpowers/ subdirectories. Contains architectural decisions, module documentation, and superpowers reference material.",
+      "tags": [
+        "docs",
+        "decisions",
+        "architecture",
+        "superpowers"
+      ],
+      "updated_at": "2026-05-29T00:00:00Z",
+      "confidence": "medium",
+      "status": "synced"
+    },
+    {
+      "id": "modules/openspec",
+      "type": "module",
+      "path": "modules/openspec.md",
+      "title": "OpenSpec Framework",
+      "summary": "Specification-driven development framework with changes/, specs/, and schemas/ directories. Uses an artifact workflow (proposal \u2192 design \u2192 specs \u2192 tasks \u2192 verify). All changes are in archived state.",
+      "tags": [
+        "openspec",
+        "specs",
+        "workflow",
+        "changes"
+      ],
+      "updated_at": "2026-05-29T00:00:00Z",
+      "confidence": "high",
+      "status": "synced"
+    },
+    {
+      "id": "modules/plan",
+      "type": "module",
+      "path": "modules/plan.md",
+      "title": "Planning Documents",
+      "summary": "Planning workspace containing openspec-memory-sync-v2.md and question01.md. Lightweight planning directory separate from OpenSpec change artifacts.",
+      "tags": [
+        "plan",
+        "planning",
+        "workspace"
+      ],
+      "updated_at": "2026-05-29T00:00:00Z",
+      "confidence": "medium",
+      "status": "synced"
+    },
+    {
+      "id": "modules/skills",
+      "type": "module",
+      "path": "modules/skills.md",
+      "title": "Skills Collection",
+      "summary": "Core skill definitions organized by prefix taxonomy. 14 skills across qa-, research-, sdlc-, transform-, study-, media-, integration-, ops-, and meta-skill- categories. Each skill has SKILL.md, optional scripts/, schemas/, templates/, references/.",
+      "tags": [
+        "skills",
+        "taxonomy",
+        "collection"
+      ],
+      "updated_at": "2026-05-29T00:00:00Z",
+      "confidence": "high",
+      "status": "synced"
+    },
+    {
+      "id": "modules/tests",
+      "type": "module",
+      "path": "modules/tests.md",
+      "title": "Test Suite",
+      "summary": "Python test suite covering skill lifecycle, module discovery, OCR router, and repository memory (init/load/sync). Uses pytest-style tests with supporting test images and markdown fixtures.",
+      "tags": [
+        "tests",
+        "pytest",
+        "skills",
+        "memory"
+      ],
+      "updated_at": "2026-05-29T00:00:00Z",
+      "confidence": "high",
+      "status": "synced"
+    }
+  ],
+  "excluded_paths": [
+    "sync-history/",
+    "sessions/",
+    "snapshots/",
+    "tmp/",
+    "cache/"
+  ]
+}

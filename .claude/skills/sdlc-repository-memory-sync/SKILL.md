@@ -46,10 +46,12 @@ Synchronize repository memory after changes. Classify evidence into memory types
 
     6d. **LLM evaluate discovery candidates.** For `new` and `previously_rejected` candidates, analyze structural metadata (file_types, has_build_file, top_level_files, depth, children_count) and recommend: Accept (create independent module memory), Reject (not a module), or Merge (into an existing module).
 
-    6e. **User confirmation for discovery candidates.** Present recommendations to user:
+    6e. **Child module discovery for accepted parent modules.** For accepted modules that are broad containers, evaluate child candidates beneath the parent path using generic structural scoring. Use a 10-point scale: scores higher than 7 are high confidence and auto-create child module memory; scores 5-7 are medium confidence and must be presented interactively before writing review entries; scores lower than 5 are low confidence and should be skipped or rejected as implementation details when appropriate. Child module memory files use `modules/<parent>/<child>.md` paths and include `parent_id`, key files, entry points, tests, related specs, and pitfalls when evidence exists.
+
+    6f. **User confirmation for discovery candidates.** Present recommendations to user:
     - **Accept** — create module memory file with YAML frontmatter, write to `discovery-prefs.json` with `status: accepted`.
     - **Reject** — write to `discovery-prefs.json` with `status: rejected` and reason.
-    - **Merge** — update existing module memory file, write to `discovery-prefs.json` with `status: accepted` pointing to the existing `memory_id`.
+- **Merge** — update existing module memory file, write to `discovery-prefs.json` with `status: accepted` pointing to the existing `memory_id`.
     Known candidates (from diffs) auto-update without confirmation.
 
  7. **Auto-update eligible types.** For sessions, pitfalls, specs, modules (diff-detected), and evolution: write memory deltas directly.
@@ -108,6 +110,7 @@ When multiple active OpenSpec changes form a lineage (change B refines change A)
 
 ## Review Queue Policy
 
+- Medium-confidence child module candidates are presented interactively before any review entry is written.
 - `needs_user_review` items are written to `.ai-memory/review-queue.json`.
 - They are NOT written as formal memory files.
 - The review queue is committed to git but only read by `sdlc-repository-memory-sync`.

@@ -58,6 +58,10 @@
               "type": "string",
               "description": "Memory file path relative to .ai-memory/ (required when status is accepted)."
             },
+            "parent_id": {
+              "type": "string",
+              "description": "Parent module ID when this entry is a child module."
+            },
             "confirmed_at": {
               "type": "string",
               "format": "date-time",

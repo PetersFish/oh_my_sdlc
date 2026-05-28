@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -16,7 +17,16 @@ EXCLUDED_FILES = {"review-queue.json"}
 
 
 def _tokenize(text: str) -> set[str]:
-    return set(text.lower().split())
+    return set(t for t in re.split(r"[^a-z0-9_\-]+", text.lower()) if t)
+
+
+def _list_tokens(values: object) -> set[str]:
+    if not isinstance(values, list):
+        return set()
+    tokens: set[str] = set()
+    for value in values:
+        tokens.update(_tokenize(str(value)))
+    return tokens
 
 
 def _score_entry(entry: dict, query_tokens: set[str]) -> int:
@@ -28,18 +38,33 @@ def _score_entry(entry: dict, query_tokens: set[str]) -> int:
     tags = entry.get("tags", [])
     path = entry.get("path", "")
     mem_type = entry.get("type", "")
+    owned_paths = entry.get("owned_paths", [])
+    path_hints = entry.get("path_hints", [])
+    keywords = entry.get("keywords", [])
+    test_paths = entry.get("test_paths", [])
+    spec_paths = entry.get("spec_paths", [])
 
     title_tokens = _tokenize(title)
     summary_tokens = _tokenize(summary)
-    tag_tokens = set(t.lower() for t in tags) if isinstance(tags, list) else set()
+    tag_tokens = _list_tokens(tags)
     path_tokens = _tokenize(path)
     type_tokens = _tokenize(mem_type)
+    owned_path_tokens = _list_tokens(owned_paths)
+    path_hint_tokens = _list_tokens(path_hints)
+    keyword_tokens = _list_tokens(keywords)
+    test_path_tokens = _list_tokens(test_paths)
+    spec_path_tokens = _list_tokens(spec_paths)
 
     score += len(query_tokens & title_tokens) * 3
     score += len(query_tokens & summary_tokens) * 2
     score += len(query_tokens & tag_tokens) * 2
     score += len(query_tokens & path_tokens)
     score += len(query_tokens & type_tokens)
+    score += len(query_tokens & keyword_tokens) * 4
+    score += len(query_tokens & path_hint_tokens) * 3
+    score += len(query_tokens & owned_path_tokens) * 3
+    score += len(query_tokens & test_path_tokens) * 2
+    score += len(query_tokens & spec_path_tokens) * 2
     return score
 
 

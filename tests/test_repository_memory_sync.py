@@ -24,6 +24,7 @@ _reconcile_mod = _load_module("reconcile_pending", SYNC_SCRIPTS_DIR / "reconcile
 _validate_mod = _load_module("validate_memory_sync", SYNC_SCRIPTS_DIR / "validate_memory.py")
 _rebuild_mod = _load_module("rebuild_index", SYNC_SCRIPTS_DIR / "rebuild_index.py")
 _update_mod = _load_module("update_manifest", SYNC_SCRIPTS_DIR / "update_manifest.py")
+_child_modules_mod = _load_module("child_modules", SYNC_SCRIPTS_DIR / "child_modules.py")
 
 _detect_git = _detect_state_mod._detect_git
 _detect_openspec_candidates = _detect_state_mod._detect_openspec_candidates
@@ -31,6 +32,8 @@ reconcile_pending = _reconcile_mod.reconcile_pending
 validate_memory = _validate_mod.validate_memory
 rebuild_index = _rebuild_mod.rebuild_index
 update_manifest = _update_mod.update_manifest
+create_child_module = _child_modules_mod.create_child_module
+save_child_candidate_review = _child_modules_mod.save_child_candidate_review
 
 
 def _init_git_repo(path: Path) -> None:
@@ -407,6 +410,192 @@ class TestRebuildIndex:
         result = rebuild_index(tmp_path, write=False)
         entry = next(e for e in result["entries"] if e["id"] == "pending-mod")
         assert entry["status"] == "pending_commit"
+
+    def test_child_module_enriched_metadata_is_indexed(self, tmp_path):
+        memory_dir = tmp_path / ".ai-memory"
+        child_dir = memory_dir / "modules" / "skills"
+        child_dir.mkdir(parents=True)
+        self._make_memory_file(
+            child_dir / "repository-memory.md",
+            {
+                "id": "modules/skills/repository-memory",
+                "parent_id": "modules/skills",
+                "type": "module",
+                "title": "Repository Memory",
+                "summary": "Focused memory child module",
+                "sync_status": "synced",
+                "evidence_mode": "discovery",
+                "linked_commits": [],
+                "linked_specs": ["module-discovery"],
+                "linked_sessions": [],
+                "updated_at": "2026-01-01T00:00:00Z",
+                "confidence": "high",
+                "tags": ["memory"],
+                "owned_paths": ["skills/sdlc-repository-memory-sync"],
+                "path_hints": ["skills/sdlc-repository-memory-sync/scripts/discover_modules.py"],
+                "keywords": ["child-module", "memory-sync"],
+                "test_paths": ["tests/test_module_discovery.py"],
+                "spec_paths": ["openspec/specs/module-discovery/spec.md"],
+            },
+        )
+
+        result = rebuild_index(tmp_path, write=False)
+        entry = next(e for e in result["entries"] if e["id"] == "modules/skills/repository-memory")
+
+        assert entry["parent_id"] == "modules/skills"
+        assert entry["owned_paths"] == ["skills/sdlc-repository-memory-sync"]
+        assert entry["path_hints"] == ["skills/sdlc-repository-memory-sync/scripts/discover_modules.py"]
+        assert entry["keywords"] == ["child-module", "memory-sync"]
+
+    def test_rebuild_index_derives_keywords_when_missing(self, tmp_path):
+        memory_dir = tmp_path / ".ai-memory"
+        child_dir = memory_dir / "modules" / "skills"
+        child_dir.mkdir(parents=True)
+        self._make_memory_file(
+            child_dir / "repository-memory.md",
+            {
+                "id": "modules/skills/repository-memory",
+                "parent_id": "modules/skills",
+                "type": "module",
+                "title": "Repository Memory",
+                "summary": "Focused memory child module",
+                "sync_status": "synced",
+                "evidence_mode": "discovery",
+                "linked_commits": [],
+                "linked_specs": ["module-discovery"],
+                "linked_sessions": [],
+                "updated_at": "2026-01-01T00:00:00Z",
+                "confidence": "high",
+                "tags": ["memory"],
+                "owned_paths": ["skills/sdlc-repository-memory-sync"],
+                "test_paths": ["tests/test_module_discovery.py"],
+                "spec_paths": ["openspec/specs/module-discovery/spec.md"],
+            },
+        )
+
+        result = rebuild_index(tmp_path, write=False)
+        entry = next(e for e in result["entries"] if e["id"] == "modules/skills/repository-memory")
+
+        assert "repository" in entry["keywords"]
+        assert "memory" in entry["keywords"]
+        assert "module-discovery" in entry["keywords"]
+
+
+class TestChildModuleSyncHelpers:
+    def _make_memory_file(self, path: Path, frontmatter_fields: dict, body: str = "Some content.") -> Path:
+        lines = ["---"]
+        for k, v in frontmatter_fields.items():
+            if isinstance(v, list):
+                lines.append(f"{k}: [{', '.join(str(i) for i in v)}]")
+            else:
+                lines.append(f"{k}: {v}")
+        lines.append("---")
+        lines.append(body)
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return path
+
+    def _write_memory_root(self, root: Path) -> Path:
+        memory_dir = root / ".ai-memory"
+        (memory_dir / "modules").mkdir(parents=True)
+        (memory_dir / "review-queue.json").write_text('{"items": []}\n', encoding="utf-8")
+        (memory_dir / "discovery-prefs.json").write_text(
+            json.dumps({
+                "schema_version": "1.0",
+                "exclude_patterns": [],
+                "scan_paths": None,
+                "max_depth": 5,
+                "module_map": {
+                    "skills": {
+                        "fs_path": "skills",
+                        "status": "accepted",
+                        "memory_id": "modules/skills",
+                        "memory_path": "modules/skills.md",
+                        "confirmed_at": "2026-01-01T00:00:00Z",
+                    },
+                },
+            }, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        (memory_dir / "modules" / "skills.md").write_text(
+            "---\nid: modules/skills\ntype: module\ntitle: Skills\nsummary: Skills\n"
+            "sync_status: synced\nevidence_mode: discovery\nlinked_commits: []\n"
+            "linked_specs: []\nlinked_sessions: []\nupdated_at: 2026-01-01T00:00:00Z\n"
+            "confidence: high\ntags: [skills]\n---\n# Skills\n",
+            encoding="utf-8",
+        )
+        return memory_dir
+
+    def test_high_confidence_child_module_is_created_with_nested_path(self, tmp_path):
+        self._write_memory_root(tmp_path)
+        candidate = {
+            "name": "repository-memory",
+            "path": "skills/repository-memory",
+            "parent_id": "modules/skills",
+            "parent_path": "skills",
+            "score": 9,
+            "confidence_band": "high",
+            "top_level_files": ["SKILL.md", "scripts/"],
+            "positive_signals": ["entry_marker:SKILL.md"],
+            "negative_signals": [],
+        }
+
+        result = create_child_module(tmp_path, candidate, write=True)
+
+        assert result["created"] is True
+        assert result["memory_path"] == "modules/skills/repository-memory.md"
+        child_file = tmp_path / ".ai-memory" / result["memory_path"]
+        assert child_file.exists()
+        content = child_file.read_text(encoding="utf-8")
+        assert "parent_id: modules/skills" in content
+        assert "## When To Load" in content
+        assert "## Key Files" in content
+        prefs = json.loads((tmp_path / ".ai-memory" / "discovery-prefs.json").read_text(encoding="utf-8"))
+        assert prefs["module_map"]["skills/repository-memory"]["status"] == "accepted"
+        assert prefs["module_map"]["skills/repository-memory"]["parent_id"] == "modules/skills"
+        parent_content = (tmp_path / ".ai-memory" / "modules" / "skills.md").read_text(encoding="utf-8")
+        assert "## Child Modules" in parent_content
+        assert "modules/skills/repository-memory.md" in parent_content
+
+    def test_generated_child_module_evidence_mode_is_allowed_by_schema(self, tmp_path):
+        self._write_memory_root(tmp_path)
+        schema = json.loads((REPO_ROOT / "skills" / "sdlc-repository-memory-sync" / "schemas" / "memory-frontmatter.schema.json").read_text(encoding="utf-8"))
+        candidate = {
+            "name": "repository-memory",
+            "path": "skills/repository-memory",
+            "parent_id": "modules/skills",
+            "parent_path": "skills",
+            "score": 9,
+            "confidence_band": "high",
+            "top_level_files": ["SKILL.md"],
+        }
+        result = create_child_module(tmp_path, candidate, write=True)
+        content = (tmp_path / ".ai-memory" / result["memory_path"]).read_text(encoding="utf-8")
+        frontmatter = {}
+        for line in content.split("---", 2)[1].strip().splitlines():
+            key, _, value = line.partition(":")
+            frontmatter[key.strip()] = value.strip()
+
+        allowed_modes = schema["properties"]["evidence_mode"]["enum"]
+        assert frontmatter["evidence_mode"] in allowed_modes
+
+    def test_medium_confidence_candidate_saved_as_proposed_review_item(self, tmp_path):
+        self._write_memory_root(tmp_path)
+        candidate = {
+            "name": "maybe-module",
+            "path": "skills/maybe-module",
+            "parent_id": "modules/skills",
+            "parent_path": "skills",
+            "score": 6,
+            "confidence_band": "medium",
+        }
+
+        result = save_child_candidate_review(tmp_path, candidate, write=True)
+
+        assert result["queued"] is True
+        queue = json.loads((tmp_path / ".ai-memory" / "review-queue.json").read_text(encoding="utf-8"))
+        assert queue["items"][0]["type"] == "module"
+        assert queue["items"][0]["reason"] == "medium_confidence_child_candidate"
+        assert queue["items"][0]["status"] == "open"
 
     def test_needs_user_review_excluded(self, tmp_path):
         memory_dir = tmp_path / ".ai-memory"

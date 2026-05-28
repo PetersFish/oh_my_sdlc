@@ -146,7 +146,7 @@ def _validate_frontmatter_files(memory_dir: Path) -> list[str]:
         dir_path = memory_dir / formal_dir
         if not dir_path.is_dir():
             continue
-        for md_file in sorted(dir_path.glob("*.md")):
+        for md_file in sorted(dir_path.glob("**/*.md")):
             relative = str(md_file.relative_to(memory_dir))
             content = md_file.read_text(encoding="utf-8")
             fm = _parse_frontmatter(content)
@@ -202,8 +202,8 @@ def _validate_sync_history_not_in_index(memory_dir: Path, index_path: Path) -> l
 
 REQUIRED_DISCOVERY_PREFS_FIELDS = {"schema_version", "exclude_patterns", "scan_paths", "max_depth", "module_map"}
 VALID_MAP_STATUSES = {"accepted", "rejected", "pending"}
-REQUIRED_MAP_ACCEPTED_FIELDS = {"fs_path", "status", "memory_id", "memory_path", "confirmed_at"}
-REQUIRED_MAP_REJECTED_FIELDS = {"fs_path", "status", "reason_rejected", "rejected_at"}
+REQUIRED_MAP_ACCEPTED_FIELDS = {"status", "memory_id"}
+REQUIRED_MAP_REJECTED_FIELDS = {"status"}
 
 
 def _validate_discovery_prefs(prefs_path: Path) -> list[str]:
@@ -248,11 +248,17 @@ def _validate_discovery_prefs(prefs_path: Path) -> list[str]:
             missing_accepted = REQUIRED_MAP_ACCEPTED_FIELDS - set(entry.keys())
             if missing_accepted:
                 errors.append(f"discovery-prefs.json module_map.{key} (accepted) missing fields: {', '.join(sorted(missing_accepted))}")
+            if "fs_path" not in entry and "path" not in entry and not key:
+                errors.append(f"discovery-prefs.json module_map.{key} (accepted) missing fields: fs_path or path")
 
         if status == "rejected":
             missing_rejected = REQUIRED_MAP_REJECTED_FIELDS - set(entry.keys())
             if missing_rejected:
                 errors.append(f"discovery-prefs.json module_map.{key} (rejected) missing fields: {', '.join(sorted(missing_rejected))}")
+            if "fs_path" not in entry and "path" not in entry and not key:
+                errors.append(f"discovery-prefs.json module_map.{key} (rejected) missing fields: fs_path or path")
+            if "reason_rejected" not in entry and "reason" not in entry:
+                errors.append(f"discovery-prefs.json module_map.{key} (rejected) missing fields: reason_rejected or reason")
 
     return errors
 

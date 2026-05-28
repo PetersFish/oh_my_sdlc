@@ -24,6 +24,10 @@
       "type": "string",
       "description": "Brief summary of the memory content."
     },
+    "parent_id": {
+      "type": "string",
+      "description": "Parent module ID for child module memory entries."
+    },
     "sync_status": {
       "type": "string",
       "enum": ["synced", "pending_commit", "needs_user_review"],
@@ -31,7 +35,7 @@
     },
     "evidence_mode": {
       "type": "string",
-      "enum": ["commit", "uncommitted_snapshot", "session_observation", "spec_reference"],
+      "enum": ["commit", "uncommitted_snapshot", "session_observation", "spec_reference", "discovery"],
       "description": "How the evidence for this memory was collected."
     },
     "linked_commits": {
@@ -82,6 +86,31 @@
     "review_reason": {
       "type": "string",
       "description": "Reason the entry was flagged for user review."
+    },
+    "owned_paths": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Repository paths owned by this memory entry."
+    },
+    "path_hints": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "High-value files or directories for retrieval."
+    },
+    "keywords": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Search keywords for retrieval."
+    },
+    "test_paths": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Tests related to this memory entry."
+    },
+    "spec_paths": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Specs related to this memory entry."
     }
   }
 }

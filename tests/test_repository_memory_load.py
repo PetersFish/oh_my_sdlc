@@ -130,6 +130,39 @@ class TestSelectMemoryMissingIndex(unittest.TestCase):
         self.assertIn("total_eligible", result)
         self.assertIn("skipped_paths", result)
 
+    def test_enriched_metadata_ranks_child_above_parent(self) -> None:
+        self._init()
+        parent = {
+            "id": "modules/skills",
+            "title": "Skills Collection",
+            "summary": "All skills including repository memory skills",
+            "path": "modules/skills.md",
+            "type": "module",
+            "sync_status": "synced",
+            "tags": ["skills", "memory"],
+        }
+        child = {
+            "id": "modules/skills/repository-memory",
+            "parent_id": "modules/skills",
+            "title": "Repository Memory Skills",
+            "summary": "Focused child module for repository memory implementation",
+            "path": "modules/skills/repository-memory.md",
+            "type": "module",
+            "sync_status": "synced",
+            "tags": ["memory"],
+            "owned_paths": ["skills/sdlc-repository-memory-sync"],
+            "path_hints": ["skills/sdlc-repository-memory-sync/scripts/discover_modules.py"],
+            "keywords": ["child-module", "discovery", "memory-sync"],
+            "test_paths": ["tests/test_module_discovery.py"],
+            "spec_paths": ["openspec/specs/module-discovery/spec.md"],
+        }
+        index = {"schema_version": "1.0", "entries": [parent, child]}
+        (self._memory_dir() / "index.json").write_text(json.dumps(index), encoding="utf-8")
+
+        result = select_memory(TEST_ROOT, query="discover_modules child-module")
+
+        self.assertEqual(result["entries"][0]["path"], "modules/skills/repository-memory.md")
+
 
 class TestIsExcluded(unittest.TestCase):
     def test_sessions_excluded(self) -> None:
@@ -173,6 +206,23 @@ class TestScoreEntry(unittest.TestCase):
         score = _score_entry(entry, {"auth"})
         self.assertGreater(score, 0)
 
+    def test_enriched_fields_contribute_to_score(self) -> None:
+        entry = {
+            "title": "Repository Memory",
+            "summary": "Module",
+            "path": "modules/skills/repository-memory.md",
+            "type": "module",
+            "tags": [],
+            "path_hints": ["skills/sdlc-repository-memory-sync/scripts/discover_modules.py"],
+            "keywords": ["child-module"],
+            "test_paths": ["tests/test_module_discovery.py"],
+            "spec_paths": ["openspec/specs/module-discovery/spec.md"],
+        }
+
+        score = _score_entry(entry, {"discover_modules", "child-module"})
+
+        self.assertGreaterEqual(score, 5)
+
 
 class TestValidateMemory(unittest.TestCase):
     def setUp(self) -> None:
@@ -195,7 +245,7 @@ class TestValidateMemory(unittest.TestCase):
         manifest = {"schema_version": "1.0", "memory_version": 1, "git": {"available": False, "has_commits": False, "head": None, "last_synced_commit": None, "worktree_state": "unknown"}, "pending_snapshots": [], "last_sync": None}
         (memory_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
         index = {"schema_version": "1.0", "entries": [
-            {"title": "Auth", "summary": "Auth module", "path": "modules/auth.md", "type": "module", "sync_status": "synced", "tags": ["auth"]},
+            {"id": "auth", "title": "Auth", "summary": "Auth module", "path": "modules/auth.md", "type": "module", "status": "synced", "tags": ["auth"], "updated_at": "2026-01-01T00:00:00Z", "confidence": "high"},
         ]}
         (memory_dir / "index.json").write_text(json.dumps(index), encoding="utf-8")
 
@@ -219,12 +269,12 @@ class TestValidateMemory(unittest.TestCase):
     def test_rejects_unsupported_sync_status(self) -> None:
         self._init_valid()
         index = {"schema_version": "1.0", "entries": [
-            {"title": "Bad", "summary": "Bad status", "path": "modules/bad.md", "type": "module", "sync_status": "unknown_status", "tags": []},
+            {"id": "bad", "title": "Bad", "summary": "Bad status", "path": "modules/bad.md", "type": "module", "status": "unknown_status", "tags": [], "updated_at": "2026-01-01T00:00:00Z", "confidence": "high"},
         ]}
         (self._memory_dir() / "index.json").write_text(json.dumps(index), encoding="utf-8")
         result = validate_memory(TEST_ROOT)
         self.assertFalse(result["valid"])
-        has_status_error = any("invalid sync_status" in e for e in result["errors"])
+        has_status_error = any("invalid status" in e for e in result["errors"])
         self.assertTrue(has_status_error)
 
     def test_missing_manifest_reported(self) -> None:
@@ -246,6 +296,33 @@ class TestValidateMemory(unittest.TestCase):
         self.assertFalse(result["valid"])
         has_missing = any("missing fields" in e for e in result["errors"])
         self.assertTrue(has_missing)
+
+    def test_accepts_child_module_enriched_index_fields(self) -> None:
+        self._init_valid()
+        index = {"schema_version": "1.0", "entries": [
+            {
+                "title": "Repository Memory",
+                "summary": "Child module",
+                "path": "modules/skills/repository-memory.md",
+                "type": "module",
+                "status": "synced",
+                "tags": ["memory"],
+                "id": "modules/skills/repository-memory",
+                "updated_at": "2026-01-01T00:00:00Z",
+                "confidence": "high",
+                "parent_id": "modules/skills",
+                "owned_paths": ["skills/sdlc-repository-memory-sync"],
+                "path_hints": ["skills/sdlc-repository-memory-sync/scripts/discover_modules.py"],
+                "keywords": ["child-module"],
+                "test_paths": ["tests/test_module_discovery.py"],
+                "spec_paths": ["openspec/specs/module-discovery/spec.md"],
+            },
+        ]}
+        (self._memory_dir() / "index.json").write_text(json.dumps(index), encoding="utf-8")
+
+        result = validate_memory(TEST_ROOT)
+
+        self.assertTrue(result["valid"], result["errors"])
 
 
 if __name__ == "__main__":
