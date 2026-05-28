@@ -53,7 +53,8 @@ description: 针对 zyBooks 技术/算法章节做知识点提炼、应试准备
 - 系统流程：缓存/索引/队列/请求流/数据结构操作流水线
 
 **强制工具与格式：**
-- 图示生成必须使用用户级技能 `transform-markdown-svg`（draw.io/diagrams.net），不要用 Mermaid 代替“需要落盘为图片”的图示。
+- 最终落盘图示（即保存到 `images/` 并插入文档的图）必须使用 `transform-markdown-svg`（draw.io/diagrams.net 导出 SVG），不得用 Mermaid 替代。
+- Mermaid 仅允许作为 **临时文本草图** 用于分析中辅助理解（如快速画个概念关系），但 **不得保存为最终图示产物**，不得嵌入 `images/` 目录，不得替代 `transform-markdown-svg` 的 draw.io SVG。
 - 图示输出位置：目标笔记 Markdown 同级 `images/` 目录（由 `transform-markdown-svg` 统一管理）。
 - Markdown 插入格式默认使用 Obsidian 引用：`![[images/<name>.svg]]`（不要内嵌 `<svg ...>`）。
 
@@ -118,8 +119,7 @@ description: 针对 zyBooks 技术/算法章节做知识点提炼、应试准备
 
 ### 算法渲染规范来源（必须遵守）
 
-- 本 skill 的算法章节渲染由原子 skill `transform-algo-render` 统一定义，路径：
-  - `/Users/yuping/.cursor/skills/transform-algo-render/SKILL.md`
+- 本 skill 的算法章节渲染由原子 skill `transform-algo-render` 统一定义。
 - 在生成「三、算法」时，必须遵循该原子 skill 的完整输出契约：
   - 核心流程（2-5 条）
   - `.pseudocode` 渲染块（`<style> + <div class="pseudocode">`）
@@ -180,7 +180,7 @@ description: 针对 zyBooks 技术/算法章节做知识点提炼、应试准备
 [基于图片附件中的算法图示/伪代码提炼：核心流程、关键步骤、复杂度、边界条件；若无图片附件，先提示用户补充图片后再细化。]
 [如果流程/状态变化用图更清晰：调用 `transform-markdown-svg` 生成 draw.io SVG，并在对应段落插入引用：`![[images/<topic>.svg]]`]
 
-[模板来自原子 skill：`/Users/yuping/.cursor/skills/transform-algo-render/SKILL.md`]
+[模板来自原子 skill：`transform-algo-render`]
 - **核心流程**：按原子 skill 使用 2-5 条要点。
 - **伪代码块**：按原子 skill 的 `.pseudocode` 渲染模板逐字使用（每个算法一个）。
 - **Running Time / 时间复杂度**：按原子 skill 模板输出。

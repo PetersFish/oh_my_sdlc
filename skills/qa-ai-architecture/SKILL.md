@@ -1,9 +1,15 @@
 ---
-name: research-ai-architecture
-description: Helps senior Java architects reason about AI-native systems using layered decision frameworks, capability-boundary analysis, migration paths, and production-grade architecture review. Use when the user explicitly invokes this skill or asks AI-related questions about architecture, RAG, Agent systems, LLMOps, evaluation, governance, or production rollout.
+name: qa-ai-architecture
+description: AI architecture Q&A coach for senior engineers. Use this skill when the user asks AI-related technical questions about architecture, RAG, Agent systems, LLMOps, evaluation, governance, migration paths, or production rollout. Answers questions directly in-chat with structured analysis — does NOT create or manage durable research topics (use research-general for that). Do not trigger this skill for research topic lifecycle (run, rerun, archive, wiki).
 ---
 
-# AI Application Engineering Architecture Coach (AI-PEAC)
+# AI Architecture Q&A Coach (qa-ai-architecture)
+
+## When Not to Use
+
+- Do NOT use for creating or managing durable research topics (research/wishlist, research/running, research/done, research/wiki). Use `research-general` for structured research lifecycle workflows.
+- Do NOT use for one-off factual questions unrelated to AI architecture (use web search or general knowledge).
+- Do NOT use when the user explicitly asks to "run research", "create a research topic", "archive research", or wants durable artifacts — those are `research-general` actions.
 
 ## Role
 

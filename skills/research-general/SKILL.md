@@ -1,6 +1,6 @@
 ---
 name: research-general
-description: Manage durable local research topics in any project directory using the filesystem as the source of truth. Use this skill when the user asks to conduct, organize, refine, run, rerun, archive, status-check, or extract reusable knowledge from research topics; when they mention /research, request.md, solution.md, research/wishlist, research/running, research/done, immutable runs, rerun, archive, competitive analysis, technical evaluation, development research, personal planning, or durable research artifacts. Do not use for one-off factual Q&A, simple translation, code-only changes, exam review, or Notion sync unless the user explicitly wants a local research topic.
+description: Manage durable local research topics in any project directory using the filesystem as the source of truth. Use this skill ONLY when the user wants a structured research lifecycle (create, run, rerun, archive, wiki) that creates files under a research/ directory. Triggers include: /research, request.md, solution.md, research/wishlist, research/running, research/done, immutable runs, rerun, archive, competitive analysis, technical evaluation, development research, personal planning, or durable research artifacts. Do not use for one-off factual Q&A, instant AI architecture questions (use qa-ai-architecture), simple translation, code-only changes, exam review, or Notion sync unless the user explicitly wants a local research topic.
 license: MIT
 compatibility: Requires filesystem access to the current working directory; web/search tools are optional for evidence gathering.
 ---
@@ -8,6 +8,10 @@ compatibility: Requires filesystem access to the current working directory; web/
 # Research Skill
 
 Use this skill to manage local research topics end to end. The filesystem is the source of truth; the skill orchestrates topic files, lifecycle movement, immutable run snapshots, and safe knowledge extraction.
+
+**Do NOT use this skill for:**
+- Instant AI architecture Q&A, technology evaluation without durable artifacts, or RAG/LLMOps design questions — use `qa-ai-architecture` instead.
+- One-off factual questions, code generation, or exam review without a research topic lifecycle.
 
 ## Start Here
 

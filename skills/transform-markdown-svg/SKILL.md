@@ -119,7 +119,7 @@ Use the selected palette file for concrete draw.io style snippets. Keep any fall
 Run the script from anywhere:
 
 ```bash
-python3 "/Users/yuping/.cursor/skills/transform-markdown-svg/scripts/embed_drawio_svg.py" \
+python3 scripts/embed_drawio_svg.py \
   --markdown "/abs/path/to/note.md" \
   --position placeholder \
   --placeholder "<!-- DIAGRAM:algo-flow -->" \

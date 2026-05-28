@@ -1,6 +1,6 @@
 ---
 name: sdlc-repository-memory-sync
-description: Use when syncing repository memory after code changes, git commits, session work, OpenSpec verification, or when the user asks to update `.ai-memory/`. Do not use for initializing memory or loading memory context.
+description: Primary entry point for syncing repository memory. Use after code changes, git commits, session work, or when the user asks to update `.ai-memory/`. Also invoked internally by `sdlc-openspec-memory-sync` for OpenSpec verified-before-archive workflows. Do not use for initializing memory or loading memory context.
 license: MIT
 ---
 

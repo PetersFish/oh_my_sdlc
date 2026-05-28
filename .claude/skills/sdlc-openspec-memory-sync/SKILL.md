@@ -1,6 +1,6 @@
 ---
 name: sdlc-openspec-memory-sync
-description: OpenSpec memory sync, memory-sync.md, verify, archive, ADR, pitfall, module docs. Use when a verified OpenSpec change needs durable docs updated before archive, or when the user says memory sync, openspec-memory-sync, post-verify, before archive, or wants to turn an OpenSpec change into evidence-backed repository memory. Do not use for ordinary code changes or broad documentation rewrites.
+description: OpenSpec post-verify memory sync gate. Use ONLY when a verified OpenSpec change needs durable docs (ADR, pitfall, module docs) updated before archive — specifically after openspec-verify-change and before openspec-archive-change. Do NOT use for ordinary .ai-memory/ sync, session sync, code-change sync, or direct memory updates (use sdlc-repository-memory-sync for those).
 license: MIT
 ---
 
@@ -15,8 +15,10 @@ OpenSpec adapter for repository memory sync. This skill is a THIN WRAPPER that c
 ## When to Use
 
 - After `openspec-verify-change` and before `openspec-archive-change`.
-- When the user asks to sync memory for an OpenSpec change, or says "memory sync", "openspec-memory-sync", or "post-verify".
+- When the user asks to sync memory for a verified OpenSpec change, or says "openspec-memory-sync" or "post-verify".
 - When a verified change needs durable documentation of decisions, risks, or module responsibility changes.
+
+**Do NOT use for:** ordinary code changes, session sync, or direct `.ai-memory/` updates after git commits — use `sdlc-repository-memory-sync` for those scenarios.
 
 ## Required Inputs
 
