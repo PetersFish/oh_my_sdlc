@@ -20,8 +20,131 @@
   "scan_paths": null,
   "max_depth": 5,
   "module_map": {
-    "skills": {"fs_path": "skills", "status": "accepted", "memory_id": "skills", "memory_path": "modules/skills.md", "confirmed_at": "2026-05-29T00:00:00Z"},
-    "openspec": {"fs_path": "openspec", "status": "accepted", "memory_id": "openspec", "memory_path": "modules/openspec.md", "confirmed_at": "2026-05-29T00:00:00Z"},
-    "tests": {"fs_path": "tests", "status": "accepted", "memory_id": "tests", "memory_path": "modules/tests.md", "confirmed_at": "2026-05-29T00:00:00Z"}
+    "skills": {
+      "status": "accepted",
+      "memory_id": "skills",
+      "memory_path": "modules/skills.md",
+      "parent_id": "root",
+      "confirmed_at": "2026-05-30T11:47:00Z"
+    },
+    "skills/sdlc-repository-memory-init": {
+      "status": "accepted",
+      "memory_id": "skills/sdlc",
+      "memory_path": "modules/skills/sdlc.md",
+      "parent_id": "skills",
+      "confirmed_at": "2026-05-30T11:47:00Z"
+    },
+    "skills/sdlc-repository-memory-load": {
+      "status": "accepted",
+      "memory_id": "skills/sdlc",
+      "memory_path": "modules/skills/sdlc.md",
+      "parent_id": "skills",
+      "confirmed_at": "2026-05-30T11:47:00Z"
+    },
+    "skills/sdlc-repository-memory-reset": {
+      "status": "accepted",
+      "memory_id": "skills/sdlc",
+      "memory_path": "modules/skills/sdlc.md",
+      "parent_id": "skills",
+      "confirmed_at": "2026-05-30T11:47:00Z"
+    },
+    "skills/sdlc-repository-memory-sync": {
+      "status": "accepted",
+      "memory_id": "skills/sdlc",
+      "memory_path": "modules/skills/sdlc.md",
+      "parent_id": "skills",
+      "confirmed_at": "2026-05-30T11:47:00Z"
+    },
+    "skills/sdlc-openspec-memory-sync": {
+      "status": "accepted",
+      "memory_id": "skills/sdlc",
+      "memory_path": "modules/skills/sdlc.md",
+      "parent_id": "skills",
+      "confirmed_at": "2026-05-30T11:47:00Z"
+    },
+    "skills/transform-algo-render": {
+      "status": "accepted",
+      "memory_id": "skills/transform",
+      "memory_path": "modules/skills/transform.md",
+      "parent_id": "skills",
+      "confirmed_at": "2026-05-30T11:47:00Z"
+    },
+    "skills/transform-markdown-svg": {
+      "status": "accepted",
+      "memory_id": "skills/transform",
+      "memory_path": "modules/skills/transform.md",
+      "parent_id": "skills",
+      "confirmed_at": "2026-05-30T11:47:00Z"
+    },
+    "skills/transform-math-formula": {
+      "status": "accepted",
+      "memory_id": "skills/transform",
+      "memory_path": "modules/skills/transform.md",
+      "parent_id": "skills",
+      "confirmed_at": "2026-05-30T11:47:00Z"
+    },
+    "skills/transform-xmind": {
+      "status": "accepted",
+      "memory_id": "skills/transform",
+      "memory_path": "modules/skills/transform.md",
+      "parent_id": "skills",
+      "confirmed_at": "2026-05-30T11:47:00Z"
+    },
+    "skills/integration-notion-sync": {
+      "status": "accepted",
+      "memory_id": "skills/integration-notion-sync",
+      "memory_path": "modules/skills/integration-notion-sync.md",
+      "parent_id": "skills",
+      "confirmed_at": "2026-05-30T11:47:00Z"
+    },
+    "skills/media-ocr-router": {
+      "status": "accepted",
+      "memory_id": "skills/media-ocr-router",
+      "memory_path": "modules/skills/media-ocr-router.md",
+      "parent_id": "skills",
+      "confirmed_at": "2026-05-30T11:47:00Z"
+    },
+    "skills/meta-skill-lifecycle-governance": {
+      "status": "accepted",
+      "memory_id": "skills/meta-skill-lifecycle-governance",
+      "memory_path": "modules/skills/meta-skill-lifecycle-governance.md",
+      "parent_id": "skills",
+      "confirmed_at": "2026-05-30T11:47:00Z"
+    },
+    "skills/ops-mackup-backup": {
+      "status": "accepted",
+      "memory_id": "skills/ops-mackup-backup",
+      "memory_path": "modules/skills/ops-mackup-backup.md",
+      "parent_id": "skills",
+      "confirmed_at": "2026-05-30T11:47:00Z"
+    },
+    "skills/qa-ai-architecture": {
+      "status": "accepted",
+      "memory_id": "skills/qa-ai-architecture",
+      "memory_path": "modules/skills/qa-ai-architecture.md",
+      "parent_id": "skills",
+      "confirmed_at": "2026-05-30T11:47:00Z"
+    },
+    "skills/research-general": {
+      "status": "accepted",
+      "memory_id": "skills/research-general",
+      "memory_path": "modules/skills/research-general.md",
+      "parent_id": "skills",
+      "confirmed_at": "2026-05-30T11:47:00Z"
+    },
+    "skills/study-zybook-notes": {
+      "status": "accepted",
+      "memory_id": "skills/study-zybook-notes",
+      "memory_path": "modules/skills/study-zybook-notes.md",
+      "parent_id": "skills",
+      "confirmed_at": "2026-05-30T11:47:00Z"
+    },
+    "tests": {
+      "status": "accepted",
+      "memory_id": "tests",
+      "memory_path": "modules/tests.md",
+      "parent_id": "root",
+      "confirmed_at": "2026-05-30T11:47:00Z"
+    }
   }
 }

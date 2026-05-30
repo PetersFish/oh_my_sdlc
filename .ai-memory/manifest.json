@@ -3,16 +3,12 @@
   "repository_id": "",
   "memory_version": 1,
   "git": {
-    "available": true,
-    "has_commits": true,
-    "head": "f0e31eb84265bfbab04c5de5f64cc3d459df4a54",
-    "last_synced_commit": "f0e31eb84265bfbab04c5de5f64cc3d459df4a54",
-    "worktree_state": "dirty"
+    "available": false,
+    "has_commits": false,
+    "head": null,
+    "last_synced_commit": null,
+    "worktree_state": "unknown"
   },
   "pending_snapshots": [],
-  "last_sync": {
-    "timestamp": "2026-05-29T02:00:13.701838Z",
-    "commit": "f0e31eb84265bfbab04c5de5f64cc3d459df4a54",
-    "snapshot_id": "20260529-000001"
-  }
+  "last_sync": null
 }

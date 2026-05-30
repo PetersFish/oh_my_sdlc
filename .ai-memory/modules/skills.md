@@ -2,20 +2,20 @@
 id: skills
 type: module
 title: Skills
-summary: 16 AI skill definitions (SKILL.md + scripts/schemas) for SDLC, media routing, research, transforms, and lifecycle governance. Load when exploring skill behavior, writing new skills, or debugging skill dispatch.
-parent_id: null
+summary: Personal AI skill collection across SDLC workflow, content transformation, research, study, and system integration domains.
+parent_id: root
 sync_status: synced
 evidence_mode: discovery
 linked_commits: []
 linked_specs: []
-linked_sessions: ["20260529-000001"]
-updated_at: 2026-05-29T00:00:00Z
+linked_sessions: []
+updated_at: 2026-05-30T11:47:00Z
 confidence: high
-tags: [skills, ai-skills, skill-system, sdlc, transforms, lifecycle]
-owned_paths: ["skills/"]
-path_hints: ["skills/"]
-keywords: [skill, SKILL.md, skill-lifecycle, skill-creator]
-test_paths: ["tests/test_repository_memory_skill_copies.py"]
+tags: [skills, sdlc, transform, research]
+owned_paths: [skills/]
+path_hints: [skills/]
+keywords: [skill, agent, opencode]
+test_paths: []
 spec_paths: []
 ---
 
@@ -23,41 +23,40 @@ spec_paths: []
 
 ## Current Understanding
 
-The `skills/` directory contains 16 AI skill packages, each following a canonical structure (SKILL.md + optional scripts/, schemas/, templates/, references/). Skills are categorized by domain: SDLC (OpenSpec, repository memory), media routing (OCR/VLM), research, transforms (SVG, math, XMind, algorithms), and lifecycle governance.
+Root module for all AI skills. Contains grouped SDLC workflow skills (`sdlc-*`), content transformation skills (`transform-*`), and standalone skills for integration, research, study, and system operations.
 
 ## Evidence
 
-Initial discovery scan: 94 files across 16 subdirectories. File types: .md (47), .json (18), .py (16), .pyc (12), .yaml (1).
+Directory discovery at repository root. Contains 95 files across 17 sub-directories.
 
 ## Operational Guidance
 
-- New skills follow the pattern in any existing skill directory (SKILL.md at root, scripts/ for tool scripts, schemas/ for validation).
-- Skill lifecycle is governed by `meta-skill-lifecycle-governance`.
-- When modifying a skill, check corresponding tests in `tests/`.
+- SDLC skills handle repository memory lifecycle (init, load, sync, reset)
+- Transform skills handle content rendering (markdown SVG, math formulas, algorithm blocks)
+- Standalone skills handle specific domains (research, notion sync, zybooks, mackup backup, architecture coaching)
 
 ## Child Modules
 
-16 individual skill packages, each self-contained:
-- `integration-notion-sync/`, `media-ocr-router/`, `meta-skill-lifecycle-governance/`
-- `ops-mackup-backup/`, `qa-ai-architecture/`, `research-general/`
-- `sdlc-openspec-memory-sync/`, `sdlc-repository-memory-init/`, `sdlc-repository-memory-load/`, `sdlc-repository-memory-sync/`
-- `study-zybook-notes/`, `transform-algo-render/`, `transform-markdown-svg/`, `transform-math-formula/`, `transform-xmind/`
+- `skills/sdlc` — SDLC workflow skills (memory init/load/sync/reset, OpenSpec memory sync)
+- `skills/transform` — Content transformation skills (algo render, markdown SVG, math formula, xmind)
+- `skills/integration-notion-sync` — Notion knowledge base sync
+- `skills/media-ocr-router` — OCR/VLM image routing
+- `skills/meta-skill-lifecycle-governance` — Skill lifecycle governance
+- `skills/ops-mackup-backup` — Mackup directory backup
+- `skills/qa-ai-architecture` — AI architecture coaching
+- `skills/research-general` — Durable local research topics
+- `skills/study-zybook-notes` — zyBooks study notes
 
 ## Key Files
 
-- `skills/TAXONOMY.md` — skill categorization reference
-- Each `skills/<name>/SKILL.md` — entry point for the skill
-
 ## Entry Points
-
-All entry points follow `skills/<skill-name>/SKILL.md` convention.
 
 ## Tests
 
-- `tests/test_repository_memory_skill_copies.py` — verifies skill copies consistency
-- `tests/test_lifecycle_utils.py` — lifecycle governance utilities
-- `tests/test_ocr_router_skill.py` — OCR router skill tests
+## Related Specs
+
+## Known Pitfalls
 
 ## Update Notes
 
-First sync after repository memory initialization.
+First sync after memory reset. Created from discovery.
