@@ -109,6 +109,17 @@ Synchronize repository memory after code changes, git commits, session work, or 
 - **WHEN** `sdlc-repository-memory-sync` rebuilds `index.json`
 - **THEN** it SHALL NOT include entries from `sync-history/`
 
+### Requirement: Sync history skipped types reporting
+`sdlc-repository-memory-sync` SHALL include a `Skipped` section in every sync history report. For each memory type not updated during a sync run, the section SHALL list the type and the reason it was skipped. Types that are candidate-only (`architecture`, `decisions`) or require specific evidence (`evolution`, `specs`, `pitfalls`) SHALL be listed with the applicable policy reason.
+
+#### Scenario: First sync with no prior evidence
+- **WHEN** a first sync has no architecture candidates, no decision candidates, no pitfall evidence, no spec ID, and no stable commit range for evolution
+- **THEN** the sync history `Skipped` section SHALL list architecture (no candidates), decisions (no candidates), pitfalls (no failure evidence), specs (no change ID detected), evolution (no stable commit range)
+
+#### Scenario: Sync with partial type updates
+- **WHEN** a sync updates sessions, modules, and evolution but has no architecture or decision candidates
+- **THEN** the sync history `Skipped` section SHALL list architecture (no candidates) and decisions (no candidates)
+
 ### Requirement: YAML frontmatter per memory file
 Each memory file under `.ai-memory/` SHALL contain YAML frontmatter with required fields: `id`, `type`, `title`, `summary`, `sync_status`, `evidence_mode`, `linked_commits`, `linked_specs`, `linked_sessions`, `updated_at`, `confidence`, and `tags`.
 
@@ -190,8 +201,8 @@ Each entry in `.ai-memory/index.json` SHALL contain a `summary` field with 2-3 s
 - **WHEN** `.ai-memory/manifest.json` does not exist and the user declines initialization
 - **THEN** `sdlc-repository-memory-sync` SHALL stop and report that memory is not initialized
 
-### Requirement: Module discovery via filesystem scan
-`sdlc-repository-memory-sync` SHALL run `discover_modules.py` during module classification to identify candidates from the filesystem that may not appear in the git diff. It SHALL compare discovery results against `discovery-prefs.json` and present new or previously-rejected candidates to the LLM with their structural metadata for recommendation.
+### Requirement: Child module discovery for accepted parent modules with semantic grouping
+For accepted modules that are broad containers, `sdlc-repository-memory-sync` SHALL evaluate child candidates beneath the parent path using generic structural scoring. Use a 10-point scale: scores higher than 7 are high confidence; scores 5-7 are medium confidence; scores lower than 5 are low confidence. Before creating individual child memory files, high-confidence child candidates SHALL be evaluated for semantic grouping by common prefix or domain. Grouped candidates SHALL be consolidated into a single logical child module memory file with multiple `owned_paths`. Child module memory files use `modules/<parent>/<child>.md` paths and include `parent_id`, key files, entry points, tests, related specs, and pitfalls when evidence exists.
 
 #### Scenario: New candidate with metadata presented to LLM
 - **WHEN** `discover_modules.py` returns a candidate with `disposition: new` and metadata including `file_types` and `has_build_file`
@@ -204,6 +215,22 @@ Each entry in `.ai-memory/index.json` SHALL contain a `summary` field with 2-3 s
 #### Scenario: Previously rejected candidate re-evaluated
 - **WHEN** a candidate has `disposition: previously_rejected`
 - **THEN** `sdlc-repository-memory-sync` SHALL present it with a "previously rejected" label and the original `reason_rejected`, allowing user to re-evaluate
+
+#### Scenario: High-confidence candidates grouped by prefix
+- **WHEN** four or more high-confidence child candidates under the same parent share a common directory name prefix and have matching `frontmatter_name` values
+- **THEN** `sdlc-repository-memory-sync` SHALL create a single grouped logical child module instead of individual child memory files, listing all grouped paths in `owned_paths`
+
+#### Scenario: Medium-confidence grouping presented to user
+- **WHEN** child candidates with medium confidence scores share a prefix or domain, or when fewer than four candidates share a prefix
+- **THEN** `sdlc-repository-memory-sync` SHALL present the proposed grouping to the user before writing memory files
+
+#### Scenario: No grouping applied to isolated candidates
+- **WHEN** a child candidate does not share a prefix or domain with any sibling
+- **THEN** `sdlc-repository-memory-sync` SHALL process it as a standalone child module using the existing per-candidate path
+
+#### Scenario: Paths in discovery-prefs map to grouped memory
+- **WHEN** grouped child candidates were previously `new`
+- **THEN** each source path in `discovery-prefs.json` SHALL be recorded with the grouped `memory_id` and `memory_path`, parent_id, and `status: accepted`
 
 ### Requirement: User confirmation for discovered module candidates
 For each new or previously-rejected module candidate, `sdlc-repository-memory-sync` SHALL present the candidate with the LLM recommendation and ask the user to Accept, Reject, or Merge into an existing module.
@@ -246,3 +273,50 @@ Sync scripts SHALL accept `--root` (repository root path) and `--json` (JSON out
 #### Scenario: discover_modules.py with JSON output
 - **WHEN** `python discover_modules.py --root . --json` is executed
 - **THEN** it SHALL output JSON with module candidates and stats summary
+
+### Requirement: Auto-create high-confidence child module memory
+`sdlc-repository-memory-sync` SHALL automatically create child module memory for child candidates whose confidence score is higher than 7.
+
+#### Scenario: High-confidence child module is auto-created
+- **WHEN** child discovery returns a new child candidate with score greater than 7
+- **THEN** memory sync SHALL create a child module memory file, update `discovery-prefs.json` with `status: accepted`, and include the child in the rebuilt index
+
+#### Scenario: Auto-created child module records parent reference
+- **WHEN** memory sync creates a child module memory file
+- **THEN** the child memory SHALL record its parent module reference and use a nested path under `modules/<parent>/`
+
+### Requirement: Present medium-confidence child candidates interactively
+`sdlc-repository-memory-sync` SHALL present medium-confidence child candidates interactively before writing pending review entries.
+
+#### Scenario: Medium-confidence child candidate requires interaction
+- **WHEN** child discovery returns a new child candidate with score from 5 through 7
+- **THEN** memory sync SHALL present the candidate to the user with Accept, Reject, Merge, and Save as proposed options before writing it to review state
+
+#### Scenario: Save as proposed writes review queue item
+- **WHEN** the user chooses Save as proposed for a medium-confidence child candidate
+- **THEN** memory sync SHALL write an open review queue item and SHALL NOT create a formal child module memory file
+
+### Requirement: Reject or ignore low-confidence child candidates
+`sdlc-repository-memory-sync` SHALL not create formal memory for low-confidence child candidates whose score is lower than 5.
+
+#### Scenario: Low-confidence implementation detail is rejected
+- **WHEN** child discovery returns a low-confidence child candidate with negative implementation-detail signals
+- **THEN** memory sync SHALL skip formal memory creation and MAY record the rejection reason in `discovery-prefs.json`
+
+### Requirement: Update parent module routing map
+`sdlc-repository-memory-sync` SHALL update a parent module's child routing map when child modules are created, accepted, merged, or rejected.
+
+#### Scenario: Parent routing map includes new child
+- **WHEN** a child module is created beneath a parent module
+- **THEN** memory sync SHALL update the parent module memory with a child routing entry pointing to the child memory file
+
+#### Scenario: Parent module remains broad summary
+- **WHEN** child modules exist beneath a parent module
+- **THEN** the parent module SHALL retain boundary and routing information rather than duplicating all child module details
+
+### Requirement: Generate actionable child module content
+`sdlc-repository-memory-sync` SHALL generate child module memory content that includes actionable navigation fields for agents.
+
+#### Scenario: Child module includes navigation sections
+- **WHEN** memory sync creates a child module memory file
+- **THEN** the file SHALL include sections for when to load, key files, entry points, tests, related specs, and known pitfalls when evidence is available
