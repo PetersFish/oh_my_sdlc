@@ -182,3 +182,112 @@ def save_child_candidate_review(root: Path, candidate: dict, write: bool = False
     if write:
         _write_json(queue_path, queue)
     return {"queued": True, "item": item}
+
+
+def group_by_prefix(candidates: list[dict]) -> dict[str, list[dict]]:
+    groups: dict[str, list[dict]] = {}
+    for c in candidates:
+        name = c.get("name", "")
+        parts = name.rsplit("-", 1)
+        if len(parts) > 1 and len(parts[0]) > 2:
+            prefix = parts[0]
+            groups.setdefault(prefix, []).append(c)
+    return groups
+
+
+def _grouped_memory_path(parent_id: str, parent_path: str, group_name: str) -> str:
+    parent = _parent_slug(parent_id, parent_path)
+    child = _slug(group_name)
+    return f"modules/{parent}/{child}.md"
+
+
+def _grouped_child_content(candidates: list[dict], memory_path: str, group_name: str) -> str:
+    if not candidates:
+        return ""
+    parent_id = candidates[0].get("parent_id", "")
+    all_paths = [c.get("path", "") for c in candidates if c.get("path")]
+    tags = ["module", "child", _slug(group_name), "grouped"]
+    title = group_name.replace("-", " ").title()
+
+    rows: list[str] = []
+    for c in candidates:
+        name = c.get("name", "")
+        path = c.get("path", "")
+        desc = c.get("frontmatter_description", "")[:120]
+        top_level = c.get("top_level_files", [])
+        key_files = [f"{path}/{item}" for item in top_level if not str(item).endswith("/")]
+        rows.append(f"| `{name}` | {desc} | {', '.join(key_files[:3]) if key_files else '—'} |")
+
+    return "\n".join([
+        "---",
+        f"id: {memory_path.removesuffix('.md')}",
+        f"parent_id: {parent_id}",
+        "type: module",
+        f"title: {title}",
+        f"summary: Grouped child module covering {len(candidates)} related packages under `{group_name}`. Load this memory for tasks targeting any owned path in this group.",
+        "sync_status: synced",
+        "evidence_mode: discovery",
+        "linked_commits: []",
+        "linked_specs: []",
+        "linked_sessions: []",
+        f"updated_at: {_now()}",
+        f"confidence: {max((c.get('confidence_band') or 'medium' for c in candidates), key=lambda x: {'high': 3, 'medium': 2, 'low': 1}.get(x, 0))}" if candidates else "confidence: medium",
+        f"tags: {_format_list(tags)}",
+        f"owned_paths: {_format_list(all_paths)}",
+        f"path_hints: {_format_list(all_paths)}",
+        f"keywords: {_format_list([_slug(group_name), 'child-module', 'grouped'])}",
+        "test_paths: []",
+        "spec_paths: []",
+        "---",
+        "",
+        f"# {title}",
+        "",
+        "## When To Load",
+        "",
+        f"Load this memory when work targets any path owned by the `{group_name}` child module group.",
+        "",
+        "## Grouped Packages",
+        "",
+        "| Name | Description | Key Files |",
+        "|------|-------------|-----------|",
+        *rows,
+        "",
+        "## Entry Points",
+        "",
+        "- Each grouped package has its own SKILL.md entry point.",
+        "",
+        "## Tests",
+        "",
+        "- See individual package test paths.",
+        "",
+        "## Related Specs",
+        "",
+        "- See individual package spec paths.",
+        "",
+        "## Known Pitfalls",
+        "",
+        "- None recorded yet.",
+        "",
+    ])
+
+
+def create_grouped_child_module(root: Path, candidates: list[dict], group_name: str, write: bool = False) -> dict:
+    if not candidates:
+        return {"created": False, "error": "no candidates"}
+    parent_id = candidates[0].get("parent_id", "")
+    parent_path = candidates[0].get("parent_path", "")
+    memory_path = _grouped_memory_path(parent_id, parent_path, group_name)
+    child_file = root / ".ai-memory" / memory_path
+    content = _grouped_child_content(candidates, memory_path, group_name)
+    if write:
+        child_file.parent.mkdir(parents=True, exist_ok=True)
+        child_file.write_text(content, encoding="utf-8")
+    for c in candidates:
+        _update_discovery_prefs(root, c, memory_path, write)
+    _update_parent_routing(root, candidates[0], memory_path, write)
+    return {
+        "created": True,
+        "memory_path": memory_path,
+        "parent_id": parent_id,
+        "grouped_count": len(candidates),
+    }

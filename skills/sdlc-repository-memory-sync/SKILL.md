@@ -46,9 +46,16 @@ Synchronize repository memory after changes. Classify evidence into memory types
 
     6d. **LLM evaluate discovery candidates.** For `new` and `previously_rejected` candidates, analyze structural metadata (file_types, has_build_file, top_level_files, depth, children_count) and recommend: Accept (create independent module memory), Reject (not a module), or Merge (into an existing module).
 
-    6e. **Child module discovery for accepted parent modules.** For accepted modules that are broad containers, evaluate child candidates beneath the parent path using generic structural scoring. Use a 10-point scale: scores higher than 7 are high confidence and auto-create child module memory; scores 5-7 are medium confidence and must be presented interactively before writing review entries; scores lower than 5 are low confidence and should be skipped or rejected as implementation details when appropriate. Child module memory files use `modules/<parent>/<child>.md` paths and include `parent_id`, key files, entry points, tests, related specs, and pitfalls when evidence exists.
+    6e. **Child module discovery for accepted parent modules.** For accepted modules that are broad containers, evaluate child candidates beneath the parent path using generic structural scoring. Use a 10-point scale: scores higher than 7 are high confidence; scores 5-7 are medium confidence; scores lower than 5 are low confidence.
 
-    6f. **User confirmation for discovery candidates.** Present recommendations to user:
+    6f. **Semantic grouping of child candidates.** Before creating individual child memory files, apply semantic grouping to sibling candidates under the same parent:
+
+    - **Prefix-based grouping**: When multiple high or medium-confidence child candidates share a common directory name prefix (e.g., `sdlc-repository-memory-*`, `transform-*`), group them into a single logical child module. Use the shared prefix domain as the child module name (e.g., `memory`, `transform`).
+    - **Grouping thresholds**: 4+ siblings with common prefix → high confidence auto-create; 2-3 siblings with common prefix → medium confidence present to user; 1 sibling or no prefix match → evaluate as standalone.
+    - **Logical child module**: Write one `modules/<parent>/<child>.md` file with `parent_id` set to the parent module, `owned_paths` listing all grouped candidate paths, and body sections listing each grouped candidate with its key files, SKILL.md description, tests, and specs.
+    - **Discovery prefs**: Record every grouped source path in `discovery-prefs.json` with the same `memory_id` and `memory_path`, `parent_id`, and `confirmed_at` so future syncs treat them as `known`.
+
+    6g. **User confirmation for discovery candidates.** Present recommendations to user:
     - **Accept** — create module memory file with YAML frontmatter, write to `discovery-prefs.json` with `status: accepted`.
     - **Reject** — write to `discovery-prefs.json` with `status: rejected` and reason.
 - **Merge** — update existing module memory file, write to `discovery-prefs.json` with `status: accepted` pointing to the existing `memory_id`.
@@ -120,6 +127,12 @@ When multiple active OpenSpec changes form a lineage (change B refines change A)
 ## Sync History
 
 - Each sync writes `.ai-memory/sync-history/<sync_id>.md` using the sync-history template.
+- Sync history MUST include a `## Skipped` section listing every memory type not updated and the reason:
+  - `architecture`: no candidates, or user declined
+  - `decisions`: no candidates, or user declined
+  - `pitfalls`: no failure evidence (no stack trace, failing test, or observed misbehavior)
+  - `specs`: no OpenSpec change ID detected
+  - `evolution`: no stable commit range available (first sync or dirty-only changes)
 - Sync history files are committed to git.
 - They are NOT indexed by `index.json`.
 - They are NOT loaded by `sdlc-repository-memory-load` by default.
@@ -146,7 +159,7 @@ After sync, report:
 Memory Sync Complete — <sync_id>
 
 Updated: <list of memory docs updated by type>
-Skipped: <types skipped and why>
+Skipped: <types skipped and why — MUST include every skipped type with reason>
 Evidence: <commit range, OpenSpec change IDs, session observations used>
 Pending: <items marked pending_commit>
 Review Queue: <items in review-queue awaiting user decision>

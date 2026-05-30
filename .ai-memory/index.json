@@ -1,84 +1,113 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-05-28T16:30:21.613792Z",
+  "generated_at": "2026-05-29T02:00:11.587536Z",
   "entries": [
     {
-      "id": "modules/docs",
-      "type": "module",
-      "path": "modules/docs.md",
-      "title": "Documentation",
-      "summary": "Supporting documentation organized into decisions/, modules/, and superpowers/ subdirectories. Contains architectural decisions, module documentation, and superpowers reference material.",
-      "tags": [
-        "docs",
-        "decisions",
-        "architecture",
-        "superpowers"
-      ],
-      "updated_at": "2026-05-29T00:00:00Z",
-      "confidence": "medium",
-      "status": "synced"
-    },
-    {
-      "id": "modules/openspec",
+      "id": "openspec",
       "type": "module",
       "path": "modules/openspec.md",
-      "title": "OpenSpec Framework",
-      "summary": "Specification-driven development framework with changes/, specs/, and schemas/ directories. Uses an artifact workflow (proposal \u2192 design \u2192 specs \u2192 tasks \u2192 verify). All changes are in archived state.",
+      "title": "OpenSpec",
+      "summary": "OpenSpec workflow artifacts: change proposals, designs, specs, tasks, and verification reports. Structured as changes/ (active), changes/archive/ (completed), and specs/ (master specs). Load when working with OpenSpec workflow steps.",
       "tags": [
         "openspec",
-        "specs",
+        "specifications",
         "workflow",
-        "changes"
+        "changes",
+        "proposals"
       ],
       "updated_at": "2026-05-29T00:00:00Z",
       "confidence": "high",
-      "status": "synced"
-    },
-    {
-      "id": "modules/plan",
-      "type": "module",
-      "path": "modules/plan.md",
-      "title": "Planning Documents",
-      "summary": "Planning workspace containing openspec-memory-sync-v2.md and question01.md. Lightweight planning directory separate from OpenSpec change artifacts.",
-      "tags": [
-        "plan",
-        "planning",
-        "workspace"
+      "status": "synced",
+      "parent_id": "null",
+      "owned_paths": [
+        "openspec/"
       ],
-      "updated_at": "2026-05-29T00:00:00Z",
-      "confidence": "medium",
-      "status": "synced"
+      "path_hints": [
+        "openspec/"
+      ],
+      "keywords": [
+        "openspec",
+        "change",
+        "proposal",
+        "design",
+        "spec",
+        "task",
+        "verify",
+        "brainstorm"
+      ],
+      "test_paths": [],
+      "spec_paths": [
+        "openspec/specs/"
+      ]
     },
     {
-      "id": "modules/skills",
+      "id": "skills",
       "type": "module",
       "path": "modules/skills.md",
-      "title": "Skills Collection",
-      "summary": "Core skill definitions organized by prefix taxonomy. 14 skills across qa-, research-, sdlc-, transform-, study-, media-, integration-, ops-, and meta-skill- categories. Each skill has SKILL.md, optional scripts/, schemas/, templates/, references/.",
+      "title": "Skills",
+      "summary": "16 AI skill definitions (SKILL.md + scripts/schemas) for SDLC, media routing, research, transforms, and lifecycle governance. Load when exploring skill behavior, writing new skills, or debugging skill dispatch.",
       "tags": [
         "skills",
-        "taxonomy",
-        "collection"
+        "ai-skills",
+        "skill-system",
+        "sdlc",
+        "transforms",
+        "lifecycle"
       ],
       "updated_at": "2026-05-29T00:00:00Z",
       "confidence": "high",
-      "status": "synced"
+      "status": "synced",
+      "parent_id": "null",
+      "owned_paths": [
+        "skills/"
+      ],
+      "path_hints": [
+        "skills/"
+      ],
+      "keywords": [
+        "skill",
+        "SKILL.md",
+        "skill-lifecycle",
+        "skill-creator"
+      ],
+      "test_paths": [
+        "tests/test_repository_memory_skill_copies.py"
+      ],
+      "spec_paths": []
     },
     {
-      "id": "modules/tests",
+      "id": "tests",
       "type": "module",
       "path": "modules/tests.md",
-      "title": "Test Suite",
-      "summary": "Python test suite covering skill lifecycle, module discovery, OCR router, and repository memory (init/load/sync). Uses pytest-style tests with supporting test images and markdown fixtures.",
+      "title": "Tests",
+      "summary": "Test suite for repository skills: memory init/load/sync, module discovery, OCR routing, skill copies, lifecycle utilities, and research. Python-based with image fixtures. Run with pytest from the repository root.",
       "tags": [
         "tests",
         "pytest",
-        "skills",
-        "memory"
+        "python",
+        "verification"
       ],
       "updated_at": "2026-05-29T00:00:00Z",
       "confidence": "high",
-      "status": "synced"
+      "status": "synced",
+      "parent_id": "null",
+      "owned_paths": [
+        "tests/"
+      ],
+      "path_hints": [
+        "tests/"
+      ],
+      "keywords": [
+        "test",
+        "pytest",
+        "verify",
+        "assertion",
+        "test file"
+      ],
+      "test_paths": [
+        "tests/"
+      ],
+      "spec_paths": []
     }
   ],
   "excluded_paths": [

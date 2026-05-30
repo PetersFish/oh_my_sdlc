@@ -1,43 +1,62 @@
 ---
-id: modules/openspec
+id: openspec
 type: module
-title: OpenSpec Framework
-summary: Specification-driven development framework with changes/, specs/, and schemas/ directories. Uses an artifact workflow (proposal → design → specs → tasks → verify). All changes are in archived state.
+title: OpenSpec
+summary: OpenSpec workflow artifacts: change proposals, designs, specs, tasks, and verification reports. Structured as changes/ (active), changes/archive/ (completed), and specs/ (master specs). Load when working with OpenSpec workflow steps.
+parent_id: null
 sync_status: synced
 evidence_mode: discovery
-linked_commits: ["72272fb8c448292dd985d7ee35f160de9e5c94bc"]
+linked_commits: []
 linked_specs: []
-linked_sessions: ["20260529-01"]
+linked_sessions: ["20260529-000001"]
 updated_at: 2026-05-29T00:00:00Z
 confidence: high
-tags: [openspec, specs, workflow, changes]
+tags: [openspec, specifications, workflow, changes, proposals]
+owned_paths: ["openspec/"]
+path_hints: ["openspec/"]
+keywords: [openspec, change, proposal, design, spec, task, verify, brainstorm]
+test_paths: []
+spec_paths: ["openspec/specs/"]
 ---
 
-# OpenSpec Framework
+# OpenSpec
 
 ## Current Understanding
 
-This repo embeds an OpenSpec workflow for managing changes to skills and memory infrastructure. Structure:
-- **changes/archive/**: 6 archived changes covering memory sync, multimodal routing, module discovery, and skill cleanup
-- **schemas/**: SDD+Superpowers schema templates for artifact generation
-- **specs/**: 10 active specs that define behavior of individual skills/modules (clipboard-routing, module-discovery, openspec-memory-sync, etc.)
-
-The artifact workflow follows: proposal → design → specs → tasks → verify → archive.
+The `openspec/` directory stores all OpenSpec workflow artifacts. Active changes live in `openspec/changes/`, completed/archived changes in `openspec/changes/archive/`, and master specifications in `openspec/specs/`. Each change has a standardized set of artifacts: proposal, design, specs (delta), tasks, and optionally brainstorm/plan.
 
 ## Evidence
 
-- `openspec/changes/archive/` contains 6 completed change directories with full artifact sets
-- `openspec/specs/` contains 10 spec directories, each with a spec.md
-- `openspec/schemas/sdd-plus-superpowers/` provides artifact templates
-- Module discovery confirmed 52 .md and 2 .yaml files in the openspec tree
+Initial discovery scan: 61 files (59 .md, 2 .yaml). 2 active changes (`generic-child-module-discovery`), 6 archived changes. Config in `config.yaml`.
 
 ## Operational Guidance
 
-- Active changes should go in `openspec/changes/<id>/`, not directly in archive/
-- Specs in `openspec/specs/` are the source of truth for skill behavior
-- Archived changes provide evidence history for memory sync
-- When creating new specs, follow the SDD+Superpowers template
+- Active changes follow `openspec/changes/<change-id>/` convention.
+- Each change contains proposal.md, design.md, specs/, and tasks.md.
+- Archive completed changes under `openspec/changes/archive/<date>-<change-id>/`.
+- Master specs live in `openspec/specs/<spec-name>/spec.md`.
+
+## Child Modules
+
+Not applicable — this is a storage/convention module, not a code module.
+
+## Key Files
+
+- `openspec/config.yaml` — workflow configuration
+- `openspec/schemas/sdd-plus-superpowers/` — schema definitions and templates
+
+## Entry Points
+
+Changes are created/advanced through OpenSpec skills (`openspec-new-change`, `openspec-propose`, etc.).
+
+## Tests
+
+No dedicated test files for OpenSpec artifacts.
+
+## Related Specs
+
+Master specs under `openspec/specs/` define the formal specifications for clipboard-routing, module-discovery, openspec-memory-sync, repository-memory-init/load/sync, skill-boundary-cleanup, and others.
 
 ## Update Notes
 
-Initial discovery during first repository memory sync (2026-05-29).
+First sync after repository memory initialization.
