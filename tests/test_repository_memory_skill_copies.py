@@ -10,11 +10,9 @@ CLIENT_DIRS = [
     REPO_ROOT / ".claude" / "skills",
     REPO_ROOT / ".cursor" / "skills",
 ]
-REPO_MEMORY_SKILLS = [
-    "sdlc-repository-memory-init",
-    "sdlc-repository-memory-load",
-    "sdlc-repository-memory-sync",
-]
+CANONICAL_SKILLS = sorted(
+    path.name for path in CANONICAL_DIR.iterdir() if path.is_dir() and path.name.startswith("sdlc-")
+)
 INSTALL_METADATA_REQUIRED_FIELDS = [
     "skill",
     "source_repo",
@@ -30,13 +28,13 @@ SUBDIRS_WITH_CONTENT = ["scripts", "schemas", "templates"]
 
 class TestRepositoryMemorySkillCopies:
     def test_canonical_skill_dirs_exist(self):
-        for skill in REPO_MEMORY_SKILLS:
+        for skill in CANONICAL_SKILLS:
             canonical = CANONICAL_DIR / skill
             assert canonical.is_dir(), f"Canonical skill dir missing: {canonical}"
             assert (canonical / "SKILL.md").is_file(), f"Canonical SKILL.md missing: {skill}"
 
     def test_installed_copies_exist_in_all_client_dirs(self):
-        for skill in REPO_MEMORY_SKILLS:
+        for skill in CANONICAL_SKILLS:
             for client_dir in CLIENT_DIRS:
                 skill_dir = client_dir / skill
                 assert skill_dir.is_dir(), f"Installed copy missing: {skill_dir}"
@@ -44,7 +42,7 @@ class TestRepositoryMemorySkillCopies:
                 assert skill_md.is_file(), f"SKILL.md missing: {skill_dir}"
 
     def test_skill_md_content_matches_canonical(self):
-        for skill in REPO_MEMORY_SKILLS:
+        for skill in CANONICAL_SKILLS:
             canonical_content = (CANONICAL_DIR / skill / "SKILL.md").read_text(encoding="utf-8")
             for client_dir in CLIENT_DIRS:
                 copy_content = (client_dir / skill / "SKILL.md").read_text(encoding="utf-8")
@@ -53,13 +51,13 @@ class TestRepositoryMemorySkillCopies:
                 )
 
     def test_skill_install_json_exists_in_all_copies(self):
-        for skill in REPO_MEMORY_SKILLS:
+        for skill in CANONICAL_SKILLS:
             for client_dir in CLIENT_DIRS:
                 install_json = client_dir / skill / ".skill-install.json"
                 assert install_json.is_file(), f".skill-install.json missing: {skill} in {client_dir.name}"
 
     def test_skill_install_json_has_required_fields(self):
-        for skill in REPO_MEMORY_SKILLS:
+        for skill in CANONICAL_SKILLS:
             for client_dir in CLIENT_DIRS:
                 install_json = client_dir / skill / ".skill-install.json"
                 data = json.loads(install_json.read_text(encoding="utf-8"))
@@ -67,14 +65,14 @@ class TestRepositoryMemorySkillCopies:
                     assert field in data, f"Missing field '{field}' in {install_json}"
 
     def test_skill_install_json_skill_name_matches(self):
-        for skill in REPO_MEMORY_SKILLS:
+        for skill in CANONICAL_SKILLS:
             for client_dir in CLIENT_DIRS:
                 install_json = client_dir / skill / ".skill-install.json"
                 data = json.loads(install_json.read_text(encoding="utf-8"))
                 assert data["skill"] == skill, f"Expected skill={skill}, got {data['skill']} in {install_json}"
 
     def test_canonical_scripts_exist_in_all_copies(self):
-        for skill in REPO_MEMORY_SKILLS:
+        for skill in CANONICAL_SKILLS:
             canonical_scripts = CANONICAL_DIR / skill / "scripts"
             if not canonical_scripts.is_dir():
                 continue
@@ -91,7 +89,7 @@ class TestRepositoryMemorySkillCopies:
                     )
 
     def test_canonical_schemas_exist_in_all_copies(self):
-        for skill in REPO_MEMORY_SKILLS:
+        for skill in CANONICAL_SKILLS:
             canonical_schemas = CANONICAL_DIR / skill / "schemas"
             if not canonical_schemas.is_dir():
                 continue
@@ -108,7 +106,7 @@ class TestRepositoryMemorySkillCopies:
                     )
 
     def test_canonical_templates_exist_in_all_copies(self):
-        for skill in REPO_MEMORY_SKILLS:
+        for skill in CANONICAL_SKILLS:
             canonical_templates = CANONICAL_DIR / skill / "templates"
             if not canonical_templates.is_dir():
                 continue

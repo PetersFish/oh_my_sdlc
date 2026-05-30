@@ -1,0 +1,15 @@
+{
+  "skill": "sdlc-project-bootstrap",
+  "source_repo": "/Users/yuping/Documents/workspace/oh_my_skills",
+  "source_ref": "HEAD",
+  "source_path": "skills/sdlc-project-bootstrap",
+  "target": ".claude/skills/sdlc-project-bootstrap",
+  "installed_at": "2026-05-30T14:26:15.086576Z",
+  "status": "stable",
+  "backport_policy": "review-required",
+  "payload_hash": "a4a7b1cc525650ac33ce56d9847faf56a0c59ec499f5597bf56d1969b765e4c3",
+  "files": [
+    "SKILL.md",
+    "templates/AGENTS.md"
+  ]
+}

@@ -4,10 +4,10 @@
   "source_ref": "HEAD",
   "source_path": "skills/sdlc-openspec-memory-sync",
   "target": ".opencode/skills/sdlc-openspec-memory-sync",
-  "installed_at": "2026-05-28T00:00:00Z",
+  "installed_at": "2026-05-30T14:26:15.086576Z",
   "status": "stable",
   "backport_policy": "review-required",
-  "payload_hash": "0ce8781e31f1402866de0687c1db46e3f57b7cbab0f22c7636319205f90c2ea3",
+  "payload_hash": "5c2a370dfba03c93e4537770cf06774384a3e3a9190b25020fe5037af849f199",
   "files": [
     "SKILL.md"
   ]

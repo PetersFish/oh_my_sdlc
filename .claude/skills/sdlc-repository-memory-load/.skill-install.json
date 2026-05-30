@@ -4,10 +4,10 @@
   "source_ref": "HEAD",
   "source_path": "skills/sdlc-repository-memory-load",
   "target": ".claude/skills/sdlc-repository-memory-load",
-  "installed_at": "2026-05-28T00:00:00Z",
+  "installed_at": "2026-05-30T14:26:15.086576Z",
   "status": "stable",
   "backport_policy": "review-required",
-  "payload_hash": "389f9f156a47fbd4dfc4c10fb263fd2bc6a9491743940c2b6c7b7198787bf78c",
+  "payload_hash": "cb6f4746bb0297f08e5ee736d79201dd85e36add83f3f260282e76e0b503b0d7",
   "files": [
     "SKILL.md",
     "schemas/index.schema.json",

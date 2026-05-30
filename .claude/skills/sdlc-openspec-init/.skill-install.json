@@ -1,0 +1,20 @@
+{
+  "skill": "sdlc-openspec-init",
+  "source_repo": "/Users/yuping/Documents/workspace/oh_my_skills",
+  "source_ref": "HEAD",
+  "source_path": "skills/sdlc-openspec-init",
+  "target": ".claude/skills/sdlc-openspec-init",
+  "installed_at": "2026-05-30T14:26:15.086576Z",
+  "status": "stable",
+  "backport_policy": "review-required",
+  "payload_hash": "945af30e6ff38935ecc6b4d98848ca57400c3cf53fc1c085e195866f15796281",
+  "files": [
+    "SKILL.md",
+    "templates/sdd-plus-superpowers/README.md",
+    "templates/sdd-plus-superpowers/schema.yaml",
+    "templates/sdd-plus-superpowers/templates/design.md",
+    "templates/sdd-plus-superpowers/templates/proposal.md",
+    "templates/sdd-plus-superpowers/templates/spec.md",
+    "templates/sdd-plus-superpowers/templates/tasks.md"
+  ]
+}
