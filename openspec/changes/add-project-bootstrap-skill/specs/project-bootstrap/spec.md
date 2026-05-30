@@ -1,15 +1,26 @@
 ## ADDED Requirements
 
 ### Requirement: Bootstrap execution order
-`sdlc-project-bootstrap` SHALL execute initialization steps in a fixed order: AGENTS.md, OpenSpec, repository memory. If a step cannot proceed safely, the skill SHALL stop and report the failing step before continuing.
+`sdlc-project-bootstrap` SHALL execute initialization steps in a fixed order: AGENTS.md, OpenSpec/schema (via `sdlc-openspec-init`), repository memory. If a step cannot proceed safely, the skill SHALL stop and report the failing step before continuing.
 
 #### Scenario: Full bootstrap on empty project
 - **WHEN** a project has no AGENTS.md, no OpenSpec configuration, and no `.ai-memory/`
-- **THEN** the skill SHALL create AGENTS.md, initialize OpenSpec, and initialize repository memory in that order
+- **THEN** the skill SHALL create AGENTS.md, invoke `sdlc-openspec-init`, and invoke `sdlc-repository-memory-init` in that order
 
 #### Scenario: Partial bootstrap stops on failure
 - **WHEN** a step fails with a non-recoverable error
 - **THEN** the skill SHALL report the failure and stop without executing remaining steps
+
+### Requirement: Dry-run preview
+`sdlc-project-bootstrap` SHALL support dry-run mode that reports all planned actions without modifying any files.
+
+#### Scenario: Dry-run on empty project
+- **WHEN** dry-run mode is invoked on a project with no initialized infrastructure
+- **THEN** the skill SHALL report the planned actions (create AGENTS.md, init OpenSpec, install schema, init memory) without creating or modifying any files
+
+#### Scenario: Dry-run on partially initialized project
+- **WHEN** dry-run mode is invoked on a project where some steps are already initialized
+- **THEN** the skill SHALL report only the missing steps as planned actions, and report already-initialized steps as skipped
 
 ### Requirement: AGENTS.md initialization
 `sdlc-project-bootstrap` SHALL initialize AGENTS.md at the repository root using the baseline template bundled at `templates/AGENTS.md`.
@@ -37,24 +48,16 @@ The bundled AGENTS.md template SHALL NOT include the Repository Memory reminder 
 - **WHEN** the template `templates/AGENTS.md` is inspected
 - **THEN** it SHALL NOT contain a "## Repository Memory" section or equivalent memory-load instruction
 
-### Requirement: OpenSpec initialization
-`sdlc-project-bootstrap` SHALL detect whether OpenSpec is initialized at the project root and delegate initialization to the OpenSpec CLI when it is missing.
+### Requirement: OpenSpec initialization delegation
+`sdlc-project-bootstrap` SHALL delegate OpenSpec initialization and schema installation to `sdlc-openspec-init`.
 
-#### Scenario: OpenSpec is already initialized
-- **WHEN** `openspec/config.yaml` or equivalent OpenSpec markers exist at the project root
-- **THEN** the skill SHALL report OpenSpec as already initialized and skip the step
+#### Scenario: Delegation to openspec-init
+- **WHEN** the bootstrap reaches the OpenSpec step
+- **THEN** the skill SHALL invoke `sdlc-openspec-init` to handle OpenSpec detection, CLI init, and schema installation
 
-#### Scenario: OpenSpec is not initialized
-- **WHEN** no OpenSpec configuration exists at the project root
-- **THEN** the skill SHALL invoke OpenSpec CLI initialization
-
-#### Scenario: No OpenSpec change is created automatically
-- **WHEN** the skill initializes OpenSpec
-- **THEN** the skill SHALL NOT automatically create an OpenSpec change
-
-#### Scenario: Post-init suggestion
-- **WHEN** OpenSpec initialization completes
-- **THEN** the skill SHALL suggest the next command for creating a change, including the recommended schema (`sdd-plus-superpowers`) when applicable
+#### Scenario: openspec-init reports already initialized
+- **WHEN** `sdlc-openspec-init` reports that OpenSpec and schema are already present
+- **THEN** the skill SHALL report OpenSpec as already initialized and proceed to the next step
 
 ### Requirement: Repository memory initialization
 `sdlc-project-bootstrap` SHALL delegate repository memory initialization to `sdlc-repository-memory-init`. This step SHALL run only after AGENTS.md and OpenSpec initialization have completed.

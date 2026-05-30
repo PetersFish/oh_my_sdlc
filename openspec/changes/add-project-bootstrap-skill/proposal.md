@@ -1,27 +1,34 @@
 ## Why
 
-New project initialization in this ecosystem currently requires the developer to know and execute three independent steps: create `AGENTS.md`, initialize OpenSpec, and set up repository memory. Each step has different tools and invocation patterns, and the correct execution order (`AGENTS.md` -> OpenSpec -> memory) is not obvious. An orchestration skill provides a single, idempotent entry point that sequences these steps correctly and reports results.
+New project initialization in this ecosystem currently requires the developer to know and execute multiple independent steps: create `AGENTS.md`, initialize OpenSpec, install the `sdd-plus-superpowers` schema (currently only in this repo, must be manually copied), and set up repository memory. Each step has different tools and invocation patterns, and the correct execution order (`AGENTS.md` -> OpenSpec -> schema -> memory) is not obvious. An orchestration skill paired with a dedicated OpenSpec init skill provides a single, idempotent, dry-run-capable entry point that sequences these steps correctly and reports results.
 
 ## What Changes
 
+- **New skill `sdlc-openspec-init`**: Initializes OpenSpec in a project and installs the `sdd-plus-superpowers` schema from this repository. Supports schema detection, installation when missing, and schema iteration over time. Can be invoked standalone.
 - **New skill `sdlc-project-bootstrap`**: Orchestrates project foundation initialization with a fixed execution order:
   1. `AGENTS.md` initialization (create from template or conservative merge)
-  2. OpenSpec initialization (delegate to OpenSpec CLI)
+  2. OpenSpec + schema initialization (delegate to `sdlc-openspec-init`)
   3. Repository memory initialization (delegate to `sdlc-repository-memory-init`)
-- **New template `templates/AGENTS.md`**: Baseline agent behavior rules (from current repository `AGENTS.md` lines 1-61), bundled with the skill so it is self-contained for the AGENTS step.
+- **New template `templates/AGENTS.md`**: Baseline agent behavior rules (from current repository `AGENTS.md` lines 1-61), bundled with `sdlc-project-bootstrap`.
+- **Dry-run support**: `sdlc-project-bootstrap` supports preview mode that reports planned actions without modifying files.
 - Each step is idempotent. Existing artifacts are preserved; only missing artifacts or missing standard blocks are added.
 - The skill reports created, skipped, and appended actions, plus suggested next steps.
 
 ## Capabilities
 
 ### New Capabilities
-- `sdlc-project-bootstrap`: Single-command project foundation initialization with sequenced, idempotent steps
+- `sdlc-openspec-init`: OpenSpec initialization and schema installation for new projects, with reusable schema lifecycle management
+- `sdlc-project-bootstrap`: Single-command project foundation initialization with sequenced, idempotent steps and dry-run preview
 
 ## Impact
 
-- New canonical skill directory: `skills/sdlc-project-bootstrap/`
-  - `SKILL.md`: Orchestration workflow and guard rules
-  - `templates/AGENTS.md`: Baseline agent behavior rules
+- New canonical skill directories:
+  - `skills/sdlc-openspec-init/`
+    - `SKILL.md`: OpenSpec initialization and schema installation workflow
+    - `templates/sdd-plus-superpowers/`: Schema files copied from this repository
+  - `skills/sdlc-project-bootstrap/`
+    - `SKILL.md`: Orchestration workflow and guard rules
+    - `templates/AGENTS.md`: Baseline agent behavior rules
 - No changes to existing skills (`sdlc-repository-memory-init`, etc.)
 - No schema changes
 - No breaking changes

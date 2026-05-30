@@ -2,22 +2,24 @@
 
 This repository already has `sdlc-repository-memory-init` for `.ai-memory/` setup and uses OpenSpec CLI for spec-driven development. AGENTS.md is manually maintained. A new project lacks all three, and the developer must know to run each one in the correct order.
 
-This skill fills the gap as a lightweight orchestrator. It does not reimplement existing capabilities; it sequences them and adds the one piece not covered by existing skills: AGENTS.md initialization.
+Two new skills fill the gaps: `sdlc-openspec-init` handles OpenSpec initialization and schema installation, while `sdlc-project-bootstrap` orchestrates all three foundation steps with an AGENTS.md baseline template and dry-run support.
 
 ## Goals / Non-Goals
 
 **Goals:**
-- Provide a single skill that initializes a new project's foundation (AGENTS.md, OpenSpec, repository memory)
-- Enforce correct execution order: AGENTS.md -> OpenSpec -> repository memory
+- Provide a single entry point (`sdlc-project-bootstrap`) that initializes a new project's foundation (AGENTS.md, OpenSpec + schema, repository memory)
+- Provide a standalone `sdlc-openspec-init` skill for reusable OpenSpec initialization and schema management
+- Enforce correct execution order: AGENTS.md -> OpenSpec/schema -> repository memory
+- Support dry-run mode that previews planned actions without modifying files
 - Be fully idempotent: safe to run repeatedly on the same project
 - Use conservative merge for existing AGENTS.md
-- Delegate OpenSpec and memory initialization to their respective tools
-- Bundle an AGENTS.md baseline template so the skill is self-contained for its first step
-- Design an extensible step structure so future bootstrap steps (README, CI, .gitignore) can be added naturally
+- Delegate OpenSpec/schema and memory initialization to their respective skills
+- Bundle an AGENTS.md baseline template so bootstrap is self-contained for its first step
+- Design an extensible step structure so future bootstrap steps can be added naturally
 
 **Non-Goals:**
 - Do not reimplement `.ai-memory/` initialization logic
-- Do not reimplement OpenSpec initialization logic
+- Do not reimplement OpenSpec CLI logic
 - Do not auto-create OpenSpec changes
 - Do not auto-run repository memory sync
 - Do not auto-commit to git
@@ -28,15 +30,15 @@ This skill fills the gap as a lightweight orchestrator. It does not reimplement 
 
 ### Decision 1: Orchestration skill, not self-contained
 
-The skill sequences existing tools and templates. OpenSpec initialization calls the OpenSpec CLI. Memory initialization delegates to `sdlc-repository-memory-init`. Only AGENTS.md initialization is handled inline because no existing skill covers it.
+The skill sequences existing tools and templates. OpenSpec/Schema initialization delegates to `sdlc-openspec-init`. Memory initialization delegates to `sdlc-repository-memory-init`. Only AGENTS.md initialization is handled inline because no existing skill covers it.
 
 **Alternatives considered:**
 - Self-contained implementation: rejected because it duplicates maintenance of OpenSpec and memory initialization logic.
-- Multi-skill pipeline (one skill per step): rejected as premature for v1; structure allows future decomposition if individual steps grow complex.
+- Single-skill all-in-one: rejected because OpenSpec schema management (installation, iteration) is a domain concern that benefits from independent testability and upgradeability.
 
 ### Decision 2: Fixed execution order
 
-AGENTS.md is initialized first because subsequent tooling (OpenSpec, memory) runs under agent guidance that the AGENTS.md rules are meant to shape. OpenSpec is initialized second because spec-driven development should be available before durable memory records project context. Repository memory is initialized last because memory init appends its reminder block to AGENTS.md after the baseline rules are in place.
+AGENTS.md is initialized first because subsequent tooling (OpenSpec, memory) runs under agent guidance that the AGENTS.md rules are meant to shape. OpenSpec/schema is initialized second because spec-driven development should be available before durable memory records project context. Repository memory is initialized last because memory init appends its reminder block to AGENTS.md after the baseline rules are in place.
 
 **Alternatives considered:**
 - Parallel initialization: rejected because memory init modifies AGENTS.md, creating a race with the AGENTS step.
@@ -58,15 +60,32 @@ When AGENTS.md already exists, the skill reads it and appends only standard bloc
 - Always create fresh template: rejected because it would overwrite project-specific agent instructions.
 - Prompt user on every conflict: rejected because it adds friction; existing content is always preserved by default.
 
-### Decision 5: OpenSpec init delegates to CLI
+### Decision 5: Separate `sdlc-openspec-init` skill for schema lifecycle
 
-The skill checks for `openspec/config.yaml` or equivalent markers. If OpenSpec is not initialized, the skill instructs the executor to run the OpenSpec CLI init command. After init, it suggests the next command for creating a change with the repository's preferred schema.
+OpenSpec initialization and schema installation are handled by a dedicated `sdlc-openspec-init` skill. This skill:
+- Detects whether OpenSpec is initialized at the project root
+- Runs OpenSpec CLI init when missing
+- Copies the `sdd-plus-superpowers` schema from its bundled templates to the project's `openspec/schemas/` directory
+- Will support schema iteration (updating existing schemas in future versions)
+- Can be invoked standalone or by `sdlc-project-bootstrap`
+
+The schema template files are bundled in `skills/sdlc-openspec-init/templates/sdd-plus-superpowers/` and copied from this repository. Bootstrap does NOT own schema templates or lifecycle.
 
 **Alternatives considered:**
-- Create `openspec/config.yaml` from a template: rejected because it requires maintaining schema-specific templates and diverges from the canonical OpenSpec init path.
-- Create `sdlc-openspec-init` skill: rejected as premature; the OpenSpec CLI is the canonical init tool.
+- Inline in bootstrap: rejected because schema management is a domain concern; bootstrap should not own schema templates. Schema iteration would force bootstrap updates even when the user only wants to update schemas.
+- Use OpenSpec CLI directly from bootstrap: rejected because the CLI does not install the `sdd-plus-superpowers` schema (it's a local schema only present in this repo). The init skill bridges the gap between CLI init and schema installation.
 
-### Decision 6: Memory init delegated, sync not auto-run
+### Decision 6: Dry-run support in v1
+
+`sdlc-project-bootstrap` supports a dry-run mode that reports all planned actions across all steps without modifying any files. This is essential because bootstrap touches multiple infrastructure files and users should be able to preview before committing changes.
+
+`sdlc-openspec-init` also supports dry-run (separately or when invoked via bootstrap), reporting what would be initialized, created, or copied.
+
+**Alternatives considered:**
+- Defer to v2: rejected because bootstrap is a multi-step file-modifying operation; a preview mechanism is essential for first-use confidence.
+- CLI flag only: rejected as too coupled to execution environment. The skill should support conversational dry-run invocation (e.g., "preview the bootstrap" or "what would this do?").
+
+### Decision 7: Memory init delegated, sync not auto-run
 
 The skill delegates `.ai-memory/` setup to `sdlc-repository-memory-init`. It does NOT auto-run `sdlc-repository-memory-sync` because sync may produce review-queue entries or pending memory that needs developer review before commitment.
 
@@ -77,11 +96,7 @@ The skill delegates `.ai-memory/` setup to `sdlc-repository-memory-init`. It doe
 ## Risks / Trade-offs
 
 - **Risk: AGENTS.md template drifts from this repository's actual AGENTS.md.** -> Mitigation: the template is a copy at creation time; a future sync mechanism or test could detect drift.
-- **Risk: OpenSpec CLI behavior changes break the skill.** -> Mitigation: the skill uses documented CLI entry points; breaking changes would be caught when the skill is tested.
+- **Risk: `sdd-plus-superpowers` schema bundled in openspec-init drifts from source.** -> Mitigation: the template directory is sourced from this repository; tests should compare against the canonical schema.
 - **Risk: Conservative merge may miss intentional deletions.** -> Mitigation: the merge only appends missing blocks; it never removes content. Deleted blocks must be removed manually.
 - **Risk: Future steps added without clear ordering.** -> Mitigation: the skill explicitly defines the step order and guards it with preconditions.
-
-## Open Questions
-
-- Should the skill support a `--dry-run` flag to preview what would be initialized without making changes? (Defer to v2.)
-- Should the skill detect and prompt for `sdd-plus-superpowers` schema availability during OpenSpec init? (Yes, suggestion only in v1.)
+- **Risk: Two independent skills increase distribution surface.** -> Mitigation: both follow same canonical `skills/` structure; existing skill copy mechanisms already handle this.

@@ -29,17 +29,25 @@ When ready to implement, run /opsx:apply
    Use the **AskUserQuestion tool** (open-ended, no preset options) to ask:
    > "What change do you want to work on? Describe what you want to build or fix."
 
-   From their description, derive a kebab-case name (e.g., "add user authentication" → `add-user-auth`).
+    From their description, derive a kebab-case name (e.g., "add user authentication" → `add-user-auth`).
 
-   **IMPORTANT**: Do NOT proceed without understanding what the user wants to build.
+    **IMPORTANT**: Do NOT proceed without understanding what the user wants to build.
 
-2. **Create the change directory**
+2. **Run the discovery gate**
+
+   Before writing proposal content for a `sdd-plus-superpowers` change, check whether the user has already provided enough scope, motivation, constraints, direction, and capability impact.
+
+   - If context is insufficient, ask focused clarifying questions or use interactive brainstorming/exploration.
+   - If context is sufficient, proceed without extra probing and preserve the decision context in proposal/design artifacts.
+   - Do not create `brainstorm.md`; brainstorming is an interaction gate, not a durable artifact.
+
+3. **Create the change directory**
    ```bash
    openspec new change "<name>"
    ```
    This creates a scaffolded change at `openspec/changes/<name>/` with `.openspec.yaml`.
 
-3. **Get the artifact build order**
+4. **Get the artifact build order**
    ```bash
    openspec status --change "<name>" --json
    ```
@@ -47,7 +55,7 @@ When ready to implement, run /opsx:apply
    - `applyRequires`: array of artifact IDs needed before implementation (e.g., `["tasks"]`)
    - `artifacts`: list of all artifacts with their status and dependencies
 
-4. **Create artifacts in sequence until apply-ready**
+5. **Create artifacts in sequence until apply-ready**
 
    Use the **TodoWrite tool** to track progress through the artifacts.
 
@@ -79,7 +87,7 @@ When ready to implement, run /opsx:apply
       - Use **AskUserQuestion tool** to clarify
       - Then continue with creation
 
-5. **Show final status**
+6. **Show final status**
    ```bash
    openspec status --change "<name>"
    ```

@@ -6,9 +6,10 @@ Starting a new project in this ecosystem requires multiple manual initialization
 
 - Creating `AGENTS.md` with standard agent behavior rules
 - Initializing OpenSpec for spec-driven development
+- Installing the `sdd-plus-superpowers` schema (currently only exists in this repo, must be manually copied)
 - Setting up repository memory (`.ai-memory/`) for durable context
 
-These steps have a fixed dependency order (`AGENTS.md` -> OpenSpec -> memory) but currently require the developer to know and execute each one manually. There is no single entry point that sequences these initializations correctly, ensures idempotence, and reports what was done.
+These steps have a fixed dependency order (`AGENTS.md` -> OpenSpec -> memory) but currently require the developer to know and execute each one manually. There is no single entry point that sequences these initializations correctly, ensures idempotence, and reports what was done. Additionally, the `sdd-plus-superpowers` schema has no automated installation path for new repositories.
 
 ## Constraints
 
@@ -17,37 +18,42 @@ These steps have a fixed dependency order (`AGENTS.md` -> OpenSpec -> memory) bu
 - Must not auto-commit to git
 - Must not auto-run memory sync (init only)
 - Must use conservative merge for existing `AGENTS.md`
+- Must support dry-run preview so users can see planned actions before execution
+- The `sdd-plus-superpowers` schema is only in this repository today; new repos need a path to install it
+- Schema will iterate over time; schema lifecycle management should be a dedicated concern
 - v1 scope intentionally narrow; designed to be extensible for future bootstrap steps
 
 ## Options
 
-### Option A: Orchestration skill (recommended)
+### Option A: Single orchestration skill (original)
 
-Single `sdlc-project-bootstrap` skill that sequences three steps: AGENTS.md creation/merge, OpenSpec CLI init, and `sdlc-repository-memory-init` delegation. Each step checks preconditions before acting. Extensible via adding new steps to the sequence.
+One `sdlc-project-bootstrap` skill that sequences AGENTS.md creation/merge, OpenSpec CLI init, and `sdlc-repository-memory-init`. Schema installation not automated.
 
 **Trade-offs:**
 - Smallest implementation surface
-- Clear dependency on existing skills/CLI
-- Easy to add future steps (README, CI, .gitignore)
+- Schema still requires manual copy, no dry-run
 
 ### Option B: Self-contained bootstrap skill
 
-Bundles all initialization logic (AGENTS template, OpenSpec templates, memory templates) into one skill with no external dependencies.
+Bundles all initialization logic into one skill with no external dependencies.
 
 **Trade-offs:**
-- No dependency risk from external skills changing
 - Template duplication with existing init modules
 - Maintenance drift risk
 
-### Option C: Multi-skill initialization pipeline
+### Option C: Orchestration skill + dedicated openspec-init skill (recommended)
 
-Each concern gets its own skill (`sdlc-agents-init`, `sdlc-openspec-init`, `sdlc-repository-memory-init`), and bootstrap merely invokes them in order.
+Two skills working together:
+
+- `sdlc-openspec-init`: Handles OpenSpec initialization and `sdd-plus-superpowers` schema installation. Can be invoked standalone or by bootstrap.
+- `sdlc-project-bootstrap`: Orchestrates AGENTS.md, calls `sdlc-openspec-init`, calls `sdlc-repository-memory-init`. Supports dry-run.
 
 **Trade-offs:**
-- Cleanest separation of concerns
-- Highest implementation cost for v1
-- Premature decomposition for currently trivial steps
+- Two skills instead of one, but each has clear scope
+- Schema lifecycle management is owned by the right domain skill
+- Dry-run is a natural fit for the bootstrap orchestrator
+- Follows same delegation pattern already used for memory (bootstrap -> memory-init)
 
 ## Recommendation
 
-Option A (Orchestration skill). The AGENTS.md step is simple enough to inline (creating from template), the OpenSpec step delegates to CLI, and the memory step delegates to existing init. This keeps v1 small while the step-based structure makes future decomposition natural if any step grows complex enough to warrant its own skill.
+Option C. The `sdd-plus-superpowers` schema requires installation and will iterate — this is not a trivial one-line CLI call but a domain capability that deserves its own skill. Separating it from bootstrap keeps bootstrap as a pure orchestrator and makes schema management independently testable and upgradeable. Dry-run enters v1 scope as a bootstrap-level feature that previews all planned actions across steps.
