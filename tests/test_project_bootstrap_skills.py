@@ -50,6 +50,20 @@ class TestSdlcOpenspecInitSkill(unittest.TestCase):
         content = (OPENSPEC_INIT_SKILL / "SKILL.md").read_text(encoding="utf-8")
         self.assertIn("dry-run", content.lower())
 
+    def test_skill_md_mentions_multi_tool_selection(self) -> None:
+        content = (OPENSPEC_INIT_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("opencode", content.lower())
+        self.assertIn("one or more ai tools", content.lower())
+        self.assertIn("comma-separated", content.lower())
+        self.assertIn("--tools", content)
+        self.assertIn("none", content.lower())
+
+    def test_skill_md_mentions_partial_init_recovery(self) -> None:
+        content = (OPENSPEC_INIT_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("partial init", content.lower())
+        self.assertIn("openspec/config.yaml", content)
+        self.assertIn("recover", content.lower())
+
     def test_schema_template_exists(self) -> None:
         schema_dir = OPENSPEC_INIT_SKILL / "templates" / "sdd-plus-superpowers"
         self.assertTrue(schema_dir.is_dir(), "Schema template directory must exist")
@@ -84,6 +98,18 @@ class TestSdlcOpenspecInitSkill(unittest.TestCase):
         content = (OPENSPEC_INIT_SKILL / "SKILL.md").read_text(encoding="utf-8")
         self.assertIn("iteration", content.lower())
         self.assertIn("newer", content.lower())
+
+    def test_skill_md_prompts_for_default_schema_choice(self) -> None:
+        content = (OPENSPEC_INIT_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("openspec schemas --json", content)
+        self.assertIn("spec-driven", content)
+        self.assertIn("choose", content.lower())
+        self.assertIn("default schema", content.lower())
+
+    def test_skill_md_persists_selected_schema_to_config(self) -> None:
+        content = (OPENSPEC_INIT_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("openspec/config.yaml", content)
+        self.assertIn("schema:", content)
 
     def test_skill_md_has_no_create_change_auto(self) -> None:
         content = (OPENSPEC_INIT_SKILL / "SKILL.md").read_text(encoding="utf-8")
@@ -122,6 +148,17 @@ class TestSdlcProjectBootstrapSkill(unittest.TestCase):
             "sdlc-openspec-init", content,
             "Must delegate OpenSpec step to sdlc-openspec-init",
         )
+
+    def test_skill_md_delegates_schema_choice_to_openspec_init(self) -> None:
+        content = (BOOTSTRAP_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("choose", content.lower())
+        self.assertIn("schema", content.lower())
+        self.assertIn("sdlc-openspec-init", content)
+
+    def test_skill_md_surfaces_ai_tools_selection(self) -> None:
+        content = (BOOTSTRAP_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("AI tools", content)
+        self.assertIn("selected by user", content.lower())
 
     def test_skill_md_delegates_to_memory_init(self) -> None:
         content = (BOOTSTRAP_SKILL / "SKILL.md").read_text(encoding="utf-8")

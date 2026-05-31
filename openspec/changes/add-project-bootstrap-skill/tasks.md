@@ -47,3 +47,10 @@
 - [x] 6.10 Test openspec-init schema update detection from older version
 - [x] 6.11 Test AGENTS.md duplicate block prevention
 - [x] 6.12 Write test cases under `tests/`
+
+## 7. OpenSpec init tool-selection follow-up
+
+- [x] 7.1 Update `skills/sdlc-openspec-init/SKILL.md` to prompt for one or more AI tools, default to `opencode`, and pass multi-select values via comma-separated `--tools`
+- [x] 7.2 Update `skills/sdlc-openspec-init/SKILL.md` to recover when OpenSpec init skips `openspec/config.yaml` in non-interactive mode
+- [x] 7.3 Update `specs/openspec-init/spec.md` with multi-tool selection and partial init recovery requirements
+- [x] 7.4 Add tests that assert `opencode` is the default tool, multiple tool selections are supported, and missing config recovery is documented

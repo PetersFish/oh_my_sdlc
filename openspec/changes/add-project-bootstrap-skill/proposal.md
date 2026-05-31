@@ -4,7 +4,7 @@ New project initialization in this ecosystem currently requires the developer to
 
 ## What Changes
 
-- **New skill `sdlc-openspec-init`**: Initializes OpenSpec in a project and installs the `sdd-plus-superpowers` schema from this repository. Supports schema detection, installation when missing, and schema iteration over time. Can be invoked standalone.
+- **New skill `sdlc-openspec-init`**: Initializes OpenSpec in a project, installs the `sdd-plus-superpowers` schema from this repository when needed, lists the available schemas via `openspec schemas --json`, prompts the user to choose one or more OpenSpec AI tools with `opencode` as the default, prompts the user to choose a default schema, and persists that choice in `openspec/config.yaml`. Supports schema detection, installation when missing, schema iteration over time, and recovery when `openspec init` skips `openspec/config.yaml` in non-interactive mode. Can be invoked standalone.
 - **New skill `sdlc-project-bootstrap`**: Orchestrates project foundation initialization with a fixed execution order:
   1. `AGENTS.md` initialization (create from template or conservative merge)
   2. OpenSpec + schema initialization (delegate to `sdlc-openspec-init`)

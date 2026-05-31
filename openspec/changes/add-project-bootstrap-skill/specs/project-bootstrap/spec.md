@@ -49,15 +49,23 @@ The bundled AGENTS.md template SHALL NOT include the Repository Memory reminder 
 - **THEN** it SHALL NOT contain a "## Repository Memory" section or equivalent memory-load instruction
 
 ### Requirement: OpenSpec initialization delegation
-`sdlc-project-bootstrap` SHALL delegate OpenSpec initialization and schema installation to `sdlc-openspec-init`.
+`sdlc-project-bootstrap` SHALL delegate OpenSpec initialization, schema discovery, default schema selection, and schema installation to `sdlc-openspec-init`.
 
 #### Scenario: Delegation to openspec-init
 - **WHEN** the bootstrap reaches the OpenSpec step
-- **THEN** the skill SHALL invoke `sdlc-openspec-init` to handle OpenSpec detection, CLI init, and schema installation
+- **THEN** the skill SHALL invoke `sdlc-openspec-init` to handle OpenSpec detection, CLI init, schema listing, default schema selection, and schema installation
 
 #### Scenario: openspec-init reports already initialized
 - **WHEN** `sdlc-openspec-init` reports that OpenSpec and schema are already present
 - **THEN** the skill SHALL report OpenSpec as already initialized and proceed to the next step
+
+#### Scenario: Default schema selection is surfaced
+- **WHEN** `sdlc-openspec-init` prompts the user to choose a default schema
+- **THEN** the bootstrap summary SHALL surface the selected schema name before proceeding
+
+#### Scenario: AI tools selection is surfaced
+- **WHEN** `sdlc-openspec-init` prompts the user to choose one or more AI tools
+- **THEN** the bootstrap summary SHALL surface the selected tool list before proceeding
 
 ### Requirement: Repository memory initialization
 `sdlc-project-bootstrap` SHALL delegate repository memory initialization to `sdlc-repository-memory-init`. This step SHALL run only after AGENTS.md and OpenSpec initialization have completed.

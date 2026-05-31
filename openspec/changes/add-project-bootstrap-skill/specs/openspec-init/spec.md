@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
-### Requirement: OpenSpec CLI initialization
-`sdlc-openspec-init` SHALL detect whether OpenSpec is initialized at the project root and delegate to the OpenSpec CLI when it is missing.
+### Requirement: OpenSpec CLI initialization and tool selection
+`sdlc-openspec-init` SHALL detect whether OpenSpec is initialized at the project root, prompt for one or more AI tools with `opencode` as the default, and delegate to the OpenSpec CLI when initialization is missing.
 
 #### Scenario: OpenSpec is already initialized
 - **WHEN** `openspec/config.yaml` exists at the project root
@@ -9,7 +9,15 @@
 
 #### Scenario: OpenSpec is not initialized
 - **WHEN** no OpenSpec configuration exists at the project root
-- **THEN** the skill SHALL invoke OpenSpec CLI initialization
+- **THEN** the skill SHALL ask the user to choose one or more AI tools, default to `opencode`, and invoke OpenSpec CLI initialization with `--tools <selected-tools>`
+
+#### Scenario: Multiple AI tools are selected
+- **WHEN** the user selects more than one supported AI tool
+- **THEN** the skill SHALL pass the selection to `openspec init` as a comma-separated `--tools` value
+
+#### Scenario: No AI tool integration is selected
+- **WHEN** the user chooses no AI tool integration
+- **THEN** the skill SHALL invoke `openspec init --tools none`
 
 #### Scenario: No OpenSpec change is created automatically
 - **WHEN** the skill initializes OpenSpec via CLI
@@ -37,12 +45,38 @@ The `sdd-plus-superpowers` schema files SHALL be bundled in `skills/sdlc-openspe
 - **WHEN** the template directory `templates/sdd-plus-superpowers/` is inspected
 - **THEN** it SHALL contain `schema.yaml` and `templates/` matching the canonical source
 
+### Requirement: Schema discovery and default selection
+`sdlc-openspec-init` SHALL list all available OpenSpec schemas with `openspec schemas --json` and ask the user to choose the default schema when one is not already configured.
+
+#### Scenario: Available schemas include project and package schemas
+- **WHEN** OpenSpec is initialized and the schema list is requested
+- **THEN** the skill SHALL include both project-local schemas such as `sdd-plus-superpowers` and package-provided schemas such as `spec-driven`
+
+#### Scenario: Default schema is not yet configured
+- **WHEN** `openspec/config.yaml` exists but does not contain a `schema` value
+- **THEN** the skill SHALL present the available schemas and ask the user to choose one as the default
+
+#### Scenario: Default schema is chosen
+- **WHEN** the user selects a schema from the available list
+- **THEN** the skill SHALL persist the selected schema name in `openspec/config.yaml`
+
+#### Scenario: Existing default schema is preserved
+- **WHEN** `openspec/config.yaml` already contains a `schema` value and the user did not request a change
+- **THEN** the skill SHALL keep the existing value and skip the schema choice prompt
+
+### Requirement: Partial OpenSpec init recovery
+`sdlc-openspec-init` SHALL recover from non-interactive CLI init runs that create OpenSpec state without `openspec/config.yaml` by persisting the config when the default schema is chosen.
+
+#### Scenario: OpenSpec directory exists without config
+- **WHEN** `openspec/` exists but `openspec/config.yaml` does not exist after CLI init
+- **THEN** the skill SHALL treat the project as partially initialized and create `openspec/config.yaml` when persisting the selected default schema
+
 ### Requirement: Dry-run support
 `sdlc-openspec-init` SHALL support dry-run mode that reports planned actions without modifying files.
 
 #### Scenario: Dry-run on uninitialized project
 - **WHEN** dry-run mode is invoked on a project with no OpenSpec or schema
-- **THEN** the skill SHALL report planned actions (init OpenSpec, install schema) without modifying files
+- **THEN** the skill SHALL report planned actions (prompt for AI tools, init OpenSpec, install schema, list schemas, prompt for default schema) without modifying files
 
 #### Scenario: Dry-run on partially initialized project
 - **WHEN** dry-run mode is invoked on a project with OpenSpec init but no schema

@@ -19,7 +19,7 @@ Copy template resources before writing skills. Templates must exist before SKILL
 Write `skills/sdlc-openspec-init/SKILL.md` as a single file covering:
 
 - Frontmatter: name, description (trigger keywords: OpenSpec setup, schema install, openspec init, sdd-plus-superpowers), license
-- Workflow (task 2.2): detect OpenSpec via `openspec/config.yaml` → init CLI if missing → detect schema via `openspec/schemas/sdd-plus-superpowers/` → install from bundled templates if missing → report
+- Workflow (task 2.2): detect OpenSpec via `openspec/config.yaml` → prompt for one or more AI tools with `opencode` as the default → init CLI with `--tools <selection>` if missing → detect schema via `openspec/schemas/sdd-plus-superpowers/` → install from bundled templates if missing → recover missing `openspec/config.yaml` if init ran non-interactively → report
 - Trigger description (task 2.3): new project OpenSpec setup, schema installation, schema version iteration
 - Dry-run (task 2.5): check-and-report mode, no file writes
 

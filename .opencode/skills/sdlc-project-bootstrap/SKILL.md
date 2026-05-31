@@ -52,10 +52,13 @@ The bundled AGENTS.md template does NOT include the Repository Memory reminder. 
 
 ### Step 2: Initialize OpenSpec
 
-Delegate to `sdlc-openspec-init` for OpenSpec CLI initialization and schema installation. The bootstrap skill does NOT perform OpenSpec initialization directly.
+Delegate to `sdlc-openspec-init` for OpenSpec CLI initialization, schema discovery, asking the user to choose a default schema, and schema installation. The bootstrap skill does NOT perform OpenSpec initialization directly.
 
 Report the result from `sdlc-openspec-init`:
 - OpenSpec: [created / already present]
+- AI tools: [selected by user]
+- Available schemas: [listed]
+- Default schema: [selected by user]
 - sdd-plus-superpowers schema: [installed / already present]
 
 If `sdlc-openspec-init` fails, report the error and stop. Do NOT proceed to step 3.
@@ -82,6 +85,9 @@ Project Foundation Bootstrap Complete
 
 AGENTS.md: [created | already present | appended missing blocks]
 OpenSpec: [initialized | already present]
+  AI tools: [selected]
+  Available schemas: [listed]
+  Default schema: [selected]
   Schema: [installed | already present]
 Repository Memory: [initialized | already present]
 
@@ -99,6 +105,8 @@ Dry-run preview:
 
 AGENTS.md: [would create from template | would append missing blocks | already present]
 OpenSpec: [would initialize via openspec init | already present]
+  AI tools: [would prompt for selection | already selected]
+  Available schemas: [would list schemas and prompt for selection | already present]
   Schema: [would install sdd-plus-superpowers | already present]
 Repository Memory: [would initialize via sdlc-repository-memory-init | already present]
 ```

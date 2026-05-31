@@ -178,6 +178,8 @@
   },
   "active": "3dd6162e08d108df",
   "lastOpenFiles": [
+    "tests/_test_repo_init",
+    "tests/_test_repo_load",
     "openspec/changes/archive/2026-05-30-simplify-sdd-plus-superpowers-schema/specs/openspec-workflow-schema/spec.md",
     "openspec/changes/archive/2026-05-30-simplify-sdd-plus-superpowers-schema/specs/openspec-workflow-schema",
     "openspec/changes/archive/2026-05-30-simplify-sdd-plus-superpowers-schema/tasks.md",

@@ -8,7 +8,7 @@ Two new skills fill the gaps: `sdlc-openspec-init` handles OpenSpec initializati
 
 **Goals:**
 - Provide a single entry point (`sdlc-project-bootstrap`) that initializes a new project's foundation (AGENTS.md, OpenSpec + schema, repository memory)
-- Provide a standalone `sdlc-openspec-init` skill for reusable OpenSpec initialization and schema management
+- Provide a standalone `sdlc-openspec-init` skill for reusable OpenSpec initialization, schema discovery, and schema management
 - Enforce correct execution order: AGENTS.md -> OpenSpec/schema -> repository memory
 - Support dry-run mode that previews planned actions without modifying files
 - Be fully idempotent: safe to run repeatedly on the same project
@@ -64,10 +64,15 @@ When AGENTS.md already exists, the skill reads it and appends only standard bloc
 
 OpenSpec initialization and schema installation are handled by a dedicated `sdlc-openspec-init` skill. This skill:
 - Detects whether OpenSpec is initialized at the project root
-- Runs OpenSpec CLI init when missing
+- Prompts the user to choose one or more OpenSpec AI tools before init, with `opencode` as the default/recommended selection
+- Runs OpenSpec CLI init with `--tools <comma-separated-tools>` when missing
+- Lists all available schemas with `openspec schemas --json`, including project-local and package-provided schemas such as `sdd-plus-superpowers` and `spec-driven`
+- Prompts the user to choose the default schema when one is not already configured
+- Persists the chosen schema to `openspec/config.yaml`
 - Copies the `sdd-plus-superpowers` schema from its bundled templates to the project's `openspec/schemas/` directory
 - Will support schema iteration (updating existing schemas in future versions)
 - Can be invoked standalone or by `sdlc-project-bootstrap`
+- Recovers from non-interactive init runs that create OpenSpec state without `openspec/config.yaml` by creating the config when the default schema is persisted
 
 The schema template files are bundled in `skills/sdlc-openspec-init/templates/sdd-plus-superpowers/` and copied from this repository. Bootstrap does NOT own schema templates or lifecycle.
 
