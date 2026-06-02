@@ -23,7 +23,12 @@
 - **WHEN** the skill initializes OpenSpec via CLI
 - **THEN** the skill SHALL NOT automatically create an OpenSpec change
 
+#### Scenario: Tool selection prompt precedes CLI init
+- **WHEN** the skill detects OpenSpec is not initialized
+- **THEN** the skill SHALL prompt the user for tool selection and SHALL NOT execute `openspec init` until the user has provided their tool choice
+
 ### Requirement: sdd-plus-superpowers schema installation
+`sdlc-openspec-init` SHALL install the `sdd-plus-superpowers` schema into the project when it is missing. The schema SHALL be installed BEFORE listing available schemas so that it appears in the `openspec schemas --json` output.
 `sdlc-openspec-init` SHALL install the `sdd-plus-superpowers` schema into the project when it is missing.
 
 #### Scenario: Schema already installed
@@ -37,6 +42,10 @@
 #### Scenario: Schema install target directory does not exist
 - **WHEN** the `openspec/schemas/` directory does not exist
 - **THEN** the skill SHALL create the directory before copying the schema
+
+#### Scenario: Schema installed before listing available schemas
+- **WHEN** the skill installs the `sdd-plus-superpowers` schema
+- **THEN** the schema installation SHALL complete before the skill runs `openspec schemas --json`, so the newly installed schema appears in the listing
 
 ### Requirement: Schema bundled as template
 The `sdd-plus-superpowers` schema files SHALL be bundled in `skills/sdlc-openspec-init/templates/sdd-plus-superpowers/` and SHALL match the canonical source at this repository's `openspec/schemas/sdd-plus-superpowers/`.
@@ -63,6 +72,10 @@ The `sdd-plus-superpowers` schema files SHALL be bundled in `skills/sdlc-openspe
 #### Scenario: Existing default schema is preserved
 - **WHEN** `openspec/config.yaml` already contains a `schema` value and the user did not request a change
 - **THEN** the skill SHALL keep the existing value and skip the schema choice prompt
+
+#### Scenario: sdd-plus-superpowers is the recommended default schema
+- **WHEN** the skill presents available schemas for default selection
+- **THEN** `sdd-plus-superpowers` SHALL be presented as the recommended or default choice, while still allowing the user to select a different schema
 
 ### Requirement: Partial OpenSpec init recovery
 `sdlc-openspec-init` SHALL recover from non-interactive CLI init runs that create OpenSpec state without `openspec/config.yaml` by persisting the config when the default schema is chosen.

@@ -115,6 +115,46 @@ class TestSdlcOpenspecInitSkill(unittest.TestCase):
         content = (OPENSPEC_INIT_SKILL / "SKILL.md").read_text(encoding="utf-8")
         self.assertIn("NOT create an OpenSpec change", content)
 
+    def test_skill_md_enforces_prompt_before_openspec_init(self) -> None:
+        content = (OPENSPEC_INIT_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        lower = content.lower()
+        self.assertIn("do not run", lower)
+        self.assertIn("openspec init", lower)
+        self.assertIn("until the user", lower)
+        self.assertIn("always prompt first", lower)
+
+    def test_skill_md_schema_install_before_schema_listing(self) -> None:
+        content = (OPENSPEC_INIT_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        install_pos = content.lower().find("install sdd-plus-superpowers schema")
+        list_pos = content.lower().find("openspec schemas --json")
+        self.assertGreater(install_pos, -1, "Must mention schema install step")
+        self.assertGreater(list_pos, -1, "Must mention schema listing command")
+        self.assertLess(install_pos, list_pos,
+                        "Schema install step must appear before schema listing step")
+
+    def test_skill_md_sdd_plus_superpowers_is_recommended_default_schema(self) -> None:
+        content = (OPENSPEC_INIT_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("recommended", content.lower())
+        self.assertIn("sdd-plus-superpowers", content.lower())
+
+    def test_skill_md_guardrail_no_init_without_tool_choice(self) -> None:
+        content = (OPENSPEC_INIT_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        guardrails_start = content.find("## Guardrails")
+        self.assertGreater(guardrails_start, -1, "Must have Guardrails section")
+        guardrails = content[guardrails_start:].lower()
+        self.assertIn("do not run", guardrails)
+        self.assertIn("openspec init", guardrails)
+        self.assertIn("always prompt first", guardrails)
+
+    def test_skill_md_guardrail_no_schema_prompt_before_install(self) -> None:
+        content = (OPENSPEC_INIT_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        guardrails_start = content.find("## Guardrails")
+        self.assertGreater(guardrails_start, -1, "Must have Guardrails section")
+        guardrails = content[guardrails_start:].lower()
+        self.assertIn("do not ask for the default schema until", guardrails)
+        self.assertIn("sdd-plus-superpowers", guardrails)
+        self.assertIn("openspec schemas --json", guardrails)
+
 
 class TestSdlcProjectBootstrapSkill(unittest.TestCase):
     """Validate sdlc-project-bootstrap skill structure."""
@@ -159,6 +199,18 @@ class TestSdlcProjectBootstrapSkill(unittest.TestCase):
         content = (BOOTSTRAP_SKILL / "SKILL.md").read_text(encoding="utf-8")
         self.assertIn("AI tools", content)
         self.assertIn("selected by user", content.lower())
+
+    def test_skill_md_requires_default_schema_in_openspec_result(self) -> None:
+        content = (BOOTSTRAP_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("Default schema", content)
+        self.assertIn("selected by user", content.lower())
+
+    def test_skill_md_disallows_completion_when_openspec_result_incomplete(self) -> None:
+        content = (BOOTSTRAP_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("Do NOT report", content)
+        self.assertIn("Bootstrap Complete", content)
+        self.assertIn("AI tools", content)
+        self.assertIn("Default schema", content)
 
     def test_skill_md_delegates_to_memory_init(self) -> None:
         content = (BOOTSTRAP_SKILL / "SKILL.md").read_text(encoding="utf-8")

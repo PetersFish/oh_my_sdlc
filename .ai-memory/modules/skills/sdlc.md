@@ -2,29 +2,33 @@
 id: skills/sdlc
 type: module
 title: SDLC Workflow Skills
-summary: SDLC lifecycle management skills covering repository memory init, load, sync, reset, and OpenSpec memory sync.
+summary: SDLC lifecycle management skills covering project bootstrap, OpenSpec init, repository memory init/load/sync/reset, and OpenSpec memory sync.
 parent_id: skills
 sync_status: synced
 evidence_mode: discovery
 linked_commits: []
-linked_specs: [sdlc-repository-memory-sync, sdlc-repository-memory-load, sdlc-repository-memory-init, sdlc-repository-memory-reset, sdlc-openspec-memory-sync]
+linked_specs: [add-project-bootstrap-skill, sdlc-repository-memory-sync, sdlc-repository-memory-load, sdlc-repository-memory-init, sdlc-repository-memory-reset, sdlc-openspec-memory-sync]
 linked_sessions: []
-updated_at: 2026-05-30T11:47:00Z
+updated_at: 2026-05-31T11:10:00Z
 confidence: high
-tags: [sdlc, memory, workflow]
+tags: [sdlc, openspec, bootstrap, memory, workflow]
 owned_paths:
   - skills/sdlc-repository-memory-init
+  - skills/sdlc-openspec-init
+  - skills/sdlc-project-bootstrap
   - skills/sdlc-repository-memory-load
   - skills/sdlc-repository-memory-reset
   - skills/sdlc-repository-memory-sync
   - skills/sdlc-openspec-memory-sync
 path_hints:
   - skills/sdlc-repository-memory-init
+  - skills/sdlc-openspec-init
+  - skills/sdlc-project-bootstrap
   - skills/sdlc-repository-memory-load
   - skills/sdlc-repository-memory-reset
   - skills/sdlc-repository-memory-sync
   - skills/sdlc-openspec-memory-sync
-keywords: [sdlc, memory, init, load, sync, reset, openspec]
+keywords: [sdlc, bootstrap, openspec, schema, tools, memory, init, load, sync, reset]
 test_paths: []
 spec_paths: []
 ---
@@ -33,9 +37,11 @@ spec_paths: []
 
 ## Current Understanding
 
-Grouped child module for 5 SDLC-related skills sharing the `sdlc-*` prefix. These skills cover the full lifecycle of repository memory management: initialization, loading, synchronization, reset, and OpenSpec-specific memory sync.
+Grouped child module for SDLC-related skills sharing the `sdlc-*` prefix. These skills cover project foundation bootstrap, OpenSpec initialization with schema/tool selection, and the full lifecycle of repository memory management.
 
 - **sdlc-repository-memory-init** — One-time `.ai-memory/` infrastructure creation
+- **sdlc-openspec-init** — OpenSpec initialization, AI tool selection, schema installation/default persistence, and partial init recovery
+- **sdlc-project-bootstrap** — Ordered bootstrap orchestration: AGENTS.md -> OpenSpec/init schema -> repository memory
 - **sdlc-repository-memory-load** — Loading repository memory context for sessions
 - **sdlc-repository-memory-reset** — Safe deletion and re-initialization of `.ai-memory/`
 - **sdlc-repository-memory-sync** — Synchronizing memory after code changes
@@ -43,11 +49,11 @@ Grouped child module for 5 SDLC-related skills sharing the `sdlc-*` prefix. Thes
 
 ## Evidence
 
-Prefix-based semantic grouping of 5 sibling skill directories under `skills/`.
+Prefix-based semantic grouping of sibling skill directories under `skills/`, plus change-driven updates from `add-project-bootstrap-skill` verification and redistribution.
 
 ## Operational Guidance
 
-Use `sdlc-repository-memory-load` when starting work; `sdlc-repository-memory-sync` after changes; `sdlc-repository-memory-reset` only for test/clean-slate scenarios.
+Use `sdlc-project-bootstrap` for new-project foundation setup, `sdlc-openspec-init` for standalone OpenSpec/schema setup, `sdlc-repository-memory-load` when starting work, and `sdlc-repository-memory-sync` after changes.
 
 ## Key Files
 
@@ -66,6 +72,11 @@ Use `sdlc-repository-memory-load` when starting work; `sdlc-repository-memory-sy
 
 ## Known Pitfalls
 
+- Stale global skill copies (for example under `~/.config/opencode/skills`) can silently bypass updated bootstrap/init guardrails even when repo-local copies are current.
+- Symptom: bootstrap summary reports `config.yaml skipped in non-interactive mode` and lacks `AI tools`/`Default schema` fields.
+- Mitigation: redistribute canonical `skills/sdlc-openspec-init/SKILL.md` and `skills/sdlc-project-bootstrap/SKILL.md` to all active CLI targets (`~/.config/opencode/skills`, `~/.claude/skills`, `~/.cursor/skills`, and repo-local copies).
+
 ## Update Notes
 
 First sync after memory reset. Created from prefix-based child module discovery.
+Updated after `add-project-bootstrap-skill`: added bootstrap/init ownership and stale-global-copy pitfall.

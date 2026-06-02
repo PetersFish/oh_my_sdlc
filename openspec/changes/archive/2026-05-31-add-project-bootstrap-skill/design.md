@@ -64,12 +64,12 @@ When AGENTS.md already exists, the skill reads it and appends only standard bloc
 
 OpenSpec initialization and schema installation are handled by a dedicated `sdlc-openspec-init` skill. This skill:
 - Detects whether OpenSpec is initialized at the project root
-- Prompts the user to choose one or more OpenSpec AI tools before init, with `opencode` as the default/recommended selection
+- **Prompts the user to choose one or more OpenSpec AI tools before init**, with `opencode` as the default/recommended selection. The skill SHALL NOT run `openspec init` until the user has responded with their tool choice.
 - Runs OpenSpec CLI init with `--tools <comma-separated-tools>` when missing
+- Copies the `sdd-plus-superpowers` schema from its bundled templates to the project's `openspec/schemas/` directory BEFORE listing schemas, so it appears in the output
 - Lists all available schemas with `openspec schemas --json`, including project-local and package-provided schemas such as `sdd-plus-superpowers` and `spec-driven`
-- Prompts the user to choose the default schema when one is not already configured
+- Prompts the user to choose the default schema when one is not already configured, with `sdd-plus-superpowers` as the recommended/default selection
 - Persists the chosen schema to `openspec/config.yaml`
-- Copies the `sdd-plus-superpowers` schema from its bundled templates to the project's `openspec/schemas/` directory
 - Will support schema iteration (updating existing schemas in future versions)
 - Can be invoked standalone or by `sdlc-project-bootstrap`
 - Recovers from non-interactive init runs that create OpenSpec state without `openspec/config.yaml` by creating the config when the default schema is persisted

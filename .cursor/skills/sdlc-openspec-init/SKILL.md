@@ -33,16 +33,20 @@ Check whether `openspec/config.yaml` exists at the project root.
 
 If `openspec/` exists but `openspec/config.yaml` does not, treat that as a partial init state and recover the config after schema selection instead of rerunning CLI init blindly.
 
-### 3. Initialize OpenSpec (if missing)
+### 3. Ask for AI tools BEFORE running openspec init
+
+**HARD RULE:** Do NOT run `openspec init` until the user has chosen their AI tools. Always prompt first, execute after.
 
 Prompt the user to choose one or more AI tools before initialization.
 
-- Present the supported tool choices from `openspec init --help`.
+- Run `openspec init --help` to discover the currently supported tool list.
+- Present the supported tool choices to the user.
 - Default/recommended choice: `opencode`.
-- If the user selects multiple tools, pass them as a comma-separated list to `--tools`.
-- If the user chooses no tool integration, pass `--tools none`.
+- When the user selects one or more tools, pass them as a comma-separated list to `--tools`.
+- When the user chooses no tool integration, pass `--tools none`.
+- When the user selects every tool, it's cleaner to pass `--tools all`.
 
-Run OpenSpec CLI initialization with the selected tools:
+Only after the user responds with their choice, run:
 
 ```bash
 openspec init --tools <selected-tools>
@@ -50,34 +54,14 @@ openspec init --tools <selected-tools>
 
 After init completes, confirm `openspec/config.yaml` was created. If init succeeds but `openspec/config.yaml` is still missing, keep going and recover it when persisting the selected schema. If the init command fails, report the error and stop.
 
-### 4. Detect schema state
+### 4. Install sdd-plus-superpowers schema (if missing)
+
+Install the bundled schema BEFORE listing schemas so that `sdd-plus-superpowers` appears in the `openspec schemas --json` output.
 
 Check whether `openspec/schemas/sdd-plus-superpowers/` exists at the project root.
 
 - **Exists**: Report "sdd-plus-superpowers schema already installed". Skip installation.
-- **Missing**: Proceed to step 5.
-
-### 5. List available schemas and ask for the default
-
-Run the OpenSpec schema listing command:
-
-```bash
-openspec schemas --json
-```
-
-Present every returned schema to the user, including package-provided schemas such as `spec-driven` and project-local schemas such as `sdd-plus-superpowers`, then ask which one should become the default schema.
-
-### 6. Persist the chosen default schema
-
-Write the user-selected schema name into `openspec/config.yaml` as the `schema` value.
-
-If `openspec/config.yaml` is missing after non-interactive init, create it here while writing the selected schema.
-
-If `openspec/config.yaml` already has a `schema` value and the user did not ask to change it, keep the existing value and skip this step.
-
-### 7. Install schema (if missing)
-
-Copy the bundled schema template from this skill's `templates/sdd-plus-superpowers/` to the project's `openspec/schemas/` directory:
+- **Missing**: Copy the bundled schema template from this skill's `templates/sdd-plus-superpowers/` to the project's `openspec/schemas/` directory:
 
 ```
 skills/sdlc-openspec-init/templates/sdd-plus-superpowers/
@@ -91,21 +75,43 @@ The schema template includes:
 
 If the `openspec/schemas/` directory does not exist, create it first.
 
-### 8. Report result
+### 5. List available schemas and ask for the default
+
+Now that the bundled schema is installed, run the OpenSpec schema listing command:
+
+```bash
+openspec schemas --json
+```
+
+Present every returned schema to the user, including package-provided schemas such as `spec-driven` and project-local schemas such as `sdd-plus-superpowers`, then ask which one should become the default schema.
+
+- **Recommended/default**: `sdd-plus-superpowers`. Present it as the recommended choice.
+- If only one schema is available and the spec requires user choice, still ask explicitly.
+- If the user has already stated their schema preference earlier, skip this prompt.
+
+### 6. Persist the chosen default schema
+
+Write the user-selected schema name into `openspec/config.yaml` as the `schema` value.
+
+If `openspec/config.yaml` is missing after non-interactive init, create it here while writing the selected schema.
+
+If `openspec/config.yaml` already has a `schema` value and the user did not ask to change it, keep the existing value and skip this step.
+
+### 7. Report result
 
 After initialization, output a summary:
 
 ```
 OpenSpec initialized: [created / already present]
-Schema choices: [listed / already listed]
-Default schema selected: [<schema-name>]
+AI tools: [selected tools]
+Default schema: [selected schema name]
 sdd-plus-superpowers schema: [installed / already present]
 
 Suggested next step:
   openspec new change <name> --schema sdd-plus-superpowers
 ```
 
-### 9. Dry-run mode
+### 8. Dry-run mode
 
 When the user requests dry-run (e.g., "dry run", "preview", "what would this do"), report planned actions without modifying any files:
 
@@ -116,10 +122,10 @@ Planned actions:
   - [prompt] Ask user to choose one or more AI tools (default: opencode)
   - [init] OpenSpec: openspec init --tools <selected-tools> (not yet initialized)
   - [skip] OpenSpec: already initialized at openspec/config.yaml
-  - [list] Available schemas: openspec schemas --json
-  - [prompt] Ask user to choose default schema (e.g. sdd-plus-superpowers or spec-driven)
   - [install] sdd-plus-superpowers schema: copy from templates to openspec/schemas/
   - [skip] sdd-plus-superpowers schema: already installed at openspec/schemas/sdd-plus-superpowers/
+  - [list] Available schemas: openspec schemas --json
+  - [prompt] Ask user to choose default schema (recommended: sdd-plus-superpowers)
 ```
 
 Only show actions that would actually be taken (skip the skip entries if nothing is already present). Do NOT execute any actions in dry-run mode.
@@ -127,7 +133,7 @@ Only show actions that would actually be taken (skip the skip entries if nothing
 ## Standalone Invocation
 
 This skill can be invoked independently of any project bootstrap orchestrator. When invoked standalone:
-- Run steps 1-8 as described above.
+- Run steps 1-7 as described above.
 - The skill does NOT depend on bootstrap context.
 
 ## Schema Iteration
@@ -141,6 +147,8 @@ When the skill is invoked on a project that already has the schema installed, co
 
 ## Guardrails
 
+- Do NOT run `openspec init` until the user has chosen their AI tools. Always prompt first, execute after.
+- Do NOT ask for the default schema until the `sdd-plus-superpowers` schema is installed and `openspec schemas --json` can include it.
 - Do NOT create an OpenSpec change automatically. Initialization only.
 - Do NOT overwrite existing `openspec/config.yaml` unless the user explicitly chooses a different default schema.
 - Do NOT assume `openspec/config.yaml` exists after non-interactive init; recover it when persisting the chosen schema.

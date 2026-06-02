@@ -1,5 +1,396 @@
 {
   "schema_version": "1.0",
-  "generated_at": null,
-  "entries": []
+  "generated_at": "2026-05-31T03:27:27.648221Z",
+  "entries": [
+    {
+      "id": "skills/integration-notion-sync",
+      "type": "module",
+      "path": "modules/skills/integration-notion-sync.md",
+      "title": "Notion Sync Skill",
+      "summary": "Syncs learning notes and conversation summaries into structured Notion Knowledge Base hierarchy.",
+      "tags": [
+        "notion",
+        "sync",
+        "integration"
+      ],
+      "updated_at": "2026-05-30T11:47:00Z",
+      "confidence": "high",
+      "status": "synced",
+      "parent_id": "skills",
+      "owned_paths": [
+        "skills/integration-notion-sync"
+      ],
+      "path_hints": [
+        "skills/integration-notion-sync"
+      ],
+      "keywords": [
+        "notion",
+        "sync",
+        "knowledge-base"
+      ],
+      "test_paths": [],
+      "spec_paths": []
+    },
+    {
+      "id": "skills/media-ocr-router",
+      "type": "module",
+      "path": "modules/skills/media-ocr-router.md",
+      "title": "OCR/VLM Media Router Skill",
+      "summary": "Routes clipboard images, local image paths, and Markdown-embedded media through the best available image workflow.",
+      "tags": [
+        "ocr",
+        "vision",
+        "media"
+      ],
+      "updated_at": "2026-05-30T11:47:00Z",
+      "confidence": "high",
+      "status": "synced",
+      "parent_id": "skills",
+      "owned_paths": [
+        "skills/media-ocr-router"
+      ],
+      "path_hints": [
+        "skills/media-ocr-router"
+      ],
+      "keywords": [
+        "ocr",
+        "vlm",
+        "image",
+        "media",
+        "routing"
+      ],
+      "test_paths": [],
+      "spec_paths": []
+    },
+    {
+      "id": "skills/meta-skill-lifecycle-governance",
+      "type": "module",
+      "path": "modules/skills/meta-skill-lifecycle-governance.md",
+      "title": "Skill Lifecycle Governance Skill",
+      "summary": "Governs the lifecycle of personal AI skills across development, repo evaluation, project pilots, release, and multi-CLI distribution.",
+      "tags": [
+        "meta",
+        "governance",
+        "lifecycle"
+      ],
+      "updated_at": "2026-05-30T11:47:00Z",
+      "confidence": "high",
+      "status": "synced",
+      "parent_id": "skills",
+      "owned_paths": [
+        "skills/meta-skill-lifecycle-governance"
+      ],
+      "path_hints": [
+        "skills/meta-skill-lifecycle-governance"
+      ],
+      "keywords": [
+        "skill",
+        "lifecycle",
+        "governance",
+        "meta"
+      ],
+      "test_paths": [],
+      "spec_paths": []
+    },
+    {
+      "id": "skills/ops-mackup-backup",
+      "type": "module",
+      "path": "modules/skills/ops-mackup-backup.md",
+      "title": "Mackup Backup Skill",
+      "summary": "Backs up user-specified directories via Mackup configuration management.",
+      "tags": [
+        "backup",
+        "mackup",
+        "ops"
+      ],
+      "updated_at": "2026-05-30T11:47:00Z",
+      "confidence": "high",
+      "status": "synced",
+      "parent_id": "skills",
+      "owned_paths": [
+        "skills/ops-mackup-backup"
+      ],
+      "path_hints": [
+        "skills/ops-mackup-backup"
+      ],
+      "keywords": [
+        "mackup",
+        "backup",
+        "dotfiles"
+      ],
+      "test_paths": [],
+      "spec_paths": []
+    },
+    {
+      "id": "skills/qa-ai-architecture",
+      "type": "module",
+      "path": "modules/skills/qa-ai-architecture.md",
+      "title": "AI Architecture Coach Skill",
+      "summary": "Helps senior Java architects reason about AI-native systems using layered decision frameworks and production-grade architecture review.",
+      "tags": [
+        "architecture",
+        "ai",
+        "coaching"
+      ],
+      "updated_at": "2026-05-30T11:47:00Z",
+      "confidence": "high",
+      "status": "synced",
+      "parent_id": "skills",
+      "owned_paths": [
+        "skills/qa-ai-architecture"
+      ],
+      "path_hints": [
+        "skills/qa-ai-architecture"
+      ],
+      "keywords": [
+        "architecture",
+        "ai",
+        "rag",
+        "agent",
+        "llmops"
+      ],
+      "test_paths": [],
+      "spec_paths": []
+    },
+    {
+      "id": "skills/research-general",
+      "type": "module",
+      "path": "modules/skills/research-general.md",
+      "title": "Research Skill",
+      "summary": "Manages durable local research topics using the filesystem as the source of truth.",
+      "tags": [
+        "research",
+        "knowledge"
+      ],
+      "updated_at": "2026-05-30T11:47:00Z",
+      "confidence": "high",
+      "status": "synced",
+      "parent_id": "skills",
+      "owned_paths": [
+        "skills/research-general"
+      ],
+      "path_hints": [
+        "skills/research-general"
+      ],
+      "keywords": [
+        "research",
+        "topic",
+        "learning"
+      ],
+      "test_paths": [],
+      "spec_paths": []
+    },
+    {
+      "id": "skills/sdlc",
+      "type": "module",
+      "path": "modules/skills/sdlc.md",
+      "title": "SDLC Workflow Skills",
+      "summary": "SDLC lifecycle management skills covering project bootstrap, OpenSpec init, repository memory init/load/sync/reset, and OpenSpec memory sync.",
+      "tags": [
+        "sdlc",
+        "openspec",
+        "bootstrap",
+        "memory",
+        "workflow"
+      ],
+      "updated_at": "2026-05-31T11:10:00Z",
+      "confidence": "high",
+      "status": "synced",
+      "parent_id": "skills",
+      "owned_paths": "",
+      "path_hints": "",
+      "keywords": [
+        "sdlc",
+        "bootstrap",
+        "openspec",
+        "schema",
+        "tools",
+        "memory",
+        "init",
+        "load",
+        "sync",
+        "reset"
+      ],
+      "test_paths": [],
+      "spec_paths": []
+    },
+    {
+      "id": "skills/study-zybook-notes",
+      "type": "module",
+      "path": "modules/skills/study-zybook-notes.md",
+      "title": "zyBooks Study Notes Skill",
+      "summary": "Extracts key knowledge points, exam prep, and translations for zyBooks technical/algorithm chapters.",
+      "tags": [
+        "study",
+        "zybooks",
+        "education"
+      ],
+      "updated_at": "2026-05-30T11:47:00Z",
+      "confidence": "high",
+      "status": "synced",
+      "parent_id": "skills",
+      "owned_paths": [
+        "skills/study-zybook-notes"
+      ],
+      "path_hints": [
+        "skills/study-zybook-notes"
+      ],
+      "keywords": [
+        "zybooks",
+        "study",
+        "algorithm",
+        "notes"
+      ],
+      "test_paths": [],
+      "spec_paths": []
+    },
+    {
+      "id": "skills/transform",
+      "type": "module",
+      "path": "modules/skills/transform.md",
+      "title": "Content Transformation Skills",
+      "summary": "Markdown content transformation skills for rendering diagrams, math formulas, algorithm blocks, and XMind mind maps.",
+      "tags": [
+        "transform",
+        "rendering",
+        "markdown"
+      ],
+      "updated_at": "2026-05-30T11:47:00Z",
+      "confidence": "high",
+      "status": "synced",
+      "parent_id": "skills",
+      "owned_paths": "",
+      "path_hints": "",
+      "keywords": [
+        "transform",
+        "svg",
+        "math",
+        "algorithm",
+        "xmind",
+        "markdown"
+      ],
+      "test_paths": [],
+      "spec_paths": []
+    },
+    {
+      "id": "skills",
+      "type": "module",
+      "path": "modules/skills.md",
+      "title": "Skills",
+      "summary": "Personal AI skill collection across SDLC workflow, content transformation, research, study, and system integration domains.",
+      "tags": [
+        "skills",
+        "sdlc",
+        "transform",
+        "research"
+      ],
+      "updated_at": "2026-05-30T11:47:00Z",
+      "confidence": "high",
+      "status": "synced",
+      "parent_id": "root",
+      "owned_paths": [
+        "skills/"
+      ],
+      "path_hints": [
+        "skills/"
+      ],
+      "keywords": [
+        "skill",
+        "agent",
+        "opencode"
+      ],
+      "test_paths": [],
+      "spec_paths": []
+    },
+    {
+      "id": "tests",
+      "type": "module",
+      "path": "modules/tests.md",
+      "title": "Tests",
+      "summary": "Test infrastructure and test image assets.",
+      "tags": [
+        "tests"
+      ],
+      "updated_at": "2026-05-30T11:47:00Z",
+      "confidence": "high",
+      "status": "synced",
+      "parent_id": "root",
+      "owned_paths": [
+        "tests/"
+      ],
+      "path_hints": [
+        "tests/"
+      ],
+      "keywords": [
+        "test",
+        "testing"
+      ],
+      "test_paths": [
+        "tests/"
+      ],
+      "spec_paths": []
+    },
+    {
+      "id": "pitfalls/stale-global-skill-copies-break-openspec-init",
+      "type": "pitfalls",
+      "path": "pitfalls/stale-global-skill-copies-break-openspec-init.md",
+      "title": "Stale global skill copies bypass OpenSpec init guardrails",
+      "summary": "If global CLI skill copies are stale, bootstrap/init may run old non-interactive OpenSpec commands and skip config.yaml persistence despite updated repo-local skills.",
+      "tags": [
+        "pitfall",
+        "openspec",
+        "bootstrap",
+        "init",
+        "skill-distribution"
+      ],
+      "updated_at": "2026-05-31T11:10:00Z",
+      "confidence": "high",
+      "status": "synced",
+      "owned_paths": "",
+      "path_hints": "",
+      "keywords": [
+        "config.yaml skipped",
+        "non-interactive mode",
+        "stale global skills",
+        "redistribute"
+      ],
+      "test_paths": "",
+      "spec_paths": ""
+    },
+    {
+      "id": "specs/add-project-bootstrap-skill",
+      "type": "specs",
+      "path": "specs/add-project-bootstrap-skill.md",
+      "title": "OpenSpec bootstrap and init skill contract",
+      "summary": "Defines and verifies project bootstrap orchestration and OpenSpec init behavior, including pre-init tool selection, schema recommendation, partial init recovery, and strict summary contract.",
+      "tags": [
+        "openspec",
+        "bootstrap",
+        "schema",
+        "tools",
+        "recovery"
+      ],
+      "updated_at": "2026-05-31T11:10:00Z",
+      "confidence": "high",
+      "status": "synced",
+      "owned_paths": "",
+      "path_hints": "",
+      "keywords": [
+        "bootstrap",
+        "openspec init",
+        "ai tools selection",
+        "default schema",
+        "config.yaml recovery"
+      ],
+      "test_paths": "",
+      "spec_paths": ""
+    }
+  ],
+  "excluded_paths": [
+    "sync-history/",
+    "sessions/",
+    "snapshots/",
+    "tmp/",
+    "cache/"
+  ]
 }
