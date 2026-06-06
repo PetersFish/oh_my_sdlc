@@ -1,0 +1,23 @@
+{
+  "skill_name": "refresh-tech-article",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "请刷新 `docs/rag-architecture.md`。这篇文章写于 2023 年，主题是企业 RAG 架构，里面提到了向量数据库、LangChain、Agent 和评测。先联网校验是否过时，默认生成刷新报告，等我确认后再生成新版副本。",
+      "expected_output": "Uses report-first mode, researches current RAG architecture with AI architecture reasoning, distinguishes mature approaches/frontier/controversies, saves or proposes a report under versions/, and suggests diagrams only as a confirmation-gated option.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "直接刷新 `notes/kafka-consumer-best-practices.md`，生成一个带时间戳的新副本和刷新报告。重点检查 Kafka consumer group、offset 管理、重平衡和 exactly-once 相关内容是否过时。",
+      "expected_output": "Uses direct refresh mode for a non-AI technical article, researches current Kafka guidance, creates both timestamped refreshed copy and report paths under versions/, preserves source language/style, and does not overfit to AI-only analysis.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "我已经验收 `docs/versions/rag-architecture.20260606-1430.md`，请刷回 `docs/rag-architecture.md`。报告是 `docs/versions/rag-architecture.20260606-1430.report.md`。",
+      "expected_output": "Does not overwrite immediately. Shows source path, refreshed copy path, report path, notes that versions remain preserved, and asks for explicit second confirmation before source write-back.",
+      "files": []
+    }
+  ]
+}
