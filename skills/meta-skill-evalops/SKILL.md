@@ -82,6 +82,21 @@ The assistant SHOULD proactively suggest capture when:
 
 The assistant MUST ask for confirmation before writing any case to disk.
 
+## Pre-Implementation Eval Asset Gate
+
+For any new AI-behavior target, or any change that expands a target's behavior scope, eval assets MUST be prepared before implementation begins.
+
+**Required before implementation:**
+- `evals/coverage/<target-id>.yaml` exists.
+- `coverage.review.reviewed_by_user` is true.
+- Critical/high-risk dimensions have at least one accepted or golden case.
+- For release-bound work, critical cases SHOULD be promoted to golden before implementation starts.
+
+**Exceptions:**
+- Pure deterministic code changes may use TDD only and do not require eval assets.
+- Existing targets with stable golden datasets may skip case generation and run existing golden cases.
+- Newly discovered failures during implementation or verification should be captured to inbox and triaged later; they do not need to block initial implementation.
+
 ## Directory Structure
 
 The skill maintains assets under `evals/` at the project root:
@@ -315,16 +330,41 @@ These rules override any contextual ambiguity. Violating them produces an incorr
 ### With Superpowers Skills
 
 - `brainstorming`: use for coverage exploration and case design discussions.
-- `test-driven-development`: use for code behavior verification; this skill covers AI behavior.
-- `meta-skill-lifecycle-governance`: EVALUATE-IN-REPO phase should run golden eval before release.
-- `verification-before-completion`: before claiming work complete, report whether eval was run.
+- `test-driven-development`: use for deterministic code behavior verification; this skill covers AI behavior.
+- `verification-before-completion`: before claiming work complete, report whether eval was run and whether eval assets existed before implementation.
+
+### With Skill Lifecycle Governance
+
+`meta-skill-lifecycle-governance` is a repository skill lifecycle governance capability, not a Superpowers core workflow. It can require `evalops run` during EVALUATE-IN-REPO and require critical golden eval pass before RELEASE.
 
 ### With OpenSpec
 
+**For a new AI-behavior target or behavior-scope expansion:**
+
 ```
-openspec propose → design → spec → tasks
-→ apply + TDD
-→ evalops run (for affected targets)
+openspec propose
+→ brainstorming
+→ evalops define-coverage
+→ evalops generate-cases
+→ evalops triage
+→ evalops promote critical golden cases
+→ openspec design → spec → tasks
+→ apply + TDD where applicable
+→ evalops run
+→ openspec verify
+→ memory sync
+→ archive
+```
+
+**For an existing target with reviewed coverage and golden cases:**
+
+```
+openspec propose
+→ inspect existing coverage and golden cases
+→ update coverage/cases if behavior scope changed
+→ apply + TDD where applicable
+→ evalops run
+→ capture new failures to inbox if found
 → openspec verify
 → memory sync
 → archive

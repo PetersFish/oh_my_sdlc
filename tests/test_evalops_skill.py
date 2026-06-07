@@ -130,6 +130,18 @@ class TestEvalopsSkillHardRules:
         assert "not" in lower and "auto" in lower and "fix" in lower, \
             "Hard rule: no automatic fix on eval failure"
 
+    def test_pre_implementation_eval_asset_gate(self):
+        content = (EVALOPS_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        assert "## Pre-Implementation Eval Asset Gate" in content, \
+            "SKILL.md must have Pre-Implementation Eval Asset Gate section"
+        lower = content.lower()
+        assert "required before implementation" in lower, \
+            "Pre-implementation gate must list required items"
+        assert "reviewed_by_user" in lower, \
+            "Pre-implementation gate must require reviewed coverage"
+        assert "golden" in lower, \
+            "Pre-implementation gate must reference golden cases"
+
 
 class TestEvalopsSkillTemplates:
     """Validate bundled templates exist and are well-formed."""
@@ -233,3 +245,26 @@ class TestEvalopsSkillWorkflowIntegration:
         lower = content.lower()
         assert "brainstorming" in lower, \
             "SKILL.md must mention brainstorming integration"
+
+    def test_openspec_integration_distinguishes_new_and_existing_targets(self):
+        content = (EVALOPS_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        lower = content.lower()
+        assert "new" in lower and "target" in lower, \
+            "OpenSpec section must distinguish new targets"
+        assert "existing" in lower, \
+            "OpenSpec section must distinguish existing targets"
+        assert "define-coverage" in lower, \
+            "New target flow must include define-coverage before implementation"
+        assert "inspect" in lower or "update coverage" in lower, \
+            "Existing target flow must include inspecting/updating coverage"
+
+    def test_lifecycle_governance_is_not_listed_as_superpowers_core(self):
+        content = (EVALOPS_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        lower = content.lower()
+        assert "## skill lifecycle governance" not in content.lower(), \
+            "SKILL.md must not use misleading section title"
+        assert "with skill lifecycle governance" in lower, \
+            "SKILL.md must have separate Skill Lifecycle Governance section"
+        assert "repository skill lifecycle governance capability" in lower or \
+               "not a superpowers core workflow" in lower, \
+            "Must clarify that skill lifecycle governance is not Superpowers core"
