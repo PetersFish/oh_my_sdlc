@@ -74,14 +74,14 @@ If `sdlc-openspec-init` fails, report the error and stop. Do NOT proceed to step
 
 ### Step 3: Initialize Repository Memory
 
-Check whether `.ai-memory/manifest.json` exists at the project root.
+Check whether `.ai/memory/manifest.json` exists at the project root.
 
 **If manifest.json exists:**
 - Report "Repository memory: already initialized, no changes needed".
 - Suggest running `sdlc-repository-memory-sync` separately if the user wants to populate memory.
 
 **If manifest.json does not exist:**
-- Delegate to `sdlc-repository-memory-init` to create the `.ai-memory/` directory structure, manifest, index, templates, and gitignore.
+- Delegate to `sdlc-repository-memory-init` to create the `.ai/memory/` directory structure, manifest, index, templates, and gitignore.
 - Report the result from `sdlc-repository-memory-init`.
 - Do NOT auto-run `sdlc-repository-memory-sync`. Only suggest it as a next step.
 

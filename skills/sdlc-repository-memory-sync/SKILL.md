@@ -1,12 +1,16 @@
 ---
 name: sdlc-repository-memory-sync
-description: Primary entry point for syncing repository memory. Use after code changes, git commits, session work, or when the user asks to update `.ai-memory/`. Also invoked internally by `sdlc-openspec-memory-sync` for OpenSpec verified-before-archive workflows. Do not use for initializing memory or loading memory context.
+description: Primary entry point for syncing repository memory. Use after code changes, git commits, session work, or when the user asks to update `.ai/memory/`. Also invoked internally by `sdlc-openspec-memory-sync` for OpenSpec verified-before-archive workflows. Do not use for initializing memory or loading memory context.
 license: MIT
 ---
 
 # Repository Memory Sync
 
 Synchronize repository memory after changes. Classify evidence into memory types, apply per-type policies, handle dirty worktrees, manage pending reconciliation, write sync-history audit trail.
+
+## Runtime Path Compatibility
+
+The canonical runtime path is `.ai/memory/`. For existing projects, scripts will read legacy `.ai-memory/` when `.ai/memory/` is absent. New initialization writes only to `.ai/memory/` — do not create new `.ai-memory/` directories.
 
 ## When to Use
 
@@ -15,7 +19,7 @@ Synchronize repository memory after changes. Classify evidence into memory types
 - At the end of work sessions.
 - After OpenSpec verification completes.
 - When the user explicitly requests memory sync.
-- When the user asks to update `.ai-memory/`.
+- When the user asks to update `.ai/memory/`.
 
 ## Required Inputs
 
@@ -26,8 +30,8 @@ Synchronize repository memory after changes. Classify evidence into memory types
 
 ## Workflow
 
-1. **Check manifest.** Verify `.ai-memory/manifest.json` exists. If missing, ask user whether to initialize via `sdlc-repository-memory-init`. Do not proceed without a manifest.
-2. **Load existing memory.** Run `sdlc-repository-memory-load` first if `.ai-memory/index.json` exists, to ensure classification and deduplication work against current memory state.
+1. **Check manifest.** Verify `.ai/memory/manifest.json` exists. If missing, ask user whether to initialize via `sdlc-repository-memory-init`. Do not proceed without a manifest.
+2. **Load existing memory.** Run `sdlc-repository-memory-load` first if `.ai/memory/index.json` exists, to ensure classification and deduplication work against current memory state.
 3. **Detect repository state.** Run `detect_state.py` to determine commit range, dirty worktree status, and changed paths.
 4. **Reconcile pending snapshots.** Run `reconcile_pending.py` to resolve any `pending_commit` entries from prior dirty-worktree syncs that have since been committed.
 5. **Compute sync inputs.** Assemble:
@@ -40,7 +44,7 @@ Synchronize repository memory after changes. Classify evidence into memory types
 
     6a. **Run discover_modules.py.** Execute `scripts/discover_modules.py --root <root> --json` to scan the filesystem for module candidates. The script recursively discovers non-hidden directories (default max_depth=5) that satisfy Rule A (≥1 direct file) or Rule B (≥2 direct subdirectories), collecting language-neutral structural metadata (extension histogram, build-file detection, top-level filenames).
 
-    6b. **Cross-reference with discovery-prefs.json.** Compare candidate paths against `.ai-memory/discovery-prefs.json` `module_map` to determine `disposition`: `new` (not in map), `known` (status: accepted), or `previously_rejected` (status: rejected).
+    6b. **Cross-reference with discovery-prefs.json.** Compare candidate paths against `.ai/memory/discovery-prefs.json` `module_map` to determine `disposition`: `new` (not in map), `known` (status: accepted), or `previously_rejected` (status: rejected).
 
     6c. **Classify changed-files modules.** For each changed path or observation from git diff, determine which existing module memory type it maps to and whether it is auto-update or candidate-only (existing behavior).
 
@@ -67,11 +71,11 @@ Synchronize repository memory after changes. Classify evidence into memory types
     - **Skip** — discard this candidate.
     - **Save as proposed** — write to review queue for later confirmation.
     - **Other** — user specifies alternative disposition.
- 9. **Handle `needs_user_review` items.** Create entries in `.ai-memory/review-queue.json`. Do NOT create formal memory files for these items.
+ 9. **Handle `needs_user_review` items.** Create entries in `.ai/memory/review-queue.json`. Do NOT create formal memory files for these items.
 10. **Validate.** Run `validate_memory.py` to check schema conformance, reference integrity, and policy compliance.
 11. **Rebuild index.** Run `rebuild_index.py`, excluding `needs_user_review` items and restricted paths (`sync-history/`, `sessions/`, `snapshots/`, `tmp/`, `cache/`).
 12. **Update manifest.** Run `update_manifest.py` to record sync timestamp, last-synced commit, and stats.
-13. **Write sync history.** Create `.ai-memory/sync-history/<sync_id>.md` with the audit trail for this run (see sync-history template).
+13. **Write sync history.** Create `.ai/memory/sync-history/<sync_id>.md` with the audit trail for this run (see sync-history template).
 14. **Present review queue to user.** For any items in the review queue, offer:
     - **Accept into memory** — promote to formal memory file.
     - **Keep pending** — leave in review queue.
@@ -118,7 +122,7 @@ When multiple active OpenSpec changes form a lineage (change B refines change A)
 ## Review Queue Policy
 
 - Medium-confidence child module candidates are presented interactively before any review entry is written.
-- `needs_user_review` items are written to `.ai-memory/review-queue.json`.
+- `needs_user_review` items are written to `.ai/memory/review-queue.json`.
 - They are NOT written as formal memory files.
 - The review queue is committed to git but only read by `sdlc-repository-memory-sync`.
 - On the next sync, open review queue items are processed first, before classifying new changes.
@@ -126,7 +130,7 @@ When multiple active OpenSpec changes form a lineage (change B refines change A)
 
 ## Sync History
 
-- Each sync writes `.ai-memory/sync-history/<sync_id>.md` using the sync-history template.
+- Each sync writes `.ai/memory/sync-history/<sync_id>.md` using the sync-history template.
 - Sync history MUST include a `## Skipped` section listing every memory type not updated and the reason:
   - `architecture`: no candidates, or user declined
   - `decisions`: no candidates, or user declined
@@ -147,7 +151,7 @@ When multiple active OpenSpec changes form a lineage (change B refines change A)
 - Do NOT allow `needs_user_review` items into `index.json`.
 - Do NOT overwrite existing memory without evidence (commit, spec, session observation).
 - Do NOT treat `pending_commit` memory as stable fact. It is provisional until reconciled.
-- If `.ai-memory/manifest.json` is missing, direct the user to `sdlc-repository-memory-init` rather than creating it.
+- If `.ai/memory/manifest.json` is missing, direct the user to `sdlc-repository-memory-init` rather than creating it.
 - Do NOT create module memory for candidates marked as rejected in `discovery-prefs.json` without explicit user re-confirmation.
 - Modules from discovery must use `evidence_mode: discovery` and `linked_sessions` referencing the current session.
 

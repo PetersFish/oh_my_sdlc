@@ -1,8 +1,8 @@
 # Repository Memory Context
 
 ## Loaded Memory
-- `.ai-memory/modules/...`
-- `.ai-memory/specs/...`
+- `.ai/memory/modules/...`
+- `.ai/memory/specs/...`
 
 ## Relevant Facts
 - fact 1

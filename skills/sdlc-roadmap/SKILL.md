@@ -6,12 +6,12 @@ license: MIT
 
 # SDLC Roadmap
 
-Thin orchestration layer between long-term product roadmap and single formal OpenSpec changes. Manages `.roadmap/` file system and provides capability entry points.
+Thin orchestration layer between long-term product roadmap and single formal OpenSpec changes. Manages `.ai/roadmap/` file system and provides capability entry points.
 
 ## When to Use
 
 - User wants to capture a long-term roadmap from conversation (MVP/V2/V3/Later planning).
-- User wants to initialize `.roadmap/` directory structure.
+- User wants to initialize `.ai/roadmap/` directory structure.
 - User wants to see current roadmap status.
 - User wants to promote a roadmap item into an OpenSpec change.
 - User wants to mark a roadmap item as done and get follow-up prompts.
@@ -26,10 +26,10 @@ Thin orchestration layer between long-term product roadmap and single formal Ope
 
 ## File Model
 
-`.roadmap/` lives at the project root, sibling to `openspec/`, `.ai-memory/`, `skills/`.
+`.ai/roadmap/` lives at the project root, sibling to `openspec/`, `.ai/memory/`, `skills/`.
 
 ```
-.roadmap/
+.ai/roadmap/
   roadmap.md          # Human-readable overview
   index.json          # Machine index (derived, not the source of truth)
   items/              # RM-XXX-slug.md, one per item
@@ -37,6 +37,8 @@ Thin orchestration layer between long-term product roadmap and single formal Ope
   patches/            # Lightweight patch records (V2+)
   decisions.md        # Cross-item decision records
 ```
+
+The canonical runtime path is `.ai/roadmap/`. For existing projects, scripts will read legacy `.roadmap/` when `.ai/roadmap/` is absent. New initialization writes only to `.ai/roadmap/` — do not create new `.roadmap/` directories.
 
 **Markdown item files are the source of truth.** `index.json` is a derived index. When they disagree, item files win. Use `rebuild_index.py` to repair with explicit user confirmation after reporting the diff.
 
@@ -70,13 +72,13 @@ patches: []          # List of patch IDs (V2+)
 
 ### roadmap init
 
-Initialize the `.roadmap/` directory structure at project root.
+Initialize the `.ai/roadmap/` directory structure at project root.
 
 **When:** First time using roadmap in a project, or user explicitly asks.
 
 **Produces:**
 ```
-.roadmap/
+.ai/roadmap/
   roadmap.md (from template)
   index.json (empty version 1)
   items/
@@ -86,7 +88,7 @@ Initialize the `.roadmap/` directory structure at project root.
 ```
 
 **Rules:**
-- Do NOT overwrite existing `.roadmap/` if already present. Report what exists and skip.
+- Do NOT overwrite existing `.ai/roadmap/` if already present. Report what exists and skip.
 - If partial state exists (e.g., `roadmap.md` missing but `items/` present), report the incomplete state and ask whether to repair by generating missing files from available data.
 
 ### roadmap capture
@@ -98,7 +100,7 @@ Extract MVP/V2/V3/Later planning from conversation context and generate roadmap 
 **Workflow:**
 1. Read current conversation context for phased planning.
 2. Identify each phase (MVP, V2, V3, Later) with goal, scope, and acceptance criteria.
-3. For each phase, create `.roadmap/items/RM-XX-slug.md` with frontmatter populated:
+3. For each phase, create `.ai/roadmap/items/RM-XX-slug.md` with frontmatter populated:
    - `status`: `ready` for MVP, `planned` for later phases.
    - `stage`: match the phase label.
    - `order`: assign increments of 10 (10, 20, 30...) to allow insertion.
@@ -109,7 +111,7 @@ Extract MVP/V2/V3/Later planning from conversation context and generate roadmap 
 
 **Rules:**
 - Assign IDs sequentially: RM-001, RM-002, ...
-- If `.roadmap/` not initialized, run init first.
+- If `.ai/roadmap/` not initialized, run init first.
 - Only items that change product capability boundaries should enter roadmap. One-off bugfixes and prompt tweaks do not.
 
 ### roadmap list
@@ -119,7 +121,7 @@ Show the current roadmap as a structured summary.
 **Trigger:** User asks "what's the roadmap status", "roadmap list", or equivalent.
 
 **Workflow:**
-1. Read items from `.roadmap/items/*.md` frontmatter.
+1. Read items from `.ai/roadmap/items/*.md` frontmatter.
 2. Output a table: ID, Status, Title, Stage, Order.
 3. Sort by `order` ascending.
 4. Highlight or mark the `active` item if any.
@@ -223,10 +225,10 @@ idea ──→ planned ──→ ready ──→ active ──→ done
 |---------|-------------|
 | What items exist and their status | What was learned and decided |
 | Sequence and prioritization | Architecture, pitfalls, decisions |
-| `.roadmap/` directory | `.ai-memory/` directory |
+| `.ai/roadmap/` directory | `.ai/memory/` directory |
 | Transient planning state | Durable facts |
 
-**Rule:** Roadmap is not a long-term knowledge store. Only completed capabilities, architecture decisions, pitfalls, and stable conventions go into `.ai-memory/`.
+**Rule:** Roadmap is not a long-term knowledge store. Only completed capabilities, architecture decisions, pitfalls, and stable conventions go into `.ai/memory/`.
 
 ### Roadmap vs Superpowers
 
@@ -244,7 +246,7 @@ idea ──→ planned ──→ ready ──→ active ──→ done
 | Product phase goal (MVP contract review) | Roadmap item |
 | Formal change spec for that phase | OpenSpec change |
 | Implementation of the change | Superpowers execution |
-| Architecture decision made during build | Memory sync (`.ai-memory/`) |
+| Architecture decision made during build | Memory sync (`.ai/memory/`) |
 | Bug noticed after completion | Patch log (V2) |
 | Roadmap reordered after learning | Revision (V2) |
 
@@ -252,7 +254,7 @@ idea ──→ planned ──→ ready ──→ active ──→ done
 
 - Do NOT create OpenSpec proposal/design/tasks/spec files in promote. Only generate promotion context and guide user.
 - Do NOT auto-trigger memory sync. Only prompt and let the user decide.
-- Do NOT silently overwrite existing `.roadmap/` files.
+- Do NOT silently overwrite existing `.ai/roadmap/` files.
 - Do NOT delete or remove items during capture. Use status transitions (deferred, cancelled, superseded) instead.
 - Item files are the source of truth. When `index.json` disagrees, report the diff and offer to rebuild.
 - Run `validate.py` after any item modification to catch inconsistency early.
@@ -267,6 +269,6 @@ idea ──→ planned ──→ ready ──→ active ──→ done
 
 ## Templates Reference
 
-- `templates/roadmap.md` — `.roadmap/roadmap.md` template with overview table and active/next sections.
+- `templates/roadmap.md` — `.ai/roadmap/roadmap.md` template with overview table and active/next sections.
 - `templates/item.md` — Roadmap item template with frontmatter and body sections.
-- `templates/decisions.md` — `.roadmap/decisions.md` template for cross-item decision records.
+- `templates/decisions.md` — `.ai/roadmap/decisions.md` template for cross-item decision records.
