@@ -350,7 +350,7 @@ class TestEndToEndScenarios(unittest.TestCase):
         (self.tmp_dir / "AGENTS.md").write_text(content, encoding="utf-8")
 
     def _create_ai_memory(self) -> None:
-        memory_dir = self.tmp_dir / ".ai-memory"
+        memory_dir = self.tmp_dir / ".ai" / "memory"
         memory_dir.mkdir(parents=True, exist_ok=True)
         (memory_dir / "manifest.json").write_text(
             json.dumps({"schema_version": "1.0", "memory_version": 1}), encoding="utf-8"
@@ -366,7 +366,7 @@ class TestEndToEndScenarios(unittest.TestCase):
             "agents_md": "create" if not (self.tmp_dir / "AGENTS.md").exists() else "skip",
             "openspec": "init" if not (self.tmp_dir / "openspec" / "config.yaml").exists() else "skip",
             "schema": "install" if not (self.tmp_dir / "openspec" / "schemas" / "sdd-plus-superpowers").exists() else "skip",
-            "memory": "init" if not (self.tmp_dir / ".ai-memory" / "manifest.json").exists() else "skip",
+            "memory": "init" if not (self.tmp_dir / ".ai" / "memory" / "manifest.json").exists() else "skip",
         }
         return result
 
