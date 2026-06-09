@@ -10,6 +10,12 @@ import sys
 import re
 from pathlib import Path
 
+LIB_DIR = Path(__file__).resolve().parents[2] / "_lib"
+if str(LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(LIB_DIR))
+
+from sdlc_runtime_paths import find_project_root, resolve_roadmap_dir  # noqa: E402
+
 VALID_STATUSES = {"idea", "planned", "ready", "active", "done", "deferred", "cancelled", "superseded"}
 VALID_PRIORITIES = {"p0", "p1", "p2", "p3"}
 REQUIRED_FM_FIELDS = {"id", "title", "status", "stage", "priority", "order", "depends_on", "openspec_change", "patches"}
@@ -71,30 +77,17 @@ def parse_frontmatter(content: str) -> dict:
     return result
 
 
-def find_root() -> Path:
-    """Find the project root by looking for .roadmap/ or common markers."""
-    cwd = Path.cwd()
-    for parent in [cwd] + list(cwd.parents):
-        if (parent / ".roadmap").is_dir():
-            return parent
-        if (parent / ".ai-memory").is_dir():
-            return parent
-        if (parent / "openspec").is_dir():
-            return parent
-    return cwd
-
-
 def main():
-    root = find_root()
-    roadmap_dir = root / ".roadmap"
+    root = find_project_root()
+    roadmap_dir = resolve_roadmap_dir(root).path
     items_dir = roadmap_dir / "items"
 
     if not roadmap_dir.is_dir():
-        print("ERROR: .roadmap/ directory not found")
+        print("ERROR: .ai/roadmap/ directory not found")
         return 1
 
     if not items_dir.is_dir():
-        print("ERROR: .roadmap/items/ directory not found")
+        print("ERROR: .ai/roadmap/items/ directory not found")
         return 1
 
     errors = []
@@ -102,7 +95,7 @@ def main():
     item_files = sorted(items_dir.glob("*.md"))
 
     if not item_files:
-        print("WARNING: No item files found in .roadmap/items/")
+        print("WARNING: No item files found in .ai/roadmap/items/")
     else:
         for item_file in item_files:
             content = item_file.read_text()
@@ -188,7 +181,7 @@ def main():
             for idx_id in index_items:
                 if idx_id not in items:
                     errors.append(
-                        f"index.json: item '{idx_id}' in index but not in .roadmap/items/"
+                        f"index.json: item '{idx_id}' in index but not in .ai/roadmap/items/"
                     )
         except json.JSONDecodeError as e:
             errors.append(f"index.json: invalid JSON: {e}")

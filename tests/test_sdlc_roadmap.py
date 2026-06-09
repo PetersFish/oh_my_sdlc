@@ -156,7 +156,7 @@ class TestTemplates(unittest.TestCase):
 class TestValidateScript(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
-        self.roadmap_dir = Path(self.tmpdir) / ".roadmap"
+        self.roadmap_dir = Path(self.tmpdir) / ".ai" / "roadmap"
         (self.roadmap_dir / "items").mkdir(parents=True)
         (self.roadmap_dir / "revisions").mkdir(parents=True)
         (self.roadmap_dir / "patches").mkdir(parents=True)
@@ -224,7 +224,7 @@ Missing order field."""
 class TestRebuildIndexScript(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
-        self.roadmap_dir = Path(self.tmpdir) / ".roadmap"
+        self.roadmap_dir = Path(self.tmpdir) / ".ai" / "roadmap"
         (self.roadmap_dir / "items").mkdir(parents=True)
         (self.roadmap_dir / "revisions").mkdir(parents=True)
         (self.roadmap_dir / "patches").mkdir(parents=True)
@@ -268,7 +268,7 @@ class TestRebuildIndexScript(unittest.TestCase):
 class TestListScript(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
-        self.roadmap_dir = Path(self.tmpdir) / ".roadmap"
+        self.roadmap_dir = Path(self.tmpdir) / ".ai" / "roadmap"
         (self.roadmap_dir / "items").mkdir(parents=True)
         (self.roadmap_dir / "revisions").mkdir(parents=True)
         (self.roadmap_dir / "patches").mkdir(parents=True)
@@ -295,6 +295,17 @@ class TestListScript(unittest.TestCase):
         result = _run_script("list.py", self.tmpdir)
         self.assertEqual(result.returncode, 0)
         self.assertIn("No roadmap items", result.stdout)
+
+    def test_legacy_roadmap_is_read_as_fallback(self) -> None:
+        shutil.rmtree(self.roadmap_dir.parent)
+        legacy_roadmap = Path(self.tmpdir) / ".roadmap"
+        (legacy_roadmap / "items").mkdir(parents=True)
+        _make_item(legacy_roadmap, "RM-001", status="ready", order=10)
+
+        result = _run_script("list.py", self.tmpdir)
+
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("RM-001", result.stdout)
 
 
 class TestDistribution(unittest.TestCase):

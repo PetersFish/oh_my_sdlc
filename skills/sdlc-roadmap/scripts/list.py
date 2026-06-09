@@ -5,6 +5,12 @@ import re
 import sys
 from pathlib import Path
 
+LIB_DIR = Path(__file__).resolve().parents[2] / "_lib"
+if str(LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(LIB_DIR))
+
+from sdlc_runtime_paths import find_project_root, resolve_roadmap_dir  # noqa: E402
+
 
 def parse_frontmatter(content: str) -> dict:
     if not content.startswith("---"):
@@ -57,21 +63,9 @@ def parse_frontmatter(content: str) -> dict:
     return result
 
 
-def find_root() -> Path:
-    cwd = Path.cwd()
-    for parent in [cwd] + list(cwd.parents):
-        if (parent / ".roadmap").is_dir():
-            return parent
-        if (parent / ".ai-memory").is_dir():
-            return parent
-        if (parent / "openspec").is_dir():
-            return parent
-    return cwd
-
-
 def main():
-    root = find_root()
-    items_dir = root / ".roadmap" / "items"
+    root = find_project_root()
+    items_dir = resolve_roadmap_dir(root).path / "items"
 
     if not items_dir.is_dir():
         print("No roadmap items found. Use 'roadmap capture' to create items.")
