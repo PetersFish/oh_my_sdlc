@@ -134,8 +134,8 @@ class TestDiscoverModules:
             "---\nname: fresh\n---\n", encoding="utf-8"
         )
 
-        ai_memory = tmp_path / ".ai-memory"
-        ai_memory.mkdir()
+        ai_memory = tmp_path / ".ai" / "memory"
+        ai_memory.mkdir(parents=True)
         prefs = {
             "schema_version": "1.0",
             "exclude_patterns": [],
@@ -229,8 +229,8 @@ class TestDiscoverModules:
         )
         (child / "scripts").mkdir()
         (child / "scripts" / "sync.py").write_text("", encoding="utf-8")
-        ai_memory = tmp_path / ".ai-memory"
-        ai_memory.mkdir()
+        ai_memory = tmp_path / ".ai" / "memory"
+        ai_memory.mkdir(parents=True)
         (ai_memory / "discovery-prefs.json").write_text(
             json.dumps({
                 "schema_version": "1.0",
@@ -273,8 +273,8 @@ class TestDiscoverModules:
         (high / "templates" / "t.md").write_text("", encoding="utf-8")
         (medium / "SKILL.md").write_text("---\nname: medium\n---\n", encoding="utf-8")
         (low / "image.png").write_text("", encoding="utf-8")
-        ai_memory = tmp_path / ".ai-memory"
-        ai_memory.mkdir()
+        ai_memory = tmp_path / ".ai" / "memory"
+        ai_memory.mkdir(parents=True)
         (ai_memory / "discovery-prefs.json").write_text(
             json.dumps({
                 "schema_version": "1.0",
@@ -309,8 +309,8 @@ class TestDiscoverModules:
         grandchild = child / "scripts"
         grandchild.mkdir(parents=True)
         (grandchild / "sync.py").write_text("", encoding="utf-8")
-        ai_memory = tmp_path / ".ai-memory"
-        ai_memory.mkdir()
+        ai_memory = tmp_path / ".ai" / "memory"
+        ai_memory.mkdir(parents=True)
         (ai_memory / "discovery-prefs.json").write_text(
             json.dumps({
                 "schema_version": "1.0",
@@ -348,7 +348,7 @@ class TestInitMemoryDiscoveryPrefs:
     def test_init_creates_discovery_prefs_with_defaults(self, tmp_path):
         result = init_memory(tmp_path)
 
-        prefs_path = tmp_path / ".ai-memory" / "discovery-prefs.json"
+        prefs_path = tmp_path / ".ai" / "memory" / "discovery-prefs.json"
         assert prefs_path.exists()
 
         prefs = json.loads(prefs_path.read_text(encoding="utf-8"))
@@ -363,7 +363,7 @@ class TestInitMemoryDiscoveryPrefs:
     def test_reinit_does_not_overwrite_existing_discovery_prefs(self, tmp_path):
         init_memory(tmp_path)
 
-        prefs_path = tmp_path / ".ai-memory" / "discovery-prefs.json"
+        prefs_path = tmp_path / ".ai" / "memory" / "discovery-prefs.json"
         prefs_path.write_text(
             json.dumps({
                 "schema_version": "1.0",
@@ -406,7 +406,7 @@ class TestRebuildIndexNestedModules:
         return path
 
     def test_nested_module_directories_are_scanned(self, tmp_path):
-        memory_dir = tmp_path / ".ai-memory"
+        memory_dir = tmp_path / ".ai" / "memory"
         self._make_memory_file(
             memory_dir / "modules" / "group-a" / "sub-module.md",
             {
@@ -432,7 +432,7 @@ class TestRebuildIndexNestedModules:
         assert any(e["id"] == "sub-module" for e in result["entries"])
 
     def test_flat_module_directories_still_work(self, tmp_path):
-        memory_dir = tmp_path / ".ai-memory"
+        memory_dir = tmp_path / ".ai" / "memory"
         self._make_memory_file(
             memory_dir / "modules" / "flat-module.md",
             {
@@ -478,7 +478,7 @@ class TestValidateDiscoveryPrefsSchema:
         )
 
     def test_valid_discovery_prefs_validates(self, tmp_path):
-        memory_dir = tmp_path / ".ai-memory"
+        memory_dir = tmp_path / ".ai" / "memory"
         self._write_manifest(memory_dir)
         (memory_dir / "index.json").write_text(
             json.dumps(
@@ -501,7 +501,7 @@ class TestValidateDiscoveryPrefsSchema:
         assert result["valid"] is True
 
     def test_invalid_discovery_prefs_missing_status_reports_error(self, tmp_path):
-        memory_dir = tmp_path / ".ai-memory"
+        memory_dir = tmp_path / ".ai" / "memory"
         self._write_manifest(memory_dir)
         (memory_dir / "index.json").write_text(
             json.dumps(
@@ -530,7 +530,7 @@ class TestValidateDiscoveryPrefsSchema:
         assert result["valid"] is False
 
     def test_legacy_discovery_prefs_path_and_reason_validate(self, tmp_path):
-        memory_dir = tmp_path / ".ai-memory"
+        memory_dir = tmp_path / ".ai" / "memory"
         self._write_manifest(memory_dir)
         (memory_dir / "index.json").write_text(
             json.dumps({"schema_version": "1.0", "generated_at": "2026-01-01T00:00:00Z", "entries": []}) + "\n",

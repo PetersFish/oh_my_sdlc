@@ -112,7 +112,7 @@ class TestReconcilePending:
         _init_git_repo(tmp_path)
         (tmp_path / "README.md").write_text("hello", encoding="utf-8")
         _git_commit(tmp_path, "initial")
-        memory_dir = tmp_path / ".ai-memory"
+        memory_dir = tmp_path / ".ai" / "memory"
         modules_dir = memory_dir / "modules"
         modules_dir.mkdir(parents=True)
         self._make_memory_file(
@@ -140,7 +140,7 @@ class TestReconcilePending:
     def test_partial_match_creates_review_item(self, tmp_path):
         _init_git_repo(tmp_path)
         (tmp_path / "README.md").write_text("hello", encoding="utf-8")
-        memory_dir = tmp_path / ".ai-memory"
+        memory_dir = tmp_path / ".ai" / "memory"
         modules_dir = memory_dir / "modules"
         modules_dir.mkdir(parents=True)
         self._make_memory_file(
@@ -173,7 +173,7 @@ class TestReconcilePending:
         _init_git_repo(tmp_path)
         (tmp_path / "README.md").write_text("hello", encoding="utf-8")
         _git_commit(tmp_path, "initial")
-        memory_dir = tmp_path / ".ai-memory"
+        memory_dir = tmp_path / ".ai" / "memory"
         modules_dir = memory_dir / "modules"
         modules_dir.mkdir(parents=True)
         self._make_memory_file(
@@ -202,7 +202,7 @@ class TestReconcilePending:
         _init_git_repo(tmp_path)
         (tmp_path / "README.md").write_text("hello", encoding="utf-8")
         _git_commit(tmp_path, "initial")
-        memory_dir = tmp_path / ".ai-memory"
+        memory_dir = tmp_path / ".ai" / "memory"
         modules_dir = memory_dir / "modules"
         modules_dir.mkdir(parents=True)
         self._make_memory_file(
@@ -251,7 +251,7 @@ class TestValidateMemory:
         return manifest
 
     def test_valid_manifest_passes(self, tmp_path):
-        memory_dir = tmp_path / ".ai-memory"
+        memory_dir = tmp_path / ".ai" / "memory"
         self._write_manifest(memory_dir, self._valid_manifest())
         (memory_dir / "index.json").write_text(
             json.dumps({"schema_version": "1.0", "generated_at": "2026-01-01T00:00:00Z", "entries": []}) + "\n",
@@ -262,7 +262,7 @@ class TestValidateMemory:
         assert result["counts"]["manifest"]["valid"] is True
 
     def test_missing_manifest_field_reported(self, tmp_path):
-        memory_dir = tmp_path / ".ai-memory"
+        memory_dir = tmp_path / ".ai" / "memory"
         manifest = self._valid_manifest()
         del manifest["repository_id"]
         self._write_manifest(memory_dir, manifest)
@@ -270,7 +270,7 @@ class TestValidateMemory:
         assert any("missing required fields" in e and "repository_id" in e for e in result["errors"])
 
     def test_invalid_sync_status_rejected(self, tmp_path):
-        memory_dir = tmp_path / ".ai-memory"
+        memory_dir = tmp_path / ".ai" / "memory"
         modules_dir = memory_dir / "modules"
         modules_dir.mkdir(parents=True)
         (modules_dir / "bad-status.md").write_text(
@@ -289,7 +289,7 @@ class TestValidateMemory:
         assert any("partially_reconciled" in e for e in result["errors"])
 
     def test_invalid_memory_type_rejected(self, tmp_path):
-        memory_dir = tmp_path / ".ai-memory"
+        memory_dir = tmp_path / ".ai" / "memory"
         modules_dir = memory_dir / "modules"
         modules_dir.mkdir(parents=True)
         (modules_dir / "bad-type.md").write_text(
@@ -308,7 +308,7 @@ class TestValidateMemory:
         assert any("invalid_type" in e for e in result["errors"])
 
     def test_valid_frontmatter_passes(self, tmp_path):
-        memory_dir = tmp_path / ".ai-memory"
+        memory_dir = tmp_path / ".ai" / "memory"
         modules_dir = memory_dir / "modules"
         modules_dir.mkdir(parents=True)
         (modules_dir / "good.md").write_text(
@@ -361,7 +361,7 @@ class TestRebuildIndex:
         return path
 
     def test_synced_module_is_indexed(self, tmp_path):
-        memory_dir = tmp_path / ".ai-memory"
+        memory_dir = tmp_path / ".ai" / "memory"
         modules_dir = memory_dir / "modules"
         modules_dir.mkdir(parents=True)
         self._make_memory_file(
@@ -387,7 +387,7 @@ class TestRebuildIndex:
         assert "modules/my-module.md" in paths
 
     def test_pending_module_indexed_with_status_pending(self, tmp_path):
-        memory_dir = tmp_path / ".ai-memory"
+        memory_dir = tmp_path / ".ai" / "memory"
         modules_dir = memory_dir / "modules"
         modules_dir.mkdir(parents=True)
         self._make_memory_file(
@@ -412,7 +412,7 @@ class TestRebuildIndex:
         assert entry["status"] == "pending_commit"
 
     def test_child_module_enriched_metadata_is_indexed(self, tmp_path):
-        memory_dir = tmp_path / ".ai-memory"
+        memory_dir = tmp_path / ".ai" / "memory"
         child_dir = memory_dir / "modules" / "skills"
         child_dir.mkdir(parents=True)
         self._make_memory_file(
@@ -448,7 +448,7 @@ class TestRebuildIndex:
         assert entry["keywords"] == ["child-module", "memory-sync"]
 
     def test_rebuild_index_derives_keywords_when_missing(self, tmp_path):
-        memory_dir = tmp_path / ".ai-memory"
+        memory_dir = tmp_path / ".ai" / "memory"
         child_dir = memory_dir / "modules" / "skills"
         child_dir.mkdir(parents=True)
         self._make_memory_file(
@@ -480,6 +480,29 @@ class TestRebuildIndex:
         assert "memory" in entry["keywords"]
         assert "module-discovery" in entry["keywords"]
 
+    def test_rebuild_index_reads_legacy_ai_memory_when_canonical_missing(self, tmp_path):
+        memory_dir = tmp_path / ".ai-memory"
+        (memory_dir / "modules").mkdir(parents=True)
+        (memory_dir / "modules" / "legacy.md").write_text(
+            "---\n"
+            "id: legacy\n"
+            "type: module\n"
+            "title: Legacy\n"
+            "summary: Legacy memory\n"
+            "sync_status: synced\n"
+            "updated_at: 2026-01-01T00:00:00Z\n"
+            "confidence: high\n"
+            "tags: []\n"
+            "---\n\n"
+            "Legacy body.\n",
+            encoding="utf-8",
+        )
+
+        result = rebuild_index(tmp_path, write=False)
+
+        assert result["status"] == "ok"
+        assert result["entries"][0]["id"] == "legacy"
+
 
 class TestChildModuleSyncHelpers:
     def _make_memory_file(self, path: Path, frontmatter_fields: dict, body: str = "Some content.") -> Path:
@@ -495,7 +518,7 @@ class TestChildModuleSyncHelpers:
         return path
 
     def _write_memory_root(self, root: Path) -> Path:
-        memory_dir = root / ".ai-memory"
+        memory_dir = root / ".ai" / "memory"
         (memory_dir / "modules").mkdir(parents=True)
         (memory_dir / "review-queue.json").write_text('{"items": []}\n', encoding="utf-8")
         (memory_dir / "discovery-prefs.json").write_text(
@@ -543,16 +566,16 @@ class TestChildModuleSyncHelpers:
 
         assert result["created"] is True
         assert result["memory_path"] == "modules/skills/repository-memory.md"
-        child_file = tmp_path / ".ai-memory" / result["memory_path"]
+        child_file = tmp_path / ".ai" / "memory" / result["memory_path"]
         assert child_file.exists()
         content = child_file.read_text(encoding="utf-8")
         assert "parent_id: modules/skills" in content
         assert "## When To Load" in content
         assert "## Key Files" in content
-        prefs = json.loads((tmp_path / ".ai-memory" / "discovery-prefs.json").read_text(encoding="utf-8"))
+        prefs = json.loads((tmp_path / ".ai" / "memory" / "discovery-prefs.json").read_text(encoding="utf-8"))
         assert prefs["module_map"]["skills/repository-memory"]["status"] == "accepted"
         assert prefs["module_map"]["skills/repository-memory"]["parent_id"] == "modules/skills"
-        parent_content = (tmp_path / ".ai-memory" / "modules" / "skills.md").read_text(encoding="utf-8")
+        parent_content = (tmp_path / ".ai" / "memory" / "modules" / "skills.md").read_text(encoding="utf-8")
         assert "## Child Modules" in parent_content
         assert "modules/skills/repository-memory.md" in parent_content
 
@@ -569,7 +592,7 @@ class TestChildModuleSyncHelpers:
             "top_level_files": ["SKILL.md"],
         }
         result = create_child_module(tmp_path, candidate, write=True)
-        content = (tmp_path / ".ai-memory" / result["memory_path"]).read_text(encoding="utf-8")
+        content = (tmp_path / ".ai" / "memory" / result["memory_path"]).read_text(encoding="utf-8")
         frontmatter = {}
         for line in content.split("---", 2)[1].strip().splitlines():
             key, _, value = line.partition(":")
@@ -592,13 +615,13 @@ class TestChildModuleSyncHelpers:
         result = save_child_candidate_review(tmp_path, candidate, write=True)
 
         assert result["queued"] is True
-        queue = json.loads((tmp_path / ".ai-memory" / "review-queue.json").read_text(encoding="utf-8"))
+        queue = json.loads((tmp_path / ".ai" / "memory" / "review-queue.json").read_text(encoding="utf-8"))
         assert queue["items"][0]["type"] == "module"
         assert queue["items"][0]["reason"] == "medium_confidence_child_candidate"
         assert queue["items"][0]["status"] == "open"
 
     def test_needs_user_review_excluded(self, tmp_path):
-        memory_dir = tmp_path / ".ai-memory"
+        memory_dir = tmp_path / ".ai" / "memory"
         modules_dir = memory_dir / "modules"
         modules_dir.mkdir(parents=True)
         self._make_memory_file(
@@ -623,7 +646,7 @@ class TestChildModuleSyncHelpers:
         assert "review-mod" not in ids
 
     def test_sync_history_excluded(self, tmp_path):
-        memory_dir = tmp_path / ".ai-memory"
+        memory_dir = tmp_path / ".ai" / "memory"
         sync_dir = memory_dir / "sync-history"
         sync_dir.mkdir(parents=True)
         (sync_dir / "sync-001.md").write_text("# Sync History\nSome content\n", encoding="utf-8")
@@ -632,7 +655,7 @@ class TestChildModuleSyncHelpers:
         assert "sync-history" in result.get("excluded_dirs", [])
 
     def test_sessions_excluded(self, tmp_path):
-        memory_dir = tmp_path / ".ai-memory"
+        memory_dir = tmp_path / ".ai" / "memory"
         sessions_dir = memory_dir / "sessions"
         sessions_dir.mkdir(parents=True)
         (sessions_dir / "session-001.md").write_text("# Session\n", encoding="utf-8")
@@ -645,7 +668,7 @@ class TestUpdateManifest:
         _init_git_repo(tmp_path)
         (tmp_path / "README.md").write_text("hello", encoding="utf-8")
         head = _git_commit(tmp_path, "initial")
-        memory_dir = tmp_path / ".ai-memory"
+        memory_dir = tmp_path / ".ai" / "memory"
         memory_dir.mkdir(parents=True)
         manifest_data = {
             "schema_version": "1.0",
@@ -679,7 +702,7 @@ class TestUpdateManifest:
 
     def test_no_commit_repo_keeps_last_synced_commit_null(self, tmp_path):
         _init_git_repo(tmp_path)
-        memory_dir = tmp_path / ".ai-memory"
+        memory_dir = tmp_path / ".ai" / "memory"
         memory_dir.mkdir(parents=True)
         manifest_data = {
             "schema_version": "1.0",

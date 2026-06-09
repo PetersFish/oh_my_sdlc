@@ -7,6 +7,12 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+LIB_DIR = Path(__file__).resolve().parents[2] / "_lib"
+if str(LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(LIB_DIR))
+
+from sdlc_runtime_paths import resolve_memory_dir  # noqa: E402
+
 FRONTMATTER_DELIMITER = "---"
 VALID_SYNC_STATUSES = {"synced", "pending_commit", "needs_user_review"}
 
@@ -112,7 +118,7 @@ def _find_pending_files(memory_dir: Path) -> list[tuple[Path, dict]]:
 
 
 def reconcile_pending(root: Path, write: bool = False) -> dict:
-    memory_dir = root / ".ai-memory"
+    memory_dir = resolve_memory_dir(root).path
     manifest_path = memory_dir / "manifest.json"
     queue_path = memory_dir / "review-queue.json"
 

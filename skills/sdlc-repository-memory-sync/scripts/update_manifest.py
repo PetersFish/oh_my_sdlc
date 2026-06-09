@@ -7,6 +7,12 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+LIB_DIR = Path(__file__).resolve().parents[2] / "_lib"
+if str(LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(LIB_DIR))
+
+from sdlc_runtime_paths import resolve_memory_dir  # noqa: E402
+
 
 def _run_git(root: Path, *args: str) -> str | None:
     try:
@@ -39,7 +45,7 @@ SYNC_HISTORY_TEMPLATE = """# Sync History: {sync_id}
 
 
 def update_manifest(root: Path, sync_id: str | None = None, write: bool = False) -> dict:
-    memory_dir = root / ".ai-memory"
+    memory_dir = resolve_memory_dir(root).path
     manifest_path = memory_dir / "manifest.json"
 
     manifest: dict = {}
@@ -123,7 +129,7 @@ def update_manifest(root: Path, sync_id: str | None = None, write: bool = False)
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Update .ai-memory/manifest.json after sync")
+    parser = argparse.ArgumentParser(description="Update .ai/memory/manifest.json after sync")
     parser.add_argument("--root", default=".", help="Repository root path (default: current directory)")
     parser.add_argument("--json", action="store_true", help="Output JSON results")
     parser.add_argument("--write", action="store_true", help="Write updated manifest to disk")
