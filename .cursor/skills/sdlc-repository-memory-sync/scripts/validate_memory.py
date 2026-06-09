@@ -5,6 +5,12 @@ import json
 import sys
 from pathlib import Path
 
+LIB_DIR = Path(__file__).resolve().parents[2] / "_lib"
+if str(LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(LIB_DIR))
+
+from sdlc_runtime_paths import resolve_memory_dir  # noqa: E402
+
 VALID_SYNC_STATUSES = {"synced", "pending_commit", "needs_user_review"}
 INDEX_STATUSES = {"synced", "pending_commit"}
 VALID_MEMORY_TYPES = {"module", "architecture", "decisions", "pitfalls", "specs", "evolution", "sessions"}
@@ -264,7 +270,7 @@ def _validate_discovery_prefs(prefs_path: Path) -> list[str]:
 
 
 def validate_memory(root: Path) -> dict:
-    memory_dir = root / ".ai-memory"
+    memory_dir = resolve_memory_dir(root).path
     all_errors: list[str] = []
 
     manifest_errors = _validate_manifest(memory_dir / "manifest.json")
@@ -307,7 +313,7 @@ def validate_memory(root: Path) -> dict:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Validate .ai-memory/ structure and content")
+    parser = argparse.ArgumentParser(description="Validate .ai/memory/ structure and content")
     parser.add_argument("--root", default=".", help="Repository root path (default: current directory)")
     parser.add_argument("--json", action="store_true", help="Output JSON results")
     args = parser.parse_args()

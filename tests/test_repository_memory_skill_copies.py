@@ -128,3 +128,10 @@ class TestRepositoryMemorySkillCopies:
             assert skill_dir.is_dir(), f"sdlc-openspec-memory-sync missing in {client_dir.name}"
             skill_md = skill_dir / "SKILL.md"
             assert skill_md.is_file(), f"sdlc-openspec-memory-sync SKILL.md missing in {client_dir.name}"
+
+    def test_runtime_path_helper_copied_to_cli_skill_trees(self):
+        canonical = CANONICAL_DIR / "_lib" / "sdlc_runtime_paths.py"
+        for target in [".opencode", ".claude", ".cursor"]:
+            helper = REPO_ROOT / target / "skills" / "_lib" / "sdlc_runtime_paths.py"
+            assert helper.exists(), f"missing runtime helper in {target}"
+            assert helper.read_text(encoding="utf-8") == canonical.read_text(encoding="utf-8")

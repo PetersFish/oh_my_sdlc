@@ -6,6 +6,12 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+LIB_DIR = Path(__file__).resolve().parents[2] / "_lib"
+if str(LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(LIB_DIR))
+
+from sdlc_runtime_paths import resolve_memory_dir  # noqa: E402
+
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 
 SUBDIRS = [
@@ -37,7 +43,7 @@ def _load_template(name: str) -> str:
 
 
 def init_memory(root: Path) -> dict:
-    memory_dir = root / ".ai-memory"
+    memory_dir = resolve_memory_dir(root).path
     created: list[str] = []
     skipped: list[str] = []
 
@@ -52,7 +58,7 @@ def init_memory(root: Path) -> dict:
     discovery_prefs_content = json.dumps({
         "schema_version": "1.0",
         "exclude_patterns": [
-            ".git", ".ai-memory", "node_modules", "__pycache__",
+            ".git", ".ai", ".ai-memory", "node_modules", "__pycache__",
             ".venv", "venv", ".pytest_cache", ".mypy_cache",
             ".ruff_cache", ".tox", "dist", "build", "target",
             ".idea", ".vscode",
@@ -97,7 +103,7 @@ def init_memory(root: Path) -> dict:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Initialize .ai-memory/ in a repository.")
+    parser = argparse.ArgumentParser(description="Initialize .ai/memory/ in a repository.")
     parser.add_argument("--root", default=".", help="Repository root path (default: current directory)")
     parser.add_argument("--json", action="store_true", help="Output JSON summary")
     args = parser.parse_args()
@@ -108,11 +114,12 @@ def main() -> int:
         return 1
 
     result = init_memory(root)
+    memory_dir = resolve_memory_dir(root).path
 
     if args.json:
         print(json.dumps(result, indent=2))
     else:
-        print(f"Repository Memory initialized at {root}/.ai-memory/")
+        print(f"Repository Memory initialized at {memory_dir}/")
         print()
         if result["created"]:
             print("Created:")

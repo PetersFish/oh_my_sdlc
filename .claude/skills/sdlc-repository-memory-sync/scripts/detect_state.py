@@ -6,6 +6,12 @@ import subprocess
 import sys
 from pathlib import Path
 
+LIB_DIR = Path(__file__).resolve().parents[2] / "_lib"
+if str(LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(LIB_DIR))
+
+from sdlc_runtime_paths import resolve_memory_dir  # noqa: E402
+
 
 def _run_git(root: Path, *args: str) -> str | None:
     try:
@@ -44,7 +50,7 @@ def _detect_git(root: Path) -> dict:
     if has_commits:
         head = _run_git(root, "rev-parse", "HEAD")
 
-    manifest_path = root / ".ai-memory" / "manifest.json"
+    manifest_path = resolve_memory_dir(root).path / "manifest.json"
     last_synced_commit = None
     if manifest_path.exists():
         try:
@@ -164,7 +170,7 @@ def main() -> int:
         git_state.get("staged_files", []),
     )
 
-    manifest_path = root / ".ai-memory" / "manifest.json"
+    manifest_path = resolve_memory_dir(root).path / "manifest.json"
     pending_snapshots: list[str] = []
     if manifest_path.exists():
         try:

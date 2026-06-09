@@ -6,6 +6,12 @@ import re
 import sys
 from pathlib import Path
 
+LIB_DIR = Path(__file__).resolve().parents[2] / "_lib"
+if str(LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(LIB_DIR))
+
+from sdlc_runtime_paths import resolve_memory_dir  # noqa: E402
+
 EXCLUDED_PREFIXES = (
     "sync-history/",
     "sessions/",
@@ -76,8 +82,9 @@ def _is_excluded(path: str) -> bool:
 
 
 def select_memory(root: Path, query: str = "", max_results: int = 5) -> dict:
-    index_path = root / ".ai-memory" / "index.json"
-    manifest_path = root / ".ai-memory" / "manifest.json"
+    memory_dir = resolve_memory_dir(root).path
+    index_path = memory_dir / "index.json"
+    manifest_path = memory_dir / "manifest.json"
 
     if not manifest_path.exists():
         return {
@@ -124,7 +131,7 @@ def select_memory(root: Path, query: str = "", max_results: int = 5) -> dict:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Select relevant memory entries from .ai-memory/index.json")
+    parser = argparse.ArgumentParser(description="Select relevant memory entries from .ai/memory/index.json")
     parser.add_argument("--root", default=".", help="Repository root path (default: current directory)")
     parser.add_argument("--query", default="", help="Comma-separated search keywords")
     parser.add_argument("--max", type=int, default=5, help="Maximum results (default: 5)")

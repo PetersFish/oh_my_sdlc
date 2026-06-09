@@ -2,8 +2,15 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
+
+LIB_DIR = Path(__file__).resolve().parents[2] / "_lib"
+if str(LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(LIB_DIR))
+
+from sdlc_runtime_paths import resolve_memory_dir  # noqa: E402
 
 
 def _now() -> str:
@@ -108,7 +115,7 @@ def _child_content(candidate: dict, memory_path: str) -> str:
 
 
 def _update_discovery_prefs(root: Path, candidate: dict, memory_path: str, write: bool) -> None:
-    prefs_path = root / ".ai-memory" / "discovery-prefs.json"
+    prefs_path = resolve_memory_dir(root).path / "discovery-prefs.json"
     prefs = _load_json(prefs_path, {
         "schema_version": "1.0",
         "exclude_patterns": [],
@@ -134,7 +141,7 @@ def _update_parent_routing(root: Path, candidate: dict, memory_path: str, write:
     parent_id = candidate.get("parent_id", "")
     if not parent_id.startswith("modules/"):
         return
-    parent_file = root / ".ai-memory" / (parent_id + ".md")
+    parent_file = resolve_memory_dir(root).path / (parent_id + ".md")
     if not parent_file.exists():
         return
     content = parent_file.read_text(encoding="utf-8")
@@ -150,7 +157,7 @@ def _update_parent_routing(root: Path, candidate: dict, memory_path: str, write:
 
 def create_child_module(root: Path, candidate: dict, write: bool = False) -> dict:
     memory_path = _child_memory_path(candidate)
-    child_file = root / ".ai-memory" / memory_path
+    child_file = resolve_memory_dir(root).path / memory_path
     content = _child_content(candidate, memory_path)
     if write:
         child_file.parent.mkdir(parents=True, exist_ok=True)
@@ -165,7 +172,7 @@ def create_child_module(root: Path, candidate: dict, write: bool = False) -> dic
 
 
 def save_child_candidate_review(root: Path, candidate: dict, write: bool = False) -> dict:
-    queue_path = root / ".ai-memory" / "review-queue.json"
+    queue_path = resolve_memory_dir(root).path / "review-queue.json"
     queue = _load_json(queue_path, {"items": []})
     item = {
         "id": "child-module-" + _slug(candidate.get("path", candidate.get("name", "candidate"))),
@@ -277,7 +284,7 @@ def create_grouped_child_module(root: Path, candidates: list[dict], group_name: 
     parent_id = candidates[0].get("parent_id", "")
     parent_path = candidates[0].get("parent_path", "")
     memory_path = _grouped_memory_path(parent_id, parent_path, group_name)
-    child_file = root / ".ai-memory" / memory_path
+    child_file = resolve_memory_dir(root).path / memory_path
     content = _grouped_child_content(candidates, memory_path, group_name)
     if write:
         child_file.parent.mkdir(parents=True, exist_ok=True)

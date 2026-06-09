@@ -6,8 +6,15 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+LIB_DIR = Path(__file__).resolve().parents[2] / "_lib"
+if str(LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(LIB_DIR))
+
+from sdlc_runtime_paths import resolve_memory_dir  # noqa: E402
+
 BUILTIN_EXCLUDE = {
     ".git",
+    ".ai",
     ".ai-memory",
     "node_modules",
     "__pycache__",
@@ -245,7 +252,7 @@ def _build_candidate(root: Path, child: Path, depth: int, module_map: dict) -> d
 
 
 def discover_modules(root: Path) -> dict:
-    prefs = _load_prefs(root / ".ai-memory")
+    prefs = _load_prefs(resolve_memory_dir(root).path)
     exclude_patterns = set(BUILTIN_EXCLUDE) | set(prefs.get("exclude_patterns", []))
     max_depth = prefs.get("max_depth", 5)
     module_map = prefs.get("module_map", {})

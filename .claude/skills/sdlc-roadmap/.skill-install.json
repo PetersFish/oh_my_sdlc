@@ -1,0 +1,16 @@
+{
+  "skill": "sdlc-roadmap",
+  "source_repo": "/Users/yuping/Documents/workspace/oh_my_skills",
+  "source_ref": "HEAD",
+  "source_path": "skills/sdlc-roadmap",
+  "target": ".claude/skills/sdlc-roadmap",
+  "installed_at": "2026-06-09T00:00:00.000000Z",
+  "status": "stable",
+  "backport_policy": "review-required",
+  "payload_hash": "dummy",
+  "files": [
+    "SKILL.md",
+    "scripts/list.py",
+    "templates/item.md"
+  ]
+}
