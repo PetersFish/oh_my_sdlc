@@ -40,6 +40,8 @@ Thin orchestration layer between long-term product roadmap and single formal Ope
 
 The canonical runtime path is `.ai/roadmap/`. For existing projects, scripts will read legacy `.roadmap/` when `.ai/roadmap/` is absent. New initialization writes only to `.ai/roadmap/` — do not create new `.roadmap/` directories.
 
+For manual path migration from `.roadmap/` to `.ai/roadmap/`, follow `docs/sdlc-runtime-layout.md`. Do not merge canonical and legacy directories automatically.
+
 **Markdown item files are the source of truth.** `index.json` is a derived index. When they disagree, item files win. Use `rebuild_index.py` to repair with explicit user confirmation after reporting the diff.
 
 ### Roadmap Item Frontmatter Fields

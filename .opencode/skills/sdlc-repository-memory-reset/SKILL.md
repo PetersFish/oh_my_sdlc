@@ -8,6 +8,8 @@ license: MIT
 
 Safely remove `.ai/memory/`, re-initialize infrastructure, and optionally run sync — with interactive confirmation at each destructive step.
 
+For manual path migration from `.ai-memory/` to `.ai/memory/`, follow `docs/sdlc-runtime-layout.md`. Do not merge canonical and legacy directories automatically.
+
 ## When to Use
 
 - Testing `sdlc-repository-memory-sync` or `sdlc-repository-memory-init` workflows and needing a clean slate.
