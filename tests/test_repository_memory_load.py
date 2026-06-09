@@ -35,7 +35,7 @@ class TestSelectMemoryMissingIndex(unittest.TestCase):
             shutil.rmtree(TEST_ROOT)
 
     def _memory_dir(self) -> Path:
-        return TEST_ROOT / ".ai-memory"
+        return TEST_ROOT / ".ai" / "memory"
 
     def _init(self) -> None:
         memory_dir = self._memory_dir()
@@ -63,6 +63,20 @@ class TestSelectMemoryMissingIndex(unittest.TestCase):
         self._init()
         result = select_memory(TEST_ROOT)
         self.assertEqual(result["entries"], [])
+
+    def test_legacy_ai_memory_is_read_as_fallback(self) -> None:
+        legacy_dir = TEST_ROOT / ".ai-memory"
+        legacy_dir.mkdir(parents=True, exist_ok=True)
+        manifest = {"schema_version": "1.0", "memory_version": 1, "git": {"available": False}}
+        (legacy_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+        index = {"schema_version": "1.0", "entries": [
+            {"title": "Legacy Auth", "summary": "Legacy memory", "path": "modules/auth.md", "type": "module", "sync_status": "synced", "tags": ["auth"]},
+        ]}
+        (legacy_dir / "index.json").write_text(json.dumps(index), encoding="utf-8")
+
+        result = select_memory(TEST_ROOT, query="auth")
+
+        assert result["entries"][0]["title"] == "Legacy Auth"
 
     def test_query_selects_by_tag(self) -> None:
         self._init()
@@ -237,7 +251,7 @@ class TestValidateMemory(unittest.TestCase):
             shutil.rmtree(TEST_ROOT)
 
     def _memory_dir(self) -> Path:
-        return TEST_ROOT / ".ai-memory"
+        return TEST_ROOT / ".ai" / "memory"
 
     def _init_valid(self) -> None:
         memory_dir = self._memory_dir()
