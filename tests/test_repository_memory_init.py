@@ -23,7 +23,7 @@ class TestRepositoryMemoryInit(unittest.TestCase):
             shutil.rmtree(self.tmp_dir)
 
     def _memory_dir(self) -> Path:
-        return self.tmp_dir / ".ai-memory"
+        return self.tmp_dir / ".ai" / "memory"
 
     def test_init_creates_full_directory_structure(self) -> None:
         result = init_memory(self.tmp_dir)
@@ -141,7 +141,7 @@ class TestEndToEndIntegration(unittest.TestCase):
                 REPO_ROOT / "skills" / "sdlc-repository-memory-init" / "scripts" / "init_memory.py",
             )
             result1 = init_mod.init_memory(tmp_dir)
-            memory_dir = tmp_dir / ".ai-memory"
+            memory_dir = tmp_dir / ".ai" / "memory"
             for subdir in init_mod.SUBDIRS:
                 assert (memory_dir / subdir).is_dir(), f"Missing subdirectory: {subdir}"
             assert (memory_dir / "manifest.json").exists()
@@ -176,7 +176,7 @@ class TestEndToEndIntegration(unittest.TestCase):
                 REPO_ROOT / "skills" / "sdlc-repository-memory-init" / "scripts" / "init_memory.py",
             )
             init_mod.init_memory(tmp_dir)
-            modules_dir = tmp_dir / ".ai-memory" / "modules"
+            modules_dir = tmp_dir / ".ai" / "memory" / "modules"
             modules_dir.mkdir(parents=True, exist_ok=True)
             module_content = (
                 "---\n"
@@ -208,7 +208,7 @@ class TestEndToEndIntegration(unittest.TestCase):
             updated_content = module_file.read_text(encoding="utf-8")
             assert "sync_status: synced" in updated_content
             assert "evidence_mode: commit" in updated_content
-            rq = json.loads((tmp_dir / ".ai-memory" / "review-queue.json").read_text(encoding="utf-8"))
+            rq = json.loads((tmp_dir / ".ai" / "memory" / "review-queue.json").read_text(encoding="utf-8"))
             has_reconcile_item = any(
                 item.get("id", "").startswith("review-auth-module") or item.get("reason") in ("partial_reconcile", "no_matching_commit")
                 for item in rq.get("items", [])
