@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "id": "RM-001",
+      "status": "ready",
+      "title": "sdlc-roadmap Skill MVP",
+      "stage": "mvp",
+      "priority": "p0",
+      "order": 10,
+      "depends_on": [],
+      "openspec_change": "add-sdlc-roadmap-skill",
+      "patches": []
+    },
+    {
+      "id": "RM-002",
+      "status": "planned",
+      "title": "Replan & Patch",
+      "stage": "v2",
+      "priority": "p1",
+      "order": 20,
+      "depends_on": [
+        "RM-001"
+      ],
+      "openspec_change": null,
+      "patches": []
+    },
+    {
+      "id": "RM-003",
+      "status": "planned",
+      "title": "Validation & Sync",
+      "stage": "v3",
+      "priority": "p2",
+      "order": 30,
+      "depends_on": [
+        "RM-002"
+      ],
+      "openspec_change": null,
+      "patches": []
+    },
+    {
+      "id": "RM-004",
+      "status": "planned",
+      "title": "Backlog / GitHub Issues Integration",
+      "stage": "v4",
+      "priority": "p3",
+      "order": 40,
+      "depends_on": [
+        "RM-003"
+      ],
+      "openspec_change": null,
+      "patches": []
+    }
+  ]
+}
