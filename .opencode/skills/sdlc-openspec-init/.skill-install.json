@@ -9,12 +9,6 @@
   "backport_policy": "review-required",
   "payload_hash": "945af30e6ff38935ecc6b4d98848ca57400c3cf53fc1c085e195866f15796281",
   "files": [
-    "SKILL.md",
-    "templates/sdd-plus-superpowers/README.md",
-    "templates/sdd-plus-superpowers/schema.yaml",
-    "templates/sdd-plus-superpowers/templates/design.md",
-    "templates/sdd-plus-superpowers/templates/proposal.md",
-    "templates/sdd-plus-superpowers/templates/spec.md",
-    "templates/sdd-plus-superpowers/templates/tasks.md"
+    "SKILL.md"
   ]
 }

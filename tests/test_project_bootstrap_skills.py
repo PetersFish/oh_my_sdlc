@@ -64,40 +64,20 @@ class TestSdlcOpenspecInitSkill(unittest.TestCase):
         self.assertIn("openspec/config.yaml", content)
         self.assertIn("recover", content.lower())
 
-    def test_schema_template_exists(self) -> None:
-        schema_dir = OPENSPEC_INIT_SKILL / "templates" / "sdd-plus-superpowers"
-        self.assertTrue(schema_dir.is_dir(), "Schema template directory must exist")
-        self.assertTrue((schema_dir / "schema.yaml").exists(), "schema.yaml must exist")
-        self.assertTrue((schema_dir / "templates").is_dir(), "templates/ subdirectory must exist")
-
-    def test_schema_template_matches_canonical(self) -> None:
-        canonical = REPO_ROOT / "openspec" / "schemas" / "sdd-plus-superpowers"
-        template = OPENSPEC_INIT_SKILL / "templates" / "sdd-plus-superpowers"
-        self.assertEqual(
-            (canonical / "schema.yaml").read_text(encoding="utf-8"),
-            (template / "schema.yaml").read_text(encoding="utf-8"),
-            "Schema template must match canonical source",
-        )
-        canonical_templates = sorted(
-            p.name for p in (canonical / "templates").iterdir()
-        )
-        template_templates = sorted(
-            p.name for p in (template / "templates").iterdir()
-        )
-        self.assertEqual(
-            canonical_templates,
-            template_templates,
-            "Template files must match canonical source",
-        )
+    def test_no_custom_schema_templates(self) -> None:
+        """After removing sdd-plus-superpowers, no custom schema templates should remain."""
+        old_schema = OPENSPEC_INIT_SKILL / "templates" / "sdd-plus-superpowers"
+        self.assertFalse(old_schema.is_dir(), "sdd-plus-superpowers template directory must be removed")
 
     def test_skill_md_references_standalone_invocation(self) -> None:
         content = (OPENSPEC_INIT_SKILL / "SKILL.md").read_text(encoding="utf-8")
         self.assertIn("standalone", content.lower())
 
-    def test_skill_md_references_schema_iteration(self) -> None:
+    def test_skill_md_has_no_custom_schema_iteration(self) -> None:
+        """No custom schema to iterate - the iteration section is removed."""
         content = (OPENSPEC_INIT_SKILL / "SKILL.md").read_text(encoding="utf-8")
-        self.assertIn("iteration", content.lower())
-        self.assertIn("newer", content.lower())
+        self.assertNotIn("install sdd-plus-superpowers", content.lower())
+        self.assertNotIn("iterate", content.lower())
 
     def test_skill_md_prompts_for_default_schema_choice(self) -> None:
         content = (OPENSPEC_INIT_SKILL / "SKILL.md").read_text(encoding="utf-8")
@@ -123,19 +103,14 @@ class TestSdlcOpenspecInitSkill(unittest.TestCase):
         self.assertIn("until the user", lower)
         self.assertIn("always prompt first", lower)
 
-    def test_skill_md_schema_install_before_schema_listing(self) -> None:
+    def test_skill_md_does_not_mention_custom_schema_install(self) -> None:
         content = (OPENSPEC_INIT_SKILL / "SKILL.md").read_text(encoding="utf-8")
-        install_pos = content.lower().find("install sdd-plus-superpowers schema")
-        list_pos = content.lower().find("openspec schemas --json")
-        self.assertGreater(install_pos, -1, "Must mention schema install step")
-        self.assertGreater(list_pos, -1, "Must mention schema listing command")
-        self.assertLess(install_pos, list_pos,
-                        "Schema install step must appear before schema listing step")
+        self.assertNotIn("sdd-plus-superpowers", content.lower())
 
-    def test_skill_md_sdd_plus_superpowers_is_recommended_default_schema(self) -> None:
+    def test_skill_md_spec_driven_is_recommended_default_schema(self) -> None:
         content = (OPENSPEC_INIT_SKILL / "SKILL.md").read_text(encoding="utf-8")
         self.assertIn("recommended", content.lower())
-        self.assertIn("sdd-plus-superpowers", content.lower())
+        self.assertIn("spec-driven", content.lower())
 
     def test_skill_md_guardrail_no_init_without_tool_choice(self) -> None:
         content = (OPENSPEC_INIT_SKILL / "SKILL.md").read_text(encoding="utf-8")
@@ -146,14 +121,15 @@ class TestSdlcOpenspecInitSkill(unittest.TestCase):
         self.assertIn("openspec init", guardrails)
         self.assertIn("always prompt first", guardrails)
 
-    def test_skill_md_guardrail_no_schema_prompt_before_install(self) -> None:
+    def test_skill_md_guardrail_no_auto_new_change(self) -> None:
         content = (OPENSPEC_INIT_SKILL / "SKILL.md").read_text(encoding="utf-8")
         guardrails_start = content.find("## Guardrails")
         self.assertGreater(guardrails_start, -1, "Must have Guardrails section")
         guardrails = content[guardrails_start:].lower()
-        self.assertIn("do not ask for the default schema until", guardrails)
-        self.assertIn("sdd-plus-superpowers", guardrails)
-        self.assertIn("openspec schemas --json", guardrails)
+        self.assertIn("do not run", guardrails)
+        self.assertIn("openspec init", guardrails)
+        self.assertIn("always prompt first", guardrails)
+        self.assertIn("do not create an openspec change", guardrails)
 
 
 class TestSdlcProjectBootstrapSkill(unittest.TestCase):
@@ -341,11 +317,6 @@ class TestEndToEndScenarios(unittest.TestCase):
             "schema: spec-driven\n", encoding="utf-8"
         )
 
-    def _create_schema_dir(self) -> None:
-        schema_dir = self.tmp_dir / "openspec" / "schemas" / "sdd-plus-superpowers"
-        schema_dir.mkdir(parents=True, exist_ok=True)
-        (schema_dir / "schema.yaml").write_text("name: sdd-plus-superpowers\nversion: 1\n", encoding="utf-8")
-
     def _create_agents_md(self, content: str = "") -> None:
         (self.tmp_dir / "AGENTS.md").write_text(content, encoding="utf-8")
 
@@ -365,7 +336,6 @@ class TestEndToEndScenarios(unittest.TestCase):
         result = {
             "agents_md": "create" if not (self.tmp_dir / "AGENTS.md").exists() else "skip",
             "openspec": "init" if not (self.tmp_dir / "openspec" / "config.yaml").exists() else "skip",
-            "schema": "install" if not (self.tmp_dir / "openspec" / "schemas" / "sdd-plus-superpowers").exists() else "skip",
             "memory": "init" if not (self.tmp_dir / ".ai" / "memory" / "manifest.json").exists() else "skip",
         }
         return result
@@ -374,25 +344,21 @@ class TestEndToEndScenarios(unittest.TestCase):
         result = self._simulate_full_bootstrap()
         self.assertEqual(result["agents_md"], "create")
         self.assertEqual(result["openspec"], "init")
-        self.assertEqual(result["schema"], "install")
         self.assertEqual(result["memory"], "init")
 
     def test_all_initialized_project_no_actions_needed(self) -> None:
         self._create_agents_md("# Test AGENTS\n")
         self._create_openspec_config()
-        self._create_schema_dir()
         self._create_ai_memory()
         result = self._simulate_full_bootstrap()
         self.assertEqual(result["agents_md"], "skip")
         self.assertEqual(result["openspec"], "skip")
-        self.assertEqual(result["schema"], "skip")
         self.assertEqual(result["memory"], "skip")
 
     def test_existing_agents_md_preserved(self) -> None:
         original = "# Custom Instructions\nDo not remove me.\n"
         self._create_agents_md(original)
         self._create_openspec_config()
-        self._create_schema_dir()
         self._create_ai_memory()
         result = self._simulate_full_bootstrap()
         self.assertEqual(result["agents_md"], "skip")
@@ -404,11 +370,6 @@ class TestEndToEndScenarios(unittest.TestCase):
         result = self._simulate_full_bootstrap()
         self.assertEqual(result["openspec"], "skip")
 
-    def test_existing_schema_detected_and_skipped(self) -> None:
-        self._create_schema_dir()
-        result = self._simulate_full_bootstrap()
-        self.assertEqual(result["schema"], "skip")
-
     def test_existing_memory_detected_and_skipped(self) -> None:
         self._create_ai_memory()
         result = self._simulate_full_bootstrap()
@@ -417,14 +378,12 @@ class TestEndToEndScenarios(unittest.TestCase):
     def test_idempotence_repeated_detection(self) -> None:
         self._create_agents_md("# Test\n")
         self._create_openspec_config()
-        self._create_schema_dir()
         self._create_ai_memory()
         result1 = self._simulate_full_bootstrap()
         result2 = self._simulate_full_bootstrap()
         self.assertEqual(result1, result2, "Detection results must be identical on re-runs")
         self.assertEqual(result1["agents_md"], "skip")
         self.assertEqual(result1["openspec"], "skip")
-        self.assertEqual(result1["schema"], "skip")
         self.assertEqual(result1["memory"], "skip")
 
     def test_partial_init_only_missing_steps(self) -> None:
@@ -432,7 +391,6 @@ class TestEndToEndScenarios(unittest.TestCase):
         result = self._simulate_full_bootstrap()
         self.assertEqual(result["agents_md"], "skip")
         self.assertEqual(result["openspec"], "init")
-        self.assertEqual(result["schema"], "install")
         self.assertEqual(result["memory"], "init")
 
     def test_dry_run_detection_no_side_effects(self) -> None:
@@ -447,36 +405,99 @@ class TestEndToEndScenarios(unittest.TestCase):
         self.assertEqual(original_files, after_files, "Dry-run must not create any files")
         self.assertEqual(result["agents_md"], "create")
 
-    def test_schema_newer_version_detection(self) -> None:
-        """When schema exists but is older version, mark as install."""
-        self._create_schema_dir()
-        old_schema = self.tmp_dir / "openspec" / "schemas" / "sdd-plus-superpowers" / "schema.yaml"
-        old_schema.write_text("name: sdd-plus-superpowers\nversion: 0\n", encoding="utf-8")
-        schema_path = old_schema
-        self.assertTrue(schema_path.exists(), "Schema should exist even if outdated")
-        result = self._simulate_full_bootstrap()
-        self.assertEqual(result["schema"], "skip",
-                         "Basic detection treats installed schema as present; version comparison is runtime behavior")
-
     def test_duplicate_run_no_triple_init(self) -> None:
         """Simulate three detection runs; should be stable."""
         self._create_agents_md("# AGENTS\n")
         self._create_openspec_config()
-        self._create_schema_dir()
         self._create_ai_memory()
         results = [self._simulate_full_bootstrap() for _ in range(3)]
         for r in results:
             self.assertEqual(r["agents_md"], "skip")
             self.assertEqual(r["openspec"], "skip")
-            self.assertEqual(r["schema"], "skip")
             self.assertEqual(r["memory"], "skip")
 
-    def test_openspec_init_standalone_openspec_only_schema_missing(self) -> None:
-        """Standalone openspec-init: OpenSpec exists but schema is missing."""
+    def test_openspec_init_standalone_openspec_exists(self) -> None:
+        """Standalone openspec-init: OpenSpec already exists but memory is missing."""
         self._create_openspec_config()
         result = self._simulate_full_bootstrap()
         self.assertEqual(result["openspec"], "skip")
-        self.assertEqual(result["schema"], "install")
+        self.assertEqual(result["memory"], "init")
+
+
+ORCHESTRATOR_SKILL = REPO_ROOT / "skills" / "sdlc-orchestrator"
+
+
+class TestSdlcOrchestratorSkill(unittest.TestCase):
+    """Validate sdlc-orchestrator skill structure and routing coverage."""
+
+    def test_skill_md_exists(self) -> None:
+        self.assertTrue(
+            (ORCHESTRATOR_SKILL / "SKILL.md").exists(),
+            "sdlc-orchestrator/SKILL.md must exist",
+        )
+
+    def test_skill_md_has_valid_frontmatter(self) -> None:
+        fm = _read_frontmatter(ORCHESTRATOR_SKILL / "SKILL.md")
+        self.assertEqual(fm.get("name"), "sdlc-orchestrator")
+        self.assertIn("description", fm)
+        self.assertGreater(len(fm["description"]), 20, "description too short")
+        self.assertIn("orchestrat", fm["description"].lower())
+
+    def test_skill_md_has_route_classification(self) -> None:
+        content = (ORCHESTRATOR_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("Route Classification", content)
+        self.assertIn("score", content.lower())
+        self.assertIn("superpowers-direct", content.lower())
+
+    def test_skill_md_has_propose_flow(self) -> None:
+        content = (ORCHESTRATOR_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("spec-driven-propose-flow", content.lower())
+        self.assertIn("openspec-propose", content.lower())
+
+    def test_skill_md_has_incremental_flow(self) -> None:
+        content = (ORCHESTRATOR_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("spec-driven-incremental-flow", content.lower())
+        self.assertIn("openspec-new-change", content.lower())
+        self.assertIn("openspec-continue-change", content.lower())
+
+    def test_skill_md_has_review_summary(self) -> None:
+        content = (ORCHESTRATOR_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("Review Summary", content)
+        self.assertIn("Review Focus", content)
+
+    def test_skill_md_has_boundary_rules(self) -> None:
+        content = (ORCHESTRATOR_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("Boundary Rules", content)
+        self.assertIn("Orchestrator vs OpenSpec", content)
+        self.assertIn("Orchestrator vs Roadmap", content)
+        self.assertIn("Orchestrator vs EvalOps", content)
+
+    def test_skill_md_has_routing_examples(self) -> None:
+        content = (ORCHESTRATOR_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("## Examples", content)
+        self.assertIn("superpowers-direct", content.lower())
+        self.assertIn("roadmap-first", content.lower())
+        self.assertIn("evalops-gated", content.lower())
+        self.assertIn("memory-sync", content.lower())
+
+    def test_skill_md_mentions_roadmap_first(self) -> None:
+        content = (ORCHESTRATOR_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("roadmap-first", content.lower())
+        self.assertIn("sdlc-roadmap", content.lower())
+
+    def test_skill_md_mentions_evalops_gate(self) -> None:
+        content = (ORCHESTRATOR_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("evalops-gated", content.lower())
+        self.assertIn("meta-skill-evalops", content.lower())
+
+    def test_skill_md_mentions_memory_sync(self) -> None:
+        content = (ORCHESTRATOR_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("memory-sync", content.lower())
+        self.assertIn("sdlc-repository-memory-sync", content.lower())
+
+    def test_skill_md_does_not_mention_sdd_plus_superpowers(self) -> None:
+        content = (ORCHESTRATOR_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        self.assertNotIn("sdd-plus-superpowers", content.lower())
 
 
 if __name__ == "__main__":

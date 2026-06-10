@@ -57,18 +57,14 @@ Delegate to `sdlc-openspec-init` for OpenSpec CLI initialization, schema discove
 Treat this as a delegation contract. The OpenSpec step is only complete when `sdlc-openspec-init` returns all of these fields:
 - OpenSpec: [created / already present]
 - AI tools: [selected by user]
-- Available schemas: [listed]
 - Default schema: [selected by user]
-- sdd-plus-superpowers schema: [installed / already present]
 
 If the result is missing `AI tools` or `Default schema`, treat the OpenSpec step as incomplete, run standalone `sdlc-openspec-init` to recover, and stop if recovery still cannot produce those fields.
 
 Report the result from `sdlc-openspec-init`:
 - OpenSpec: [created / already present]
 - AI tools: [selected by user]
-- Available schemas: [listed]
 - Default schema: [selected by user]
-- sdd-plus-superpowers schema: [installed / already present]
 
 If `sdlc-openspec-init` fails, report the error and stop. Do NOT proceed to step 3.
 
@@ -95,13 +91,11 @@ Project Foundation Bootstrap Complete
 AGENTS.md: [created | already present | appended missing blocks]
 OpenSpec: [initialized | already present]
   AI tools: [selected]
-  Available schemas: [listed]
   Default schema: [selected]
-  Schema: [installed | already present]
 Repository Memory: [initialized | already present]
 
 Suggested next steps:
-  1. Create your first change: openspec new change <name> --schema sdd-plus-superpowers
+  1. Create your first change: openspec new change <name>
   2. Populate repository memory: run sdlc-repository-memory-sync
 ```
 
@@ -115,8 +109,7 @@ Dry-run preview:
 AGENTS.md: [would create from template | would append missing blocks | already present]
 OpenSpec: [would initialize via openspec init | already present]
   AI tools: [would prompt for selection | already selected]
-  Available schemas: [would list schemas and prompt for selection | already present]
-  Schema: [would install sdd-plus-superpowers | already present]
+  Default schema: [would prompt for selection | already selected]
 Repository Memory: [would initialize via sdlc-repository-memory-init | already present]
 ```
 
