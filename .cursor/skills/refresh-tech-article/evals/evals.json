@@ -1,0 +1,65 @@
+{
+  "skill_name": "refresh-tech-article",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "请刷新 `docs/rag-architecture.md`。这篇文章写于 2023 年，主题是企业 RAG 架构，里面提到了向量数据库、LangChain、Agent 和评测。先联网校验是否过时，默认生成刷新报告，等我确认后再生成新版副本。",
+      "expected_output": "Uses report-first mode, researches current RAG architecture with AI architecture reasoning, distinguishes mature approaches/frontier/controversies, saves or proposes a report under versions/, and suggests diagrams only as a confirmation-gated option.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "直接刷新 `notes/kafka-consumer-best-practices.md`，生成一个带时间戳的新副本和刷新报告。重点检查 Kafka consumer group、offset 管理、重平衡和 exactly-once 相关内容是否过时。",
+      "expected_output": "Uses direct refresh mode for a non-AI technical article, researches current Kafka guidance, creates both timestamped refreshed copy and report paths under versions/, preserves source language/style, and does not overfit to AI-only analysis.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "我已经验收 `docs/versions/rag-architecture.20260606-1430.md`，请刷回 `docs/rag-architecture.md`。报告是 `docs/versions/rag-architecture.20260606-1430.report.md`。",
+      "expected_output": "Does not overwrite immediately. Shows source path, refreshed copy path, report path, notes that versions remain preserved, and asks for explicit second confirmation before source write-back.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "请刷新这篇 LangChain 入门教程 `wiki/langchain-tutorial.md`。文章包含环境搭建、Prompt、Tools、Agent、一个天气助手 demo。我希望保留新手友好、可运行代码和学习曲线，但补充 2026 年 Agent 工程化视角：LangGraph 工作流、Middleware、Guardrails、Eval、MCP 协议、生产部署注意事项。同时参考另一篇方法论文章 `wiki/langchain-methodology-2026.md` 的优势，把它们吸收到刷新版里。",
+      "expected_output": "Classifies as Structural or Strategic Refresh. Runs Architecture Gap Analysis covering at least: workflow/orchestration, guardrails, evaluation, MCP/tool ecosystem, observability. Includes Integration Strategy table mapping source strengths to new imports. Preserves runnable code, beginner tone, and progressive learning curve. Adds new sections rather than rewriting every paragraph. Report includes gap analysis, integration strategy, and proposed new structure. Waits for user confirmation before writing refreshed copy.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "刷新 `notes/python-3.12-whats-new.md`，只需要校验 API 和版本事实是否准确，不要改结构，不要加架构方法论。",
+      "expected_output": "Classifies as Conservative Refresh. Report does NOT include Architecture Gap Analysis or Integration Strategy sections. Refreshed copy preserves exact structure and tone. Does not add workflow, evaluation, or governance sections.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "帮我比较两篇 RAG 框架选型文章 `rag-comparison-2024.md` 和 `rag-engineering-2026.md`，把后者的工程化优势吸收到前者的刷新版里。保留前者对 LlamaIndex、LangChain、Haystack 的对比表，但要补后者里的生产评估指标、chunking 策略对比、rerank 选型和成本分析。",
+      "expected_output": "Classifies as Structural Refresh. Runs Architecture Gap Analysis. Report includes Integration Strategy with source strengths to preserve and new strengths to import. Result preserves the comparison table structure but adds evaluation/cost/production dimensions as named sections. Waits for user confirmation before writing.",
+      "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "直接刷新 `wiki/langchain-tutorial.md`，生成报告和新版后，请校验报告中的建议修改是否全部同步到新版文章。如果报告里写了 '待生成' 但新版已存在，也要指出。",
+      "expected_output": "After generating the refreshed copy, performs Report-to-Copy Sync Check. Checks every row in 建议修改, Architecture Gap Analysis (High priority only), and Integration Strategy (Add/Insert/Include actions) against the refreshed copy. Reports Synced, Partially synced, Missing, and Deferred by user decision items with line evidence. Flags stale report metadata such as '待生成' if the copy exists. Suggests fixes for gaps. Does NOT flag informational report sections (前沿探索, 来源与证据, etc.) as missing.",
+      "files": []
+    },
+    {
+      "id": 8,
+      "prompt": "刷新 `docs/rag-guide.md`，报告里建议加入多 agent 架构和 MCP 工具集成，但新版文章先不要加入这些前沿内容。生成新版后检查报告是否同步。",
+      "expected_output": "Marks explicitly excluded items (multi-agent, MCP) as Deferred by user decision, not Missing. Confirms required factual/API updates are synced. Separates intentional omissions from accidental omissions. Does not push the user to include deferred content. The sync check table clearly shows which items were excluded by user choice vs. which were missed.",
+      "files": []
+    },
+    {
+      "id": 9,
+      "prompt": "请刷新 `docs/microservices-guide.md`。",
+      "expected_output": "After reading the source, presents three refresh depth modes (Conservative/Structural/Strategic) with a recommendation clearly marked. Explains rationale for the recommendation. Waits for user confirmation before writing refreshed content. Does NOT assume a mode even though the user did not specify one. The user's general '刷新' request triggers mode presentation, not default mode selection.",
+      "files": []
+    },
+    {
+      "id": 10,
+      "prompt": "直接刷新 `docs/architecture-overview.md`，文章里有几张架构图，但有一张图片链接已经失效了。",
+      "expected_output": "Uses direct refresh workflow mode but still confirms refresh depth mode before writing. Audits all image references in the source document. Classifies each image as readable/broken/obsolete in the report. For the broken image link, does NOT silently keep it — proposes a replacement based on refreshed content and model understanding, asking for user confirmation before generation. Report includes 图片与图示刷新建议 table with each image's status and recommended action. Invokes transform-markdown-svg or equivalent only after user confirmation.",
+      "files": []
+    }
+  ]
+}

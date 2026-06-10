@@ -1,0 +1,9 @@
+{
+  "skill": "media-ocr-router",
+  "source_repo": ".",
+  "source_ref": "2b0e7581d12198746dc50df9fb6f7485dc3e3cf5",
+  "status": "stable",
+  "target": ".claude/skills/media-ocr-router",
+  "installed_at": "2026-06-10T13:35:20.968546Z",
+  "backport_policy": "review-required"
+}

@@ -1,0 +1,9 @@
+{
+  "skill": "sdlc-memory-sync",
+  "source_repo": ".",
+  "source_ref": "2b0e7581d12198746dc50df9fb6f7485dc3e3cf5",
+  "status": "stable",
+  "target": ".opencode/skills/sdlc-memory-sync",
+  "installed_at": "2026-06-10T13:36:09.851790Z",
+  "backport_policy": "review-required"
+}

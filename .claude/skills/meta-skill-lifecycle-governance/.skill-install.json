@@ -1,0 +1,9 @@
+{
+  "skill": "meta-skill-lifecycle-governance",
+  "source_repo": ".",
+  "source_ref": "2b0e7581d12198746dc50df9fb6f7485dc3e3cf5",
+  "status": "stable",
+  "target": ".claude/skills/meta-skill-lifecycle-governance",
+  "installed_at": "2026-06-10T13:35:21.006193Z",
+  "backport_policy": "review-required"
+}
