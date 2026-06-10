@@ -28,7 +28,7 @@ The new architecture separates:
 - **Artifact governance** → `spec-driven` (package-provided)
 - **Workflow routing & complexity classification** → `sdlc-orchestrator`
 - **Execution discipline** → Superpowers skills
-- **Quality gates** → `meta-skill-evalops`
+- **Quality gates** → `sdlc-evalops`
 - **Long-term planning** → `sdlc-roadmap`
 
 ## Consequences

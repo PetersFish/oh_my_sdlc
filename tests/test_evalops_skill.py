@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-EVALOPS_SKILL = REPO_ROOT / "skills" / "meta-skill-evalops"
+EVALOPS_SKILL = REPO_ROOT / "skills" / "sdlc-evalops"
 
 
 def _read_frontmatter(path: Path) -> dict:
@@ -25,16 +25,16 @@ def _read_frontmatter(path: Path) -> dict:
 
 
 class TestEvalopsSkillFrontmatter:
-    """Validate meta-skill-evalops frontmatter and basic structure."""
+    """Validate sdlc-evalops frontmatter and basic structure."""
 
     def test_skill_md_exists(self):
         assert (EVALOPS_SKILL / "SKILL.md").is_file(), \
-            "meta-skill-evalops/SKILL.md must exist"
+            "sdlc-evalops/SKILL.md must exist"
 
     def test_skill_md_has_valid_frontmatter(self):
         fm = _read_frontmatter(EVALOPS_SKILL / "SKILL.md")
-        assert fm.get("name") == "meta-skill-evalops", \
-            f"Expected name=meta-skill-evalops, got {fm.get('name')}"
+        assert fm.get("name") == "sdlc-evalops", \
+            f"Expected name=sdlc-evalops, got {fm.get('name')}"
         assert "description" in fm, "description must exist in frontmatter"
         assert len(fm["description"]) > 50, \
             f"description too short: {len(fm['description'])} chars"
@@ -209,7 +209,7 @@ class TestEvalopsSkillEvals:
         data = json.loads(
             (EVALOPS_SKILL / "evals" / "evals.json").read_text(encoding="utf-8")
         )
-        assert data["skill_name"] == "meta-skill-evalops"
+        assert data["skill_name"] == "sdlc-evalops"
         assert len(data["evals"]) >= 3, \
             f"Expected at least 3 eval scenarios, got {len(data['evals'])}"
 

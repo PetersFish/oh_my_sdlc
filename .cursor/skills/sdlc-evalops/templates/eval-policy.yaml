@@ -1,0 +1,4 @@
+default_runner: promptfoo
+golden_requires_human_approval: true
+ai_generated_cases_default_status: inbox
+coverage_review_required_before_generation: true

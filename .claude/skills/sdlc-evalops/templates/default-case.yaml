@@ -1,0 +1,36 @@
+id: <<target-id>>.<<case-type>>.<<short-name>>
+
+target:
+  id: <<target-id>>
+  type: <<target-type>>
+  path: <<target-source-path>>
+
+status: inbox
+case_type: failure
+source: manual
+severity: medium
+created_at: <<YYYY-MM-DD>>
+
+coverage:
+  functional: []
+  quality: []
+
+input: |
+  <<user-input>>
+
+actual: |
+  <<actual-output-if-applicable>>
+
+expected:
+  must_include: []
+  must_not_include: []
+  rubric: |
+    <<evaluation-rubric>>
+
+evaluators:
+  rule_based:
+    contains: []
+  llm_judge:
+    enabled: false
+    rubric: |
+      <<llm-judge-rubric>>

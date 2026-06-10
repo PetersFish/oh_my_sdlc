@@ -35,7 +35,7 @@
 
 ## Decisions
 
-### D1: 命名 evalops-skill，前缀 meta-skill-evalops
+### D1: 命名 evalops-skill，前缀 sdlc-evalops
 
 定位为 meta-skill 体系一员，和 meta-skill-lifecycle-governance 平行。`evalops-` 前缀表明它是 Eval 操作横切能力，不绑定单一评测工具。
 

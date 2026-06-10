@@ -1,0 +1,6 @@
+- vars:
+    input: |
+      <<user-input>>
+  assert:
+    - type: contains
+      value: <<expected-substring>>

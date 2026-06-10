@@ -488,7 +488,7 @@ class TestSdlcOrchestratorSkill(unittest.TestCase):
     def test_skill_md_mentions_evalops_gate(self) -> None:
         content = (ORCHESTRATOR_SKILL / "SKILL.md").read_text(encoding="utf-8")
         self.assertIn("evalops-gated", content.lower())
-        self.assertIn("meta-skill-evalops", content.lower())
+        self.assertIn("sdlc-evalops", content.lower())
 
     def test_skill_md_mentions_memory_sync(self) -> None:
         content = (ORCHESTRATOR_SKILL / "SKILL.md").read_text(encoding="utf-8")

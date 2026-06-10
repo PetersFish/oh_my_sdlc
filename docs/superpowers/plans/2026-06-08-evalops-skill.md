@@ -1,8 +1,8 @@
-# meta-skill-evalops Implementation Plan
+# sdlc-evalops Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build `meta-skill-evalops`, a meta-skill that manages AI eval assets (coverage matrix, case collection, golden dataset), exports to Promptfoo, and runs regression evaluation for skill/agent/workflow/project targets.
+**Goal:** Build `sdlc-evalops`, a meta-skill that manages AI eval assets (coverage matrix, case collection, golden dataset), exports to Promptfoo, and runs regression evaluation for skill/agent/workflow/project targets.
 
 **Architecture:** Single SKILL.md as the LLM-facing instruction document, mirroring the established `SKILL.md + templates/` pattern used by `sdlc-openspec-init` and `meta-skill-lifecycle-governance`. Seven internal commands (`init`, `define-coverage`, `capture`, `generate-cases`, `triage`, `promote`, `run`) are exposed as LLM-orchestratable capabilities behind three high-level natural-language workflows (`create-eval-suite`, `capture-regression`, `run-regression`). Templates provide ready-to-copy artifact scaffolds.
 
@@ -13,7 +13,7 @@
 ### File Structure
 
 ```
-skills/meta-skill-evalops/
+skills/sdlc-evalops/
   SKILL.md                          # LLM-facing skill instructions
   templates/
     default-coverage.yaml           # Coverage matrix template
@@ -34,23 +34,23 @@ tests/
 ### Task 1: Create skill directory, templates, and eval stub
 
 **Files:**
-- Create: `skills/meta-skill-evalops/` (directory)
-- Create: `skills/meta-skill-evalops/templates/` (directory)
-- Create: `skills/meta-skill-evalops/evals/` (directory)
-- Create: `skills/meta-skill-evalops/templates/default-coverage.yaml`
-- Create: `skills/meta-skill-evalops/templates/default-case.yaml`
-- Create: `skills/meta-skill-evalops/templates/eval-policy.yaml`
-- Create: `skills/meta-skill-evalops/templates/target-index.yaml`
-- Create: `skills/meta-skill-evalops/templates/promptfooconfig.yaml`
-- Create: `skills/meta-skill-evalops/templates/promptfoo-cases.yaml`
-- Create: `skills/meta-skill-evalops/evals/evals.json`
+- Create: `skills/sdlc-evalops/` (directory)
+- Create: `skills/sdlc-evalops/templates/` (directory)
+- Create: `skills/sdlc-evalops/evals/` (directory)
+- Create: `skills/sdlc-evalops/templates/default-coverage.yaml`
+- Create: `skills/sdlc-evalops/templates/default-case.yaml`
+- Create: `skills/sdlc-evalops/templates/eval-policy.yaml`
+- Create: `skills/sdlc-evalops/templates/target-index.yaml`
+- Create: `skills/sdlc-evalops/templates/promptfooconfig.yaml`
+- Create: `skills/sdlc-evalops/templates/promptfoo-cases.yaml`
+- Create: `skills/sdlc-evalops/evals/evals.json`
 
 - [ ] **Step 1: Create directory structure**
 
 Run: 
 
 ```bash
-mkdir -p skills/meta-skill-evalops/templates skills/meta-skill-evalops/evals
+mkdir -p skills/sdlc-evalops/templates skills/sdlc-evalops/evals
 ```
 
 - [ ] **Step 2: Write default-coverage.yaml template**
@@ -79,7 +79,7 @@ review:
 Run: 
 
 ```bash
-cat > skills/meta-skill-evalops/templates/default-coverage.yaml << 'COVERAGEEOF'
+cat > skills/sdlc-evalops/templates/default-coverage.yaml << 'COVERAGEEOF'
 target:
   id: <<target-id>>
   type: <<target-type>>
@@ -145,7 +145,7 @@ evaluators:
 Run: 
 
 ```bash
-cat > skills/meta-skill-evalops/templates/default-case.yaml << 'CASEEOF'
+cat > skills/sdlc-evalops/templates/default-case.yaml << 'CASEEOF'
 id: <<target-id>>.<<case-type>>.<<short-name>>
 
 target:
@@ -197,7 +197,7 @@ coverage_review_required_before_generation: true
 Run: 
 
 ```bash
-cat > skills/meta-skill-evalops/templates/eval-policy.yaml << 'POLICYEOF'
+cat > skills/sdlc-evalops/templates/eval-policy.yaml << 'POLICYEOF'
 default_runner: promptfoo
 golden_requires_human_approval: true
 ai_generated_cases_default_status: inbox
@@ -214,7 +214,7 @@ targets: []
 Run: 
 
 ```bash
-echo 'targets: []' > skills/meta-skill-evalops/templates/target-index.yaml
+echo 'targets: []' > skills/sdlc-evalops/templates/target-index.yaml
 ```
 
 - [ ] **Step 6: Write promptfooconfig.yaml template**
@@ -238,7 +238,7 @@ tests: "<<cases-file>>"
 Run: 
 
 ```bash
-cat > skills/meta-skill-evalops/templates/promptfooconfig.yaml << 'PFCONFIGEOF'
+cat > skills/sdlc-evalops/templates/promptfooconfig.yaml << 'PFCONFIGEOF'
 description: "EvalOps export for <<target-id>>"
 
 prompts:
@@ -269,7 +269,7 @@ PFCONFIGEOF
 Run: 
 
 ```bash
-cat > skills/meta-skill-evalops/templates/promptfoo-cases.yaml << 'PFCASEEOF'
+cat > skills/sdlc-evalops/templates/promptfoo-cases.yaml << 'PFCASEEOF'
 - vars:
     input: |
       <<user-input>>
@@ -283,7 +283,7 @@ PFCASEEOF
 
 ```json
 {
-  "skill_name": "meta-skill-evalops",
+  "skill_name": "sdlc-evalops",
   "evals": [
     {
       "id": 1,
@@ -310,9 +310,9 @@ PFCASEEOF
 Run: 
 
 ```bash
-cat > skills/meta-skill-evalops/evals/evals.json << 'EVALSEOF'
+cat > skills/sdlc-evalops/evals/evals.json << 'EVALSEOF'
 {
-  "skill_name": "meta-skill-evalops",
+  "skill_name": "sdlc-evalops",
   "evals": [
     {
       "id": 1,
@@ -340,8 +340,8 @@ EVALSEOF
 - [ ] **Step 9: Commit**
 
 ```bash
-git add skills/meta-skill-evalops/
-git commit -m "feat: scaffold meta-skill-evalops directory, templates, and eval stub"
+git add skills/sdlc-evalops/
+git commit -m "feat: scaffold sdlc-evalops directory, templates, and eval stub"
 ```
 
 ---
@@ -349,13 +349,13 @@ git commit -m "feat: scaffold meta-skill-evalops directory, templates, and eval 
 ### Task 2: Write SKILL.md — Frontmatter and When to Use
 
 **Files:**
-- Create: `skills/meta-skill-evalops/SKILL.md`
+- Create: `skills/sdlc-evalops/SKILL.md`
 
 - [ ] **Step 1: Write the frontmatter and initial sections**
 
 ```markdown
 ---
-name: meta-skill-evalops
+name: sdlc-evalops
 description: Manage AI eval assets across skill, agent, workflow, RAG, and project targets. Use when the user wants to create eval cases, define coverage for a target's quality dimensions, capture real failures for regression, manage a golden dataset, export to Promptfoo, or run eval. Triggers include: building an eval suite, capturing a regression case, running eval for a target, defining quality coverage, managing an inbox/golden case pipeline, or phrases like 评测体系, 评估用例, 回归测试, eval case, golden dataset, coverage matrix. Do NOT use for debugging a single code failure (use systematic-debugging), writing unit tests (use test-driven-development), or one-off model comparisons without durable case management.
 compatibility: Requires filesystem access for reading/writing evals/ directory, bash for promptfoo eval, and access to the target's source. Uses qa-ai-architecture for evaluator design discussions and brainstorming for coverage exploration when available.
 ---
@@ -384,13 +384,13 @@ Manage AI eval assets as version-controlled, tool-neutral artifacts. The skill d
 - [ ] **Step 2: Verify file written**
 
 ```bash
-test -f skills/meta-skill-evalops/SKILL.md && echo "OK"
+test -f skills/sdlc-evalops/SKILL.md && echo "OK"
 ```
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add skills/meta-skill-evalops/SKILL.md
+git add skills/sdlc-evalops/SKILL.md
 git commit -m "feat: add SKILL.md frontmatter and When to Use section"
 ```
 
@@ -399,7 +399,7 @@ git commit -m "feat: add SKILL.md frontmatter and When to Use section"
 ### Task 3: Write SKILL.md — Interaction Model
 
 **Files:**
-- Modify: `skills/meta-skill-evalops/SKILL.md`
+- Modify: `skills/sdlc-evalops/SKILL.md`
 
 - [ ] **Step 1: Append the Interaction Model section**
 
@@ -468,7 +468,7 @@ The assistant MUST ask for confirmation before writing any case to disk.
 - [ ] **Step 2: Commit**
 
 ```bash
-git add skills/meta-skill-evalops/SKILL.md
+git add skills/sdlc-evalops/SKILL.md
 git commit -m "feat: add Interaction Model section with three workflows"
 ```
 
@@ -477,7 +477,7 @@ git commit -m "feat: add Interaction Model section with three workflows"
 ### Task 4: Write SKILL.md — Data Models and Directory Structure
 
 **Files:**
-- Modify: `skills/meta-skill-evalops/SKILL.md`
+- Modify: `skills/sdlc-evalops/SKILL.md`
 
 - [ ] **Step 1: Append Data Models section**
 
@@ -560,7 +560,7 @@ Template at `templates/target-index.yaml`. A registry of all eval targets in the
 - [ ] **Step 2: Commit**
 
 ```bash
-git add skills/meta-skill-evalops/SKILL.md
+git add skills/sdlc-evalops/SKILL.md
 git commit -m "feat: add Data Models and Directory Structure sections"
 ```
 
@@ -569,7 +569,7 @@ git commit -m "feat: add Data Models and Directory Structure sections"
 ### Task 5: Write SKILL.md — Commands
 
 **Files:**
-- Modify: `skills/meta-skill-evalops/SKILL.md`
+- Modify: `skills/sdlc-evalops/SKILL.md`
 
 - [ ] **Step 1: Append Commands section**
 
@@ -708,7 +708,7 @@ Run golden eval for a target using Promptfoo.
 - [ ] **Step 2: Commit**
 
 ```bash
-git add skills/meta-skill-evalops/SKILL.md
+git add skills/sdlc-evalops/SKILL.md
 git commit -m "feat: add seven internal commands section"
 ```
 
@@ -717,7 +717,7 @@ git commit -m "feat: add seven internal commands section"
 ### Task 6: Write SKILL.md — Promptfoo Mapping, Hard Rules, and Workflow Integration
 
 **Files:**
-- Modify: `skills/meta-skill-evalops/SKILL.md`
+- Modify: `skills/sdlc-evalops/SKILL.md`
 
 - [ ] **Step 1: Append remaining sections**
 
@@ -810,7 +810,7 @@ Candidate cases generated by AI use: `candidate-<sequential>` as short-name.
 - [ ] **Step 2: Commit**
 
 ```bash
-git add skills/meta-skill-evalops/SKILL.md
+git add skills/sdlc-evalops/SKILL.md
 git commit -m "feat: add Promptfoo mapping, hard rules, and workflow integration"
 ```
 
@@ -830,7 +830,7 @@ import json
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-EVALOPS_SKILL = REPO_ROOT / "skills" / "meta-skill-evalops"
+EVALOPS_SKILL = REPO_ROOT / "skills" / "sdlc-evalops"
 
 
 def _read_frontmatter(path: Path) -> dict:
@@ -851,16 +851,16 @@ def _read_frontmatter(path: Path) -> dict:
 
 
 class TestEvalopsSkillFrontmatter:
-    """Validate meta-skill-evalops frontmatter and basic structure."""
+    """Validate sdlc-evalops frontmatter and basic structure."""
 
     def test_skill_md_exists(self):
         assert (EVALOPS_SKILL / "SKILL.md").is_file(), \
-            "meta-skill-evalops/SKILL.md must exist"
+            "sdlc-evalops/SKILL.md must exist"
 
     def test_skill_md_has_valid_frontmatter(self):
         fm = _read_frontmatter(EVALOPS_SKILL / "SKILL.md")
-        assert fm.get("name") == "meta-skill-evalops", \
-            f"Expected name=meta-skill-evalops, got {fm.get('name')}"
+        assert fm.get("name") == "sdlc-evalops", \
+            f"Expected name=sdlc-evalops, got {fm.get('name')}"
         assert "description" in fm, "description must exist in frontmatter"
         assert len(fm["description"]) > 50, \
             f"description too short: {len(fm['description'])} chars"
@@ -1023,7 +1023,7 @@ class TestEvalopsSkillEvals:
         data = json.loads(
             (EVALOPS_SKILL / "evals" / "evals.json").read_text(encoding="utf-8")
         )
-        assert data["skill_name"] == "meta-skill-evalops"
+        assert data["skill_name"] == "sdlc-evalops"
         assert len(data["evals"]) >= 3, \
             f"Expected at least 3 eval scenarios, got {len(data['evals'])}"
 
@@ -1096,7 +1096,7 @@ Expected: no new failures introduced.
 - [ ] **Step 4: Verify SKILL.md line count**
 
 ```bash
-wc -l skills/meta-skill-evalops/SKILL.md
+wc -l skills/sdlc-evalops/SKILL.md
 ```
 
 Expected: SKILL.md should be substantive (200+ lines).
@@ -1104,7 +1104,7 @@ Expected: SKILL.md should be substantive (200+ lines).
 - [ ] **Step 5: Commit final fixes if any**
 
 ```bash
-git add skills/meta-skill-evalops/SKILL.md tests/test_evalops_skill.py
+git add skills/sdlc-evalops/SKILL.md tests/test_evalops_skill.py
 git commit -m "fix: address test failures after verification"
 ```
 
@@ -1144,11 +1144,11 @@ Expected: all pre-existing tests still PASS.
 git status --short
 ```
 
-Expected: only `skills/meta-skill-evalops/` and `tests/test_evalops_skill.py` are new.
+Expected: only `skills/sdlc-evalops/` and `tests/test_evalops_skill.py` are new.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add skills/meta-skill-evalops/ tests/test_evalops_skill.py
-git commit -m "feat: add meta-skill-evalops — EvalOps asset management and Promptfoo integration"
+git add skills/sdlc-evalops/ tests/test_evalops_skill.py
+git commit -m "feat: add sdlc-evalops — EvalOps asset management and Promptfoo integration"
 ```

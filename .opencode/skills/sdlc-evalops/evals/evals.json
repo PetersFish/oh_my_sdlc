@@ -1,0 +1,23 @@
+{
+  "skill_name": "sdlc-evalops",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "帮我给 research-general skill 建一套 eval case，用于回归测试。",
+      "expected_output": "Recognize create-eval-suite intent, check initialization, lead into coverage brainstorming.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "刚才 research skill 又遗漏了成本分析，帮我把这个失败沉淀下来。",
+      "expected_output": "Recognize capture-regression intent, extract context, ask confirmation before writing to inbox.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "我改完了 openspec-init，跑一下它的 eval。",
+      "expected_output": "Recognize run-regression intent, locate target, export promptfoo, run and summarize.",
+      "files": []
+    }
+  ]
+}

@@ -103,9 +103,9 @@ When an AI behavior target is being created or modified.
 
 **Action:** Require the relevant EvalOps gate before implementation:
 
-- New target: `meta-skill-evalops` coverage review and case generation.
+- New target: `sdlc-evalops` coverage review and case generation.
 - Modified target: run existing golden eval if available.
-- Failure observed: offer `capture-regression` from `meta-skill-evalops`.
+- Failure observed: offer `capture-regression` from `sdlc-evalops`.
 
 ### memory-sync
 

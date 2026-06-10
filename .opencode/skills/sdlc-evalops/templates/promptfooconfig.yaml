@@ -1,0 +1,13 @@
+description: "EvalOps export for <<target-id>>"
+
+prompts:
+  - "<<prompt-file-or-text>>"
+
+providers: []
+
+defaultTest:
+  assert:
+    - type: contains
+      value: "<<placeholder>>"
+
+tests: "<<cases-file>>"
