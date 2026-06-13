@@ -1,0 +1,28 @@
+{
+  "skill": "sdlc-repository-memory-sync",
+  "source_repo": "/Users/yuping/Documents/workspace/oh_my_skills",
+  "source_ref": "HEAD",
+  "source_path": "skills/sdlc-repository-memory-sync",
+  "target": ".cursor/skills/sdlc-repository-memory-sync",
+  "installed_at": "2026-05-30T14:26:15.086576Z",
+  "status": "stable",
+  "backport_policy": "review-required",
+  "payload_hash": "4fb925ddff08027aadf6db0a559318fcb22da8920b5bff07bdada4752fcb21e8",
+  "files": [
+    "SKILL.md",
+    "schemas/discovery-prefs.schema.json",
+    "schemas/index.schema.json",
+    "schemas/manifest.schema.json",
+    "schemas/memory-frontmatter.schema.json",
+    "schemas/review-queue.schema.json",
+    "scripts/child_modules.py",
+    "scripts/detect_state.py",
+    "scripts/discover_modules.py",
+    "scripts/rebuild_index.py",
+    "scripts/reconcile_pending.py",
+    "scripts/update_manifest.py",
+    "scripts/validate_memory.py",
+    "templates/memory-file.md",
+    "templates/sync-history.md"
+  ]
+}

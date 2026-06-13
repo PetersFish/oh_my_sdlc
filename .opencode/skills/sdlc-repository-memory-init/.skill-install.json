@@ -1,0 +1,23 @@
+{
+  "skill": "sdlc-repository-memory-init",
+  "source_repo": "/Users/yuping/Documents/workspace/oh_my_skills",
+  "source_ref": "HEAD",
+  "source_path": "skills/sdlc-repository-memory-init",
+  "target": ".opencode/skills/sdlc-repository-memory-init",
+  "installed_at": "2026-05-30T14:26:15.086576Z",
+  "status": "stable",
+  "backport_policy": "review-required",
+  "payload_hash": "27cdbe1425d33f89d427d8079d5c2366cb0ec2fc152f1c9c1003c294457f9876",
+  "files": [
+    "SKILL.md",
+    "schemas/index.schema.json",
+    "schemas/manifest.schema.json",
+    "schemas/memory-frontmatter.schema.json",
+    "schemas/review-queue.schema.json",
+    "scripts/init_memory.py",
+    "templates/AGENTS-memory-block.md",
+    "templates/index.json",
+    "templates/manifest.json",
+    "templates/review-queue.json"
+  ]
+}

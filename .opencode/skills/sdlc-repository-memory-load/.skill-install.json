@@ -1,0 +1,21 @@
+{
+  "skill": "sdlc-repository-memory-load",
+  "source_repo": "/Users/yuping/Documents/workspace/oh_my_skills",
+  "source_ref": "HEAD",
+  "source_path": "skills/sdlc-repository-memory-load",
+  "target": ".opencode/skills/sdlc-repository-memory-load",
+  "installed_at": "2026-05-30T14:26:15.086576Z",
+  "status": "stable",
+  "backport_policy": "review-required",
+  "payload_hash": "cb6f4746bb0297f08e5ee736d79201dd85e36add83f3f260282e76e0b503b0d7",
+  "files": [
+    "SKILL.md",
+    "schemas/index.schema.json",
+    "schemas/manifest.schema.json",
+    "schemas/memory-frontmatter.schema.json",
+    "schemas/review-queue.schema.json",
+    "scripts/select_memory.py",
+    "scripts/validate_memory.py",
+    "templates/context-pack.md"
+  ]
+}
