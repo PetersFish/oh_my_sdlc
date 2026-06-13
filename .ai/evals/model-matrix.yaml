@@ -5,16 +5,22 @@ models:
     provider: opencode-go
     model: deepseek-v4-pro
     promptfoo:
-      id: file://../../../../runners/opencode_go_provider.py
+      id: openai:chat:deepseek-v4-pro
       label: opencode-go/deepseek-v4-pro
       config:
-        model: deepseek-v4-pro
+        apiBaseUrl: https://opencode.ai/zen/go/v1
+        apiKeyEnvar: OPENCODE_GO_API_KEY
+        headers:
+          Accept-Encoding: identity
         temperature: 0
         max_tokens: 4096
     grader:
-      id: file://../../../../runners/opencode_go_provider.py
+      id: openai:chat:glm-5.1
       config:
-        model: glm-5.1
+        apiBaseUrl: https://opencode.ai/zen/go/v1
+        apiKeyEnvar: OPENCODE_GO_API_KEY
+        headers:
+          Accept-Encoding: identity
         temperature: 0
         max_tokens: 4096
 
@@ -37,5 +43,7 @@ note: >
   Full multi-model matrix runner implementation is deferred.
   This schema contract defines the model, provider, environment,
   target selection, and run policy fields for future runner work.
-  The default model (opencode-go-deepseek-v4-pro) is used by
-  scripts/export-promptfoo.py to generate Promptfoo providers.
+  The default model (opencode-go-deepseek-v4-pro) uses Promptfoo's
+  built-in OpenAI-compatible provider with apiBaseUrl, apiKeyEnvar,
+  and headers.Accept-Encoding: identity. No custom Python provider
+  is required or distributed.

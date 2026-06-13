@@ -22,9 +22,18 @@ class TestEvalsRoot:
         assert EVALS_ROOT.is_dir(), ".ai/evals/ must exist"
 
     def test_platform_directories_exist(self):
-        for name in ["templates", "schemas", "runners", "targets"]:
+        """Only assert directories that current EvalOps scripts consume."""
+        manifest = yaml.safe_load(
+            (EVALS_ROOT / "manifest.yaml").read_text(encoding="utf-8")
+        )
+        declared = manifest.get("platform_directories", {})
+        for name in list(declared.keys()) + ["targets"]:
             path = EVALS_ROOT / name
             assert path.is_dir(), f".ai/evals/{name}/ must exist"
+
+    def test_runners_dir_does_not_exist(self):
+        assert not (EVALS_ROOT / "runners").is_dir(), \
+            ".ai/evals/runners/ must not exist because no custom provider is required"
 
     def test_global_manifest_exists(self):
         assert (EVALS_ROOT / "manifest.yaml").is_file(), \
@@ -192,25 +201,27 @@ class TestExportPromptfooScript:
                 assert assertion.get("type") in deterministic_types | {"llm-rubric"}, \
                     f"Unknown assertion type: {assertion.get('type')}"
 
-    def test_provider_uses_python_provider(self):
+    def test_provider_uses_openai_chat_provider(self):
         config = yaml.safe_load(
             (TARGET_WS / "exports" / "promptfoo" / "promptfooconfig.yaml")
             .read_text(encoding="utf-8")
         )
         provider_id = config["providers"][0]["id"]
-        assert provider_id.startswith("file://"), \
-            f"Provider id must use file:// prefix (Python provider), got: {provider_id}"
-        assert "opencode_go_provider.py" in provider_id, \
-            f"Provider id must reference opencode_go_provider.py, got: {provider_id}"
+        assert provider_id.startswith("openai:chat:"), \
+            f"Provider id must use openai:chat: prefix, got: {provider_id}"
+        assert "deepseek-v4-pro" in provider_id, \
+            f"Provider id must reference deepseek-v4-pro, got: {provider_id}"
 
-    def test_provider_has_model_config(self):
+    def test_provider_has_openai_chat_config(self):
         config = yaml.safe_load(
             (TARGET_WS / "exports" / "promptfoo" / "promptfooconfig.yaml")
             .read_text(encoding="utf-8")
         )
         provider_config = config["providers"][0]["config"]
-        assert provider_config.get("model") == "deepseek-v4-pro", \
-            f"model mismatch: {provider_config.get('model')}"
+        assert provider_config.get("apiBaseUrl") == "https://opencode.ai/zen/go/v1", \
+            f"apiBaseUrl mismatch: {provider_config.get('apiBaseUrl')}"
+        assert provider_config.get("apiKeyEnvar") == "OPENCODE_GO_API_KEY", \
+            f"apiKeyEnvar mismatch: {provider_config.get('apiKeyEnvar')}"
         assert provider_config.get("temperature") == 0
         assert provider_config.get("max_tokens") == 4096
 
@@ -221,29 +232,76 @@ class TestExportPromptfooScript:
         )
         grader = config.get("defaultTest", {}).get("options", {}).get("provider", {})
         assert grader, "defaultTest.options.provider must be configured for llm-rubric grading"
-        assert "opencode_go_provider.py" in grader.get("id", ""), \
-            "Grader must use opencode_go_provider.py"
-        assert grader.get("config", {}).get("model") == "glm-5.1", \
-            f"Grader model must be glm-5.1, got: {grader.get('config', {}).get('model')}"
+        assert grader.get("id", "").startswith("openai:chat:"), \
+            "Grader must use openai:chat: provider"
+        assert grader.get("config", {}).get("apiBaseUrl") == "https://opencode.ai/zen/go/v1", \
+            "Grader must use opencode-go endpoint"
+        assert grader.get("config", {}).get("apiKeyEnvar") == "OPENCODE_GO_API_KEY", \
+            "Grader must use OPENCODE_GO_API_KEY"
 
     def test_provider_config_has_no_api_key_value(self):
         config_content = (TARGET_WS / "exports" / "promptfoo" / "promptfooconfig.yaml") \
             .read_text(encoding="utf-8")
         assert "apiKey:" not in config_content, \
             "Promptfoo config must not contain raw apiKey value"
-        assert "OPENCODE_GO_API_KEY" not in config_content, \
-            "Promptfoo config must not contain env var name as value"
+        assert "apiKeyEnvar" in config_content, \
+            "Promptfoo config must reference apiKeyEnvar for credential injection"
 
-    def test_provider_not_hardcoded_opencode_id(self):
+    def test_provider_uses_opencode_go_endpoint(self):
         config = yaml.safe_load(
             (TARGET_WS / "exports" / "promptfoo" / "promptfooconfig.yaml")
             .read_text(encoding="utf-8")
         )
         for p in config.get("providers", []):
-            assert p["id"] != "opencode", \
-                "Provider must not use hardcoded 'opencode' id"
-            assert not p["id"].startswith("openai:"), \
-                f"Provider must not use OpenAI provider, got: {p['id']}"
+            assert p["id"].startswith("openai:chat:"), \
+                "Provider must use openai:chat: id for opencode-go"
+            assert p["config"].get("apiBaseUrl") == "https://opencode.ai/zen/go/v1", \
+                "Provider must use opencode-go endpoint"
+
+
+    def test_provider_has_accept_encoding_identity(self):
+        config = yaml.safe_load(
+            (TARGET_WS / "exports" / "promptfoo" / "promptfooconfig.yaml")
+            .read_text(encoding="utf-8")
+        )
+        provider_config = config["providers"][0]["config"]
+        headers = provider_config.get("headers", {})
+        assert headers.get("Accept-Encoding") == "identity", \
+            "Provider must set Accept-Encoding: identity"
+
+    def test_grader_has_accept_encoding_identity(self):
+        config = yaml.safe_load(
+            (TARGET_WS / "exports" / "promptfoo" / "promptfooconfig.yaml")
+            .read_text(encoding="utf-8")
+        )
+        grader = config.get("defaultTest", {}).get("options", {}).get("provider", {})
+        headers = grader.get("config", {}).get("headers", {})
+        assert headers.get("Accept-Encoding") == "identity", \
+            "Grader must set Accept-Encoding: identity"
+
+    def test_model_matrix_has_accept_encoding_identity(self):
+        mm = yaml.safe_load(
+            (EVALS_ROOT / "model-matrix.yaml").read_text(encoding="utf-8")
+        )
+        for model in mm.get("models", []):
+            pf = model.get("promptfoo", {})
+            pf_headers = pf.get("config", {}).get("headers", {})
+            assert pf_headers.get("Accept-Encoding") == "identity", \
+                f"Model {model.get('name')} promptfoo provider must set Accept-Encoding: identity"
+            gr = model.get("grader", {})
+            if gr:
+                gr_headers = gr.get("config", {}).get("headers", {})
+                assert gr_headers.get("Accept-Encoding") == "identity", \
+                    f"Model {model.get('name')} grader must set Accept-Encoding: identity"
+
+    def test_smoke_config_has_accept_encoding_identity(self):
+        smoke = yaml.safe_load(
+            (EVALS_ROOT / "smoke" / "promptfooconfig.yaml").read_text(encoding="utf-8")
+        )
+        for p in smoke.get("providers", []):
+            headers = p.get("config", {}).get("headers", {})
+            assert headers.get("Accept-Encoding") == "identity", \
+                "Smoke test config must set Accept-Encoding: identity"
 
 
 class TestExportPromptfooCheck:
@@ -319,6 +377,31 @@ class TestDistributedSkillCopies:
         copy = REPO_ROOT / ".cursor" / "skills" / "sdlc-orchestrator" / "SKILL.md"
         assert copy.read_text(encoding="utf-8") == canonical, \
             ".cursor sdlc-orchestrator copy must match canonical"
+
+    def test_evalops_skill_does_not_mention_fallback_provider(self):
+        canonical = self._canonical("sdlc-evalops")
+        assert "opencode_go_provider.py" not in canonical, \
+            "Canonical SKILL.md must not reference opencode_go_provider.py"
+        assert "Python Provider Fallback" not in canonical, \
+            "Canonical SKILL.md must not have Python Provider Fallback section"
+
+    def test_opencode_evalops_copy_does_not_mention_fallback(self):
+        content = (REPO_ROOT / ".opencode" / "skills" / "sdlc-evalops" / "SKILL.md") \
+            .read_text(encoding="utf-8")
+        assert "opencode_go_provider.py" not in content, \
+            ".opencode copy must not reference opencode_go_provider.py"
+
+    def test_claude_evalops_copy_does_not_mention_fallback(self):
+        content = (REPO_ROOT / ".claude" / "skills" / "sdlc-evalops" / "SKILL.md") \
+            .read_text(encoding="utf-8")
+        assert "opencode_go_provider.py" not in content, \
+            ".claude copy must not reference opencode_go_provider.py"
+
+    def test_cursor_evalops_copy_does_not_mention_fallback(self):
+        content = (REPO_ROOT / ".cursor" / "skills" / "sdlc-evalops" / "SKILL.md") \
+            .read_text(encoding="utf-8")
+        assert "opencode_go_provider.py" not in content, \
+            ".cursor copy must not reference opencode_go_provider.py"
 
 
 class TestOrchestratorSkillMentionsTargetWorkspaces:

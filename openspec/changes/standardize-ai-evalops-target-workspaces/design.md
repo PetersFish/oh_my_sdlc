@@ -10,7 +10,7 @@ This change establishes `.ai/evals/` as the long-term EvalOps root. The core des
 
 - Establish `.ai/evals/` as the only long-term EvalOps root.
 - Standardize `.ai/evals/targets/<target-id>/` as the namespace for target-owned EvalOps assets.
-- Use non-underscored platform directories: `templates/`, `schemas/`, and `runners/`.
+- Use only runtime platform directories that current scripts consume; `platform_directories` defaults to empty. `runners/`, `templates/`, and `schemas/` are deferred until they have concrete consumers.
 - Make `skill.sdlc-orchestrator` the reference target workspace.
 - Define global and target manifest requirements.
 - Add a Promptfoo export script that derives exports from canonical golden cases.
@@ -51,9 +51,11 @@ The reference target workspace should contain:
 
 Alternative considered: group by artifact type globally, such as all golden cases under `.ai/evals/cases/golden/<target-id>/`. This was rejected because target workspaces make ownership, migration, and cleanup simpler as more skills and agents are evaluated.
 
-### Decision 3: Platform directories are non-underscored
+### Decision 3: Runtime platform directories are consumption-driven
 
-Global platform assets use `.ai/evals/templates/`, `.ai/evals/schemas/`, and `.ai/evals/runners/`. The names intentionally avoid leading underscores so they are easy to reference in docs, scripts, and user instructions.
+Global runtime platform assets should only exist when the EvalOps implementation actually consumes them. There are no current scripts that consume custom provider files from `.ai/evals/runners/`, and none that read `.ai/evals/templates/` or `.ai/evals/schemas/`.
+
+Therefore `.ai/evals/runners/` is not required. `platform_directories` in the manifest is empty. `.ai/evals/templates/` and `.ai/evals/schemas/` remain deferred. Skill-owned templates under `skills/sdlc-evalops/templates/` remain separate because they are part of the skill package, not project runtime state.
 
 ### Decision 4: Global manifest plus target manifest
 
@@ -110,17 +112,18 @@ For new AI skill development and material AI behavior changes, `sdlc-orchestrato
 
 The orchestrator coordinates these gates but does not duplicate detailed `sdlc-evalops` workflows.
 
-### Decision 12: opencode Go models use Python provider for Promptfoo
+### Decision 12: opencode Go models prefer Promptfoo OpenAI-compatible provider
 
-opencode Go (`opencode-go`) paid-plan models are accessible via an OpenAI-compatible endpoint at `https://opencode.ai/zen/go/v1/chat/completions`. However, Promptfoo's built-in `openai:chat:*` provider encounters a `TypeError: terminated` when reading responses from this endpoint due to an undici/Node HTTP client compatibility issue.
+opencode Go (`opencode-go`) paid-plan models are accessible via an OpenAI-compatible endpoint at `https://opencode.ai/zen/go/v1/chat/completions`. The preferred Promptfoo configuration should use the built-in OpenAI-compatible provider with `apiBaseUrl`, `apiKeyEnvar`, and `headers.Accept-Encoding: identity`.
 
 - The default eval model for this repo is `opencode-go/deepseek-v4-pro`.
-- The Promptfoo provider is a Python provider at `.ai/evals/runners/opencode_go_provider.py`, using the standard library `urllib` to call the endpoint and returning `{ "output": text }`.
-- The provider path is relative to the generated `promptfooconfig.yaml`: `file://../../../../runners/opencode_go_provider.py`.
-- Provider configuration (`model`, `temperature`, `max_tokens`) lives in `.ai/evals/model-matrix.yaml` under `models[].promptfoo`.
-- The same provider is configured as the grader (`models[].grader`) in `defaultTest.options.provider` so `llm-rubric` assertions can be evaluated through the same endpoint.
+- The canonical Promptfoo provider id is `openai:chat:<model>`.
+- Provider configuration (`apiBaseUrl`, `apiKeyEnvar`, `headers`, `temperature`, and `max_tokens`) lives in `.ai/evals/model-matrix.yaml` under `models[].promptfoo`.
+- The grader provider (`models[].grader`) should also use the OpenAI-compatible provider and may use a different model from the target model.
 - The grader model should be one with stable JSON output (e.g., GLM, Qwen, Kimi), not a reasoning-oriented model. Reasoning models may put output in `reasoning_content` instead of `content`, causing `llm-rubric` JSON extraction failures.
-- The API key is read from `OPENCODE_GO_API_KEY` environment variable by the Python provider. Keys MUST NOT be written into repository files.
+- `headers.Accept-Encoding: identity` is REQUIRED for both the target provider and the grader. Without it, Promptfoo/Node's `DecompressInterceptor` may throw `TypeError: terminated` when the endpoint returns a compressed response. The failure occurs in 2-3 seconds regardless of timeout settings.
+- `apiBaseUrl` must be the base URL only (`https://opencode.ai/zen/go/v1`); Promptfoo appends `/chat/completions` automatically.
+- The API key is read from the `OPENCODE_GO_API_KEY` environment variable through Promptfoo's `apiKeyEnvar` config. Keys MUST NOT be written into repository files.
 - `scripts/export-promptfoo.py` reads the provider block from `model-matrix.yaml` and generates the `providers` and `defaultTest.options.provider` sections of `promptfooconfig.yaml`.
 - `opencode run --model opencode-go/deepseek-v4-pro "hello"` may be used as a manual smoke test but is not the Promptfoo runner.
 
@@ -135,7 +138,8 @@ The `scripts/export-promptfoo.py` script handles only export generation. The `pr
 - Reports land under `.ai/evals/targets/<target-id>/reports/<run-id>/`
 - The `run-id` format is `<target-id>-<timestamp>` (e.g., `skill.sdlc-orchestrator-20260613T090000Z`)
 - The `sdlc-evalops` Eval Command example must include the `-o` flag and reference the runner script as the canonical way to run and record eval
-- The runner script uses `OPENCODE_GO_API_KEY` from environment (same as the Python provider)
+- The runner script exposes `OPENCODE_GO_API_KEY` from the environment to Promptfoo.
+- When using the preferred OpenAI-compatible provider, the runner exposes `OPENCODE_GO_API_KEY` to Promptfoo and Promptfoo reads it via `apiKeyEnvar`.
 - If `promptfoo eval` fails, the runner exits non-zero and reports the error to stderr
 
 Alternative considered: keep `export-promptfoo.py` as the single entry point and add a `--run` mode. Rejected because that bleeds run orchestration into a script whose existing contract is pure export generation, making `--check` guarantees harder to reason about.
@@ -148,9 +152,6 @@ The standardized layout is:
 .ai/evals/
   manifest.yaml
   model-matrix.yaml
-  templates/
-  schemas/
-  runners/
   targets/
     skill.sdlc-orchestrator/
       manifest.yaml
@@ -173,3 +174,5 @@ The layout is a contract for implementation. This proposal does not migrate file
 - Generated exports can be mistaken for canonical files. Mitigation: document exports as derived and enforce `--check` freshness.
 - Deterministic assertions may miss nuanced quality regressions. Mitigation: allow configured rubrics only when rubric text, grading model, and thresholds are explicit.
 - Full model matrix support is deferred. Mitigation: define schema now and keep runner implementation as a later bounded task.
+- Empty platform directories can mislead users into thinking runtime assets are consumed. Mitigation: keep `platform_directories` empty and omit `.ai/evals/runners/`, `.ai/evals/templates/`, and `.ai/evals/schemas/` until scripts actually read them.
+- Promptfoo's built-in OpenAI-compatible provider may fail against opencode-go in some environments due to Node/undici decompress interceptor issues. Mitigation: require `Accept-Encoding: identity` headers in all provider and grader configs, verified by tests and smoke config.

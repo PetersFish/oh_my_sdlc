@@ -278,8 +278,17 @@ class TestEvalopsSkillWorkflowIntegration:
             "SKILL.md must reference OPENCODE_GO_API_KEY"
         assert "model-matrix.yaml" in content.lower(), \
             "SKILL.md must reference model-matrix.yaml as provider source"
-        assert "opencode_go_provider.py" in content, \
-            "SKILL.md must mention opencode_go_provider.py"
+        assert "openai:chat:" in content, \
+            "SKILL.md must show openai:chat: as preferred provider"
+        assert "Accept-Encoding" in content, \
+            "SKILL.md must document Accept-Encoding: identity requirement"
+        assert "opencode_go_provider.py" not in content, \
+            "SKILL.md must NOT reference removed opencode_go_provider.py"
+
+    def test_mentions_accept_encoding_identity(self):
+        content = (EVALOPS_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        assert "Accept-Encoding: identity" in content, \
+            "SKILL.md must require Accept-Encoding: identity header"
 
     def test_mentions_api_key_not_in_repo(self):
         content = (EVALOPS_SKILL / "SKILL.md").read_text(encoding="utf-8")

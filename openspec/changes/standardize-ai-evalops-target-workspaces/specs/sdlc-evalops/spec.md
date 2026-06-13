@@ -12,9 +12,11 @@ The `sdlc-evalops` skill SHALL standardize EvalOps assets under `.ai/evals/` wit
 - **WHEN** an AI behavior target is registered for EvalOps
 - **THEN** its workspace SHALL be created under `.ai/evals/targets/<target-id>/`
 
-#### Scenario: Platform directories use non-underscored names
+#### Scenario: Platform directories are limited to consumed runtime assets
 - **WHEN** global EvalOps platform assets are created
-- **THEN** they SHALL use `.ai/evals/templates/`, `.ai/evals/schemas/`, and `.ai/evals/runners/`
+- **THEN** `platform_directories` in `.ai/evals/manifest.yaml` SHALL be empty when no consumed runtime directory exists
+- **AND** `.ai/evals/runners/` SHALL NOT exist when no custom provider is required
+- **AND** `.ai/evals/templates/` and `.ai/evals/schemas/` SHALL NOT be required until EvalOps scripts actually consume them
 
 #### Scenario: Reference target workspace exists
 - **WHEN** `skill.sdlc-orchestrator` is migrated as the reference target
@@ -159,9 +161,27 @@ The `sdlc-evalops` skill SHALL define a `.ai/evals/model-matrix.yaml` schema con
 - **AND** the generated provider SHALL use `openai:chat:<model>` as the id
 - **AND** the generated provider SHALL include `apiBaseUrl: https://opencode.ai/zen/go/v1` in config
 - **AND** the generated provider SHALL include `apiKeyEnvar: OPENCODE_GO_API_KEY` in config
+- **AND** the generated provider SHALL include `headers.Accept-Encoding: identity` in config
+- **AND** the generated grader SHALL include `headers.Accept-Encoding: identity` in config
 - **AND** the generated config SHALL NOT contain an API key value
+- **AND** the `apiBaseUrl` SHALL be the base URL only, without appending `/chat/completions`
 
-#### Scenario: opencode Go CLI smoke test is separate from Promptfoo provider
-- **WHEN** an EvalOps user wants to verify a model works
-- **THEN** `opencode run --model opencode-go/deepseek-v4-pro "hello"` MAY be used as a manual smoke test
-- **AND** the Promptfoo eval SHALL use the OpenAI-compatible endpoint, not a subprocess wrapper around opencode CLI
+#### Scenario: Accept-Encoding identity is required for opencode-go endpoint
+- **WHEN** the opencode-go endpoint returns a compressed response and Promptfoo/Node processes it
+- **THEN** the `Accept-Encoding: identity` header SHALL be present in every provider and grader config
+- **AND** a generated or smoke config that omits `Accept-Encoding: identity` SHALL fail the relevant test suite
+
+#### Scenario: Promptfoo template is a real OpenAI-compatible example
+- **WHEN** the Promptfoo config template is distributed
+- **THEN** it SHALL use `openai:chat:<<model>>` with `apiBaseUrl`, `apiKeyEnvar`, and `headers.Accept-Encoding: identity` as the example provider
+- **AND** it SHALL include a grader provider example with the same contract
+- **AND** it SHALL NOT use empty `providers: []`
+
+### Requirement: Smoke Test
+
+The `sdlc-evalops` skill SHALL include a minimal Promptfoo smoke test config that validates the opencode-go OpenAI-compatible provider without requiring actual golden cases.
+
+#### Scenario: Smoke test config is a valid standalone Promptfoo eval
+- **WHEN** `.ai/evals/smoke/promptfooconfig.yaml` is used with `promptfoo eval`
+- **THEN** it SHALL use `openai:chat:<model>` with `apiBaseUrl`, `apiKeyEnvar`, and `headers.Accept-Encoding: identity`
+- **AND** it SHALL contain exactly one test case with a deterministic `contains` assertion

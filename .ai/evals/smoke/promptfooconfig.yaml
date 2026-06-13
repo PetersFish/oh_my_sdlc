@@ -1,0 +1,16 @@
+description: "opencode-go OpenAI-compatible provider smoke test"
+prompts:
+  - "Reply with exactly the text: smoke-test-ok"
+providers:
+  - id: openai:chat:deepseek-v4-pro
+    config:
+      apiBaseUrl: https://opencode.ai/zen/go/v1
+      apiKeyEnvar: OPENCODE_GO_API_KEY
+      headers:
+        Accept-Encoding: identity
+      temperature: 0
+      max_tokens: 50
+tests:
+  - assert:
+      - type: contains
+        value: smoke-test-ok

@@ -1,6 +1,6 @@
 ## 1. EvalOps Root Migration
 
-- [x] 1.1 Create `.ai/evals/` with `manifest.yaml`, `model-matrix.yaml`, `templates/`, `schemas/`, `runners/`, and `targets/`.
+- [x] 1.1 Create `.ai/evals/` with `manifest.yaml`, `model-matrix.yaml`, and `targets/`; keep `runners/` only for custom/fallback providers, and do not require empty `.ai/evals/templates/` or `.ai/evals/schemas/` until scripts consume them.
 - [x] 1.2 Define `.ai/evals/manifest.yaml` with schema version, registered targets, default export policy, default assertion policy, report policy, platform directories, and model matrix path.
 - [x] 1.3 Define the `.ai/evals/model-matrix.yaml` schema contract for models, providers, environments, target selection, and run policy without implementing the full matrix runner.
 - [x] 1.4 Migrate existing root `evals/` assets into `.ai/evals/` and remove root `evals/` as a long-term source of truth.
@@ -71,7 +71,7 @@
 - [x] 8.2 Modify `scripts/export-promptfoo.py` to read Promptfoo provider config from `.ai/evals/model-matrix.yaml` default model instead of hardcoding `id: opencode`.
 - [x] 8.3 Update canonical `skills/sdlc-evalops/SKILL.md` with opencode Go provider rules: model matrix is provider source, OpenAI-compatible endpoint, `OPENCODE_GO_API_KEY`, no key in repo.
 - [x] 8.4 Distribute updated `sdlc-evalops` skill to `.opencode/`, `.claude/`, and `.cursor/` skill copies.
-- [x] 8.5 Add tests: generated `promptfooconfig.yaml` uses `openai:chat:deepseek-v4-pro` with `apiBaseUrl` and `apiKeyEnvar`.
+- [x] 8.5 Add tests: generated `promptfooconfig.yaml` uses `openai:chat:deepseek-v4-pro` with `apiBaseUrl` and `apiKeyEnvar`; if that provider fails a smoke test, document Python provider fallback separately rather than making it the default.
 - [x] 8.6 Run `scripts/export-promptfoo.py skill.sdlc-orchestrator --check` and verify exports are fresh.
 
 ## 9. Report Writing Gap Fix
@@ -84,3 +84,37 @@ The Promptfoo eval run command in `sdlc-evalops` and the `scripts/export-promptf
 - [x] 9.4 Run `scripts/run-promptfoo-eval.py skill.sdlc-orchestrator` and verify reports land in `.ai/evals/targets/skill.sdlc-orchestrator/reports/`.
   - **Status: done** — 6/6 passed, reports written to `reports/skill.sdlc-orchestrator-20260613T092502Z/`
 - [x] 9.5 Distribute updated `sdlc-evalops` skill to `.opencode/`, `.claude/`, and `.cursor/` skill copies.
+
+## 10. Runtime Contract Simplification and Provider Preference Follow-Up
+
+The initial implementation created empty `.ai/evals/templates/` and `.ai/evals/schemas/` placeholders and later used a Python Promptfoo provider for opencode-go. The optimized contract should avoid unused runtime directories and prefer Promptfoo's built-in OpenAI-compatible provider with `apiBaseUrl` and `apiKeyEnvar` before falling back to custom Python.
+
+- [x] 10.1 Remove `.ai/evals/templates/` and `.ai/evals/schemas/` from the required runtime layout, manifest defaults, skill docs, and tests unless a concrete consumer is added.
+- [x] 10.2 Keep `skills/sdlc-evalops/templates/` as skill-owned templates; clarify that these are not project runtime `.ai/evals/templates/`.
+- [x] 10.3 Update `.ai/evals/model-matrix.yaml` and export expectations so the default provider uses `openai:chat:<model>` with `apiBaseUrl: https://opencode.ai/zen/go/v1` and `apiKeyEnvar: OPENCODE_GO_API_KEY`.
+- [x] 10.4 Add a minimal Promptfoo smoke test for the opencode-go OpenAI-compatible provider before relying on the Python fallback.
+- [x] 10.5 Keep `.ai/evals/runners/opencode_go_provider.py` only as a documented fallback profile if the built-in provider still fails; do not require it for projects where `openai:chat:<model>` works.
+- [x] 10.6 Update tests to assert the required platform directories are consumption-driven, generated provider config contains no API key value, and fallback provider paths resolve only when fallback mode is selected.
+- [x] 10.7 Reconcile OpenSpec artifacts, canonical `skills/sdlc-evalops/SKILL.md`, distributed skill copies, and `.skill-install.json` payloads after the provider/default layout decision is implemented.
+
+## 11. OpenAI-Compatible Provider Hardening
+
+The `openai:chat:` provider with opencode-go endpoint fails with `TypeError: terminated` under Node/undici `DecompressInterceptor` when responses are compressed. Adding `Accept-Encoding: identity` to provider and grader configs prevents this at the HTTP layer without requiring a custom Python provider. The Python fallback documentation is removed because the fallback script is not distributed with the skill payload.
+
+- [x] 11.1 Add `headers.Accept-Encoding: identity` to `.ai/evals/model-matrix.yaml` provider and grader configs.
+- [x] 11.2 Update `skills/sdlc-evalops/templates/promptfooconfig.yaml` from empty `providers: []` to a real OpenAI-compatible example with `Accept-Encoding: identity` headers and grader provider.
+- [x] 11.3 Remove Python fallback docs from `skills/sdlc-evalops/SKILL.md`. Replace with an OpenCode-Go Endpoint Contract table that documents required fields: `apiBaseUrl` (base URL only, no `/chat/completions`), `apiKeyEnvar`, and `headers.Accept-Encoding: identity`. Update the generated example config to include headers.
+- [x] 11.4 Add tests: `test_provider_has_accept_encoding_identity`, `test_grader_has_accept_encoding_identity`, `test_model_matrix_has_accept_encoding_identity`, `test_smoke_config_has_accept_encoding_identity` in `test_evalops_root.py`. Update `test_mentions_opencode_go_provider_rules` to assert `Accept-Encoding` instead of `opencode_go_provider.py`. Add `test_mentions_accept_encoding_identity` in `test_evalops_skill.py`.
+- [x] 11.5 Regenerate exports, sync canonical `skills/sdlc-evalops/` SKILL.md and templates to `.opencode/`, `.claude/`, `.cursor/` distributed copies.
+
+## 12. Remove Undistributed Python Fallback Provider
+
+The Python provider at `.ai/evals/runners/opencode_go_provider.py` was a workaround for `TypeError: terminated` before `Accept-Encoding: identity` was identified as the fix. It was never distributed with the skill payload. It is now deleted along with all references in docs, manifests, and tests.
+
+- [x] 12.1 Delete `.ai/evals/runners/opencode_go_provider.py` and remove the `.ai/evals/runners/` directory.
+- [x] 12.2 Remove `platform_directories.runners` from `.ai/evals/manifest.yaml`.
+- [x] 12.3 Update `.ai/evals/model-matrix.yaml` note to remove Python fallback mention and state no custom provider is required.
+- [x] 12.4 Remove `runners/` from directory structure and `opencode_go_provider.py` from init produces in `skills/sdlc-evalops/SKILL.md`.
+- [x] 12.5 Sync canonical `skills/sdlc-evalops/SKILL.md` to `.opencode/`, `.claude/`, `.cursor/` distributed copies.
+- [x] 12.6 Add tests: `test_runners_dir_does_not_exist`, `test_evalops_skill_does_not_mention_fallback_provider`, and per-copy absence tests. Update `test_mentions_opencode_go_provider_rules` to assert `opencode_go_provider.py` is NOT in content.
+- [x] 12.7 Update OpenSpec artifacts: proposal, design, spec, tasks to document the removal.

@@ -36,7 +36,7 @@ The EvalOps root is `.ai/evals/` at the project root. The old root `evals/` is N
 - `default_export_policy`: how Promptfoo exports are derived
 - `default_assertion_policy`: deterministic assertion preference and llm-rubric policy
 - `report_policy`: where reports live and required reporting fields
-- `platform_directories`: templates, schemas, and runners directories
+- `platform_directories`: runtime directories (declared when consumed by scripts; default is empty)
 - `model_matrix_path`: path to the model matrix schema file
 
 ## Target Workspaces and Target Manifest
@@ -133,9 +133,6 @@ The skill maintains assets under `.ai/evals/` at the project root:
 .ai/evals/
   manifest.yaml           # global target registry and default policy
   model-matrix.yaml       # model matrix schema (runner deferred)
-  templates/              # global export templates
-  schemas/                # global schema files
-  runners/                # global runner configs
   targets/
     <target-id>/
       manifest.yaml       # target metadata, source paths, export/report policy
@@ -265,8 +262,10 @@ Initialize `.ai/evals/` directory at the project root.
 
 **Produces**:
 - `.ai/evals/manifest.yaml`
-- `.ai/evals/templates/`, `.ai/evals/schemas/`, `.ai/evals/runners/`
+- `.ai/evals/model-matrix.yaml` (with default opencode-go provider)
 - `.ai/evals/targets/`
+- `scripts/export-promptfoo.py`
+- `scripts/run-promptfoo-eval.py`
 
 **Rules**:
 - Do NOT create cases during init.
@@ -404,6 +403,20 @@ The `--check` flag (`scripts/export-promptfoo.py <target-id> --check`) exits non
 
 Promptfoo provider configuration is generated from `.ai/evals/model-matrix.yaml`, not hardcoded in the export script. The first model listed in `models[]` is the default. Its `promptfoo` block is used verbatim to generate the `providers` section of `promptfooconfig.yaml`.
 
+The preferred provider is Promptfoo's built-in OpenAI-compatible provider (`openai:chat:<model>`) with `apiBaseUrl` and `apiKeyEnvar`. This avoids distributing a custom provider script to every project.
+
+### OpenCode-Go Endpoint Contract
+
+The opencode-go OpenAI-compatible endpoint REQUIRES these provider config fields:
+
+| Field | Value | Notes |
+|-------|-------|-------|
+| `apiBaseUrl` | `https://opencode.ai/zen/go/v1` | Base URL only — do NOT append `/chat/completions` |
+| `apiKeyEnvar` | `OPENCODE_GO_API_KEY` | Promptfoo reads the key from the env var |
+| `headers.Accept-Encoding` | `identity` | Prevents `TypeError: terminated` from Node/undici decompress interceptor |
+
+The `Accept-Encoding: identity` header is REQUIRED. Without it, the endpoint may return a compressed response that triggers a bug in Promptfoo/Node's decompress pipeline, causing every eval case to fail with `TypeError: terminated` in 2-3 seconds regardless of timeout settings.
+
 ### Target Provider vs Grader Provider
 
 The `providers` block configures the eval target model (the model being evaluated). The `defaultTest.options.provider` block configures the grader model used for `llm-rubric` assertions. They may differ.
@@ -416,18 +429,24 @@ Generated example (target: deepseek-v4-pro, grader: glm-5.1):
 
 ```yaml
 providers:
-  - id: file://../../../../runners/opencode_go_provider.py
+  - id: openai:chat:deepseek-v4-pro
     label: opencode-go/deepseek-v4-pro
     config:
-      model: deepseek-v4-pro
+      apiBaseUrl: https://opencode.ai/zen/go/v1
+      apiKeyEnvar: OPENCODE_GO_API_KEY
+      headers:
+        Accept-Encoding: identity
       temperature: 0
       max_tokens: 4096
 defaultTest:
   options:
     provider:
-      id: file://../../../../runners/opencode_go_provider.py
+      id: openai:chat:glm-5.1
       config:
-        model: glm-5.1
+        apiBaseUrl: https://opencode.ai/zen/go/v1
+        apiKeyEnvar: OPENCODE_GO_API_KEY
+        headers:
+          Accept-Encoding: identity
         temperature: 0
         max_tokens: 4096
 ```
@@ -437,7 +456,7 @@ The `defaultTest.options.provider` block is the grader for `llm-rubric` assertio
 ### API Key Rules
 
 - The API key MUST come from the `OPENCODE_GO_API_KEY` environment variable.
-- The Python provider reads `os.environ["OPENCODE_GO_API_KEY"]` at runtime.
+- Promptfoo reads the key via the `apiKeyEnvar` config; do not hardcode the value.
 - API keys MUST NOT be written into any repository file — not in `.ai/evals/model-matrix.yaml`, not in generated exports, not in case files.
 
 ### Manual Smoke Test
@@ -549,9 +568,9 @@ DEVELOP → EVALUATE-IN-REPO (run golden eval)
 → DISTRIBUTE
 ```
 
-## Templates
+## Skill-Owned Templates
 
-Bundled templates under `templates/`:
+These templates are bundled with the skill package (`skills/sdlc-evalops/templates/`). They are **not** runtime assets under `.ai/evals/templates/` (that directory is deferred until EvalOps scripts consume it).
 
 | Template | Purpose |
 |----------|---------|

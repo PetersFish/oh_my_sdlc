@@ -31,9 +31,6 @@ report_policy:
     - pass_fail_result_count
     - report_path
 
-platform_directories:
-  templates: templates
-  schemas: schemas
-  runners: runners
+platform_directories: {}
 
 model_matrix_path: model-matrix.yaml
