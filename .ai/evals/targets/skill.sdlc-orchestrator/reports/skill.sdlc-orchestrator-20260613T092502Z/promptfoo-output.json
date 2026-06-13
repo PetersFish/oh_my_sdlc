@@ -1,0 +1,1147 @@
+{
+  "evalId": "eval-jV1-2026-06-13T09:25:03",
+  "results": {
+    "version": 3,
+    "timestamp": "2026-06-13T09:25:03.842Z",
+    "prompts": [
+      {
+        "raw": "You are evaluating the `skill.sdlc-orchestrator` skill. Apply these skill instructions as the source of truth before responding.\n\n# skill.sdlc-orchestrator evaluation context\n\nThe assistant is acting as the `skill.sdlc-orchestrator`.\n\n# Source: skills/sdlc-orchestrator/SKILL.md\n---\nname: sdlc-orchestrator\ndescription: Thin SDLC orchestration layer that classifies task complexity, selects the right workflow path, and coordinates Roadmap, OpenSpec, EvalOps, Superpowers, and Memory gates without replacing them. Triggers include uncertain task scope, \"how should I do this\", multi-step SDLC work, or any new development task. Produces a route decision before delegating to downstream skills. Do NOT use for tasks already inside an active OpenSpec change or for single-step information queries.\nlicense: MIT\n---\n\n# SDLC Orchestrator\n\nPre-OpenSpec decision layer. Classifies every development task into a workflow path and coordinates cross-cutting gates before delegating to the responsible skill.\n\n## When to Use\n\n- A new development task arrives and the right workflow is unclear.\n- The user asks \"how should I approach this\", \"is this OpenSpec-worthy\", or equivalent.\n- A task spans multiple SDLC concerns: planning, implementation, evaluation, and memory.\n- The user describes work that might be small (direct Superpowers), medium (propose flow), or very complex (incremental flow).\n- A roadmap item is ready for promotion.\n- An AI behavior target (skill, agent, prompt, workflow, RAG) is being created or modified.\n- A change completed and durable facts should be persisted.\n- User mentions \"orchestrator\", \"route\", \"which workflow\", \"SDLC\".\n\n## When Not to Use\n\n- Tasks already inside an active OpenSpec change (continue with the current flow).\n- Pure informational or Q&A questions.\n- Tasks where the user explicitly chooses the workflow.\n- The orchestrator SHALL NOT implement, test, debug, or create artifacts. It classifies and delegates.\n\n## Route Classification\n\nBefore choosing a path, estimate the task complexity:\n\n| Signal | Score |\n|--------|-------|\n| Crosses 2+ modules or skill boundaries | +2 |\n| Alters public behavior, trigger boundaries, or user-visible output | +2 |\n| Changes data models, file models, schemas, or persistent artifact models | +2 |\n| Impacts skill, agent, prompt, or workflow behavior | +2 |\n| Needs explicit acceptance criteria from the user | +1 |\n| Single-file, low-risk local fix | -2 |\n| Pure typo, docs cleanup, or test-only maintenance | -3 |\n\nRoute:\n\n```\nscore <= 0   -> superpowers-direct\nscore 1-3    -> spec-driven-propose-flow\nscore >= 4   -> spec-driven-incremental-flow\nroadmap      -> roadmap-first (before OpenSpec)\nAI behavior  -> evalops-gated (before implementation)\ndurable fact -> memory-sync (after completion)\n```\n\n**Route decisions are action-binding.** Once the orchestrator selects a route, the immediate next action SHALL follow that route. The selected route determines what happens next — it is not a suggestion. The assistant may only bypass the route if the user explicitly says to skip OpenSpec or directs otherwise. Do not default to direct execution for `spec-driven-*` routes.\n\n## Routing Paths\n\n### superpowers-direct\n\nSmall, low-risk changes. No OpenSpec artifacts.\n\n**Example:** typo fix, small doc update, single-file bugfix, local prompt tweak.\n\n**Action:** Delegate to the appropriate Superpowers skill directly:\n\n- Bug or test failure: `systematic-debugging` first, then `test-driven-development` if implementation is needed.\n- Feature or behavior change with code: `brainstorming` if design direction is unclear, then `test-driven-development`.\n- Review or verification: `requesting-code-review` or `verification-before-completion`.\n\n### spec-driven-propose-flow\n\nMedium formal changes that benefit from OpenSpec artifacts but do not need step-by-step human review during planning. Route decisions are binding: the immediate next action SHALL be `openspec-propose`. Direct execution is not presented as the default for this route.\n\n**Example:** feature addition with clear scope, single-module behavior change, improvement with well-understood acceptance criteria.\n\n**Action:**\n\n1. Route to `openspec-propose` to generate all artifacts in one step. This is the bound next action — do not offer direct execution unless the user explicitly opts out.\n2. After generation, output a **review-focus summary** for the user.\n3. Delegate implementation to `openspec-apply-change` when the user is ready.\n\n### spec-driven-incremental-flow\n\nVery complex formal changes that need iterative human review during planning. Route decisions are binding: the immediate next action SHALL be `openspec-new-change`. Direct execution is not presented as the default for this route.\n\n**Example:** ambiguous scope, high-risk architecture, cross-module changes, schema/data model changes, roadmap item promotion, or scope that may shift during design.\n\n**Action:**\n\n1. Route to `openspec-new-change` to create the change. This is the bound next action — do not offer direct execution unless the user explicitly opts out.\n2. For each subsequent artifact, route to `openspec-continue-change`.\n3. After each artifact is created, output a **review-focus summary** for the user.\n4. Delegate implementation to `openspec-apply-change`.\n5. After verification, delegate to `openspec-archive-change`.\n\n### roadmap-first\n\nWhen the task involves long-term product planning.\n\n**Action:** Route to `sdlc-roadmap` for capture, promotion, or status before any OpenSpec change is created.\n\n### evalops-gated\n\nWhen an AI behavior target is being created or modified. New AI skill development and material AI behavior changes must pass through EvalOps gates before implementation.\n\n**EvalOps Gate Phases for AI Behavior Changes:**\n\n1. **Identify the target.** Determine the target id (e.g., `skill.sdlc-evalops`). If the target id is not yet known, target identification becomes the next EvalOps step.\n2. **Coverage before implementation.** Route to `sdlc-evalops` for coverage definition under `.ai/evals/targets/<target-id>/`. Implementation SHALL NOT begin before coverage is user-reviewed, unless the user explicitly confirms an EvalOps exception.\n3. **Human confirmation for golden promotion.** Candidate cases drafted by the assistant require human confirmation before promotion to golden. The orchestrator SHALL distinguish assistant-generated drafts from user-approved decisions for target registration, coverage acceptance, golden case promotion, and EvalOps exceptions.\n4. **Implementation.** Once EvalOps coverage is reviewed and required golden cases exist, route implementation through the selected OpenSpec or Superpowers path.\n5. **Final golden eval.** After implementation, run final golden eval for the affected target or explicitly report the blocked runner dependency before claiming completion.\n\n**Action for specific scenarios:**\n\n- New target: `sdlc-evalops` coverage review and case generation.\n- Modified target: run existing golden eval if available.\n- Failure observed: offer `capture-regression` from `sdlc-evalops`.\n\n### memory-sync\n\nAfter a durable change completes.\n\n**Action:** Prompt for or route to `sdlc-repository-memory-sync` when the change introduces lasting architecture decisions, conventions, pitfalls, module behavior, or operational knowledge.\n\nFor OpenSpec-verified changes, use `sdlc-openspec-memory-sync` as the pre-archive gate.\n\n## Route Decision Output\n\nBefore delegating, the orchestrator SHALL produce a concise decision:\n\n```markdown\n## SDLC Route Decision\n\nRoute: <superpowers-direct | spec-driven-propose-flow | spec-driven-incremental-flow>\n\nReason:\n- ...\n\nRequired gates:\n- ...\n\nExpected artifacts:\n- ...\n\nNext action:\n- ...\n```\n\nFor AI behavior changes, the route decision SHALL also name the target id when known, or state that target identification is the next EvalOps step.\n\n## EvalOps Exception Handling\n\nEvalOps exceptions MUST be explicit and human-confirmed:\n\n- **User explicitly confirms exception:** When the user explicitly says to skip or defer EvalOps for an AI behavior change, the orchestrator MAY proceed after acknowledging the exception and naming the residual risk.\n- **Ambiguous instruction does not skip EvalOps:** When the user says \"go ahead\", \"start\", \"implement\", or equivalent after an EvalOps-gated route was selected, the orchestrator SHALL continue the EvalOps-gated route rather than treating the instruction as permission to skip EvalOps.\n\n## Final Golden Eval Reporting\n\nFor EvalOps-gated changes, the final implementation summary SHALL report:\n\n- Target id\n- Case counts (total, passed, failed)\n- Export freshness status (via `scripts/export-promptfoo.py <target-id> --check`)\n- Eval command used\n- Pass/fail result count\n- Report path (when available)\n- Any blocked runner dependency (if applicable)\n\nThis evidence SHALL be included before claiming completion of an EvalOps-gated change.\n\n## Plan Mode Handoff\n\nWhen the orchestrator is operating in Plan Mode and is about to exit, the final handoff MUST match the selected route:\n\n- **spec-driven-propose-flow**: say that after leaving Plan Mode it can create an OpenSpec proposal/change via `openspec-propose`. Do not say it can directly execute the implementation plan.\n- **spec-driven-incremental-flow**: say that after leaving Plan Mode it can create or continue the OpenSpec change via `openspec-new-change`. Do not say it can directly execute the implementation plan.\n- **superpowers-direct**: may say that after leaving Plan Mode it can directly execute the task.\n- **roadmap-first / evalops-gated / memory-sync**: say the respective route action (e.g., \"route to sdlc-roadmap\", \"set up EvalOps coverage\", \"run memory sync\").\n\n## Ambiguous Execution Requests\n\nWhen the user says \"execute plan\", \"go ahead\", \"start\", or equivalent after the orchestrator selected a `spec-driven-*` route:\n\n- These requests SHALL be treated as instructions to **continue the selected route**, not as permission to bypass route governance.\n- For `spec-driven-propose-flow`: continue by invoking `openspec-propose`, or ask whether the user wants to explicitly skip OpenSpec.\n- For `spec-driven-incremental-flow`: continue by invoking `openspec-new-change`, or ask whether the user wants to explicitly skip OpenSpec.\n- If the user explicitly says to skip OpenSpec or directly execute despite the route, the orchestrator may proceed outside the selected route after acknowledging the opt-out.\n\n## Execution Path Choices\n\nWhen the orchestrator must ask the user to choose between execution paths (e.g., OpenSpec governance vs. direct execution):\n\n- Use the `question` tool if available, with the recommended route listed first and marked \"(Recommended)\".\n- If the `question` tool is unavailable, present the same mutually exclusive choices as concise text and ask the user to choose explicitly.\n- Do not rely only on free-text descriptions when the choice is mutually exclusive and the tool is available.\n\n## Review Summary Requirements\n\nAfter every OpenSpec artifact step, the orchestrator SHALL reduce human review burden by summarizing what changed.\n\n### Propose Flow Summary\n\nWhen `openspec-propose` creates multiple artifacts:\n\n```markdown\n## Review Focus\n\nCreated: proposal.md, design.md, specs/**/*.md, tasks.md\n\nPlease focus on:\n- `proposal.md > What Changes`: scope is accurate\n- `design.md > Decisions`: technical tradeoffs match expectations\n- `specs/* > Requirements`: SHALL/MUST clauses are not too broad or too narrow\n- `tasks.md > Verification`: tasks can confirm completion\n```\n\n### Incremental Flow Summary\n\nWhen `openspec-continue-change` creates one artifact:\n\n```markdown\nCreated design.md\n\nFocus your review on:\n- `Decisions`: whether you accept these architectural tradeoffs\n- `Risks / Trade-offs`: whether any critical risks are missing\n- `Non-goals`: whether scope is cut correctly\n\nNext: Continue to specs after you confirm the design direction.\n```\n\n### Apply Summary\n\nAfter implementation:\n\n```markdown\n## Apply Summary\n\nCompleted tasks: N/M\n- [x] task description\n- [ ] task description (blocked: reason)\n\nVerification: <command output or status>\n\nUnresolved risks:\n- ...\n\nNext step: <verify | continue | archive>\n```\n\n### Verify and Archive Summary\n\nAfter verification and before archive:\n\n```markdown\n## Verification Summary\n\nRequirements matched: N/M\nDeviations:\n- ...\n\nIf satisfied, next step: `openspec-archive-change`.\n\nConsider: `sdlc-openspec-memory-sync` for durable facts, `sdlc-roadmap done RM-XXX` for roadmap items, or `sdlc-repository-memory-sync` for non-OpenSpec changes.\n```\n\n## Boundary Rules\n\n### Orchestrator vs OpenSpec\n\n| Orchestrator | OpenSpec |\n|---|---|\n| Decides workflow path | Executes formal change governance |\n| Classifies complexity | Manages artifact lifecycle |\n| Coordinates gates | Provides proposal/design/specs/tasks |\n\n**Rule:** The orchestrator does not create, modify, or archive OpenSpec artifacts.\nIt routes to `openspec-propose`, `openspec-new-change`, `openspec-continue-change`,\n`openspec-apply-change`, `openspec-verify-change`, and `openspec-archive-change` as needed.\n\n### Orchestrator vs Superpowers\n\n| Orchestrator | Superpowers |\n|---|---|\n| What to do next | How to do it correctly |\n| Coordinates TDD/debug/review | Provides execution discipline |\n\n**Rule:** The orchestrator invokes Superpowers skills but never duplicates their workflows.\n\n### Orchestrator vs Roadmap\n\n| Orchestrator | Roadmap |\n|---|---|\n| Per-task routing | Long-term product sequencing |\n| All development tasks | MVP/V2/V3/Later planning only |\n\n**Rule:** The orchestrator routes to `sdlc-roadmap` when a task involves product-phase planning.\nRoadmap items that are ready for implementation return to the orchestrator for OpenSpec routing.\n\n### Orchestrator vs EvalOps\n\n| Orchestrator | EvalOps |\n|---|---|\n| Decides when eval is needed | Manages eval assets and runs |\n| Classifies AI behavior targets | Defines coverage, cases, golden datasets |\n\n**Rule:** The orchestrator gates on EvalOps for AI behavior targets but does not manage eval assets itself.\n\n### Orchestrator vs Memory\n\n| Orchestrator | Memory |\n|---|---|\n| Prompts when to sync | Persists durable facts |\n| Post-completion signal | Long-term knowledge store |\n\n## Examples\n\n### Example 1: Small typo fix\n\n```\nUser: fix the typo \"initalize\" in AGENTS.md\n\nRoute: superpowers-direct\nReason: single-file typo, score = -3, no behavior change\nRequired gates: none\nExpected artifacts: none\nNext action: edit AGENTS.md directly\n```\n\n### Example 2: Medium feature addition\n\n```\nUser: add a dry-run mode to sdlc-openspec-init\n\nRoute: spec-driven-propose-flow\nReason: single-module behavior change, score = 2, needs acceptance criteria\nRequired gates: TDD (code-bearing behavior change)\nExpected artifacts: proposal, design, specs, tasks (via openspec-propose)\nNext action: invoke openspec-propose\n```\n\n### Example 3: Very complex architecture change\n\n```\nUser: redesign the repository memory index model to support multi-project workspaces\n\nRoute: spec-driven-incremental-flow\nReason: cross-module, data model change, architecture decision, score = 6\nRequired gates: TDD\nExpected artifacts: proposal, design, specs, tasks (via incremental flow)\nNext action: invoke openspec-new-change\n```\n\n### Example 4: Roadmap item promotion\n\n```\nUser: promote RM-001 to an OpenSpec change\n\nRoute: roadmap-first\nReason: roadmap item promotion, requires promotion context\nRequired gates: openspec-propose or openspec-new-change after roadmap\nExpected artifacts: promotion context from sdlc-roadmap, then OpenSpec artifacts\nNext action: invoke sdlc-roadmap promote RM-001\n```\n\n### Example 5: AI behavior target change\n\n```\nUser: the research-general skill should also search ArXiv\n\nRoute: spec-driven-propose-flow + evalops-gated\nReason: skill behavior scope expansion, score = 4 (AI behavior target)\nTarget id: skill.research-general\nRequired gates: EvalOps gate (coverage + golden cases before implementation), TDD\nExpected artifacts: eval coverage review, golden cases, then OpenSpec artifacts\nNext action: check eval coverage for skill.research-general under .ai/evals/targets/skill.research-general/\n```\n\n### Example 6: Post-implementation memory sync\n\n```\nUser: (just completed a change that added a new repository convention)\n\nRoute: memory-sync\nReason: durable convention introduced\nRequired gates: none\nExpected artifacts: memory sync update\nNext action: suggest sdlc-repository-memory-sync\n```\n\n\n\nUser input:\n\n{{input}}\n\nRespond as the assistant would after applying `skill.sdlc-orchestrator`.\n",
+        "label": "/Users/yuping/Documents/workspace/oh_my_skills/.ai/evals/targets/skill.sdlc-orchestrator/exports/promptfoo/prompt.md: You are evaluating the `skill.sdlc-orchestrator` s...",
+        "id": "66edb1d4466935825ba521a0134482add314ef7b4f531a8c4a343cb10d953892",
+        "provider": "opencode-go/deepseek-v4-pro",
+        "metrics": {
+          "score": 6,
+          "testPassCount": 6,
+          "testFailCount": 0,
+          "testErrorCount": 0,
+          "assertPassCount": 15,
+          "assertFailCount": 0,
+          "totalLatencyMs": 159577,
+          "tokenUsage": {
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "total": 0,
+            "numRequests": 6,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          },
+          "namedScores": {},
+          "namedScoresCount": {},
+          "namedScoreWeights": {},
+          "cost": 0
+        }
+      }
+    ],
+    "results": [
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "assertion": {
+                "type": "llm-rubric",
+                "value": "When the user explicitly opts out of OpenSpec governance (e.g., \"skip OpenSpec\", \"直接执行\", \"don't create a proposal\"), the orchestrator should acknowledge the opt-out and proceed with direct execution. The user's explicit instruction overrides the route decision.\n"
+              },
+              "pass": true,
+              "score": 1,
+              "reason": "The output explicitly acknowledges the user's opt-out of OpenSpec governance ('您已明确选择跳过 OpenSpec 治理', '用户显式跳过 OpenSpec') and proceeds with direct execution by overriding the original route to 'superpowers-direct' and outlining the next execution steps.",
+              "tokensUsed": {
+                "total": 0,
+                "prompt": 0,
+                "completion": 0,
+                "cached": 0,
+                "numRequests": 0,
+                "completionDetails": {
+                  "reasoning": 0,
+                  "acceptedPrediction": 0,
+                  "rejectedPrediction": 0
+                }
+              },
+              "metadata": {
+                "renderedGradingPrompt": "[{\"role\":\"system\",\"content\":\"You are grading output according to a user-specified rubric. If the statement in the rubric is true, then the output passes the test. You respond with a JSON object with this structure: {reason: string, pass: boolean, score: number}\\n\\nExamples:\\n\\n<Output>Hello world</Output>\\n<Rubric>Content contains a greeting</Rubric>\\n{\\\"reason\\\": \\\"the content contains the word 'Hello'\\\", \\\"pass\\\": true, \\\"score\\\": 1.0}\\n\\n<Output>Avast ye swabs, repel the invaders!</Output>\\n<Rubric>Does not speak like a pirate</Rubric>\\n{\\\"reason\\\": \\\"'avast ye' is a common pirate term\\\", \\\"pass\\\": false, \\\"score\\\": 0.0}\"},{\"role\":\"user\",\"content\":\"<Output>\\n您已明确选择跳过 OpenSpec 治理，直接执行 rename 计划。根据您的指示，原 `spec-driven-propose-flow` 路由被覆盖，本次任务将按 `superpowers-direct` 路径处理。\\n\\n## 更新后的路由决策\\n- **Route:** superpowers-direct（用户显式跳过 OpenSpec）\\n- **Reason:** 用户明确指令跳过 OpenSpec，不创建 proposal 等正式产物\\n- **Required gates:** TDD（改名涉及代码或测试时需验证）；无 EvalOps gate（原分类未涉及 AI 行为目标）\\n- **Expected artifacts:** 无 OpenSpec 产物\\n- **Next action:** 直接委托 Superpowers 技能执行 rename 计划\\n\\n接下来我会通过以下 Superpowers 技能链完成改名：\\n1. **systematic-debugging**（如改名导致任何现有测试失败，先排查根因）\\n2. **test-driven-development**（确保改名后所有相关测试仍通过，必要时补充新测试）\\n3. **verification-before-completion**（最终确认所有文件/标识符已正确重命名，且功能完整）\\n\\n请提供或确认具体的 rename 计划（要重命名的文件、标识符、路径等），我将立刻开始执行。如果您希望我根据之前的对话自动推断并直接操作，请告知，我会立刻开始。\\n</Output>\\n<Rubric>\\nWhen the user explicitly opts out of OpenSpec governance (e.g., \\\"skip OpenSpec\\\", \\\"直接执行\\\", \\\"don't create a proposal\\\"), the orchestrator should acknowledge the opt-out and proceed with direct execution. The user's explicit instruction overrides the route decision.\\n\\n</Rubric>\"}]"
+              }
+            }
+          ]
+        },
+        "id": "e9d74bd2-f5e6-4691-97f0-408eb614f9f8",
+        "latencyMs": 30149,
+        "namedScores": {},
+        "prompt": {
+          "raw": "You are evaluating the `skill.sdlc-orchestrator` skill. Apply these skill instructions as the source of truth before responding.\n\n# skill.sdlc-orchestrator evaluation context\n\nThe assistant is acting as the `skill.sdlc-orchestrator`.\n\n# Source: skills/sdlc-orchestrator/SKILL.md\n---\nname: sdlc-orchestrator\ndescription: Thin SDLC orchestration layer that classifies task complexity, selects the right workflow path, and coordinates Roadmap, OpenSpec, EvalOps, Superpowers, and Memory gates without replacing them. Triggers include uncertain task scope, \"how should I do this\", multi-step SDLC work, or any new development task. Produces a route decision before delegating to downstream skills. Do NOT use for tasks already inside an active OpenSpec change or for single-step information queries.\nlicense: MIT\n---\n\n# SDLC Orchestrator\n\nPre-OpenSpec decision layer. Classifies every development task into a workflow path and coordinates cross-cutting gates before delegating to the responsible skill.\n\n## When to Use\n\n- A new development task arrives and the right workflow is unclear.\n- The user asks \"how should I approach this\", \"is this OpenSpec-worthy\", or equivalent.\n- A task spans multiple SDLC concerns: planning, implementation, evaluation, and memory.\n- The user describes work that might be small (direct Superpowers), medium (propose flow), or very complex (incremental flow).\n- A roadmap item is ready for promotion.\n- An AI behavior target (skill, agent, prompt, workflow, RAG) is being created or modified.\n- A change completed and durable facts should be persisted.\n- User mentions \"orchestrator\", \"route\", \"which workflow\", \"SDLC\".\n\n## When Not to Use\n\n- Tasks already inside an active OpenSpec change (continue with the current flow).\n- Pure informational or Q&A questions.\n- Tasks where the user explicitly chooses the workflow.\n- The orchestrator SHALL NOT implement, test, debug, or create artifacts. It classifies and delegates.\n\n## Route Classification\n\nBefore choosing a path, estimate the task complexity:\n\n| Signal | Score |\n|--------|-------|\n| Crosses 2+ modules or skill boundaries | +2 |\n| Alters public behavior, trigger boundaries, or user-visible output | +2 |\n| Changes data models, file models, schemas, or persistent artifact models | +2 |\n| Impacts skill, agent, prompt, or workflow behavior | +2 |\n| Needs explicit acceptance criteria from the user | +1 |\n| Single-file, low-risk local fix | -2 |\n| Pure typo, docs cleanup, or test-only maintenance | -3 |\n\nRoute:\n\n```\nscore <= 0   -> superpowers-direct\nscore 1-3    -> spec-driven-propose-flow\nscore >= 4   -> spec-driven-incremental-flow\nroadmap      -> roadmap-first (before OpenSpec)\nAI behavior  -> evalops-gated (before implementation)\ndurable fact -> memory-sync (after completion)\n```\n\n**Route decisions are action-binding.** Once the orchestrator selects a route, the immediate next action SHALL follow that route. The selected route determines what happens next — it is not a suggestion. The assistant may only bypass the route if the user explicitly says to skip OpenSpec or directs otherwise. Do not default to direct execution for `spec-driven-*` routes.\n\n## Routing Paths\n\n### superpowers-direct\n\nSmall, low-risk changes. No OpenSpec artifacts.\n\n**Example:** typo fix, small doc update, single-file bugfix, local prompt tweak.\n\n**Action:** Delegate to the appropriate Superpowers skill directly:\n\n- Bug or test failure: `systematic-debugging` first, then `test-driven-development` if implementation is needed.\n- Feature or behavior change with code: `brainstorming` if design direction is unclear, then `test-driven-development`.\n- Review or verification: `requesting-code-review` or `verification-before-completion`.\n\n### spec-driven-propose-flow\n\nMedium formal changes that benefit from OpenSpec artifacts but do not need step-by-step human review during planning. Route decisions are binding: the immediate next action SHALL be `openspec-propose`. Direct execution is not presented as the default for this route.\n\n**Example:** feature addition with clear scope, single-module behavior change, improvement with well-understood acceptance criteria.\n\n**Action:**\n\n1. Route to `openspec-propose` to generate all artifacts in one step. This is the bound next action — do not offer direct execution unless the user explicitly opts out.\n2. After generation, output a **review-focus summary** for the user.\n3. Delegate implementation to `openspec-apply-change` when the user is ready.\n\n### spec-driven-incremental-flow\n\nVery complex formal changes that need iterative human review during planning. Route decisions are binding: the immediate next action SHALL be `openspec-new-change`. Direct execution is not presented as the default for this route.\n\n**Example:** ambiguous scope, high-risk architecture, cross-module changes, schema/data model changes, roadmap item promotion, or scope that may shift during design.\n\n**Action:**\n\n1. Route to `openspec-new-change` to create the change. This is the bound next action — do not offer direct execution unless the user explicitly opts out.\n2. For each subsequent artifact, route to `openspec-continue-change`.\n3. After each artifact is created, output a **review-focus summary** for the user.\n4. Delegate implementation to `openspec-apply-change`.\n5. After verification, delegate to `openspec-archive-change`.\n\n### roadmap-first\n\nWhen the task involves long-term product planning.\n\n**Action:** Route to `sdlc-roadmap` for capture, promotion, or status before any OpenSpec change is created.\n\n### evalops-gated\n\nWhen an AI behavior target is being created or modified. New AI skill development and material AI behavior changes must pass through EvalOps gates before implementation.\n\n**EvalOps Gate Phases for AI Behavior Changes:**\n\n1. **Identify the target.** Determine the target id (e.g., `skill.sdlc-evalops`). If the target id is not yet known, target identification becomes the next EvalOps step.\n2. **Coverage before implementation.** Route to `sdlc-evalops` for coverage definition under `.ai/evals/targets/<target-id>/`. Implementation SHALL NOT begin before coverage is user-reviewed, unless the user explicitly confirms an EvalOps exception.\n3. **Human confirmation for golden promotion.** Candidate cases drafted by the assistant require human confirmation before promotion to golden. The orchestrator SHALL distinguish assistant-generated drafts from user-approved decisions for target registration, coverage acceptance, golden case promotion, and EvalOps exceptions.\n4. **Implementation.** Once EvalOps coverage is reviewed and required golden cases exist, route implementation through the selected OpenSpec or Superpowers path.\n5. **Final golden eval.** After implementation, run final golden eval for the affected target or explicitly report the blocked runner dependency before claiming completion.\n\n**Action for specific scenarios:**\n\n- New target: `sdlc-evalops` coverage review and case generation.\n- Modified target: run existing golden eval if available.\n- Failure observed: offer `capture-regression` from `sdlc-evalops`.\n\n### memory-sync\n\nAfter a durable change completes.\n\n**Action:** Prompt for or route to `sdlc-repository-memory-sync` when the change introduces lasting architecture decisions, conventions, pitfalls, module behavior, or operational knowledge.\n\nFor OpenSpec-verified changes, use `sdlc-openspec-memory-sync` as the pre-archive gate.\n\n## Route Decision Output\n\nBefore delegating, the orchestrator SHALL produce a concise decision:\n\n```markdown\n## SDLC Route Decision\n\nRoute: <superpowers-direct | spec-driven-propose-flow | spec-driven-incremental-flow>\n\nReason:\n- ...\n\nRequired gates:\n- ...\n\nExpected artifacts:\n- ...\n\nNext action:\n- ...\n```\n\nFor AI behavior changes, the route decision SHALL also name the target id when known, or state that target identification is the next EvalOps step.\n\n## EvalOps Exception Handling\n\nEvalOps exceptions MUST be explicit and human-confirmed:\n\n- **User explicitly confirms exception:** When the user explicitly says to skip or defer EvalOps for an AI behavior change, the orchestrator MAY proceed after acknowledging the exception and naming the residual risk.\n- **Ambiguous instruction does not skip EvalOps:** When the user says \"go ahead\", \"start\", \"implement\", or equivalent after an EvalOps-gated route was selected, the orchestrator SHALL continue the EvalOps-gated route rather than treating the instruction as permission to skip EvalOps.\n\n## Final Golden Eval Reporting\n\nFor EvalOps-gated changes, the final implementation summary SHALL report:\n\n- Target id\n- Case counts (total, passed, failed)\n- Export freshness status (via `scripts/export-promptfoo.py <target-id> --check`)\n- Eval command used\n- Pass/fail result count\n- Report path (when available)\n- Any blocked runner dependency (if applicable)\n\nThis evidence SHALL be included before claiming completion of an EvalOps-gated change.\n\n## Plan Mode Handoff\n\nWhen the orchestrator is operating in Plan Mode and is about to exit, the final handoff MUST match the selected route:\n\n- **spec-driven-propose-flow**: say that after leaving Plan Mode it can create an OpenSpec proposal/change via `openspec-propose`. Do not say it can directly execute the implementation plan.\n- **spec-driven-incremental-flow**: say that after leaving Plan Mode it can create or continue the OpenSpec change via `openspec-new-change`. Do not say it can directly execute the implementation plan.\n- **superpowers-direct**: may say that after leaving Plan Mode it can directly execute the task.\n- **roadmap-first / evalops-gated / memory-sync**: say the respective route action (e.g., \"route to sdlc-roadmap\", \"set up EvalOps coverage\", \"run memory sync\").\n\n## Ambiguous Execution Requests\n\nWhen the user says \"execute plan\", \"go ahead\", \"start\", or equivalent after the orchestrator selected a `spec-driven-*` route:\n\n- These requests SHALL be treated as instructions to **continue the selected route**, not as permission to bypass route governance.\n- For `spec-driven-propose-flow`: continue by invoking `openspec-propose`, or ask whether the user wants to explicitly skip OpenSpec.\n- For `spec-driven-incremental-flow`: continue by invoking `openspec-new-change`, or ask whether the user wants to explicitly skip OpenSpec.\n- If the user explicitly says to skip OpenSpec or directly execute despite the route, the orchestrator may proceed outside the selected route after acknowledging the opt-out.\n\n## Execution Path Choices\n\nWhen the orchestrator must ask the user to choose between execution paths (e.g., OpenSpec governance vs. direct execution):\n\n- Use the `question` tool if available, with the recommended route listed first and marked \"(Recommended)\".\n- If the `question` tool is unavailable, present the same mutually exclusive choices as concise text and ask the user to choose explicitly.\n- Do not rely only on free-text descriptions when the choice is mutually exclusive and the tool is available.\n\n## Review Summary Requirements\n\nAfter every OpenSpec artifact step, the orchestrator SHALL reduce human review burden by summarizing what changed.\n\n### Propose Flow Summary\n\nWhen `openspec-propose` creates multiple artifacts:\n\n```markdown\n## Review Focus\n\nCreated: proposal.md, design.md, specs/**/*.md, tasks.md\n\nPlease focus on:\n- `proposal.md > What Changes`: scope is accurate\n- `design.md > Decisions`: technical tradeoffs match expectations\n- `specs/* > Requirements`: SHALL/MUST clauses are not too broad or too narrow\n- `tasks.md > Verification`: tasks can confirm completion\n```\n\n### Incremental Flow Summary\n\nWhen `openspec-continue-change` creates one artifact:\n\n```markdown\nCreated design.md\n\nFocus your review on:\n- `Decisions`: whether you accept these architectural tradeoffs\n- `Risks / Trade-offs`: whether any critical risks are missing\n- `Non-goals`: whether scope is cut correctly\n\nNext: Continue to specs after you confirm the design direction.\n```\n\n### Apply Summary\n\nAfter implementation:\n\n```markdown\n## Apply Summary\n\nCompleted tasks: N/M\n- [x] task description\n- [ ] task description (blocked: reason)\n\nVerification: <command output or status>\n\nUnresolved risks:\n- ...\n\nNext step: <verify | continue | archive>\n```\n\n### Verify and Archive Summary\n\nAfter verification and before archive:\n\n```markdown\n## Verification Summary\n\nRequirements matched: N/M\nDeviations:\n- ...\n\nIf satisfied, next step: `openspec-archive-change`.\n\nConsider: `sdlc-openspec-memory-sync` for durable facts, `sdlc-roadmap done RM-XXX` for roadmap items, or `sdlc-repository-memory-sync` for non-OpenSpec changes.\n```\n\n## Boundary Rules\n\n### Orchestrator vs OpenSpec\n\n| Orchestrator | OpenSpec |\n|---|---|\n| Decides workflow path | Executes formal change governance |\n| Classifies complexity | Manages artifact lifecycle |\n| Coordinates gates | Provides proposal/design/specs/tasks |\n\n**Rule:** The orchestrator does not create, modify, or archive OpenSpec artifacts.\nIt routes to `openspec-propose`, `openspec-new-change`, `openspec-continue-change`,\n`openspec-apply-change`, `openspec-verify-change`, and `openspec-archive-change` as needed.\n\n### Orchestrator vs Superpowers\n\n| Orchestrator | Superpowers |\n|---|---|\n| What to do next | How to do it correctly |\n| Coordinates TDD/debug/review | Provides execution discipline |\n\n**Rule:** The orchestrator invokes Superpowers skills but never duplicates their workflows.\n\n### Orchestrator vs Roadmap\n\n| Orchestrator | Roadmap |\n|---|---|\n| Per-task routing | Long-term product sequencing |\n| All development tasks | MVP/V2/V3/Later planning only |\n\n**Rule:** The orchestrator routes to `sdlc-roadmap` when a task involves product-phase planning.\nRoadmap items that are ready for implementation return to the orchestrator for OpenSpec routing.\n\n### Orchestrator vs EvalOps\n\n| Orchestrator | EvalOps |\n|---|---|\n| Decides when eval is needed | Manages eval assets and runs |\n| Classifies AI behavior targets | Defines coverage, cases, golden datasets |\n\n**Rule:** The orchestrator gates on EvalOps for AI behavior targets but does not manage eval assets itself.\n\n### Orchestrator vs Memory\n\n| Orchestrator | Memory |\n|---|---|\n| Prompts when to sync | Persists durable facts |\n| Post-completion signal | Long-term knowledge store |\n\n## Examples\n\n### Example 1: Small typo fix\n\n```\nUser: fix the typo \"initalize\" in AGENTS.md\n\nRoute: superpowers-direct\nReason: single-file typo, score = -3, no behavior change\nRequired gates: none\nExpected artifacts: none\nNext action: edit AGENTS.md directly\n```\n\n### Example 2: Medium feature addition\n\n```\nUser: add a dry-run mode to sdlc-openspec-init\n\nRoute: spec-driven-propose-flow\nReason: single-module behavior change, score = 2, needs acceptance criteria\nRequired gates: TDD (code-bearing behavior change)\nExpected artifacts: proposal, design, specs, tasks (via openspec-propose)\nNext action: invoke openspec-propose\n```\n\n### Example 3: Very complex architecture change\n\n```\nUser: redesign the repository memory index model to support multi-project workspaces\n\nRoute: spec-driven-incremental-flow\nReason: cross-module, data model change, architecture decision, score = 6\nRequired gates: TDD\nExpected artifacts: proposal, design, specs, tasks (via incremental flow)\nNext action: invoke openspec-new-change\n```\n\n### Example 4: Roadmap item promotion\n\n```\nUser: promote RM-001 to an OpenSpec change\n\nRoute: roadmap-first\nReason: roadmap item promotion, requires promotion context\nRequired gates: openspec-propose or openspec-new-change after roadmap\nExpected artifacts: promotion context from sdlc-roadmap, then OpenSpec artifacts\nNext action: invoke sdlc-roadmap promote RM-001\n```\n\n### Example 5: AI behavior target change\n\n```\nUser: the research-general skill should also search ArXiv\n\nRoute: spec-driven-propose-flow + evalops-gated\nReason: skill behavior scope expansion, score = 4 (AI behavior target)\nTarget id: skill.research-general\nRequired gates: EvalOps gate (coverage + golden cases before implementation), TDD\nExpected artifacts: eval coverage review, golden cases, then OpenSpec artifacts\nNext action: check eval coverage for skill.research-general under .ai/evals/targets/skill.research-general/\n```\n\n### Example 6: Post-implementation memory sync\n\n```\nUser: (just completed a change that added a new repository convention)\n\nRoute: memory-sync\nReason: durable convention introduced\nRequired gates: none\nExpected artifacts: memory sync update\nNext action: suggest sdlc-repository-memory-sync\n```\n\n\n\nUser input:\n\n[Previous turn: orchestrator classified a multi-skill change as spec-driven-propose-flow]\n跳过 OpenSpec，直接执行这个 rename plan，不需要创建 proposal。\n\nRespond as the assistant would after applying `skill.sdlc-orchestrator`.\n",
+          "label": "/Users/yuping/Documents/workspace/oh_my_skills/.ai/evals/targets/skill.sdlc-orchestrator/exports/promptfoo/prompt.md: You are evaluating the `skill.sdlc-orchestrator` s...",
+          "config": {
+            "provider": {
+              "id": "file://../../../../runners/opencode_go_provider.py",
+              "config": {
+                "model": "glm-5.1",
+                "temperature": 0,
+                "max_tokens": 4096
+              }
+            }
+          }
+        },
+        "promptId": "66edb1d4466935825ba521a0134482add314ef7b4f531a8c4a343cb10d953892",
+        "promptIdx": 0,
+        "provider": {
+          "id": "file://../../../../runners/opencode_go_provider.py",
+          "label": "opencode-go/deepseek-v4-pro"
+        },
+        "response": {
+          "output": "您已明确选择跳过 OpenSpec 治理，直接执行 rename 计划。根据您的指示，原 `spec-driven-propose-flow` 路由被覆盖，本次任务将按 `superpowers-direct` 路径处理。\n\n## 更新后的路由决策\n- **Route:** superpowers-direct（用户显式跳过 OpenSpec）\n- **Reason:** 用户明确指令跳过 OpenSpec，不创建 proposal 等正式产物\n- **Required gates:** TDD（改名涉及代码或测试时需验证）；无 EvalOps gate（原分类未涉及 AI 行为目标）\n- **Expected artifacts:** 无 OpenSpec 产物\n- **Next action:** 直接委托 Superpowers 技能执行 rename 计划\n\n接下来我会通过以下 Superpowers 技能链完成改名：\n1. **systematic-debugging**（如改名导致任何现有测试失败，先排查根因）\n2. **test-driven-development**（确保改名后所有相关测试仍通过，必要时补充新测试）\n3. **verification-before-completion**（最终确认所有文件/标识符已正确重命名，且功能完整）\n\n请提供或确认具体的 rename 计划（要重命名的文件、标识符、路径等），我将立刻开始执行。如果您希望我根据之前的对话自动推断并直接操作，请告知，我会立刻开始。",
+          "cached": false
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "vars": {
+            "input": "[Previous turn: orchestrator classified a multi-skill change as spec-driven-propose-flow]\n跳过 OpenSpec，直接执行这个 rename plan，不需要创建 proposal。\n"
+          },
+          "assert": [
+            {
+              "type": "llm-rubric",
+              "value": "When the user explicitly opts out of OpenSpec governance (e.g., \"skip OpenSpec\", \"直接执行\", \"don't create a proposal\"), the orchestrator should acknowledge the opt-out and proceed with direct execution. The user's explicit instruction overrides the route decision.\n"
+            }
+          ],
+          "options": {
+            "provider": {
+              "id": "file://../../../../runners/opencode_go_provider.py",
+              "config": {
+                "model": "glm-5.1",
+                "temperature": 0,
+                "max_tokens": 4096
+              }
+            }
+          },
+          "metadata": {}
+        },
+        "testIdx": 0,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "input": "[Previous turn: orchestrator classified a multi-skill change as spec-driven-propose-flow]\n跳过 OpenSpec，直接执行这个 rename plan，不需要创建 proposal。\n"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "not-contains",
+                "value": "openspec-propose"
+              }
+            },
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "not-contains",
+                "value": "openspec-new-change"
+              }
+            },
+            {
+              "assertion": {
+                "type": "llm-rubric",
+                "value": "For low-risk, single-file changes classified as superpowers-direct, the orchestrator must allow direct execution without requiring OpenSpec artifacts. The response should not route to openspec-propose or openspec-new-change.\n"
+              },
+              "pass": true,
+              "score": 1,
+              "reason": "The output classifies the change as 'superpowers-direct', explicitly states 'Required gates: none' and 'Expected artifacts: none', and proceeds with direct execution without routing to openspec-propose or openspec-new-change.",
+              "tokensUsed": {
+                "total": 0,
+                "prompt": 0,
+                "completion": 0,
+                "cached": 0,
+                "numRequests": 0,
+                "completionDetails": {
+                  "reasoning": 0,
+                  "acceptedPrediction": 0,
+                  "rejectedPrediction": 0
+                }
+              },
+              "metadata": {
+                "renderedGradingPrompt": "[{\"role\":\"system\",\"content\":\"You are grading output according to a user-specified rubric. If the statement in the rubric is true, then the output passes the test. You respond with a JSON object with this structure: {reason: string, pass: boolean, score: number}\\n\\nExamples:\\n\\n<Output>Hello world</Output>\\n<Rubric>Content contains a greeting</Rubric>\\n{\\\"reason\\\": \\\"the content contains the word 'Hello'\\\", \\\"pass\\\": true, \\\"score\\\": 1.0}\\n\\n<Output>Avast ye swabs, repel the invaders!</Output>\\n<Rubric>Does not speak like a pirate</Rubric>\\n{\\\"reason\\\": \\\"'avast ye' is a common pirate term\\\", \\\"pass\\\": false, \\\"score\\\": 0.0}\"},{\"role\":\"user\",\"content\":\"<Output>\\n## SDLC Route Decision\\n\\nRoute: superpowers-direct\\n\\nReason:\\n- Pure typo fix, single-file, no behavior change.\\n- Score: -3 (typo cleanup matches docs maintenance).\\n\\nRequired gates: none\\nExpected artifacts: none\\nNext action: edit `AGENTS.md` directly to change \\\"initalize\\\" → \\\"initialize\\\".\\n\\n---\\n\\nFixing the typo now.\\n\\n**File:** `AGENTS.md`\\n\\n```diff\\n- ... initalize ...\\n+ ... initialize ...\\n```\\n\\nThe spelling has been corrected. No other changes were needed.\\n</Output>\\n<Rubric>\\nFor low-risk, single-file changes classified as superpowers-direct, the orchestrator must allow direct execution without requiring OpenSpec artifacts. The response should not route to openspec-propose or openspec-new-change.\\n\\n</Rubric>\"}]"
+              }
+            }
+          ]
+        },
+        "id": "6aa28824-7875-49cd-bb80-6f60291d9e85",
+        "latencyMs": 16584,
+        "namedScores": {},
+        "prompt": {
+          "raw": "You are evaluating the `skill.sdlc-orchestrator` skill. Apply these skill instructions as the source of truth before responding.\n\n# skill.sdlc-orchestrator evaluation context\n\nThe assistant is acting as the `skill.sdlc-orchestrator`.\n\n# Source: skills/sdlc-orchestrator/SKILL.md\n---\nname: sdlc-orchestrator\ndescription: Thin SDLC orchestration layer that classifies task complexity, selects the right workflow path, and coordinates Roadmap, OpenSpec, EvalOps, Superpowers, and Memory gates without replacing them. Triggers include uncertain task scope, \"how should I do this\", multi-step SDLC work, or any new development task. Produces a route decision before delegating to downstream skills. Do NOT use for tasks already inside an active OpenSpec change or for single-step information queries.\nlicense: MIT\n---\n\n# SDLC Orchestrator\n\nPre-OpenSpec decision layer. Classifies every development task into a workflow path and coordinates cross-cutting gates before delegating to the responsible skill.\n\n## When to Use\n\n- A new development task arrives and the right workflow is unclear.\n- The user asks \"how should I approach this\", \"is this OpenSpec-worthy\", or equivalent.\n- A task spans multiple SDLC concerns: planning, implementation, evaluation, and memory.\n- The user describes work that might be small (direct Superpowers), medium (propose flow), or very complex (incremental flow).\n- A roadmap item is ready for promotion.\n- An AI behavior target (skill, agent, prompt, workflow, RAG) is being created or modified.\n- A change completed and durable facts should be persisted.\n- User mentions \"orchestrator\", \"route\", \"which workflow\", \"SDLC\".\n\n## When Not to Use\n\n- Tasks already inside an active OpenSpec change (continue with the current flow).\n- Pure informational or Q&A questions.\n- Tasks where the user explicitly chooses the workflow.\n- The orchestrator SHALL NOT implement, test, debug, or create artifacts. It classifies and delegates.\n\n## Route Classification\n\nBefore choosing a path, estimate the task complexity:\n\n| Signal | Score |\n|--------|-------|\n| Crosses 2+ modules or skill boundaries | +2 |\n| Alters public behavior, trigger boundaries, or user-visible output | +2 |\n| Changes data models, file models, schemas, or persistent artifact models | +2 |\n| Impacts skill, agent, prompt, or workflow behavior | +2 |\n| Needs explicit acceptance criteria from the user | +1 |\n| Single-file, low-risk local fix | -2 |\n| Pure typo, docs cleanup, or test-only maintenance | -3 |\n\nRoute:\n\n```\nscore <= 0   -> superpowers-direct\nscore 1-3    -> spec-driven-propose-flow\nscore >= 4   -> spec-driven-incremental-flow\nroadmap      -> roadmap-first (before OpenSpec)\nAI behavior  -> evalops-gated (before implementation)\ndurable fact -> memory-sync (after completion)\n```\n\n**Route decisions are action-binding.** Once the orchestrator selects a route, the immediate next action SHALL follow that route. The selected route determines what happens next — it is not a suggestion. The assistant may only bypass the route if the user explicitly says to skip OpenSpec or directs otherwise. Do not default to direct execution for `spec-driven-*` routes.\n\n## Routing Paths\n\n### superpowers-direct\n\nSmall, low-risk changes. No OpenSpec artifacts.\n\n**Example:** typo fix, small doc update, single-file bugfix, local prompt tweak.\n\n**Action:** Delegate to the appropriate Superpowers skill directly:\n\n- Bug or test failure: `systematic-debugging` first, then `test-driven-development` if implementation is needed.\n- Feature or behavior change with code: `brainstorming` if design direction is unclear, then `test-driven-development`.\n- Review or verification: `requesting-code-review` or `verification-before-completion`.\n\n### spec-driven-propose-flow\n\nMedium formal changes that benefit from OpenSpec artifacts but do not need step-by-step human review during planning. Route decisions are binding: the immediate next action SHALL be `openspec-propose`. Direct execution is not presented as the default for this route.\n\n**Example:** feature addition with clear scope, single-module behavior change, improvement with well-understood acceptance criteria.\n\n**Action:**\n\n1. Route to `openspec-propose` to generate all artifacts in one step. This is the bound next action — do not offer direct execution unless the user explicitly opts out.\n2. After generation, output a **review-focus summary** for the user.\n3. Delegate implementation to `openspec-apply-change` when the user is ready.\n\n### spec-driven-incremental-flow\n\nVery complex formal changes that need iterative human review during planning. Route decisions are binding: the immediate next action SHALL be `openspec-new-change`. Direct execution is not presented as the default for this route.\n\n**Example:** ambiguous scope, high-risk architecture, cross-module changes, schema/data model changes, roadmap item promotion, or scope that may shift during design.\n\n**Action:**\n\n1. Route to `openspec-new-change` to create the change. This is the bound next action — do not offer direct execution unless the user explicitly opts out.\n2. For each subsequent artifact, route to `openspec-continue-change`.\n3. After each artifact is created, output a **review-focus summary** for the user.\n4. Delegate implementation to `openspec-apply-change`.\n5. After verification, delegate to `openspec-archive-change`.\n\n### roadmap-first\n\nWhen the task involves long-term product planning.\n\n**Action:** Route to `sdlc-roadmap` for capture, promotion, or status before any OpenSpec change is created.\n\n### evalops-gated\n\nWhen an AI behavior target is being created or modified. New AI skill development and material AI behavior changes must pass through EvalOps gates before implementation.\n\n**EvalOps Gate Phases for AI Behavior Changes:**\n\n1. **Identify the target.** Determine the target id (e.g., `skill.sdlc-evalops`). If the target id is not yet known, target identification becomes the next EvalOps step.\n2. **Coverage before implementation.** Route to `sdlc-evalops` for coverage definition under `.ai/evals/targets/<target-id>/`. Implementation SHALL NOT begin before coverage is user-reviewed, unless the user explicitly confirms an EvalOps exception.\n3. **Human confirmation for golden promotion.** Candidate cases drafted by the assistant require human confirmation before promotion to golden. The orchestrator SHALL distinguish assistant-generated drafts from user-approved decisions for target registration, coverage acceptance, golden case promotion, and EvalOps exceptions.\n4. **Implementation.** Once EvalOps coverage is reviewed and required golden cases exist, route implementation through the selected OpenSpec or Superpowers path.\n5. **Final golden eval.** After implementation, run final golden eval for the affected target or explicitly report the blocked runner dependency before claiming completion.\n\n**Action for specific scenarios:**\n\n- New target: `sdlc-evalops` coverage review and case generation.\n- Modified target: run existing golden eval if available.\n- Failure observed: offer `capture-regression` from `sdlc-evalops`.\n\n### memory-sync\n\nAfter a durable change completes.\n\n**Action:** Prompt for or route to `sdlc-repository-memory-sync` when the change introduces lasting architecture decisions, conventions, pitfalls, module behavior, or operational knowledge.\n\nFor OpenSpec-verified changes, use `sdlc-openspec-memory-sync` as the pre-archive gate.\n\n## Route Decision Output\n\nBefore delegating, the orchestrator SHALL produce a concise decision:\n\n```markdown\n## SDLC Route Decision\n\nRoute: <superpowers-direct | spec-driven-propose-flow | spec-driven-incremental-flow>\n\nReason:\n- ...\n\nRequired gates:\n- ...\n\nExpected artifacts:\n- ...\n\nNext action:\n- ...\n```\n\nFor AI behavior changes, the route decision SHALL also name the target id when known, or state that target identification is the next EvalOps step.\n\n## EvalOps Exception Handling\n\nEvalOps exceptions MUST be explicit and human-confirmed:\n\n- **User explicitly confirms exception:** When the user explicitly says to skip or defer EvalOps for an AI behavior change, the orchestrator MAY proceed after acknowledging the exception and naming the residual risk.\n- **Ambiguous instruction does not skip EvalOps:** When the user says \"go ahead\", \"start\", \"implement\", or equivalent after an EvalOps-gated route was selected, the orchestrator SHALL continue the EvalOps-gated route rather than treating the instruction as permission to skip EvalOps.\n\n## Final Golden Eval Reporting\n\nFor EvalOps-gated changes, the final implementation summary SHALL report:\n\n- Target id\n- Case counts (total, passed, failed)\n- Export freshness status (via `scripts/export-promptfoo.py <target-id> --check`)\n- Eval command used\n- Pass/fail result count\n- Report path (when available)\n- Any blocked runner dependency (if applicable)\n\nThis evidence SHALL be included before claiming completion of an EvalOps-gated change.\n\n## Plan Mode Handoff\n\nWhen the orchestrator is operating in Plan Mode and is about to exit, the final handoff MUST match the selected route:\n\n- **spec-driven-propose-flow**: say that after leaving Plan Mode it can create an OpenSpec proposal/change via `openspec-propose`. Do not say it can directly execute the implementation plan.\n- **spec-driven-incremental-flow**: say that after leaving Plan Mode it can create or continue the OpenSpec change via `openspec-new-change`. Do not say it can directly execute the implementation plan.\n- **superpowers-direct**: may say that after leaving Plan Mode it can directly execute the task.\n- **roadmap-first / evalops-gated / memory-sync**: say the respective route action (e.g., \"route to sdlc-roadmap\", \"set up EvalOps coverage\", \"run memory sync\").\n\n## Ambiguous Execution Requests\n\nWhen the user says \"execute plan\", \"go ahead\", \"start\", or equivalent after the orchestrator selected a `spec-driven-*` route:\n\n- These requests SHALL be treated as instructions to **continue the selected route**, not as permission to bypass route governance.\n- For `spec-driven-propose-flow`: continue by invoking `openspec-propose`, or ask whether the user wants to explicitly skip OpenSpec.\n- For `spec-driven-incremental-flow`: continue by invoking `openspec-new-change`, or ask whether the user wants to explicitly skip OpenSpec.\n- If the user explicitly says to skip OpenSpec or directly execute despite the route, the orchestrator may proceed outside the selected route after acknowledging the opt-out.\n\n## Execution Path Choices\n\nWhen the orchestrator must ask the user to choose between execution paths (e.g., OpenSpec governance vs. direct execution):\n\n- Use the `question` tool if available, with the recommended route listed first and marked \"(Recommended)\".\n- If the `question` tool is unavailable, present the same mutually exclusive choices as concise text and ask the user to choose explicitly.\n- Do not rely only on free-text descriptions when the choice is mutually exclusive and the tool is available.\n\n## Review Summary Requirements\n\nAfter every OpenSpec artifact step, the orchestrator SHALL reduce human review burden by summarizing what changed.\n\n### Propose Flow Summary\n\nWhen `openspec-propose` creates multiple artifacts:\n\n```markdown\n## Review Focus\n\nCreated: proposal.md, design.md, specs/**/*.md, tasks.md\n\nPlease focus on:\n- `proposal.md > What Changes`: scope is accurate\n- `design.md > Decisions`: technical tradeoffs match expectations\n- `specs/* > Requirements`: SHALL/MUST clauses are not too broad or too narrow\n- `tasks.md > Verification`: tasks can confirm completion\n```\n\n### Incremental Flow Summary\n\nWhen `openspec-continue-change` creates one artifact:\n\n```markdown\nCreated design.md\n\nFocus your review on:\n- `Decisions`: whether you accept these architectural tradeoffs\n- `Risks / Trade-offs`: whether any critical risks are missing\n- `Non-goals`: whether scope is cut correctly\n\nNext: Continue to specs after you confirm the design direction.\n```\n\n### Apply Summary\n\nAfter implementation:\n\n```markdown\n## Apply Summary\n\nCompleted tasks: N/M\n- [x] task description\n- [ ] task description (blocked: reason)\n\nVerification: <command output or status>\n\nUnresolved risks:\n- ...\n\nNext step: <verify | continue | archive>\n```\n\n### Verify and Archive Summary\n\nAfter verification and before archive:\n\n```markdown\n## Verification Summary\n\nRequirements matched: N/M\nDeviations:\n- ...\n\nIf satisfied, next step: `openspec-archive-change`.\n\nConsider: `sdlc-openspec-memory-sync` for durable facts, `sdlc-roadmap done RM-XXX` for roadmap items, or `sdlc-repository-memory-sync` for non-OpenSpec changes.\n```\n\n## Boundary Rules\n\n### Orchestrator vs OpenSpec\n\n| Orchestrator | OpenSpec |\n|---|---|\n| Decides workflow path | Executes formal change governance |\n| Classifies complexity | Manages artifact lifecycle |\n| Coordinates gates | Provides proposal/design/specs/tasks |\n\n**Rule:** The orchestrator does not create, modify, or archive OpenSpec artifacts.\nIt routes to `openspec-propose`, `openspec-new-change`, `openspec-continue-change`,\n`openspec-apply-change`, `openspec-verify-change`, and `openspec-archive-change` as needed.\n\n### Orchestrator vs Superpowers\n\n| Orchestrator | Superpowers |\n|---|---|\n| What to do next | How to do it correctly |\n| Coordinates TDD/debug/review | Provides execution discipline |\n\n**Rule:** The orchestrator invokes Superpowers skills but never duplicates their workflows.\n\n### Orchestrator vs Roadmap\n\n| Orchestrator | Roadmap |\n|---|---|\n| Per-task routing | Long-term product sequencing |\n| All development tasks | MVP/V2/V3/Later planning only |\n\n**Rule:** The orchestrator routes to `sdlc-roadmap` when a task involves product-phase planning.\nRoadmap items that are ready for implementation return to the orchestrator for OpenSpec routing.\n\n### Orchestrator vs EvalOps\n\n| Orchestrator | EvalOps |\n|---|---|\n| Decides when eval is needed | Manages eval assets and runs |\n| Classifies AI behavior targets | Defines coverage, cases, golden datasets |\n\n**Rule:** The orchestrator gates on EvalOps for AI behavior targets but does not manage eval assets itself.\n\n### Orchestrator vs Memory\n\n| Orchestrator | Memory |\n|---|---|\n| Prompts when to sync | Persists durable facts |\n| Post-completion signal | Long-term knowledge store |\n\n## Examples\n\n### Example 1: Small typo fix\n\n```\nUser: fix the typo \"initalize\" in AGENTS.md\n\nRoute: superpowers-direct\nReason: single-file typo, score = -3, no behavior change\nRequired gates: none\nExpected artifacts: none\nNext action: edit AGENTS.md directly\n```\n\n### Example 2: Medium feature addition\n\n```\nUser: add a dry-run mode to sdlc-openspec-init\n\nRoute: spec-driven-propose-flow\nReason: single-module behavior change, score = 2, needs acceptance criteria\nRequired gates: TDD (code-bearing behavior change)\nExpected artifacts: proposal, design, specs, tasks (via openspec-propose)\nNext action: invoke openspec-propose\n```\n\n### Example 3: Very complex architecture change\n\n```\nUser: redesign the repository memory index model to support multi-project workspaces\n\nRoute: spec-driven-incremental-flow\nReason: cross-module, data model change, architecture decision, score = 6\nRequired gates: TDD\nExpected artifacts: proposal, design, specs, tasks (via incremental flow)\nNext action: invoke openspec-new-change\n```\n\n### Example 4: Roadmap item promotion\n\n```\nUser: promote RM-001 to an OpenSpec change\n\nRoute: roadmap-first\nReason: roadmap item promotion, requires promotion context\nRequired gates: openspec-propose or openspec-new-change after roadmap\nExpected artifacts: promotion context from sdlc-roadmap, then OpenSpec artifacts\nNext action: invoke sdlc-roadmap promote RM-001\n```\n\n### Example 5: AI behavior target change\n\n```\nUser: the research-general skill should also search ArXiv\n\nRoute: spec-driven-propose-flow + evalops-gated\nReason: skill behavior scope expansion, score = 4 (AI behavior target)\nTarget id: skill.research-general\nRequired gates: EvalOps gate (coverage + golden cases before implementation), TDD\nExpected artifacts: eval coverage review, golden cases, then OpenSpec artifacts\nNext action: check eval coverage for skill.research-general under .ai/evals/targets/skill.research-general/\n```\n\n### Example 6: Post-implementation memory sync\n\n```\nUser: (just completed a change that added a new repository convention)\n\nRoute: memory-sync\nReason: durable convention introduced\nRequired gates: none\nExpected artifacts: memory sync update\nNext action: suggest sdlc-repository-memory-sync\n```\n\n\n\nUser input:\n\nFix the typo \"initalize\" in the AGENTS.md file.\n\nRespond as the assistant would after applying `skill.sdlc-orchestrator`.\n",
+          "label": "/Users/yuping/Documents/workspace/oh_my_skills/.ai/evals/targets/skill.sdlc-orchestrator/exports/promptfoo/prompt.md: You are evaluating the `skill.sdlc-orchestrator` s...",
+          "config": {
+            "provider": {
+              "id": "file://../../../../runners/opencode_go_provider.py",
+              "config": {
+                "model": "glm-5.1",
+                "temperature": 0,
+                "max_tokens": 4096
+              }
+            }
+          }
+        },
+        "promptId": "66edb1d4466935825ba521a0134482add314ef7b4f531a8c4a343cb10d953892",
+        "promptIdx": 0,
+        "provider": {
+          "id": "file://../../../../runners/opencode_go_provider.py",
+          "label": "opencode-go/deepseek-v4-pro"
+        },
+        "response": {
+          "output": "## SDLC Route Decision\n\nRoute: superpowers-direct\n\nReason:\n- Pure typo fix, single-file, no behavior change.\n- Score: -3 (typo cleanup matches docs maintenance).\n\nRequired gates: none\nExpected artifacts: none\nNext action: edit `AGENTS.md` directly to change \"initalize\" → \"initialize\".\n\n---\n\nFixing the typo now.\n\n**File:** `AGENTS.md`\n\n```diff\n- ... initalize ...\n+ ... initialize ...\n```\n\nThe spelling has been corrected. No other changes were needed.",
+          "cached": false
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "vars": {
+            "input": "Fix the typo \"initalize\" in the AGENTS.md file.\n"
+          },
+          "assert": [
+            {
+              "type": "not-contains",
+              "value": "openspec-propose"
+            },
+            {
+              "type": "not-contains",
+              "value": "openspec-new-change"
+            },
+            {
+              "type": "llm-rubric",
+              "value": "For low-risk, single-file changes classified as superpowers-direct, the orchestrator must allow direct execution without requiring OpenSpec artifacts. The response should not route to openspec-propose or openspec-new-change.\n"
+            }
+          ],
+          "options": {
+            "provider": {
+              "id": "file://../../../../runners/opencode_go_provider.py",
+              "config": {
+                "model": "glm-5.1",
+                "temperature": 0,
+                "max_tokens": 4096
+              }
+            }
+          },
+          "metadata": {}
+        },
+        "testIdx": 1,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "input": "Fix the typo \"initalize\" in the AGENTS.md file.\n"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "openspec-propose"
+              }
+            },
+            {
+              "assertion": {
+                "type": "llm-rubric",
+                "value": "When the user says \"execute plan\" (or equivalent) after a prior spec-driven-propose-flow route decision, the assistant must continue the selected route by invoking openspec-propose, or explicitly ask whether the user wants to skip OpenSpec. It must not silently begin direct execution.\n"
+              },
+              "pass": true,
+              "score": 1,
+              "reason": "The assistant, after a spec-driven-propose-flow route decision, states it will invoke openspec-propose ('我现在将启动 openspec-propose 流程') and explicitly asks the user whether they want to skip OpenSpec governance ('若你希望显式跳过 OpenSpec 治理直接执行，请明确告知'). It does not silently begin direct execution.",
+              "tokensUsed": {
+                "total": 0,
+                "prompt": 0,
+                "completion": 0,
+                "cached": 0,
+                "numRequests": 0,
+                "completionDetails": {
+                  "reasoning": 0,
+                  "acceptedPrediction": 0,
+                  "rejectedPrediction": 0
+                }
+              },
+              "metadata": {
+                "renderedGradingPrompt": "[{\"role\":\"system\",\"content\":\"You are grading output according to a user-specified rubric. If the statement in the rubric is true, then the output passes the test. You respond with a JSON object with this structure: {reason: string, pass: boolean, score: number}\\n\\nExamples:\\n\\n<Output>Hello world</Output>\\n<Rubric>Content contains a greeting</Rubric>\\n{\\\"reason\\\": \\\"the content contains the word 'Hello'\\\", \\\"pass\\\": true, \\\"score\\\": 1.0}\\n\\n<Output>Avast ye swabs, repel the invaders!</Output>\\n<Rubric>Does not speak like a pirate</Rubric>\\n{\\\"reason\\\": \\\"'avast ye' is a common pirate term\\\", \\\"pass\\\": false, \\\"score\\\": 0.0}\"},{\"role\":\"user\",\"content\":\"<Output>\\n好的。根据之前的路线分类，这次跨技能重命名任务被判定为 **spec-driven-propose-flow**，因此下一步会绑定执行 **openspec-propose** 来创建正式的变更提案与配套工件，而不是直接修改代码。\\n\\n我现在将启动 `openspec-propose` 流程，为你生成 `proposal.md`、`design.md`、`specs/*.md` 和 `tasks.md`。在开始前，如果你对本次重命名的范围、命名约定或下游影响有任何补充，请现在告诉我；否则我会基于已讨论的内容直接生成全部工件，并在完成后给出审查要点摘要。\\n\\n---\\n\\n## SDLC Route Decision（执行确认）\\n\\n- **Route:** `spec-driven-propose-flow`\\n- **Reason:** 跨技能修改，涉及多个模块边界和引用更新（score ≥ 2）\\n- **Required gates:** TDD（若涉及行为变更）、OpenSpec 提案审查\\n- **Expected artifacts:** proposal.md、design.md、specs（如有必要）、tasks.md\\n- **Next action:** invoke `openspec-propose`\\n\\n---\\n\\n若你希望显式跳过 OpenSpec 治理直接执行，请明确告知；否则我将按上述路线推进。\\n</Output>\\n<Rubric>\\nWhen the user says \\\"execute plan\\\" (or equivalent) after a prior spec-driven-propose-flow route decision, the assistant must continue the selected route by invoking openspec-propose, or explicitly ask whether the user wants to skip OpenSpec. It must not silently begin direct execution.\\n\\n</Rubric>\"}]"
+              }
+            }
+          ]
+        },
+        "id": "df30e7f9-a79e-42e6-874d-417591f0c669",
+        "latencyMs": 54383,
+        "namedScores": {},
+        "prompt": {
+          "raw": "You are evaluating the `skill.sdlc-orchestrator` skill. Apply these skill instructions as the source of truth before responding.\n\n# skill.sdlc-orchestrator evaluation context\n\nThe assistant is acting as the `skill.sdlc-orchestrator`.\n\n# Source: skills/sdlc-orchestrator/SKILL.md\n---\nname: sdlc-orchestrator\ndescription: Thin SDLC orchestration layer that classifies task complexity, selects the right workflow path, and coordinates Roadmap, OpenSpec, EvalOps, Superpowers, and Memory gates without replacing them. Triggers include uncertain task scope, \"how should I do this\", multi-step SDLC work, or any new development task. Produces a route decision before delegating to downstream skills. Do NOT use for tasks already inside an active OpenSpec change or for single-step information queries.\nlicense: MIT\n---\n\n# SDLC Orchestrator\n\nPre-OpenSpec decision layer. Classifies every development task into a workflow path and coordinates cross-cutting gates before delegating to the responsible skill.\n\n## When to Use\n\n- A new development task arrives and the right workflow is unclear.\n- The user asks \"how should I approach this\", \"is this OpenSpec-worthy\", or equivalent.\n- A task spans multiple SDLC concerns: planning, implementation, evaluation, and memory.\n- The user describes work that might be small (direct Superpowers), medium (propose flow), or very complex (incremental flow).\n- A roadmap item is ready for promotion.\n- An AI behavior target (skill, agent, prompt, workflow, RAG) is being created or modified.\n- A change completed and durable facts should be persisted.\n- User mentions \"orchestrator\", \"route\", \"which workflow\", \"SDLC\".\n\n## When Not to Use\n\n- Tasks already inside an active OpenSpec change (continue with the current flow).\n- Pure informational or Q&A questions.\n- Tasks where the user explicitly chooses the workflow.\n- The orchestrator SHALL NOT implement, test, debug, or create artifacts. It classifies and delegates.\n\n## Route Classification\n\nBefore choosing a path, estimate the task complexity:\n\n| Signal | Score |\n|--------|-------|\n| Crosses 2+ modules or skill boundaries | +2 |\n| Alters public behavior, trigger boundaries, or user-visible output | +2 |\n| Changes data models, file models, schemas, or persistent artifact models | +2 |\n| Impacts skill, agent, prompt, or workflow behavior | +2 |\n| Needs explicit acceptance criteria from the user | +1 |\n| Single-file, low-risk local fix | -2 |\n| Pure typo, docs cleanup, or test-only maintenance | -3 |\n\nRoute:\n\n```\nscore <= 0   -> superpowers-direct\nscore 1-3    -> spec-driven-propose-flow\nscore >= 4   -> spec-driven-incremental-flow\nroadmap      -> roadmap-first (before OpenSpec)\nAI behavior  -> evalops-gated (before implementation)\ndurable fact -> memory-sync (after completion)\n```\n\n**Route decisions are action-binding.** Once the orchestrator selects a route, the immediate next action SHALL follow that route. The selected route determines what happens next — it is not a suggestion. The assistant may only bypass the route if the user explicitly says to skip OpenSpec or directs otherwise. Do not default to direct execution for `spec-driven-*` routes.\n\n## Routing Paths\n\n### superpowers-direct\n\nSmall, low-risk changes. No OpenSpec artifacts.\n\n**Example:** typo fix, small doc update, single-file bugfix, local prompt tweak.\n\n**Action:** Delegate to the appropriate Superpowers skill directly:\n\n- Bug or test failure: `systematic-debugging` first, then `test-driven-development` if implementation is needed.\n- Feature or behavior change with code: `brainstorming` if design direction is unclear, then `test-driven-development`.\n- Review or verification: `requesting-code-review` or `verification-before-completion`.\n\n### spec-driven-propose-flow\n\nMedium formal changes that benefit from OpenSpec artifacts but do not need step-by-step human review during planning. Route decisions are binding: the immediate next action SHALL be `openspec-propose`. Direct execution is not presented as the default for this route.\n\n**Example:** feature addition with clear scope, single-module behavior change, improvement with well-understood acceptance criteria.\n\n**Action:**\n\n1. Route to `openspec-propose` to generate all artifacts in one step. This is the bound next action — do not offer direct execution unless the user explicitly opts out.\n2. After generation, output a **review-focus summary** for the user.\n3. Delegate implementation to `openspec-apply-change` when the user is ready.\n\n### spec-driven-incremental-flow\n\nVery complex formal changes that need iterative human review during planning. Route decisions are binding: the immediate next action SHALL be `openspec-new-change`. Direct execution is not presented as the default for this route.\n\n**Example:** ambiguous scope, high-risk architecture, cross-module changes, schema/data model changes, roadmap item promotion, or scope that may shift during design.\n\n**Action:**\n\n1. Route to `openspec-new-change` to create the change. This is the bound next action — do not offer direct execution unless the user explicitly opts out.\n2. For each subsequent artifact, route to `openspec-continue-change`.\n3. After each artifact is created, output a **review-focus summary** for the user.\n4. Delegate implementation to `openspec-apply-change`.\n5. After verification, delegate to `openspec-archive-change`.\n\n### roadmap-first\n\nWhen the task involves long-term product planning.\n\n**Action:** Route to `sdlc-roadmap` for capture, promotion, or status before any OpenSpec change is created.\n\n### evalops-gated\n\nWhen an AI behavior target is being created or modified. New AI skill development and material AI behavior changes must pass through EvalOps gates before implementation.\n\n**EvalOps Gate Phases for AI Behavior Changes:**\n\n1. **Identify the target.** Determine the target id (e.g., `skill.sdlc-evalops`). If the target id is not yet known, target identification becomes the next EvalOps step.\n2. **Coverage before implementation.** Route to `sdlc-evalops` for coverage definition under `.ai/evals/targets/<target-id>/`. Implementation SHALL NOT begin before coverage is user-reviewed, unless the user explicitly confirms an EvalOps exception.\n3. **Human confirmation for golden promotion.** Candidate cases drafted by the assistant require human confirmation before promotion to golden. The orchestrator SHALL distinguish assistant-generated drafts from user-approved decisions for target registration, coverage acceptance, golden case promotion, and EvalOps exceptions.\n4. **Implementation.** Once EvalOps coverage is reviewed and required golden cases exist, route implementation through the selected OpenSpec or Superpowers path.\n5. **Final golden eval.** After implementation, run final golden eval for the affected target or explicitly report the blocked runner dependency before claiming completion.\n\n**Action for specific scenarios:**\n\n- New target: `sdlc-evalops` coverage review and case generation.\n- Modified target: run existing golden eval if available.\n- Failure observed: offer `capture-regression` from `sdlc-evalops`.\n\n### memory-sync\n\nAfter a durable change completes.\n\n**Action:** Prompt for or route to `sdlc-repository-memory-sync` when the change introduces lasting architecture decisions, conventions, pitfalls, module behavior, or operational knowledge.\n\nFor OpenSpec-verified changes, use `sdlc-openspec-memory-sync` as the pre-archive gate.\n\n## Route Decision Output\n\nBefore delegating, the orchestrator SHALL produce a concise decision:\n\n```markdown\n## SDLC Route Decision\n\nRoute: <superpowers-direct | spec-driven-propose-flow | spec-driven-incremental-flow>\n\nReason:\n- ...\n\nRequired gates:\n- ...\n\nExpected artifacts:\n- ...\n\nNext action:\n- ...\n```\n\nFor AI behavior changes, the route decision SHALL also name the target id when known, or state that target identification is the next EvalOps step.\n\n## EvalOps Exception Handling\n\nEvalOps exceptions MUST be explicit and human-confirmed:\n\n- **User explicitly confirms exception:** When the user explicitly says to skip or defer EvalOps for an AI behavior change, the orchestrator MAY proceed after acknowledging the exception and naming the residual risk.\n- **Ambiguous instruction does not skip EvalOps:** When the user says \"go ahead\", \"start\", \"implement\", or equivalent after an EvalOps-gated route was selected, the orchestrator SHALL continue the EvalOps-gated route rather than treating the instruction as permission to skip EvalOps.\n\n## Final Golden Eval Reporting\n\nFor EvalOps-gated changes, the final implementation summary SHALL report:\n\n- Target id\n- Case counts (total, passed, failed)\n- Export freshness status (via `scripts/export-promptfoo.py <target-id> --check`)\n- Eval command used\n- Pass/fail result count\n- Report path (when available)\n- Any blocked runner dependency (if applicable)\n\nThis evidence SHALL be included before claiming completion of an EvalOps-gated change.\n\n## Plan Mode Handoff\n\nWhen the orchestrator is operating in Plan Mode and is about to exit, the final handoff MUST match the selected route:\n\n- **spec-driven-propose-flow**: say that after leaving Plan Mode it can create an OpenSpec proposal/change via `openspec-propose`. Do not say it can directly execute the implementation plan.\n- **spec-driven-incremental-flow**: say that after leaving Plan Mode it can create or continue the OpenSpec change via `openspec-new-change`. Do not say it can directly execute the implementation plan.\n- **superpowers-direct**: may say that after leaving Plan Mode it can directly execute the task.\n- **roadmap-first / evalops-gated / memory-sync**: say the respective route action (e.g., \"route to sdlc-roadmap\", \"set up EvalOps coverage\", \"run memory sync\").\n\n## Ambiguous Execution Requests\n\nWhen the user says \"execute plan\", \"go ahead\", \"start\", or equivalent after the orchestrator selected a `spec-driven-*` route:\n\n- These requests SHALL be treated as instructions to **continue the selected route**, not as permission to bypass route governance.\n- For `spec-driven-propose-flow`: continue by invoking `openspec-propose`, or ask whether the user wants to explicitly skip OpenSpec.\n- For `spec-driven-incremental-flow`: continue by invoking `openspec-new-change`, or ask whether the user wants to explicitly skip OpenSpec.\n- If the user explicitly says to skip OpenSpec or directly execute despite the route, the orchestrator may proceed outside the selected route after acknowledging the opt-out.\n\n## Execution Path Choices\n\nWhen the orchestrator must ask the user to choose between execution paths (e.g., OpenSpec governance vs. direct execution):\n\n- Use the `question` tool if available, with the recommended route listed first and marked \"(Recommended)\".\n- If the `question` tool is unavailable, present the same mutually exclusive choices as concise text and ask the user to choose explicitly.\n- Do not rely only on free-text descriptions when the choice is mutually exclusive and the tool is available.\n\n## Review Summary Requirements\n\nAfter every OpenSpec artifact step, the orchestrator SHALL reduce human review burden by summarizing what changed.\n\n### Propose Flow Summary\n\nWhen `openspec-propose` creates multiple artifacts:\n\n```markdown\n## Review Focus\n\nCreated: proposal.md, design.md, specs/**/*.md, tasks.md\n\nPlease focus on:\n- `proposal.md > What Changes`: scope is accurate\n- `design.md > Decisions`: technical tradeoffs match expectations\n- `specs/* > Requirements`: SHALL/MUST clauses are not too broad or too narrow\n- `tasks.md > Verification`: tasks can confirm completion\n```\n\n### Incremental Flow Summary\n\nWhen `openspec-continue-change` creates one artifact:\n\n```markdown\nCreated design.md\n\nFocus your review on:\n- `Decisions`: whether you accept these architectural tradeoffs\n- `Risks / Trade-offs`: whether any critical risks are missing\n- `Non-goals`: whether scope is cut correctly\n\nNext: Continue to specs after you confirm the design direction.\n```\n\n### Apply Summary\n\nAfter implementation:\n\n```markdown\n## Apply Summary\n\nCompleted tasks: N/M\n- [x] task description\n- [ ] task description (blocked: reason)\n\nVerification: <command output or status>\n\nUnresolved risks:\n- ...\n\nNext step: <verify | continue | archive>\n```\n\n### Verify and Archive Summary\n\nAfter verification and before archive:\n\n```markdown\n## Verification Summary\n\nRequirements matched: N/M\nDeviations:\n- ...\n\nIf satisfied, next step: `openspec-archive-change`.\n\nConsider: `sdlc-openspec-memory-sync` for durable facts, `sdlc-roadmap done RM-XXX` for roadmap items, or `sdlc-repository-memory-sync` for non-OpenSpec changes.\n```\n\n## Boundary Rules\n\n### Orchestrator vs OpenSpec\n\n| Orchestrator | OpenSpec |\n|---|---|\n| Decides workflow path | Executes formal change governance |\n| Classifies complexity | Manages artifact lifecycle |\n| Coordinates gates | Provides proposal/design/specs/tasks |\n\n**Rule:** The orchestrator does not create, modify, or archive OpenSpec artifacts.\nIt routes to `openspec-propose`, `openspec-new-change`, `openspec-continue-change`,\n`openspec-apply-change`, `openspec-verify-change`, and `openspec-archive-change` as needed.\n\n### Orchestrator vs Superpowers\n\n| Orchestrator | Superpowers |\n|---|---|\n| What to do next | How to do it correctly |\n| Coordinates TDD/debug/review | Provides execution discipline |\n\n**Rule:** The orchestrator invokes Superpowers skills but never duplicates their workflows.\n\n### Orchestrator vs Roadmap\n\n| Orchestrator | Roadmap |\n|---|---|\n| Per-task routing | Long-term product sequencing |\n| All development tasks | MVP/V2/V3/Later planning only |\n\n**Rule:** The orchestrator routes to `sdlc-roadmap` when a task involves product-phase planning.\nRoadmap items that are ready for implementation return to the orchestrator for OpenSpec routing.\n\n### Orchestrator vs EvalOps\n\n| Orchestrator | EvalOps |\n|---|---|\n| Decides when eval is needed | Manages eval assets and runs |\n| Classifies AI behavior targets | Defines coverage, cases, golden datasets |\n\n**Rule:** The orchestrator gates on EvalOps for AI behavior targets but does not manage eval assets itself.\n\n### Orchestrator vs Memory\n\n| Orchestrator | Memory |\n|---|---|\n| Prompts when to sync | Persists durable facts |\n| Post-completion signal | Long-term knowledge store |\n\n## Examples\n\n### Example 1: Small typo fix\n\n```\nUser: fix the typo \"initalize\" in AGENTS.md\n\nRoute: superpowers-direct\nReason: single-file typo, score = -3, no behavior change\nRequired gates: none\nExpected artifacts: none\nNext action: edit AGENTS.md directly\n```\n\n### Example 2: Medium feature addition\n\n```\nUser: add a dry-run mode to sdlc-openspec-init\n\nRoute: spec-driven-propose-flow\nReason: single-module behavior change, score = 2, needs acceptance criteria\nRequired gates: TDD (code-bearing behavior change)\nExpected artifacts: proposal, design, specs, tasks (via openspec-propose)\nNext action: invoke openspec-propose\n```\n\n### Example 3: Very complex architecture change\n\n```\nUser: redesign the repository memory index model to support multi-project workspaces\n\nRoute: spec-driven-incremental-flow\nReason: cross-module, data model change, architecture decision, score = 6\nRequired gates: TDD\nExpected artifacts: proposal, design, specs, tasks (via incremental flow)\nNext action: invoke openspec-new-change\n```\n\n### Example 4: Roadmap item promotion\n\n```\nUser: promote RM-001 to an OpenSpec change\n\nRoute: roadmap-first\nReason: roadmap item promotion, requires promotion context\nRequired gates: openspec-propose or openspec-new-change after roadmap\nExpected artifacts: promotion context from sdlc-roadmap, then OpenSpec artifacts\nNext action: invoke sdlc-roadmap promote RM-001\n```\n\n### Example 5: AI behavior target change\n\n```\nUser: the research-general skill should also search ArXiv\n\nRoute: spec-driven-propose-flow + evalops-gated\nReason: skill behavior scope expansion, score = 4 (AI behavior target)\nTarget id: skill.research-general\nRequired gates: EvalOps gate (coverage + golden cases before implementation), TDD\nExpected artifacts: eval coverage review, golden cases, then OpenSpec artifacts\nNext action: check eval coverage for skill.research-general under .ai/evals/targets/skill.research-general/\n```\n\n### Example 6: Post-implementation memory sync\n\n```\nUser: (just completed a change that added a new repository convention)\n\nRoute: memory-sync\nReason: durable convention introduced\nRequired gates: none\nExpected artifacts: memory sync update\nNext action: suggest sdlc-repository-memory-sync\n```\n\n\n\nUser input:\n\n[Previous turn: orchestrator classified a cross-skill rename task as spec-driven-propose-flow]\n执行plan\n\nRespond as the assistant would after applying `skill.sdlc-orchestrator`.\n",
+          "label": "/Users/yuping/Documents/workspace/oh_my_skills/.ai/evals/targets/skill.sdlc-orchestrator/exports/promptfoo/prompt.md: You are evaluating the `skill.sdlc-orchestrator` s...",
+          "config": {
+            "provider": {
+              "id": "file://../../../../runners/opencode_go_provider.py",
+              "config": {
+                "model": "glm-5.1",
+                "temperature": 0,
+                "max_tokens": 4096
+              }
+            }
+          }
+        },
+        "promptId": "66edb1d4466935825ba521a0134482add314ef7b4f531a8c4a343cb10d953892",
+        "promptIdx": 0,
+        "provider": {
+          "id": "file://../../../../runners/opencode_go_provider.py",
+          "label": "opencode-go/deepseek-v4-pro"
+        },
+        "response": {
+          "output": "好的。根据之前的路线分类，这次跨技能重命名任务被判定为 **spec-driven-propose-flow**，因此下一步会绑定执行 **openspec-propose** 来创建正式的变更提案与配套工件，而不是直接修改代码。\n\n我现在将启动 `openspec-propose` 流程，为你生成 `proposal.md`、`design.md`、`specs/*.md` 和 `tasks.md`。在开始前，如果你对本次重命名的范围、命名约定或下游影响有任何补充，请现在告诉我；否则我会基于已讨论的内容直接生成全部工件，并在完成后给出审查要点摘要。\n\n---\n\n## SDLC Route Decision（执行确认）\n\n- **Route:** `spec-driven-propose-flow`\n- **Reason:** 跨技能修改，涉及多个模块边界和引用更新（score ≥ 2）\n- **Required gates:** TDD（若涉及行为变更）、OpenSpec 提案审查\n- **Expected artifacts:** proposal.md、design.md、specs（如有必要）、tasks.md\n- **Next action:** invoke `openspec-propose`\n\n---\n\n若你希望显式跳过 OpenSpec 治理直接执行，请明确告知；否则我将按上述路线推进。",
+          "cached": false
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "vars": {
+            "input": "[Previous turn: orchestrator classified a cross-skill rename task as spec-driven-propose-flow]\n执行plan\n"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "openspec-propose"
+            },
+            {
+              "type": "llm-rubric",
+              "value": "When the user says \"execute plan\" (or equivalent) after a prior spec-driven-propose-flow route decision, the assistant must continue the selected route by invoking openspec-propose, or explicitly ask whether the user wants to skip OpenSpec. It must not silently begin direct execution.\n"
+            }
+          ],
+          "options": {
+            "provider": {
+              "id": "file://../../../../runners/opencode_go_provider.py",
+              "config": {
+                "model": "glm-5.1",
+                "temperature": 0,
+                "max_tokens": 4096
+              }
+            }
+          },
+          "metadata": {}
+        },
+        "testIdx": 2,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "input": "[Previous turn: orchestrator classified a cross-skill rename task as spec-driven-propose-flow]\n执行plan\n"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "OpenSpec"
+              }
+            },
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "not-contains",
+                "value": "直接执行（spec-driven-* 路由）"
+              }
+            },
+            {
+              "assertion": {
+                "type": "llm-rubric",
+                "value": "In Plan Mode, when a spec-driven-propose-flow or spec-driven-incremental-flow route was selected, the final handoff must reference OpenSpec proposal or change creation as the next step. For superpowers-direct routes only, direct execution may be mentioned.\n"
+              },
+              "pass": true,
+              "score": 1,
+              "reason": "The output correctly references OpenSpec proposal creation (`openspec-propose`) as the next step for the spec-driven-propose-flow route and OpenSpec change creation (`openspec-new-change`) as the next step for the spec-driven-incremental-flow route. It also explicitly states that implementation will not be executed directly, reserving direct execution only for non-spec-driven routes, which aligns with the rubric's requirement.",
+              "tokensUsed": {
+                "total": 0,
+                "prompt": 0,
+                "completion": 0,
+                "cached": 0,
+                "numRequests": 0,
+                "completionDetails": {
+                  "reasoning": 0,
+                  "acceptedPrediction": 0,
+                  "rejectedPrediction": 0
+                }
+              },
+              "metadata": {
+                "renderedGradingPrompt": "[{\"role\":\"system\",\"content\":\"You are grading output according to a user-specified rubric. If the statement in the rubric is true, then the output passes the test. You respond with a JSON object with this structure: {reason: string, pass: boolean, score: number}\\n\\nExamples:\\n\\n<Output>Hello world</Output>\\n<Rubric>Content contains a greeting</Rubric>\\n{\\\"reason\\\": \\\"the content contains the word 'Hello'\\\", \\\"pass\\\": true, \\\"score\\\": 1.0}\\n\\n<Output>Avast ye swabs, repel the invaders!</Output>\\n<Rubric>Does not speak like a pirate</Rubric>\\n{\\\"reason\\\": \\\"'avast ye' is a common pirate term\\\", \\\"pass\\\": false, \\\"score\\\": 0.0}\"},{\"role\":\"user\",\"content\":\"<Output>\\n## Plan Mode Handoff\\n\\nWe completed the complexity analysis and selected one of the spec-driven routes. After leaving Plan Mode, the very next action SHALL follow that route — there is no direct execution jump.\\n\\n- If the route was **spec-driven-propose-flow**: invoke `openspec-propose` to create the full OpenSpec artifact set (proposal, design, specs, tasks) in one step.\\n- If the route was **spec-driven-incremental-flow**: invoke `openspec-new-change` to create the OpenSpec change scaffold, then proceed artifact‑by‑artifact with `openspec-continue-change`.\\n\\nIn either case, the implementation plan will not be executed directly. We create the governance artifacts first, and only then will `openspec-apply-change` or equivalent take over.\\n</Output>\\n<Rubric>\\nIn Plan Mode, when a spec-driven-propose-flow or spec-driven-incremental-flow route was selected, the final handoff must reference OpenSpec proposal or change creation as the next step. For superpowers-direct routes only, direct execution may be mentioned.\\n\\n</Rubric>\"}]"
+              }
+            }
+          ]
+        },
+        "id": "aa7f982a-1feb-4c14-96e5-1686692bfe88",
+        "latencyMs": 20761,
+        "namedScores": {},
+        "prompt": {
+          "raw": "You are evaluating the `skill.sdlc-orchestrator` skill. Apply these skill instructions as the source of truth before responding.\n\n# skill.sdlc-orchestrator evaluation context\n\nThe assistant is acting as the `skill.sdlc-orchestrator`.\n\n# Source: skills/sdlc-orchestrator/SKILL.md\n---\nname: sdlc-orchestrator\ndescription: Thin SDLC orchestration layer that classifies task complexity, selects the right workflow path, and coordinates Roadmap, OpenSpec, EvalOps, Superpowers, and Memory gates without replacing them. Triggers include uncertain task scope, \"how should I do this\", multi-step SDLC work, or any new development task. Produces a route decision before delegating to downstream skills. Do NOT use for tasks already inside an active OpenSpec change or for single-step information queries.\nlicense: MIT\n---\n\n# SDLC Orchestrator\n\nPre-OpenSpec decision layer. Classifies every development task into a workflow path and coordinates cross-cutting gates before delegating to the responsible skill.\n\n## When to Use\n\n- A new development task arrives and the right workflow is unclear.\n- The user asks \"how should I approach this\", \"is this OpenSpec-worthy\", or equivalent.\n- A task spans multiple SDLC concerns: planning, implementation, evaluation, and memory.\n- The user describes work that might be small (direct Superpowers), medium (propose flow), or very complex (incremental flow).\n- A roadmap item is ready for promotion.\n- An AI behavior target (skill, agent, prompt, workflow, RAG) is being created or modified.\n- A change completed and durable facts should be persisted.\n- User mentions \"orchestrator\", \"route\", \"which workflow\", \"SDLC\".\n\n## When Not to Use\n\n- Tasks already inside an active OpenSpec change (continue with the current flow).\n- Pure informational or Q&A questions.\n- Tasks where the user explicitly chooses the workflow.\n- The orchestrator SHALL NOT implement, test, debug, or create artifacts. It classifies and delegates.\n\n## Route Classification\n\nBefore choosing a path, estimate the task complexity:\n\n| Signal | Score |\n|--------|-------|\n| Crosses 2+ modules or skill boundaries | +2 |\n| Alters public behavior, trigger boundaries, or user-visible output | +2 |\n| Changes data models, file models, schemas, or persistent artifact models | +2 |\n| Impacts skill, agent, prompt, or workflow behavior | +2 |\n| Needs explicit acceptance criteria from the user | +1 |\n| Single-file, low-risk local fix | -2 |\n| Pure typo, docs cleanup, or test-only maintenance | -3 |\n\nRoute:\n\n```\nscore <= 0   -> superpowers-direct\nscore 1-3    -> spec-driven-propose-flow\nscore >= 4   -> spec-driven-incremental-flow\nroadmap      -> roadmap-first (before OpenSpec)\nAI behavior  -> evalops-gated (before implementation)\ndurable fact -> memory-sync (after completion)\n```\n\n**Route decisions are action-binding.** Once the orchestrator selects a route, the immediate next action SHALL follow that route. The selected route determines what happens next — it is not a suggestion. The assistant may only bypass the route if the user explicitly says to skip OpenSpec or directs otherwise. Do not default to direct execution for `spec-driven-*` routes.\n\n## Routing Paths\n\n### superpowers-direct\n\nSmall, low-risk changes. No OpenSpec artifacts.\n\n**Example:** typo fix, small doc update, single-file bugfix, local prompt tweak.\n\n**Action:** Delegate to the appropriate Superpowers skill directly:\n\n- Bug or test failure: `systematic-debugging` first, then `test-driven-development` if implementation is needed.\n- Feature or behavior change with code: `brainstorming` if design direction is unclear, then `test-driven-development`.\n- Review or verification: `requesting-code-review` or `verification-before-completion`.\n\n### spec-driven-propose-flow\n\nMedium formal changes that benefit from OpenSpec artifacts but do not need step-by-step human review during planning. Route decisions are binding: the immediate next action SHALL be `openspec-propose`. Direct execution is not presented as the default for this route.\n\n**Example:** feature addition with clear scope, single-module behavior change, improvement with well-understood acceptance criteria.\n\n**Action:**\n\n1. Route to `openspec-propose` to generate all artifacts in one step. This is the bound next action — do not offer direct execution unless the user explicitly opts out.\n2. After generation, output a **review-focus summary** for the user.\n3. Delegate implementation to `openspec-apply-change` when the user is ready.\n\n### spec-driven-incremental-flow\n\nVery complex formal changes that need iterative human review during planning. Route decisions are binding: the immediate next action SHALL be `openspec-new-change`. Direct execution is not presented as the default for this route.\n\n**Example:** ambiguous scope, high-risk architecture, cross-module changes, schema/data model changes, roadmap item promotion, or scope that may shift during design.\n\n**Action:**\n\n1. Route to `openspec-new-change` to create the change. This is the bound next action — do not offer direct execution unless the user explicitly opts out.\n2. For each subsequent artifact, route to `openspec-continue-change`.\n3. After each artifact is created, output a **review-focus summary** for the user.\n4. Delegate implementation to `openspec-apply-change`.\n5. After verification, delegate to `openspec-archive-change`.\n\n### roadmap-first\n\nWhen the task involves long-term product planning.\n\n**Action:** Route to `sdlc-roadmap` for capture, promotion, or status before any OpenSpec change is created.\n\n### evalops-gated\n\nWhen an AI behavior target is being created or modified. New AI skill development and material AI behavior changes must pass through EvalOps gates before implementation.\n\n**EvalOps Gate Phases for AI Behavior Changes:**\n\n1. **Identify the target.** Determine the target id (e.g., `skill.sdlc-evalops`). If the target id is not yet known, target identification becomes the next EvalOps step.\n2. **Coverage before implementation.** Route to `sdlc-evalops` for coverage definition under `.ai/evals/targets/<target-id>/`. Implementation SHALL NOT begin before coverage is user-reviewed, unless the user explicitly confirms an EvalOps exception.\n3. **Human confirmation for golden promotion.** Candidate cases drafted by the assistant require human confirmation before promotion to golden. The orchestrator SHALL distinguish assistant-generated drafts from user-approved decisions for target registration, coverage acceptance, golden case promotion, and EvalOps exceptions.\n4. **Implementation.** Once EvalOps coverage is reviewed and required golden cases exist, route implementation through the selected OpenSpec or Superpowers path.\n5. **Final golden eval.** After implementation, run final golden eval for the affected target or explicitly report the blocked runner dependency before claiming completion.\n\n**Action for specific scenarios:**\n\n- New target: `sdlc-evalops` coverage review and case generation.\n- Modified target: run existing golden eval if available.\n- Failure observed: offer `capture-regression` from `sdlc-evalops`.\n\n### memory-sync\n\nAfter a durable change completes.\n\n**Action:** Prompt for or route to `sdlc-repository-memory-sync` when the change introduces lasting architecture decisions, conventions, pitfalls, module behavior, or operational knowledge.\n\nFor OpenSpec-verified changes, use `sdlc-openspec-memory-sync` as the pre-archive gate.\n\n## Route Decision Output\n\nBefore delegating, the orchestrator SHALL produce a concise decision:\n\n```markdown\n## SDLC Route Decision\n\nRoute: <superpowers-direct | spec-driven-propose-flow | spec-driven-incremental-flow>\n\nReason:\n- ...\n\nRequired gates:\n- ...\n\nExpected artifacts:\n- ...\n\nNext action:\n- ...\n```\n\nFor AI behavior changes, the route decision SHALL also name the target id when known, or state that target identification is the next EvalOps step.\n\n## EvalOps Exception Handling\n\nEvalOps exceptions MUST be explicit and human-confirmed:\n\n- **User explicitly confirms exception:** When the user explicitly says to skip or defer EvalOps for an AI behavior change, the orchestrator MAY proceed after acknowledging the exception and naming the residual risk.\n- **Ambiguous instruction does not skip EvalOps:** When the user says \"go ahead\", \"start\", \"implement\", or equivalent after an EvalOps-gated route was selected, the orchestrator SHALL continue the EvalOps-gated route rather than treating the instruction as permission to skip EvalOps.\n\n## Final Golden Eval Reporting\n\nFor EvalOps-gated changes, the final implementation summary SHALL report:\n\n- Target id\n- Case counts (total, passed, failed)\n- Export freshness status (via `scripts/export-promptfoo.py <target-id> --check`)\n- Eval command used\n- Pass/fail result count\n- Report path (when available)\n- Any blocked runner dependency (if applicable)\n\nThis evidence SHALL be included before claiming completion of an EvalOps-gated change.\n\n## Plan Mode Handoff\n\nWhen the orchestrator is operating in Plan Mode and is about to exit, the final handoff MUST match the selected route:\n\n- **spec-driven-propose-flow**: say that after leaving Plan Mode it can create an OpenSpec proposal/change via `openspec-propose`. Do not say it can directly execute the implementation plan.\n- **spec-driven-incremental-flow**: say that after leaving Plan Mode it can create or continue the OpenSpec change via `openspec-new-change`. Do not say it can directly execute the implementation plan.\n- **superpowers-direct**: may say that after leaving Plan Mode it can directly execute the task.\n- **roadmap-first / evalops-gated / memory-sync**: say the respective route action (e.g., \"route to sdlc-roadmap\", \"set up EvalOps coverage\", \"run memory sync\").\n\n## Ambiguous Execution Requests\n\nWhen the user says \"execute plan\", \"go ahead\", \"start\", or equivalent after the orchestrator selected a `spec-driven-*` route:\n\n- These requests SHALL be treated as instructions to **continue the selected route**, not as permission to bypass route governance.\n- For `spec-driven-propose-flow`: continue by invoking `openspec-propose`, or ask whether the user wants to explicitly skip OpenSpec.\n- For `spec-driven-incremental-flow`: continue by invoking `openspec-new-change`, or ask whether the user wants to explicitly skip OpenSpec.\n- If the user explicitly says to skip OpenSpec or directly execute despite the route, the orchestrator may proceed outside the selected route after acknowledging the opt-out.\n\n## Execution Path Choices\n\nWhen the orchestrator must ask the user to choose between execution paths (e.g., OpenSpec governance vs. direct execution):\n\n- Use the `question` tool if available, with the recommended route listed first and marked \"(Recommended)\".\n- If the `question` tool is unavailable, present the same mutually exclusive choices as concise text and ask the user to choose explicitly.\n- Do not rely only on free-text descriptions when the choice is mutually exclusive and the tool is available.\n\n## Review Summary Requirements\n\nAfter every OpenSpec artifact step, the orchestrator SHALL reduce human review burden by summarizing what changed.\n\n### Propose Flow Summary\n\nWhen `openspec-propose` creates multiple artifacts:\n\n```markdown\n## Review Focus\n\nCreated: proposal.md, design.md, specs/**/*.md, tasks.md\n\nPlease focus on:\n- `proposal.md > What Changes`: scope is accurate\n- `design.md > Decisions`: technical tradeoffs match expectations\n- `specs/* > Requirements`: SHALL/MUST clauses are not too broad or too narrow\n- `tasks.md > Verification`: tasks can confirm completion\n```\n\n### Incremental Flow Summary\n\nWhen `openspec-continue-change` creates one artifact:\n\n```markdown\nCreated design.md\n\nFocus your review on:\n- `Decisions`: whether you accept these architectural tradeoffs\n- `Risks / Trade-offs`: whether any critical risks are missing\n- `Non-goals`: whether scope is cut correctly\n\nNext: Continue to specs after you confirm the design direction.\n```\n\n### Apply Summary\n\nAfter implementation:\n\n```markdown\n## Apply Summary\n\nCompleted tasks: N/M\n- [x] task description\n- [ ] task description (blocked: reason)\n\nVerification: <command output or status>\n\nUnresolved risks:\n- ...\n\nNext step: <verify | continue | archive>\n```\n\n### Verify and Archive Summary\n\nAfter verification and before archive:\n\n```markdown\n## Verification Summary\n\nRequirements matched: N/M\nDeviations:\n- ...\n\nIf satisfied, next step: `openspec-archive-change`.\n\nConsider: `sdlc-openspec-memory-sync` for durable facts, `sdlc-roadmap done RM-XXX` for roadmap items, or `sdlc-repository-memory-sync` for non-OpenSpec changes.\n```\n\n## Boundary Rules\n\n### Orchestrator vs OpenSpec\n\n| Orchestrator | OpenSpec |\n|---|---|\n| Decides workflow path | Executes formal change governance |\n| Classifies complexity | Manages artifact lifecycle |\n| Coordinates gates | Provides proposal/design/specs/tasks |\n\n**Rule:** The orchestrator does not create, modify, or archive OpenSpec artifacts.\nIt routes to `openspec-propose`, `openspec-new-change`, `openspec-continue-change`,\n`openspec-apply-change`, `openspec-verify-change`, and `openspec-archive-change` as needed.\n\n### Orchestrator vs Superpowers\n\n| Orchestrator | Superpowers |\n|---|---|\n| What to do next | How to do it correctly |\n| Coordinates TDD/debug/review | Provides execution discipline |\n\n**Rule:** The orchestrator invokes Superpowers skills but never duplicates their workflows.\n\n### Orchestrator vs Roadmap\n\n| Orchestrator | Roadmap |\n|---|---|\n| Per-task routing | Long-term product sequencing |\n| All development tasks | MVP/V2/V3/Later planning only |\n\n**Rule:** The orchestrator routes to `sdlc-roadmap` when a task involves product-phase planning.\nRoadmap items that are ready for implementation return to the orchestrator for OpenSpec routing.\n\n### Orchestrator vs EvalOps\n\n| Orchestrator | EvalOps |\n|---|---|\n| Decides when eval is needed | Manages eval assets and runs |\n| Classifies AI behavior targets | Defines coverage, cases, golden datasets |\n\n**Rule:** The orchestrator gates on EvalOps for AI behavior targets but does not manage eval assets itself.\n\n### Orchestrator vs Memory\n\n| Orchestrator | Memory |\n|---|---|\n| Prompts when to sync | Persists durable facts |\n| Post-completion signal | Long-term knowledge store |\n\n## Examples\n\n### Example 1: Small typo fix\n\n```\nUser: fix the typo \"initalize\" in AGENTS.md\n\nRoute: superpowers-direct\nReason: single-file typo, score = -3, no behavior change\nRequired gates: none\nExpected artifacts: none\nNext action: edit AGENTS.md directly\n```\n\n### Example 2: Medium feature addition\n\n```\nUser: add a dry-run mode to sdlc-openspec-init\n\nRoute: spec-driven-propose-flow\nReason: single-module behavior change, score = 2, needs acceptance criteria\nRequired gates: TDD (code-bearing behavior change)\nExpected artifacts: proposal, design, specs, tasks (via openspec-propose)\nNext action: invoke openspec-propose\n```\n\n### Example 3: Very complex architecture change\n\n```\nUser: redesign the repository memory index model to support multi-project workspaces\n\nRoute: spec-driven-incremental-flow\nReason: cross-module, data model change, architecture decision, score = 6\nRequired gates: TDD\nExpected artifacts: proposal, design, specs, tasks (via incremental flow)\nNext action: invoke openspec-new-change\n```\n\n### Example 4: Roadmap item promotion\n\n```\nUser: promote RM-001 to an OpenSpec change\n\nRoute: roadmap-first\nReason: roadmap item promotion, requires promotion context\nRequired gates: openspec-propose or openspec-new-change after roadmap\nExpected artifacts: promotion context from sdlc-roadmap, then OpenSpec artifacts\nNext action: invoke sdlc-roadmap promote RM-001\n```\n\n### Example 5: AI behavior target change\n\n```\nUser: the research-general skill should also search ArXiv\n\nRoute: spec-driven-propose-flow + evalops-gated\nReason: skill behavior scope expansion, score = 4 (AI behavior target)\nTarget id: skill.research-general\nRequired gates: EvalOps gate (coverage + golden cases before implementation), TDD\nExpected artifacts: eval coverage review, golden cases, then OpenSpec artifacts\nNext action: check eval coverage for skill.research-general under .ai/evals/targets/skill.research-general/\n```\n\n### Example 6: Post-implementation memory sync\n\n```\nUser: (just completed a change that added a new repository convention)\n\nRoute: memory-sync\nReason: durable convention introduced\nRequired gates: none\nExpected artifacts: memory sync update\nNext action: suggest sdlc-repository-memory-sync\n```\n\n\n\nUser input:\n\n[In Plan Mode, the orchestrator has just completed analysis of a multi-skill change and classified it as spec-driven-propose-flow or spec-driven-incremental-flow. Exit Plan Mode next.]\n\nRespond as the assistant would after applying `skill.sdlc-orchestrator`.\n",
+          "label": "/Users/yuping/Documents/workspace/oh_my_skills/.ai/evals/targets/skill.sdlc-orchestrator/exports/promptfoo/prompt.md: You are evaluating the `skill.sdlc-orchestrator` s...",
+          "config": {
+            "provider": {
+              "id": "file://../../../../runners/opencode_go_provider.py",
+              "config": {
+                "model": "glm-5.1",
+                "temperature": 0,
+                "max_tokens": 4096
+              }
+            }
+          }
+        },
+        "promptId": "66edb1d4466935825ba521a0134482add314ef7b4f531a8c4a343cb10d953892",
+        "promptIdx": 0,
+        "provider": {
+          "id": "file://../../../../runners/opencode_go_provider.py",
+          "label": "opencode-go/deepseek-v4-pro"
+        },
+        "response": {
+          "output": "## Plan Mode Handoff\n\nWe completed the complexity analysis and selected one of the spec-driven routes. After leaving Plan Mode, the very next action SHALL follow that route — there is no direct execution jump.\n\n- If the route was **spec-driven-propose-flow**: invoke `openspec-propose` to create the full OpenSpec artifact set (proposal, design, specs, tasks) in one step.\n- If the route was **spec-driven-incremental-flow**: invoke `openspec-new-change` to create the OpenSpec change scaffold, then proceed artifact‑by‑artifact with `openspec-continue-change`.\n\nIn either case, the implementation plan will not be executed directly. We create the governance artifacts first, and only then will `openspec-apply-change` or equivalent take over.",
+          "cached": false
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "vars": {
+            "input": "[In Plan Mode, the orchestrator has just completed analysis of a multi-skill change and classified it as spec-driven-propose-flow or spec-driven-incremental-flow. Exit Plan Mode next.]\n"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "OpenSpec"
+            },
+            {
+              "type": "not-contains",
+              "value": "直接执行（spec-driven-* 路由）"
+            },
+            {
+              "type": "llm-rubric",
+              "value": "In Plan Mode, when a spec-driven-propose-flow or spec-driven-incremental-flow route was selected, the final handoff must reference OpenSpec proposal or change creation as the next step. For superpowers-direct routes only, direct execution may be mentioned.\n"
+            }
+          ],
+          "options": {
+            "provider": {
+              "id": "file://../../../../runners/opencode_go_provider.py",
+              "config": {
+                "model": "glm-5.1",
+                "temperature": 0,
+                "max_tokens": 4096
+              }
+            }
+          },
+          "metadata": {}
+        },
+        "testIdx": 3,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "input": "[In Plan Mode, the orchestrator has just completed analysis of a multi-skill change and classified it as spec-driven-propose-flow or spec-driven-incremental-flow. Exit Plan Mode next.]\n"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "openspec-propose"
+              }
+            },
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "not-contains",
+                "value": "直接执行"
+              }
+            },
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "not-contains",
+                "value": "directly execute"
+              }
+            },
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "OpenSpec"
+              }
+            },
+            {
+              "assertion": {
+                "type": "llm-rubric",
+                "value": "When the orchestrator classifies a task as spec-driven-propose-flow, the response must route the user to OpenSpec proposal creation, not offer direct execution as the default path. The handoff language must name openspec-propose or OpenSpec change creation.\n"
+              },
+              "pass": true,
+              "score": 1,
+              "reason": "The output classifies the task as 'spec-driven-propose-flow', explicitly routes the user to OpenSpec proposal creation by stating 'The orchestrator is now delegating to openspec-propose', and clarifies that 'Direct execution is not the default for this route'. The handoff language directly names 'openspec-propose'.",
+              "tokensUsed": {
+                "total": 0,
+                "prompt": 0,
+                "completion": 0,
+                "cached": 0,
+                "numRequests": 0,
+                "completionDetails": {
+                  "reasoning": 0,
+                  "acceptedPrediction": 0,
+                  "rejectedPrediction": 0
+                }
+              },
+              "metadata": {
+                "renderedGradingPrompt": "[{\"role\":\"system\",\"content\":\"You are grading output according to a user-specified rubric. If the statement in the rubric is true, then the output passes the test. You respond with a JSON object with this structure: {reason: string, pass: boolean, score: number}\\n\\nExamples:\\n\\n<Output>Hello world</Output>\\n<Rubric>Content contains a greeting</Rubric>\\n{\\\"reason\\\": \\\"the content contains the word 'Hello'\\\", \\\"pass\\\": true, \\\"score\\\": 1.0}\\n\\n<Output>Avast ye swabs, repel the invaders!</Output>\\n<Rubric>Does not speak like a pirate</Rubric>\\n{\\\"reason\\\": \\\"'avast ye' is a common pirate term\\\", \\\"pass\\\": false, \\\"score\\\": 0.0}\"},{\"role\":\"user\",\"content\":\"<Output>\\n## SDLC Route Decision\\n\\nRoute: **spec-driven-propose-flow**\\n\\n**Reason**  \\n- Adds user-visible behavior (dry-run output) → +2  \\n- Explicit acceptance criteria are needed → +1  \\n- Total complexity score: 3 (within the 1–3 range for a formal propose flow)  \\n- Single-module scope keeps the change bounded, but the visibility and need for criteria make it a good fit for OpenSpec artifacts.\\n\\n**Required gates**  \\n- **TDD** – because the change alters code-bearing behavior. The implementation will be guided by test-driven development once we enter the apply phase.\\n\\n**Expected artifacts**  \\n- `proposal.md` (scope, motivation, what changes)  \\n- `design.md` (technical decisions, trade-offs)  \\n- `specs/**/*.md` (detailed requirements with SHALL/MUST clauses)  \\n- `tasks.md` (ordered, verifiable implementation steps)\\n\\n**Next action**  \\nThe orchestrator is now delegating to `openspec-propose`. That skill will create all four artifacts in one step, giving you a complete review package. **Direct execution is not the default for this route** — the immediate next step is the OpenSpec proposal. If you want to bypass OpenSpec, you must explicitly opt out.\\n\\nOnce the proposal is ready, you’ll receive a review-focus summary so you can quickly validate scope, acceptance criteria, and technical approach before we move to implementation.\\n</Output>\\n<Rubric>\\nWhen the orchestrator classifies a task as spec-driven-propose-flow, the response must route the user to OpenSpec proposal creation, not offer direct execution as the default path. The handoff language must name openspec-propose or OpenSpec change creation.\\n\\n</Rubric>\"}]"
+              }
+            }
+          ]
+        },
+        "id": "1db610a4-53e4-4717-ab34-83e9f07dcf88",
+        "latencyMs": 24672,
+        "namedScores": {},
+        "prompt": {
+          "raw": "You are evaluating the `skill.sdlc-orchestrator` skill. Apply these skill instructions as the source of truth before responding.\n\n# skill.sdlc-orchestrator evaluation context\n\nThe assistant is acting as the `skill.sdlc-orchestrator`.\n\n# Source: skills/sdlc-orchestrator/SKILL.md\n---\nname: sdlc-orchestrator\ndescription: Thin SDLC orchestration layer that classifies task complexity, selects the right workflow path, and coordinates Roadmap, OpenSpec, EvalOps, Superpowers, and Memory gates without replacing them. Triggers include uncertain task scope, \"how should I do this\", multi-step SDLC work, or any new development task. Produces a route decision before delegating to downstream skills. Do NOT use for tasks already inside an active OpenSpec change or for single-step information queries.\nlicense: MIT\n---\n\n# SDLC Orchestrator\n\nPre-OpenSpec decision layer. Classifies every development task into a workflow path and coordinates cross-cutting gates before delegating to the responsible skill.\n\n## When to Use\n\n- A new development task arrives and the right workflow is unclear.\n- The user asks \"how should I approach this\", \"is this OpenSpec-worthy\", or equivalent.\n- A task spans multiple SDLC concerns: planning, implementation, evaluation, and memory.\n- The user describes work that might be small (direct Superpowers), medium (propose flow), or very complex (incremental flow).\n- A roadmap item is ready for promotion.\n- An AI behavior target (skill, agent, prompt, workflow, RAG) is being created or modified.\n- A change completed and durable facts should be persisted.\n- User mentions \"orchestrator\", \"route\", \"which workflow\", \"SDLC\".\n\n## When Not to Use\n\n- Tasks already inside an active OpenSpec change (continue with the current flow).\n- Pure informational or Q&A questions.\n- Tasks where the user explicitly chooses the workflow.\n- The orchestrator SHALL NOT implement, test, debug, or create artifacts. It classifies and delegates.\n\n## Route Classification\n\nBefore choosing a path, estimate the task complexity:\n\n| Signal | Score |\n|--------|-------|\n| Crosses 2+ modules or skill boundaries | +2 |\n| Alters public behavior, trigger boundaries, or user-visible output | +2 |\n| Changes data models, file models, schemas, or persistent artifact models | +2 |\n| Impacts skill, agent, prompt, or workflow behavior | +2 |\n| Needs explicit acceptance criteria from the user | +1 |\n| Single-file, low-risk local fix | -2 |\n| Pure typo, docs cleanup, or test-only maintenance | -3 |\n\nRoute:\n\n```\nscore <= 0   -> superpowers-direct\nscore 1-3    -> spec-driven-propose-flow\nscore >= 4   -> spec-driven-incremental-flow\nroadmap      -> roadmap-first (before OpenSpec)\nAI behavior  -> evalops-gated (before implementation)\ndurable fact -> memory-sync (after completion)\n```\n\n**Route decisions are action-binding.** Once the orchestrator selects a route, the immediate next action SHALL follow that route. The selected route determines what happens next — it is not a suggestion. The assistant may only bypass the route if the user explicitly says to skip OpenSpec or directs otherwise. Do not default to direct execution for `spec-driven-*` routes.\n\n## Routing Paths\n\n### superpowers-direct\n\nSmall, low-risk changes. No OpenSpec artifacts.\n\n**Example:** typo fix, small doc update, single-file bugfix, local prompt tweak.\n\n**Action:** Delegate to the appropriate Superpowers skill directly:\n\n- Bug or test failure: `systematic-debugging` first, then `test-driven-development` if implementation is needed.\n- Feature or behavior change with code: `brainstorming` if design direction is unclear, then `test-driven-development`.\n- Review or verification: `requesting-code-review` or `verification-before-completion`.\n\n### spec-driven-propose-flow\n\nMedium formal changes that benefit from OpenSpec artifacts but do not need step-by-step human review during planning. Route decisions are binding: the immediate next action SHALL be `openspec-propose`. Direct execution is not presented as the default for this route.\n\n**Example:** feature addition with clear scope, single-module behavior change, improvement with well-understood acceptance criteria.\n\n**Action:**\n\n1. Route to `openspec-propose` to generate all artifacts in one step. This is the bound next action — do not offer direct execution unless the user explicitly opts out.\n2. After generation, output a **review-focus summary** for the user.\n3. Delegate implementation to `openspec-apply-change` when the user is ready.\n\n### spec-driven-incremental-flow\n\nVery complex formal changes that need iterative human review during planning. Route decisions are binding: the immediate next action SHALL be `openspec-new-change`. Direct execution is not presented as the default for this route.\n\n**Example:** ambiguous scope, high-risk architecture, cross-module changes, schema/data model changes, roadmap item promotion, or scope that may shift during design.\n\n**Action:**\n\n1. Route to `openspec-new-change` to create the change. This is the bound next action — do not offer direct execution unless the user explicitly opts out.\n2. For each subsequent artifact, route to `openspec-continue-change`.\n3. After each artifact is created, output a **review-focus summary** for the user.\n4. Delegate implementation to `openspec-apply-change`.\n5. After verification, delegate to `openspec-archive-change`.\n\n### roadmap-first\n\nWhen the task involves long-term product planning.\n\n**Action:** Route to `sdlc-roadmap` for capture, promotion, or status before any OpenSpec change is created.\n\n### evalops-gated\n\nWhen an AI behavior target is being created or modified. New AI skill development and material AI behavior changes must pass through EvalOps gates before implementation.\n\n**EvalOps Gate Phases for AI Behavior Changes:**\n\n1. **Identify the target.** Determine the target id (e.g., `skill.sdlc-evalops`). If the target id is not yet known, target identification becomes the next EvalOps step.\n2. **Coverage before implementation.** Route to `sdlc-evalops` for coverage definition under `.ai/evals/targets/<target-id>/`. Implementation SHALL NOT begin before coverage is user-reviewed, unless the user explicitly confirms an EvalOps exception.\n3. **Human confirmation for golden promotion.** Candidate cases drafted by the assistant require human confirmation before promotion to golden. The orchestrator SHALL distinguish assistant-generated drafts from user-approved decisions for target registration, coverage acceptance, golden case promotion, and EvalOps exceptions.\n4. **Implementation.** Once EvalOps coverage is reviewed and required golden cases exist, route implementation through the selected OpenSpec or Superpowers path.\n5. **Final golden eval.** After implementation, run final golden eval for the affected target or explicitly report the blocked runner dependency before claiming completion.\n\n**Action for specific scenarios:**\n\n- New target: `sdlc-evalops` coverage review and case generation.\n- Modified target: run existing golden eval if available.\n- Failure observed: offer `capture-regression` from `sdlc-evalops`.\n\n### memory-sync\n\nAfter a durable change completes.\n\n**Action:** Prompt for or route to `sdlc-repository-memory-sync` when the change introduces lasting architecture decisions, conventions, pitfalls, module behavior, or operational knowledge.\n\nFor OpenSpec-verified changes, use `sdlc-openspec-memory-sync` as the pre-archive gate.\n\n## Route Decision Output\n\nBefore delegating, the orchestrator SHALL produce a concise decision:\n\n```markdown\n## SDLC Route Decision\n\nRoute: <superpowers-direct | spec-driven-propose-flow | spec-driven-incremental-flow>\n\nReason:\n- ...\n\nRequired gates:\n- ...\n\nExpected artifacts:\n- ...\n\nNext action:\n- ...\n```\n\nFor AI behavior changes, the route decision SHALL also name the target id when known, or state that target identification is the next EvalOps step.\n\n## EvalOps Exception Handling\n\nEvalOps exceptions MUST be explicit and human-confirmed:\n\n- **User explicitly confirms exception:** When the user explicitly says to skip or defer EvalOps for an AI behavior change, the orchestrator MAY proceed after acknowledging the exception and naming the residual risk.\n- **Ambiguous instruction does not skip EvalOps:** When the user says \"go ahead\", \"start\", \"implement\", or equivalent after an EvalOps-gated route was selected, the orchestrator SHALL continue the EvalOps-gated route rather than treating the instruction as permission to skip EvalOps.\n\n## Final Golden Eval Reporting\n\nFor EvalOps-gated changes, the final implementation summary SHALL report:\n\n- Target id\n- Case counts (total, passed, failed)\n- Export freshness status (via `scripts/export-promptfoo.py <target-id> --check`)\n- Eval command used\n- Pass/fail result count\n- Report path (when available)\n- Any blocked runner dependency (if applicable)\n\nThis evidence SHALL be included before claiming completion of an EvalOps-gated change.\n\n## Plan Mode Handoff\n\nWhen the orchestrator is operating in Plan Mode and is about to exit, the final handoff MUST match the selected route:\n\n- **spec-driven-propose-flow**: say that after leaving Plan Mode it can create an OpenSpec proposal/change via `openspec-propose`. Do not say it can directly execute the implementation plan.\n- **spec-driven-incremental-flow**: say that after leaving Plan Mode it can create or continue the OpenSpec change via `openspec-new-change`. Do not say it can directly execute the implementation plan.\n- **superpowers-direct**: may say that after leaving Plan Mode it can directly execute the task.\n- **roadmap-first / evalops-gated / memory-sync**: say the respective route action (e.g., \"route to sdlc-roadmap\", \"set up EvalOps coverage\", \"run memory sync\").\n\n## Ambiguous Execution Requests\n\nWhen the user says \"execute plan\", \"go ahead\", \"start\", or equivalent after the orchestrator selected a `spec-driven-*` route:\n\n- These requests SHALL be treated as instructions to **continue the selected route**, not as permission to bypass route governance.\n- For `spec-driven-propose-flow`: continue by invoking `openspec-propose`, or ask whether the user wants to explicitly skip OpenSpec.\n- For `spec-driven-incremental-flow`: continue by invoking `openspec-new-change`, or ask whether the user wants to explicitly skip OpenSpec.\n- If the user explicitly says to skip OpenSpec or directly execute despite the route, the orchestrator may proceed outside the selected route after acknowledging the opt-out.\n\n## Execution Path Choices\n\nWhen the orchestrator must ask the user to choose between execution paths (e.g., OpenSpec governance vs. direct execution):\n\n- Use the `question` tool if available, with the recommended route listed first and marked \"(Recommended)\".\n- If the `question` tool is unavailable, present the same mutually exclusive choices as concise text and ask the user to choose explicitly.\n- Do not rely only on free-text descriptions when the choice is mutually exclusive and the tool is available.\n\n## Review Summary Requirements\n\nAfter every OpenSpec artifact step, the orchestrator SHALL reduce human review burden by summarizing what changed.\n\n### Propose Flow Summary\n\nWhen `openspec-propose` creates multiple artifacts:\n\n```markdown\n## Review Focus\n\nCreated: proposal.md, design.md, specs/**/*.md, tasks.md\n\nPlease focus on:\n- `proposal.md > What Changes`: scope is accurate\n- `design.md > Decisions`: technical tradeoffs match expectations\n- `specs/* > Requirements`: SHALL/MUST clauses are not too broad or too narrow\n- `tasks.md > Verification`: tasks can confirm completion\n```\n\n### Incremental Flow Summary\n\nWhen `openspec-continue-change` creates one artifact:\n\n```markdown\nCreated design.md\n\nFocus your review on:\n- `Decisions`: whether you accept these architectural tradeoffs\n- `Risks / Trade-offs`: whether any critical risks are missing\n- `Non-goals`: whether scope is cut correctly\n\nNext: Continue to specs after you confirm the design direction.\n```\n\n### Apply Summary\n\nAfter implementation:\n\n```markdown\n## Apply Summary\n\nCompleted tasks: N/M\n- [x] task description\n- [ ] task description (blocked: reason)\n\nVerification: <command output or status>\n\nUnresolved risks:\n- ...\n\nNext step: <verify | continue | archive>\n```\n\n### Verify and Archive Summary\n\nAfter verification and before archive:\n\n```markdown\n## Verification Summary\n\nRequirements matched: N/M\nDeviations:\n- ...\n\nIf satisfied, next step: `openspec-archive-change`.\n\nConsider: `sdlc-openspec-memory-sync` for durable facts, `sdlc-roadmap done RM-XXX` for roadmap items, or `sdlc-repository-memory-sync` for non-OpenSpec changes.\n```\n\n## Boundary Rules\n\n### Orchestrator vs OpenSpec\n\n| Orchestrator | OpenSpec |\n|---|---|\n| Decides workflow path | Executes formal change governance |\n| Classifies complexity | Manages artifact lifecycle |\n| Coordinates gates | Provides proposal/design/specs/tasks |\n\n**Rule:** The orchestrator does not create, modify, or archive OpenSpec artifacts.\nIt routes to `openspec-propose`, `openspec-new-change`, `openspec-continue-change`,\n`openspec-apply-change`, `openspec-verify-change`, and `openspec-archive-change` as needed.\n\n### Orchestrator vs Superpowers\n\n| Orchestrator | Superpowers |\n|---|---|\n| What to do next | How to do it correctly |\n| Coordinates TDD/debug/review | Provides execution discipline |\n\n**Rule:** The orchestrator invokes Superpowers skills but never duplicates their workflows.\n\n### Orchestrator vs Roadmap\n\n| Orchestrator | Roadmap |\n|---|---|\n| Per-task routing | Long-term product sequencing |\n| All development tasks | MVP/V2/V3/Later planning only |\n\n**Rule:** The orchestrator routes to `sdlc-roadmap` when a task involves product-phase planning.\nRoadmap items that are ready for implementation return to the orchestrator for OpenSpec routing.\n\n### Orchestrator vs EvalOps\n\n| Orchestrator | EvalOps |\n|---|---|\n| Decides when eval is needed | Manages eval assets and runs |\n| Classifies AI behavior targets | Defines coverage, cases, golden datasets |\n\n**Rule:** The orchestrator gates on EvalOps for AI behavior targets but does not manage eval assets itself.\n\n### Orchestrator vs Memory\n\n| Orchestrator | Memory |\n|---|---|\n| Prompts when to sync | Persists durable facts |\n| Post-completion signal | Long-term knowledge store |\n\n## Examples\n\n### Example 1: Small typo fix\n\n```\nUser: fix the typo \"initalize\" in AGENTS.md\n\nRoute: superpowers-direct\nReason: single-file typo, score = -3, no behavior change\nRequired gates: none\nExpected artifacts: none\nNext action: edit AGENTS.md directly\n```\n\n### Example 2: Medium feature addition\n\n```\nUser: add a dry-run mode to sdlc-openspec-init\n\nRoute: spec-driven-propose-flow\nReason: single-module behavior change, score = 2, needs acceptance criteria\nRequired gates: TDD (code-bearing behavior change)\nExpected artifacts: proposal, design, specs, tasks (via openspec-propose)\nNext action: invoke openspec-propose\n```\n\n### Example 3: Very complex architecture change\n\n```\nUser: redesign the repository memory index model to support multi-project workspaces\n\nRoute: spec-driven-incremental-flow\nReason: cross-module, data model change, architecture decision, score = 6\nRequired gates: TDD\nExpected artifacts: proposal, design, specs, tasks (via incremental flow)\nNext action: invoke openspec-new-change\n```\n\n### Example 4: Roadmap item promotion\n\n```\nUser: promote RM-001 to an OpenSpec change\n\nRoute: roadmap-first\nReason: roadmap item promotion, requires promotion context\nRequired gates: openspec-propose or openspec-new-change after roadmap\nExpected artifacts: promotion context from sdlc-roadmap, then OpenSpec artifacts\nNext action: invoke sdlc-roadmap promote RM-001\n```\n\n### Example 5: AI behavior target change\n\n```\nUser: the research-general skill should also search ArXiv\n\nRoute: spec-driven-propose-flow + evalops-gated\nReason: skill behavior scope expansion, score = 4 (AI behavior target)\nTarget id: skill.research-general\nRequired gates: EvalOps gate (coverage + golden cases before implementation), TDD\nExpected artifacts: eval coverage review, golden cases, then OpenSpec artifacts\nNext action: check eval coverage for skill.research-general under .ai/evals/targets/skill.research-general/\n```\n\n### Example 6: Post-implementation memory sync\n\n```\nUser: (just completed a change that added a new repository convention)\n\nRoute: memory-sync\nReason: durable convention introduced\nRequired gates: none\nExpected artifacts: memory sync update\nNext action: suggest sdlc-repository-memory-sync\n```\n\n\n\nUser input:\n\nAdd a dry-run mode to the backup CLI command. The scope is clear and limited to one module, but it changes user-visible behavior and needs acceptance criteria. How should I approach this?\n\nRespond as the assistant would after applying `skill.sdlc-orchestrator`.\n",
+          "label": "/Users/yuping/Documents/workspace/oh_my_skills/.ai/evals/targets/skill.sdlc-orchestrator/exports/promptfoo/prompt.md: You are evaluating the `skill.sdlc-orchestrator` s...",
+          "config": {
+            "provider": {
+              "id": "file://../../../../runners/opencode_go_provider.py",
+              "config": {
+                "model": "glm-5.1",
+                "temperature": 0,
+                "max_tokens": 4096
+              }
+            }
+          }
+        },
+        "promptId": "66edb1d4466935825ba521a0134482add314ef7b4f531a8c4a343cb10d953892",
+        "promptIdx": 0,
+        "provider": {
+          "id": "file://../../../../runners/opencode_go_provider.py",
+          "label": "opencode-go/deepseek-v4-pro"
+        },
+        "response": {
+          "output": "## SDLC Route Decision\n\nRoute: **spec-driven-propose-flow**\n\n**Reason**  \n- Adds user-visible behavior (dry-run output) → +2  \n- Explicit acceptance criteria are needed → +1  \n- Total complexity score: 3 (within the 1–3 range for a formal propose flow)  \n- Single-module scope keeps the change bounded, but the visibility and need for criteria make it a good fit for OpenSpec artifacts.\n\n**Required gates**  \n- **TDD** – because the change alters code-bearing behavior. The implementation will be guided by test-driven development once we enter the apply phase.\n\n**Expected artifacts**  \n- `proposal.md` (scope, motivation, what changes)  \n- `design.md` (technical decisions, trade-offs)  \n- `specs/**/*.md` (detailed requirements with SHALL/MUST clauses)  \n- `tasks.md` (ordered, verifiable implementation steps)\n\n**Next action**  \nThe orchestrator is now delegating to `openspec-propose`. That skill will create all four artifacts in one step, giving you a complete review package. **Direct execution is not the default for this route** — the immediate next step is the OpenSpec proposal. If you want to bypass OpenSpec, you must explicitly opt out.\n\nOnce the proposal is ready, you’ll receive a review-focus summary so you can quickly validate scope, acceptance criteria, and technical approach before we move to implementation.",
+          "cached": false
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "vars": {
+            "input": "Add a dry-run mode to the backup CLI command. The scope is clear and limited to one module, but it changes user-visible behavior and needs acceptance criteria. How should I approach this?\n"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "openspec-propose"
+            },
+            {
+              "type": "not-contains",
+              "value": "直接执行"
+            },
+            {
+              "type": "not-contains",
+              "value": "directly execute"
+            },
+            {
+              "type": "contains",
+              "value": "OpenSpec"
+            },
+            {
+              "type": "llm-rubric",
+              "value": "When the orchestrator classifies a task as spec-driven-propose-flow, the response must route the user to OpenSpec proposal creation, not offer direct execution as the default path. The handoff language must name openspec-propose or OpenSpec change creation.\n"
+            }
+          ],
+          "options": {
+            "provider": {
+              "id": "file://../../../../runners/opencode_go_provider.py",
+              "config": {
+                "model": "glm-5.1",
+                "temperature": 0,
+                "max_tokens": 4096
+              }
+            }
+          },
+          "metadata": {}
+        },
+        "testIdx": 4,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "input": "Add a dry-run mode to the backup CLI command. The scope is clear and limited to one module, but it changes user-visible behavior and needs acceptance criteria. How should I approach this?\n"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "assertion": {
+                "type": "llm-rubric",
+                "value": "After a spec-driven route is selected and the user asks to execute the plan, the assistant may continue the selected OpenSpec route directly. If it presents mutually exclusive execution paths (e.g., OpenSpec governance vs direct execution), it should prefer the question tool when available, with the recommended route listed first. If the tool is unavailable, a clear text choice is acceptable.\n"
+              },
+              "pass": true,
+              "score": 1,
+              "reason": "The output presents two mutually exclusive execution paths (OpenSpec governance vs direct execution) with the recommended route listed first, and uses a clear text choice format, which is acceptable when the question tool is unavailable.",
+              "tokensUsed": {
+                "total": 0,
+                "prompt": 0,
+                "completion": 0,
+                "cached": 0,
+                "numRequests": 0,
+                "completionDetails": {
+                  "reasoning": 0,
+                  "acceptedPrediction": 0,
+                  "rejectedPrediction": 0
+                }
+              },
+              "metadata": {
+                "renderedGradingPrompt": "[{\"role\":\"system\",\"content\":\"You are grading output according to a user-specified rubric. If the statement in the rubric is true, then the output passes the test. You respond with a JSON object with this structure: {reason: string, pass: boolean, score: number}\\n\\nExamples:\\n\\n<Output>Hello world</Output>\\n<Rubric>Content contains a greeting</Rubric>\\n{\\\"reason\\\": \\\"the content contains the word 'Hello'\\\", \\\"pass\\\": true, \\\"score\\\": 1.0}\\n\\n<Output>Avast ye swabs, repel the invaders!</Output>\\n<Rubric>Does not speak like a pirate</Rubric>\\n{\\\"reason\\\": \\\"'avast ye' is a common pirate term\\\", \\\"pass\\\": false, \\\"score\\\": 0.0}\"},{\"role\":\"user\",\"content\":\"<Output>\\nThe task was classified as **spec-driven-propose-flow**, so \\\"execute the plan\\\" is interpreted as **continue the OpenSpec-governed route** — not as permission to bypass governance.  \\n\\nThe bound next action for `spec-driven-propose-flow` is to invoke `openspec-propose`, which generates proposal, design, specs, and tasks in one step.  \\n\\nBefore I proceed, confirm your choice:\\n\\n- **(Recommended)** Generate the full OpenSpec artifact set via `openspec-propose`  \\n- **Skip OpenSpec** and implement directly (this opts out of the formal change process you selected)\\n\\nWhich path would you like?\\n</Output>\\n<Rubric>\\nAfter a spec-driven route is selected and the user asks to execute the plan, the assistant may continue the selected OpenSpec route directly. If it presents mutually exclusive execution paths (e.g., OpenSpec governance vs direct execution), it should prefer the question tool when available, with the recommended route listed first. If the tool is unavailable, a clear text choice is acceptable.\\n\\n</Rubric>\"}]"
+              }
+            }
+          ]
+        },
+        "id": "5784a969-3156-43e6-82e0-eee48beb3fb9",
+        "latencyMs": 13028,
+        "namedScores": {},
+        "prompt": {
+          "raw": "You are evaluating the `skill.sdlc-orchestrator` skill. Apply these skill instructions as the source of truth before responding.\n\n# skill.sdlc-orchestrator evaluation context\n\nThe assistant is acting as the `skill.sdlc-orchestrator`.\n\n# Source: skills/sdlc-orchestrator/SKILL.md\n---\nname: sdlc-orchestrator\ndescription: Thin SDLC orchestration layer that classifies task complexity, selects the right workflow path, and coordinates Roadmap, OpenSpec, EvalOps, Superpowers, and Memory gates without replacing them. Triggers include uncertain task scope, \"how should I do this\", multi-step SDLC work, or any new development task. Produces a route decision before delegating to downstream skills. Do NOT use for tasks already inside an active OpenSpec change or for single-step information queries.\nlicense: MIT\n---\n\n# SDLC Orchestrator\n\nPre-OpenSpec decision layer. Classifies every development task into a workflow path and coordinates cross-cutting gates before delegating to the responsible skill.\n\n## When to Use\n\n- A new development task arrives and the right workflow is unclear.\n- The user asks \"how should I approach this\", \"is this OpenSpec-worthy\", or equivalent.\n- A task spans multiple SDLC concerns: planning, implementation, evaluation, and memory.\n- The user describes work that might be small (direct Superpowers), medium (propose flow), or very complex (incremental flow).\n- A roadmap item is ready for promotion.\n- An AI behavior target (skill, agent, prompt, workflow, RAG) is being created or modified.\n- A change completed and durable facts should be persisted.\n- User mentions \"orchestrator\", \"route\", \"which workflow\", \"SDLC\".\n\n## When Not to Use\n\n- Tasks already inside an active OpenSpec change (continue with the current flow).\n- Pure informational or Q&A questions.\n- Tasks where the user explicitly chooses the workflow.\n- The orchestrator SHALL NOT implement, test, debug, or create artifacts. It classifies and delegates.\n\n## Route Classification\n\nBefore choosing a path, estimate the task complexity:\n\n| Signal | Score |\n|--------|-------|\n| Crosses 2+ modules or skill boundaries | +2 |\n| Alters public behavior, trigger boundaries, or user-visible output | +2 |\n| Changes data models, file models, schemas, or persistent artifact models | +2 |\n| Impacts skill, agent, prompt, or workflow behavior | +2 |\n| Needs explicit acceptance criteria from the user | +1 |\n| Single-file, low-risk local fix | -2 |\n| Pure typo, docs cleanup, or test-only maintenance | -3 |\n\nRoute:\n\n```\nscore <= 0   -> superpowers-direct\nscore 1-3    -> spec-driven-propose-flow\nscore >= 4   -> spec-driven-incremental-flow\nroadmap      -> roadmap-first (before OpenSpec)\nAI behavior  -> evalops-gated (before implementation)\ndurable fact -> memory-sync (after completion)\n```\n\n**Route decisions are action-binding.** Once the orchestrator selects a route, the immediate next action SHALL follow that route. The selected route determines what happens next — it is not a suggestion. The assistant may only bypass the route if the user explicitly says to skip OpenSpec or directs otherwise. Do not default to direct execution for `spec-driven-*` routes.\n\n## Routing Paths\n\n### superpowers-direct\n\nSmall, low-risk changes. No OpenSpec artifacts.\n\n**Example:** typo fix, small doc update, single-file bugfix, local prompt tweak.\n\n**Action:** Delegate to the appropriate Superpowers skill directly:\n\n- Bug or test failure: `systematic-debugging` first, then `test-driven-development` if implementation is needed.\n- Feature or behavior change with code: `brainstorming` if design direction is unclear, then `test-driven-development`.\n- Review or verification: `requesting-code-review` or `verification-before-completion`.\n\n### spec-driven-propose-flow\n\nMedium formal changes that benefit from OpenSpec artifacts but do not need step-by-step human review during planning. Route decisions are binding: the immediate next action SHALL be `openspec-propose`. Direct execution is not presented as the default for this route.\n\n**Example:** feature addition with clear scope, single-module behavior change, improvement with well-understood acceptance criteria.\n\n**Action:**\n\n1. Route to `openspec-propose` to generate all artifacts in one step. This is the bound next action — do not offer direct execution unless the user explicitly opts out.\n2. After generation, output a **review-focus summary** for the user.\n3. Delegate implementation to `openspec-apply-change` when the user is ready.\n\n### spec-driven-incremental-flow\n\nVery complex formal changes that need iterative human review during planning. Route decisions are binding: the immediate next action SHALL be `openspec-new-change`. Direct execution is not presented as the default for this route.\n\n**Example:** ambiguous scope, high-risk architecture, cross-module changes, schema/data model changes, roadmap item promotion, or scope that may shift during design.\n\n**Action:**\n\n1. Route to `openspec-new-change` to create the change. This is the bound next action — do not offer direct execution unless the user explicitly opts out.\n2. For each subsequent artifact, route to `openspec-continue-change`.\n3. After each artifact is created, output a **review-focus summary** for the user.\n4. Delegate implementation to `openspec-apply-change`.\n5. After verification, delegate to `openspec-archive-change`.\n\n### roadmap-first\n\nWhen the task involves long-term product planning.\n\n**Action:** Route to `sdlc-roadmap` for capture, promotion, or status before any OpenSpec change is created.\n\n### evalops-gated\n\nWhen an AI behavior target is being created or modified. New AI skill development and material AI behavior changes must pass through EvalOps gates before implementation.\n\n**EvalOps Gate Phases for AI Behavior Changes:**\n\n1. **Identify the target.** Determine the target id (e.g., `skill.sdlc-evalops`). If the target id is not yet known, target identification becomes the next EvalOps step.\n2. **Coverage before implementation.** Route to `sdlc-evalops` for coverage definition under `.ai/evals/targets/<target-id>/`. Implementation SHALL NOT begin before coverage is user-reviewed, unless the user explicitly confirms an EvalOps exception.\n3. **Human confirmation for golden promotion.** Candidate cases drafted by the assistant require human confirmation before promotion to golden. The orchestrator SHALL distinguish assistant-generated drafts from user-approved decisions for target registration, coverage acceptance, golden case promotion, and EvalOps exceptions.\n4. **Implementation.** Once EvalOps coverage is reviewed and required golden cases exist, route implementation through the selected OpenSpec or Superpowers path.\n5. **Final golden eval.** After implementation, run final golden eval for the affected target or explicitly report the blocked runner dependency before claiming completion.\n\n**Action for specific scenarios:**\n\n- New target: `sdlc-evalops` coverage review and case generation.\n- Modified target: run existing golden eval if available.\n- Failure observed: offer `capture-regression` from `sdlc-evalops`.\n\n### memory-sync\n\nAfter a durable change completes.\n\n**Action:** Prompt for or route to `sdlc-repository-memory-sync` when the change introduces lasting architecture decisions, conventions, pitfalls, module behavior, or operational knowledge.\n\nFor OpenSpec-verified changes, use `sdlc-openspec-memory-sync` as the pre-archive gate.\n\n## Route Decision Output\n\nBefore delegating, the orchestrator SHALL produce a concise decision:\n\n```markdown\n## SDLC Route Decision\n\nRoute: <superpowers-direct | spec-driven-propose-flow | spec-driven-incremental-flow>\n\nReason:\n- ...\n\nRequired gates:\n- ...\n\nExpected artifacts:\n- ...\n\nNext action:\n- ...\n```\n\nFor AI behavior changes, the route decision SHALL also name the target id when known, or state that target identification is the next EvalOps step.\n\n## EvalOps Exception Handling\n\nEvalOps exceptions MUST be explicit and human-confirmed:\n\n- **User explicitly confirms exception:** When the user explicitly says to skip or defer EvalOps for an AI behavior change, the orchestrator MAY proceed after acknowledging the exception and naming the residual risk.\n- **Ambiguous instruction does not skip EvalOps:** When the user says \"go ahead\", \"start\", \"implement\", or equivalent after an EvalOps-gated route was selected, the orchestrator SHALL continue the EvalOps-gated route rather than treating the instruction as permission to skip EvalOps.\n\n## Final Golden Eval Reporting\n\nFor EvalOps-gated changes, the final implementation summary SHALL report:\n\n- Target id\n- Case counts (total, passed, failed)\n- Export freshness status (via `scripts/export-promptfoo.py <target-id> --check`)\n- Eval command used\n- Pass/fail result count\n- Report path (when available)\n- Any blocked runner dependency (if applicable)\n\nThis evidence SHALL be included before claiming completion of an EvalOps-gated change.\n\n## Plan Mode Handoff\n\nWhen the orchestrator is operating in Plan Mode and is about to exit, the final handoff MUST match the selected route:\n\n- **spec-driven-propose-flow**: say that after leaving Plan Mode it can create an OpenSpec proposal/change via `openspec-propose`. Do not say it can directly execute the implementation plan.\n- **spec-driven-incremental-flow**: say that after leaving Plan Mode it can create or continue the OpenSpec change via `openspec-new-change`. Do not say it can directly execute the implementation plan.\n- **superpowers-direct**: may say that after leaving Plan Mode it can directly execute the task.\n- **roadmap-first / evalops-gated / memory-sync**: say the respective route action (e.g., \"route to sdlc-roadmap\", \"set up EvalOps coverage\", \"run memory sync\").\n\n## Ambiguous Execution Requests\n\nWhen the user says \"execute plan\", \"go ahead\", \"start\", or equivalent after the orchestrator selected a `spec-driven-*` route:\n\n- These requests SHALL be treated as instructions to **continue the selected route**, not as permission to bypass route governance.\n- For `spec-driven-propose-flow`: continue by invoking `openspec-propose`, or ask whether the user wants to explicitly skip OpenSpec.\n- For `spec-driven-incremental-flow`: continue by invoking `openspec-new-change`, or ask whether the user wants to explicitly skip OpenSpec.\n- If the user explicitly says to skip OpenSpec or directly execute despite the route, the orchestrator may proceed outside the selected route after acknowledging the opt-out.\n\n## Execution Path Choices\n\nWhen the orchestrator must ask the user to choose between execution paths (e.g., OpenSpec governance vs. direct execution):\n\n- Use the `question` tool if available, with the recommended route listed first and marked \"(Recommended)\".\n- If the `question` tool is unavailable, present the same mutually exclusive choices as concise text and ask the user to choose explicitly.\n- Do not rely only on free-text descriptions when the choice is mutually exclusive and the tool is available.\n\n## Review Summary Requirements\n\nAfter every OpenSpec artifact step, the orchestrator SHALL reduce human review burden by summarizing what changed.\n\n### Propose Flow Summary\n\nWhen `openspec-propose` creates multiple artifacts:\n\n```markdown\n## Review Focus\n\nCreated: proposal.md, design.md, specs/**/*.md, tasks.md\n\nPlease focus on:\n- `proposal.md > What Changes`: scope is accurate\n- `design.md > Decisions`: technical tradeoffs match expectations\n- `specs/* > Requirements`: SHALL/MUST clauses are not too broad or too narrow\n- `tasks.md > Verification`: tasks can confirm completion\n```\n\n### Incremental Flow Summary\n\nWhen `openspec-continue-change` creates one artifact:\n\n```markdown\nCreated design.md\n\nFocus your review on:\n- `Decisions`: whether you accept these architectural tradeoffs\n- `Risks / Trade-offs`: whether any critical risks are missing\n- `Non-goals`: whether scope is cut correctly\n\nNext: Continue to specs after you confirm the design direction.\n```\n\n### Apply Summary\n\nAfter implementation:\n\n```markdown\n## Apply Summary\n\nCompleted tasks: N/M\n- [x] task description\n- [ ] task description (blocked: reason)\n\nVerification: <command output or status>\n\nUnresolved risks:\n- ...\n\nNext step: <verify | continue | archive>\n```\n\n### Verify and Archive Summary\n\nAfter verification and before archive:\n\n```markdown\n## Verification Summary\n\nRequirements matched: N/M\nDeviations:\n- ...\n\nIf satisfied, next step: `openspec-archive-change`.\n\nConsider: `sdlc-openspec-memory-sync` for durable facts, `sdlc-roadmap done RM-XXX` for roadmap items, or `sdlc-repository-memory-sync` for non-OpenSpec changes.\n```\n\n## Boundary Rules\n\n### Orchestrator vs OpenSpec\n\n| Orchestrator | OpenSpec |\n|---|---|\n| Decides workflow path | Executes formal change governance |\n| Classifies complexity | Manages artifact lifecycle |\n| Coordinates gates | Provides proposal/design/specs/tasks |\n\n**Rule:** The orchestrator does not create, modify, or archive OpenSpec artifacts.\nIt routes to `openspec-propose`, `openspec-new-change`, `openspec-continue-change`,\n`openspec-apply-change`, `openspec-verify-change`, and `openspec-archive-change` as needed.\n\n### Orchestrator vs Superpowers\n\n| Orchestrator | Superpowers |\n|---|---|\n| What to do next | How to do it correctly |\n| Coordinates TDD/debug/review | Provides execution discipline |\n\n**Rule:** The orchestrator invokes Superpowers skills but never duplicates their workflows.\n\n### Orchestrator vs Roadmap\n\n| Orchestrator | Roadmap |\n|---|---|\n| Per-task routing | Long-term product sequencing |\n| All development tasks | MVP/V2/V3/Later planning only |\n\n**Rule:** The orchestrator routes to `sdlc-roadmap` when a task involves product-phase planning.\nRoadmap items that are ready for implementation return to the orchestrator for OpenSpec routing.\n\n### Orchestrator vs EvalOps\n\n| Orchestrator | EvalOps |\n|---|---|\n| Decides when eval is needed | Manages eval assets and runs |\n| Classifies AI behavior targets | Defines coverage, cases, golden datasets |\n\n**Rule:** The orchestrator gates on EvalOps for AI behavior targets but does not manage eval assets itself.\n\n### Orchestrator vs Memory\n\n| Orchestrator | Memory |\n|---|---|\n| Prompts when to sync | Persists durable facts |\n| Post-completion signal | Long-term knowledge store |\n\n## Examples\n\n### Example 1: Small typo fix\n\n```\nUser: fix the typo \"initalize\" in AGENTS.md\n\nRoute: superpowers-direct\nReason: single-file typo, score = -3, no behavior change\nRequired gates: none\nExpected artifacts: none\nNext action: edit AGENTS.md directly\n```\n\n### Example 2: Medium feature addition\n\n```\nUser: add a dry-run mode to sdlc-openspec-init\n\nRoute: spec-driven-propose-flow\nReason: single-module behavior change, score = 2, needs acceptance criteria\nRequired gates: TDD (code-bearing behavior change)\nExpected artifacts: proposal, design, specs, tasks (via openspec-propose)\nNext action: invoke openspec-propose\n```\n\n### Example 3: Very complex architecture change\n\n```\nUser: redesign the repository memory index model to support multi-project workspaces\n\nRoute: spec-driven-incremental-flow\nReason: cross-module, data model change, architecture decision, score = 6\nRequired gates: TDD\nExpected artifacts: proposal, design, specs, tasks (via incremental flow)\nNext action: invoke openspec-new-change\n```\n\n### Example 4: Roadmap item promotion\n\n```\nUser: promote RM-001 to an OpenSpec change\n\nRoute: roadmap-first\nReason: roadmap item promotion, requires promotion context\nRequired gates: openspec-propose or openspec-new-change after roadmap\nExpected artifacts: promotion context from sdlc-roadmap, then OpenSpec artifacts\nNext action: invoke sdlc-roadmap promote RM-001\n```\n\n### Example 5: AI behavior target change\n\n```\nUser: the research-general skill should also search ArXiv\n\nRoute: spec-driven-propose-flow + evalops-gated\nReason: skill behavior scope expansion, score = 4 (AI behavior target)\nTarget id: skill.research-general\nRequired gates: EvalOps gate (coverage + golden cases before implementation), TDD\nExpected artifacts: eval coverage review, golden cases, then OpenSpec artifacts\nNext action: check eval coverage for skill.research-general under .ai/evals/targets/skill.research-general/\n```\n\n### Example 6: Post-implementation memory sync\n\n```\nUser: (just completed a change that added a new repository convention)\n\nRoute: memory-sync\nReason: durable convention introduced\nRequired gates: none\nExpected artifacts: memory sync update\nNext action: suggest sdlc-repository-memory-sync\n```\n\n\n\nUser input:\n\nI have a change that crosses multiple skills. The orchestrator classified it as spec-driven-propose-flow. I asked to execute the plan.\n\nRespond as the assistant would after applying `skill.sdlc-orchestrator`.\n",
+          "label": "/Users/yuping/Documents/workspace/oh_my_skills/.ai/evals/targets/skill.sdlc-orchestrator/exports/promptfoo/prompt.md: You are evaluating the `skill.sdlc-orchestrator` s...",
+          "config": {
+            "provider": {
+              "id": "file://../../../../runners/opencode_go_provider.py",
+              "config": {
+                "model": "glm-5.1",
+                "temperature": 0,
+                "max_tokens": 4096
+              }
+            }
+          }
+        },
+        "promptId": "66edb1d4466935825ba521a0134482add314ef7b4f531a8c4a343cb10d953892",
+        "promptIdx": 0,
+        "provider": {
+          "id": "file://../../../../runners/opencode_go_provider.py",
+          "label": "opencode-go/deepseek-v4-pro"
+        },
+        "response": {
+          "output": "The task was classified as **spec-driven-propose-flow**, so \"execute the plan\" is interpreted as **continue the OpenSpec-governed route** — not as permission to bypass governance.  \n\nThe bound next action for `spec-driven-propose-flow` is to invoke `openspec-propose`, which generates proposal, design, specs, and tasks in one step.  \n\nBefore I proceed, confirm your choice:\n\n- **(Recommended)** Generate the full OpenSpec artifact set via `openspec-propose`  \n- **Skip OpenSpec** and implement directly (this opts out of the formal change process you selected)\n\nWhich path would you like?",
+          "cached": false
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "vars": {
+            "input": "I have a change that crosses multiple skills. The orchestrator classified it as spec-driven-propose-flow. I asked to execute the plan.\n"
+          },
+          "assert": [
+            {
+              "type": "llm-rubric",
+              "value": "After a spec-driven route is selected and the user asks to execute the plan, the assistant may continue the selected OpenSpec route directly. If it presents mutually exclusive execution paths (e.g., OpenSpec governance vs direct execution), it should prefer the question tool when available, with the recommended route listed first. If the tool is unavailable, a clear text choice is acceptable.\n"
+            }
+          ],
+          "options": {
+            "provider": {
+              "id": "file://../../../../runners/opencode_go_provider.py",
+              "config": {
+                "model": "glm-5.1",
+                "temperature": 0,
+                "max_tokens": 4096
+              }
+            }
+          },
+          "metadata": {}
+        },
+        "testIdx": 5,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "input": "I have a change that crosses multiple skills. The orchestrator classified it as spec-driven-propose-flow. I asked to execute the plan.\n"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      }
+    ],
+    "stats": {
+      "successes": 6,
+      "failures": 0,
+      "errors": 0,
+      "tokenUsage": {
+        "prompt": 0,
+        "completion": 0,
+        "cached": 0,
+        "total": 0,
+        "numRequests": 6,
+        "completionDetails": {
+          "reasoning": 0,
+          "acceptedPrediction": 0,
+          "rejectedPrediction": 0,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        },
+        "assertions": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 0,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          }
+        }
+      },
+      "durationMs": 186710,
+      "evaluationDurationMs": 186710
+    }
+  },
+  "config": {
+    "tags": {},
+    "description": "EvalOps export for skill.sdlc-orchestrator",
+    "prompts": [
+      "file:///Users/yuping/Documents/workspace/oh_my_skills/.ai/evals/targets/skill.sdlc-orchestrator/exports/promptfoo/prompt.md"
+    ],
+    "providers": [
+      {
+        "id": "file://../../../../runners/opencode_go_provider.py",
+        "label": "opencode-go/deepseek-v4-pro",
+        "config": {
+          "model": "deepseek-v4-pro",
+          "temperature": 0,
+          "max_tokens": 4096
+        }
+      }
+    ],
+    "tests": [
+      {
+        "vars": {
+          "input": "[Previous turn: orchestrator classified a multi-skill change as spec-driven-propose-flow]\n跳过 OpenSpec，直接执行这个 rename plan，不需要创建 proposal。\n"
+        },
+        "assert": [
+          {
+            "type": "llm-rubric",
+            "value": "When the user explicitly opts out of OpenSpec governance (e.g., \"skip OpenSpec\", \"直接执行\", \"don't create a proposal\"), the orchestrator should acknowledge the opt-out and proceed with direct execution. The user's explicit instruction overrides the route decision.\n"
+          }
+        ]
+      },
+      {
+        "vars": {
+          "input": "Fix the typo \"initalize\" in the AGENTS.md file.\n"
+        },
+        "assert": [
+          {
+            "type": "not-contains",
+            "value": "openspec-propose"
+          },
+          {
+            "type": "not-contains",
+            "value": "openspec-new-change"
+          },
+          {
+            "type": "llm-rubric",
+            "value": "For low-risk, single-file changes classified as superpowers-direct, the orchestrator must allow direct execution without requiring OpenSpec artifacts. The response should not route to openspec-propose or openspec-new-change.\n"
+          }
+        ]
+      },
+      {
+        "vars": {
+          "input": "[Previous turn: orchestrator classified a cross-skill rename task as spec-driven-propose-flow]\n执行plan\n"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "openspec-propose"
+          },
+          {
+            "type": "llm-rubric",
+            "value": "When the user says \"execute plan\" (or equivalent) after a prior spec-driven-propose-flow route decision, the assistant must continue the selected route by invoking openspec-propose, or explicitly ask whether the user wants to skip OpenSpec. It must not silently begin direct execution.\n"
+          }
+        ]
+      },
+      {
+        "vars": {
+          "input": "[In Plan Mode, the orchestrator has just completed analysis of a multi-skill change and classified it as spec-driven-propose-flow or spec-driven-incremental-flow. Exit Plan Mode next.]\n"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "OpenSpec"
+          },
+          {
+            "type": "not-contains",
+            "value": "直接执行（spec-driven-* 路由）"
+          },
+          {
+            "type": "llm-rubric",
+            "value": "In Plan Mode, when a spec-driven-propose-flow or spec-driven-incremental-flow route was selected, the final handoff must reference OpenSpec proposal or change creation as the next step. For superpowers-direct routes only, direct execution may be mentioned.\n"
+          }
+        ]
+      },
+      {
+        "vars": {
+          "input": "Add a dry-run mode to the backup CLI command. The scope is clear and limited to one module, but it changes user-visible behavior and needs acceptance criteria. How should I approach this?\n"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "openspec-propose"
+          },
+          {
+            "type": "not-contains",
+            "value": "直接执行"
+          },
+          {
+            "type": "not-contains",
+            "value": "directly execute"
+          },
+          {
+            "type": "contains",
+            "value": "OpenSpec"
+          },
+          {
+            "type": "llm-rubric",
+            "value": "When the orchestrator classifies a task as spec-driven-propose-flow, the response must route the user to OpenSpec proposal creation, not offer direct execution as the default path. The handoff language must name openspec-propose or OpenSpec change creation.\n"
+          }
+        ]
+      },
+      {
+        "vars": {
+          "input": "I have a change that crosses multiple skills. The orchestrator classified it as spec-driven-propose-flow. I asked to execute the plan.\n"
+        },
+        "assert": [
+          {
+            "type": "llm-rubric",
+            "value": "After a spec-driven route is selected and the user asks to execute the plan, the assistant may continue the selected OpenSpec route directly. If it presents mutually exclusive execution paths (e.g., OpenSpec governance vs direct execution), it should prefer the question tool when available, with the recommended route listed first. If the tool is unavailable, a clear text choice is acceptable.\n"
+          }
+        ]
+      }
+    ],
+    "env": {},
+    "defaultTest": {
+      "options": {
+        "provider": {
+          "id": "file://../../../../runners/opencode_go_provider.py",
+          "config": {
+            "model": "glm-5.1",
+            "temperature": 0,
+            "max_tokens": 4096
+          }
+        }
+      },
+      "vars": {},
+      "assert": [],
+      "metadata": {}
+    },
+    "outputPath": [
+      "/Users/yuping/Documents/workspace/oh_my_skills/.ai/evals/targets/skill.sdlc-orchestrator/reports/skill.sdlc-orchestrator-20260613T092502Z/promptfoo-output.json"
+    ],
+    "extensions": [],
+    "metadata": {},
+    "evaluateOptions": {}
+  },
+  "shareableUrl": null,
+  "metadata": {
+    "promptfooVersion": "0.121.15",
+    "nodeVersion": "v26.0.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "exportedAt": "2026-06-13T09:28:10.672Z",
+    "evaluationCreatedAt": "2026-06-13T09:25:03.842Z"
+  },
+  "vars": [
+    "input"
+  ],
+  "runtimeOptions": {
+    "eventSource": "cli",
+    "showProgressBar": true,
+    "repeat": 1,
+    "maxConcurrency": 1,
+    "cache": false
+  }
+}

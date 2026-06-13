@@ -71,10 +71,11 @@ class TestEvalopsSkillFrontmatter:
 
     def test_skill_md_defines_dir_structure(self):
         content = (EVALOPS_SKILL / "SKILL.md").read_text(encoding="utf-8")
-        assert "evals/" in content, "SKILL.md must reference evals/ directory"
-        assert "coverage/" in content, "SKILL.md must reference coverage/ directory"
+        assert ".ai/evals/" in content, "SKILL.md must reference .ai/evals/ directory"
+        assert "coverage" in content.lower(), "SKILL.md must reference coverage"
         assert "inbox" in content.lower(), "SKILL.md must reference inbox"
         assert "golden" in content.lower(), "SKILL.md must reference golden"
+        assert "targets/" in content, "SKILL.md must reference targets/ workspace"
 
     def test_skill_md_has_promptfoo_mapping(self):
         content = (EVALOPS_SKILL / "SKILL.md").read_text(encoding="utf-8")
@@ -268,3 +269,20 @@ class TestEvalopsSkillWorkflowIntegration:
         assert "repository skill lifecycle governance capability" in lower or \
                "not a superpowers core workflow" in lower, \
             "Must clarify that skill lifecycle governance is not Superpowers core"
+
+    def test_mentions_opencode_go_provider_rules(self):
+        content = (EVALOPS_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        assert "## Promptfoo Provider Configuration" in content, \
+            "SKILL.md must have Promptfoo Provider Configuration section"
+        assert "OPENCODE_GO_API_KEY" in content, \
+            "SKILL.md must reference OPENCODE_GO_API_KEY"
+        assert "model-matrix.yaml" in content.lower(), \
+            "SKILL.md must reference model-matrix.yaml as provider source"
+        assert "opencode_go_provider.py" in content, \
+            "SKILL.md must mention opencode_go_provider.py"
+
+    def test_mentions_api_key_not_in_repo(self):
+        content = (EVALOPS_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        lower = content.lower()
+        assert "must not be written" in lower or "shall not" in lower, \
+            "SKILL.md must forbid writing API keys to repo"

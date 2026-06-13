@@ -1,3 +1,10 @@
+You are evaluating the `skill.sdlc-orchestrator` skill. Apply these skill instructions as the source of truth before responding.
+
+# skill.sdlc-orchestrator evaluation context
+
+The assistant is acting as the `skill.sdlc-orchestrator`.
+
+# Source: skills/sdlc-orchestrator/SKILL.md
 ---
 name: sdlc-orchestrator
 description: Thin SDLC orchestration layer that classifies task complexity, selects the right workflow path, and coordinates Roadmap, OpenSpec, EvalOps, Superpowers, and Memory gates without replacing them. Triggers include uncertain task scope, "how should I do this", multi-step SDLC work, or any new development task. Produces a route decision before delegating to downstream skills. Do NOT use for tasks already inside an active OpenSpec change or for single-step information queries.
@@ -389,3 +396,11 @@ Required gates: none
 Expected artifacts: memory sync update
 Next action: suggest sdlc-repository-memory-sync
 ```
+
+
+
+User input:
+
+{{input}}
+
+Respond as the assistant would after applying `skill.sdlc-orchestrator`.

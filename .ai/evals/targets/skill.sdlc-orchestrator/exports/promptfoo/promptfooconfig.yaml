@@ -1,0 +1,19 @@
+description: EvalOps export for skill.sdlc-orchestrator
+prompts:
+- file://prompt.md
+providers:
+- id: file://../../../../runners/opencode_go_provider.py
+  label: opencode-go/deepseek-v4-pro
+  config:
+    model: deepseek-v4-pro
+    temperature: 0
+    max_tokens: 4096
+tests: cases.yaml
+defaultTest:
+  options:
+    provider:
+      id: file://../../../../runners/opencode_go_provider.py
+      config:
+        model: glm-5.1
+        temperature: 0
+        max_tokens: 4096

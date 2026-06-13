@@ -1,0 +1,35 @@
+id: skill.sdlc-orchestrator.positive.explicit-opt-out-direct-exec
+
+target:
+  id: skill.sdlc-orchestrator
+  type: skill
+  path: skills/sdlc-orchestrator/SKILL.md
+
+status: golden
+case_type: positive
+source: ai_suggested
+severity: medium
+created_at: 2026-06-10
+
+coverage:
+  functional:
+    - explicit-opt-out-handling
+    - route-binding
+  quality:
+    - instruction-following-fidelity
+
+input: |
+  [Previous turn: orchestrator classified a multi-skill change as spec-driven-propose-flow]
+  跳过 OpenSpec，直接执行这个 rename plan，不需要创建 proposal。
+
+expected:
+  must_include: []
+  must_not_include: []
+  rubric: |
+    When the user explicitly opts out of OpenSpec governance (e.g., "skip OpenSpec", "直接执行", "don't create a proposal"), the orchestrator should acknowledge the opt-out and proceed with direct execution. The user's explicit instruction overrides the route decision.
+
+evaluators:
+  llm_judge:
+    enabled: true
+    rubric: |
+      Verify that the assistant respects an explicit user opt-out from OpenSpec governance. When the user says to skip OpenSpec and directly execute, the assistant should acknowledge this and proceed with direct implementation rather than insisting on the OpenSpec route.

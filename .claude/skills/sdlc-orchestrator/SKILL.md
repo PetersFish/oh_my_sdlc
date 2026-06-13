@@ -101,9 +101,17 @@ When the task involves long-term product planning.
 
 ### evalops-gated
 
-When an AI behavior target is being created or modified.
+When an AI behavior target is being created or modified. New AI skill development and material AI behavior changes must pass through EvalOps gates before implementation.
 
-**Action:** Require the relevant EvalOps gate before implementation:
+**EvalOps Gate Phases for AI Behavior Changes:**
+
+1. **Identify the target.** Determine the target id (e.g., `skill.sdlc-evalops`). If the target id is not yet known, target identification becomes the next EvalOps step.
+2. **Coverage before implementation.** Route to `sdlc-evalops` for coverage definition under `.ai/evals/targets/<target-id>/`. Implementation SHALL NOT begin before coverage is user-reviewed, unless the user explicitly confirms an EvalOps exception.
+3. **Human confirmation for golden promotion.** Candidate cases drafted by the assistant require human confirmation before promotion to golden. The orchestrator SHALL distinguish assistant-generated drafts from user-approved decisions for target registration, coverage acceptance, golden case promotion, and EvalOps exceptions.
+4. **Implementation.** Once EvalOps coverage is reviewed and required golden cases exist, route implementation through the selected OpenSpec or Superpowers path.
+5. **Final golden eval.** After implementation, run final golden eval for the affected target or explicitly report the blocked runner dependency before claiming completion.
+
+**Action for specific scenarios:**
 
 - New target: `sdlc-evalops` coverage review and case generation.
 - Modified target: run existing golden eval if available.
@@ -138,6 +146,29 @@ Expected artifacts:
 Next action:
 - ...
 ```
+
+For AI behavior changes, the route decision SHALL also name the target id when known, or state that target identification is the next EvalOps step.
+
+## EvalOps Exception Handling
+
+EvalOps exceptions MUST be explicit and human-confirmed:
+
+- **User explicitly confirms exception:** When the user explicitly says to skip or defer EvalOps for an AI behavior change, the orchestrator MAY proceed after acknowledging the exception and naming the residual risk.
+- **Ambiguous instruction does not skip EvalOps:** When the user says "go ahead", "start", "implement", or equivalent after an EvalOps-gated route was selected, the orchestrator SHALL continue the EvalOps-gated route rather than treating the instruction as permission to skip EvalOps.
+
+## Final Golden Eval Reporting
+
+For EvalOps-gated changes, the final implementation summary SHALL report:
+
+- Target id
+- Case counts (total, passed, failed)
+- Export freshness status (via `scripts/export-promptfoo.py <target-id> --check`)
+- Eval command used
+- Pass/fail result count
+- Report path (when available)
+- Any blocked runner dependency (if applicable)
+
+This evidence SHALL be included before claiming completion of an EvalOps-gated change.
 
 ## Plan Mode Handoff
 
@@ -341,9 +372,10 @@ User: the research-general skill should also search ArXiv
 
 Route: spec-driven-propose-flow + evalops-gated
 Reason: skill behavior scope expansion, score = 4 (AI behavior target)
-Required gates: EvalOps gate before implementation, TDD
-Expected artifacts: eval coverage review, then OpenSpec artifacts
-Next action: check eval coverage for skill.research-general
+Target id: skill.research-general
+Required gates: EvalOps gate (coverage + golden cases before implementation), TDD
+Expected artifacts: eval coverage review, golden cases, then OpenSpec artifacts
+Next action: check eval coverage for skill.research-general under .ai/evals/targets/skill.research-general/
 ```
 
 ### Example 6: Post-implementation memory sync

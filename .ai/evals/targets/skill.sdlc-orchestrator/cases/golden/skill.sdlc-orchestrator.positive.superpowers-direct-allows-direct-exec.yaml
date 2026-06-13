@@ -1,0 +1,38 @@
+id: skill.sdlc-orchestrator.positive.superpowers-direct-allows-direct-exec
+
+target:
+  id: skill.sdlc-orchestrator
+  type: skill
+  path: skills/sdlc-orchestrator/SKILL.md
+
+status: golden
+case_type: positive
+source: ai_suggested
+severity: medium
+created_at: 2026-06-10
+
+coverage:
+  functional:
+    - route-binding
+    - boundary-preservation
+  quality:
+    - instruction-following-fidelity
+
+input: |
+  Fix the typo "initalize" in the AGENTS.md file.
+
+expected:
+  must_include: []
+  must_not_include:
+    - openspec-propose
+    - openspec-new-change
+  rubric: |
+    For low-risk, single-file changes classified as superpowers-direct, the orchestrator must allow direct execution without requiring OpenSpec artifacts. The response should not route to openspec-propose or openspec-new-change.
+
+evaluators:
+  rule_based:
+    contains: []
+  llm_judge:
+    enabled: true
+    rubric: |
+      Verify that the orchestrator correctly routes a low-risk typo fix to superpowers-direct execution without creating OpenSpec artifacts. The response should not mention openspec-propose or openspec-new-change as required steps.

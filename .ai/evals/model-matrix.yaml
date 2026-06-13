@@ -1,0 +1,41 @@
+schema_version: "1.0"
+
+models:
+  - name: opencode-go-deepseek-v4-pro
+    provider: opencode-go
+    model: deepseek-v4-pro
+    promptfoo:
+      id: file://../../../../runners/opencode_go_provider.py
+      label: opencode-go/deepseek-v4-pro
+      config:
+        model: deepseek-v4-pro
+        temperature: 0
+        max_tokens: 4096
+    grader:
+      id: file://../../../../runners/opencode_go_provider.py
+      config:
+        model: glm-5.1
+        temperature: 0
+        max_tokens: 4096
+
+environments:
+  primary: cli
+  additional: []
+
+target_selection:
+  default: all
+  filter_by_type: []
+
+run_policy:
+  mode: sequential
+  fail_fast: false
+  timeout_seconds: 300
+  retry_count: 0
+  parallel: false
+
+note: >
+  Full multi-model matrix runner implementation is deferred.
+  This schema contract defines the model, provider, environment,
+  target selection, and run policy fields for future runner work.
+  The default model (opencode-go-deepseek-v4-pro) is used by
+  scripts/export-promptfoo.py to generate Promptfoo providers.

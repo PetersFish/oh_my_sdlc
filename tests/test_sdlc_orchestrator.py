@@ -118,27 +118,29 @@ class TestOrchestratorQuestionTool:
 class TestOrchestratorEvalOpsAssets:
     """Validate EvalOps coverage and golden cases exist for orchestrator."""
 
+    TARGET_WORKSPACE = REPO_ROOT / ".ai" / "evals" / "targets" / "skill.sdlc-orchestrator"
+
     def test_coverage_matrix_exists(self):
-        coverage = REPO_ROOT / "evals" / "coverage" / "skill.sdlc-orchestrator.yaml"
+        coverage = self.TARGET_WORKSPACE / "coverage.yaml"
         assert coverage.is_file(), \
-            "evals/coverage/skill.sdlc-orchestrator.yaml must exist"
+            ".ai/evals/targets/skill.sdlc-orchestrator/coverage.yaml must exist"
 
     def test_coverage_matrix_is_reviewed(self):
-        coverage = REPO_ROOT / "evals" / "coverage" / "skill.sdlc-orchestrator.yaml"
+        coverage = self.TARGET_WORKSPACE / "coverage.yaml"
         content = coverage.read_text(encoding="utf-8")
         assert "reviewed_by_user: true" in content, \
             "Coverage matrix must have reviewed_by_user: true"
 
     def test_golden_case_count(self):
-        golden_dir = REPO_ROOT / "evals" / "cases" / "golden" / "skill.sdlc-orchestrator"
+        golden_dir = self.TARGET_WORKSPACE / "cases" / "golden"
         assert golden_dir.is_dir(), \
-            "evals/cases/golden/skill.sdlc-orchestrator/ must exist"
+            ".ai/evals/targets/skill.sdlc-orchestrator/cases/golden/ must exist"
         cases = list(golden_dir.glob("*.yaml"))
         assert len(cases) >= 6, \
             f"Expected at least 6 golden cases, found {len(cases)}"
 
     def test_golden_cases_have_required_fields(self):
-        golden_dir = REPO_ROOT / "evals" / "cases" / "golden" / "skill.sdlc-orchestrator"
+        golden_dir = self.TARGET_WORKSPACE / "cases" / "golden"
         for case_file in golden_dir.glob("*.yaml"):
             case = yaml.safe_load(case_file.read_text(encoding="utf-8"))
             assert "id" in case, f"Missing id in {case_file.name}"
@@ -150,17 +152,17 @@ class TestOrchestratorEvalOpsAssets:
             assert "input" in case, f"Missing input in {case_file.name}"
 
     def test_target_index_includes_orchestrator(self):
-        index = REPO_ROOT / "evals" / "metadata" / "target-index.yaml"
-        assert index.is_file(), "evals/metadata/target-index.yaml must exist"
+        index = REPO_ROOT / ".ai" / "evals" / "manifest.yaml"
+        assert index.is_file(), ".ai/evals/manifest.yaml must exist"
         targets = yaml.safe_load(index.read_text(encoding="utf-8"))
         target_ids = [t["id"] for t in targets.get("targets", [])]
         assert "skill.sdlc-orchestrator" in target_ids, \
-            "target-index.yaml must include skill.sdlc-orchestrator"
+            "manifest.yaml must include skill.sdlc-orchestrator"
 
     def test_promptfoo_export_exists(self):
-        export_dir = REPO_ROOT / "evals" / "exports" / "promptfoo" / "skill.sdlc-orchestrator"
+        export_dir = self.TARGET_WORKSPACE / "exports" / "promptfoo"
         assert export_dir.is_dir(), \
-            "evals/exports/promptfoo/skill.sdlc-orchestrator/ must exist"
+            ".ai/evals/targets/skill.sdlc-orchestrator/exports/promptfoo/ must exist"
         assert (export_dir / "promptfooconfig.yaml").is_file(), \
             "promptfooconfig.yaml must exist"
         assert (export_dir / "cases.yaml").is_file(), \
@@ -170,7 +172,7 @@ class TestOrchestratorEvalOpsAssets:
 class TestOrchestratorPromptfooExport:
     """Validate Promptfoo export evaluates activated skill behavior."""
 
-    EXPORT_DIR = REPO_ROOT / "evals" / "exports" / "promptfoo" / "skill.sdlc-orchestrator"
+    EXPORT_DIR = REPO_ROOT / ".ai" / "evals" / "targets" / "skill.sdlc-orchestrator" / "exports" / "promptfoo"
 
     def test_promptfoo_config_does_not_have_global_openspec_assertion(self):
         config = yaml.safe_load((self.EXPORT_DIR / "promptfooconfig.yaml").read_text(encoding="utf-8"))
@@ -190,15 +192,14 @@ class TestOrchestratorPromptfooExport:
         assert "Route decisions are action-binding" in prompt
         assert "{{input}}" in prompt
 
-    def test_promptfoo_cases_do_not_depend_on_llm_rubric_grader(self):
+    def test_promptfoo_cases_do_not_depend_on_unconfigured_llm_rubric_grader(self):
+        """Verify any llm-rubric assertions have configured rubric text."""
         cases = yaml.safe_load((self.EXPORT_DIR / "cases.yaml").read_text(encoding="utf-8"))
-        assertion_types = [
-            assertion.get("type")
-            for case in cases
-            for assertion in case.get("assert", [])
-        ]
-        assert "llm-rubric" not in assertion_types, \
-            "Use deterministic assertions for this export to avoid external grader failures"
+        for case in cases:
+            for assertion in case.get("assert", []):
+                if assertion.get("type") == "llm-rubric":
+                    assert assertion.get("value", "").strip(), \
+                        "llm-rubric assertions must have configured rubric text"
 
 
 class TestOrchestratorDistributedCopies:

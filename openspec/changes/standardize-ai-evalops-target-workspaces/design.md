@@ -110,6 +110,36 @@ For new AI skill development and material AI behavior changes, `sdlc-orchestrato
 
 The orchestrator coordinates these gates but does not duplicate detailed `sdlc-evalops` workflows.
 
+### Decision 12: opencode Go models use Python provider for Promptfoo
+
+opencode Go (`opencode-go`) paid-plan models are accessible via an OpenAI-compatible endpoint at `https://opencode.ai/zen/go/v1/chat/completions`. However, Promptfoo's built-in `openai:chat:*` provider encounters a `TypeError: terminated` when reading responses from this endpoint due to an undici/Node HTTP client compatibility issue.
+
+- The default eval model for this repo is `opencode-go/deepseek-v4-pro`.
+- The Promptfoo provider is a Python provider at `.ai/evals/runners/opencode_go_provider.py`, using the standard library `urllib` to call the endpoint and returning `{ "output": text }`.
+- The provider path is relative to the generated `promptfooconfig.yaml`: `file://../../../../runners/opencode_go_provider.py`.
+- Provider configuration (`model`, `temperature`, `max_tokens`) lives in `.ai/evals/model-matrix.yaml` under `models[].promptfoo`.
+- The same provider is configured as the grader (`models[].grader`) in `defaultTest.options.provider` so `llm-rubric` assertions can be evaluated through the same endpoint.
+- The grader model should be one with stable JSON output (e.g., GLM, Qwen, Kimi), not a reasoning-oriented model. Reasoning models may put output in `reasoning_content` instead of `content`, causing `llm-rubric` JSON extraction failures.
+- The API key is read from `OPENCODE_GO_API_KEY` environment variable by the Python provider. Keys MUST NOT be written into repository files.
+- `scripts/export-promptfoo.py` reads the provider block from `model-matrix.yaml` and generates the `providers` and `defaultTest.options.provider` sections of `promptfooconfig.yaml`.
+- `opencode run --model opencode-go/deepseek-v4-pro "hello"` may be used as a manual smoke test but is not the Promptfoo runner.
+
+### Decision 13: Eval runner script bridges export, eval, and report writing
+
+The `scripts/export-promptfoo.py` script handles only export generation. The `promptfoo eval` command must be run with `-o <output-path>` to write repo-pinned reports. Without a runner script that chains export → eval → report, reports end up in Promptfoo's default local store (`~/.promptfoo/promptfoo.db`) rather than in the repo's `reports/` directory.
+
+- `scripts/run-promptfoo-eval.py <target-id>` chains:
+  1. `scripts/export-promptfoo.py <target-id>` (ensures freshness)
+  2. `promptfoo eval -c <config> -o <reports-dir>/promptfoo-output.json --max-concurrency 1 --no-cache`
+  3. Parses the JSON output and writes `summary.md` (pass/fail counts, case details) and `failures.yaml` (failed case ids with severity)
+- Reports land under `.ai/evals/targets/<target-id>/reports/<run-id>/`
+- The `run-id` format is `<target-id>-<timestamp>` (e.g., `skill.sdlc-orchestrator-20260613T090000Z`)
+- The `sdlc-evalops` Eval Command example must include the `-o` flag and reference the runner script as the canonical way to run and record eval
+- The runner script uses `OPENCODE_GO_API_KEY` from environment (same as the Python provider)
+- If `promptfoo eval` fails, the runner exits non-zero and reports the error to stderr
+
+Alternative considered: keep `export-promptfoo.py` as the single entry point and add a `--run` mode. Rejected because that bleeds run orchestration into a script whose existing contract is pure export generation, making `--check` guarantees harder to reason about.
+
 ## Target Workspace Layout
 
 The standardized layout is:

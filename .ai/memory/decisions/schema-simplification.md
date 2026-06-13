@@ -1,10 +1,10 @@
 ---
 id: decisions/schema-simplification
-type: decision
+type: decisions
 title: Remove sdd-plus-superpowers custom schema
 summary: Replaced the custom sdd-plus-superpowers OpenSpec schema with the package-provided spec-driven schema. Workflow complexity (small/medium/large) is now handled by the sdlc-orchestrator skill via interaction flow (direct, propose, incremental) instead of custom schema variation.
 sync_status: synced
-evidence_mode: change
+evidence_mode: session_observation
 linked_commits: []
 linked_specs: [simplify-sdlc-routing-schemas]
 linked_sessions: []

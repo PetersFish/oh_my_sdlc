@@ -93,6 +93,7 @@ The `sdlc-evalops` skill SHALL distinguish interactive session evaluation from g
 #### Scenario: Promptfoo eval runs canonical golden exports
 - **WHEN** implementation changes affect an AI behavior target
 - **THEN** Promptfoo eval SHALL run generated exports from canonical golden cases or report a blocked runner dependency explicitly
+- **AND** the eval command SHALL include `-o <report-path>` to write results to `.ai/evals/targets/<target-id>/reports/<run-id>/promptfoo-output.json`
 
 ### Requirement: Reports Policy
 The `sdlc-evalops` skill SHALL store eval reports under target workspaces and require final reporting for EvalOps-gated changes.
@@ -105,6 +106,41 @@ The `sdlc-evalops` skill SHALL store eval reports under target workspaces and re
 - **WHEN** an EvalOps-gated change completes or pauses
 - **THEN** the final report summary SHALL include target id, case counts, export freshness status, eval command, pass/fail result count when available, report path, and any blocked runner dependency
 
+### Requirement: Eval Runner Script
+The `sdlc-evalops` skill SHALL provide a runner script that chains export generation, Promptfoo eval, and structured report writing.
+
+#### Scenario: Runner script chains export, eval, and report writing
+- **WHEN** `scripts/run-promptfoo-eval.py <target-id>` is executed
+- **THEN** it SHALL run `scripts/export-promptfoo.py <target-id>` first to ensure exports are fresh
+- **AND** it SHALL run `promptfoo eval -c <config-path> -o <report-path> --max-concurrency 1 --no-cache`
+- **AND** it SHALL write `summary.md` and `failures.yaml` under `.ai/evals/targets/<target-id>/reports/<run-id>/`
+
+#### Scenario: Runner script produces required report files
+- **WHEN** `scripts/run-promptfoo-eval.py <target-id>` completes
+- **THEN** `.ai/evals/targets/<target-id>/reports/<run-id>/` SHALL contain `promptfoo-output.json`, `summary.md`, and `failures.yaml`
+- **AND** `summary.md` SHALL include target id, case counts, export freshness status, eval command, pass/fail result count, and report path
+
+#### Scenario: Runner script uses API key from environment
+- **WHEN** `scripts/run-promptfoo-eval.py <target-id>` launches `promptfoo eval`
+- **THEN** it SHALL pass the `OPENCODE_GO_API_KEY` environment variable to the subprocess
+- **AND** it SHALL NOT write the API key value into any file
+
+#### Scenario: Runner script handles eval failure
+- **WHEN** `promptfoo eval` exits non-zero
+- **THEN** the runner script SHALL exit non-zero and report the error to stderr
+
+### Requirement: Eval Command Documentation
+The `sdlc-evalops` skill SHALL document the canonical eval command with the required `-o` flag and reference the runner script.
+
+#### Scenario: Eval command includes -o flag
+- **WHEN** the `sdlc-evalops` skill documents the Promptfoo eval command
+- **THEN** the command example SHALL include `-o .ai/evals/targets/<target-id>/reports/<run-id>/promptfoo-output.json`
+
+#### Scenario: Runner script is the canonical eval path
+- **WHEN** the `sdlc-evalops` skill documents how to run eval
+- **THEN** it SHALL reference `scripts/run-promptfoo-eval.py <target-id>` as the canonical runner
+- **AND** it SHALL include the raw `promptfoo eval` command as a fallback with `-o` flag
+
 ### Requirement: Model Matrix Schema
 The `sdlc-evalops` skill SHALL define a `.ai/evals/model-matrix.yaml` schema contract while deferring full matrix runner implementation.
 
@@ -116,3 +152,16 @@ The `sdlc-evalops` skill SHALL define a `.ai/evals/model-matrix.yaml` schema con
 - **WHEN** this change is implemented
 - **THEN** the system SHALL NOT require a complete multi-model matrix runner for acceptance
 - **AND** runner implementation SHALL remain available for a later roadmap item
+
+#### Scenario: Promptfoo provider is generated from model matrix
+- **WHEN** `scripts/export-promptfoo.py <target-id>` generates a `promptfooconfig.yaml`
+- **THEN** the providers section SHALL be derived from `.ai/evals/model-matrix.yaml` default model's `promptfoo` block
+- **AND** the generated provider SHALL use `openai:chat:<model>` as the id
+- **AND** the generated provider SHALL include `apiBaseUrl: https://opencode.ai/zen/go/v1` in config
+- **AND** the generated provider SHALL include `apiKeyEnvar: OPENCODE_GO_API_KEY` in config
+- **AND** the generated config SHALL NOT contain an API key value
+
+#### Scenario: opencode Go CLI smoke test is separate from Promptfoo provider
+- **WHEN** an EvalOps user wants to verify a model works
+- **THEN** `opencode run --model opencode-go/deepseek-v4-pro "hello"` MAY be used as a manual smoke test
+- **AND** the Promptfoo eval SHALL use the OpenAI-compatible endpoint, not a subprocess wrapper around opencode CLI
