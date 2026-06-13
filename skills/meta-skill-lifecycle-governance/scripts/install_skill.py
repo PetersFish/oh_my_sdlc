@@ -30,6 +30,7 @@ def main() -> int:
         source_ref=args.source_ref,
         status=args.status,
         target=str(target_dir),
+        source_skill_dir=source_skill,
     )
     (target_dir / ".skill-install.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(metadata, indent=2))

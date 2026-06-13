@@ -26,6 +26,8 @@ from sdlc_runtime_paths import (  # noqa: E402
     load_roadmap_manifest,
     resolve_roadmap_dir,
     roadmap_area_items_dir,
+    roadmap_areas_dir,
+    roadmap_manifest_path,
 )
 
 VALID_STATUSES = {"idea", "planned", "ready", "active", "done", "deferred", "cancelled", "superseded"}
@@ -318,6 +320,13 @@ def main():
         print("NOTE: flat legacy layout detected (.ai/roadmap/items/).")
         print("      Consider migrating to area-based layout.\n")
         validate_flat_layout(root, roadmap_dir, errors)
+    elif (roadmap_dir / "areas").is_dir() and any(
+        (roadmap_dir / "areas").iterdir()
+    ):
+        errors.append(
+            "root manifest.json missing but areas/ directory exists with content. "
+            "Create " + str(roadmap_manifest_path(root)) + " or remove orphan areas/"
+        )
     else:
         print("WARNING: No roadmap items directory found (neither areas/ nor items/).")
         return 0

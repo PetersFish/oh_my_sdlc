@@ -1,9 +1,21 @@
 {
   "skill": "sdlc-evalops",
   "source_repo": ".",
-  "source_ref": "2b0e7581d12198746dc50df9fb6f7485dc3e3cf5",
+  "source_ref": "HEAD",
   "status": "stable",
   "target": ".opencode/skills/sdlc-evalops",
-  "installed_at": "2026-06-10T13:36:09.688429Z",
-  "backport_policy": "review-required"
+  "installed_at": "2026-06-13T05:33:00.622454Z",
+  "backport_policy": "review-required",
+  "source_path": "skills/sdlc-evalops",
+  "payload_hash": "2b08de575962435d91fc2d77c23b636f038cfc4d848bfd3d821f9c0d0b1ec859",
+  "files": [
+    "SKILL.md",
+    "evals/evals.json",
+    "templates/default-case.yaml",
+    "templates/default-coverage.yaml",
+    "templates/eval-policy.yaml",
+    "templates/promptfoo-cases.yaml",
+    "templates/promptfooconfig.yaml",
+    "templates/target-index.yaml"
+  ]
 }
