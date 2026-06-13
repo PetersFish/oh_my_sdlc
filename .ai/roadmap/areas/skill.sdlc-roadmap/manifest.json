@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "id": "skill.sdlc-roadmap",
+  "kind": "skill",
+  "title": "sdlc-roadmap Skill",
+  "owner_path": "skills/sdlc-roadmap",
+  "id_prefix": "RM-SDLC"
+}

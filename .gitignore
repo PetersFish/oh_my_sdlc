@@ -30,5 +30,8 @@ htmlcov/
 .idea/
 .vscode/
 
+# Generated roadmap backup
+.ai/roadmap/index.json.bak
+
 # OS files
 .DS_Store

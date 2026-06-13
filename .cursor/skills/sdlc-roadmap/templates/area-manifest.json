@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "id": "<area-id>",
+  "kind": "skill|workflow|agent|project|domain",
+  "title": "<human-readable area name>",
+  "owner_path": "<source-path>",
+  "id_prefix": "<RM-PREFIX>"
+}

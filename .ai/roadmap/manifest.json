@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "default_area": "skill.sdlc-roadmap",
+  "areas": [
+    {
+      "id": "skill.sdlc-roadmap",
+      "kind": "skill",
+      "title": "sdlc-roadmap Skill",
+      "path": "areas/skill.sdlc-roadmap",
+      "owner_path": "skills/sdlc-roadmap",
+      "id_prefix": "RM-SDLC"
+    }
+  ],
+  "global_view": {
+    "include_statuses": ["active", "ready", "planned"],
+    "sort": ["priority", "order"]
+  }
+}
