@@ -1,0 +1,906 @@
+{
+  "evalId": "eval-Z4A-2026-06-10T15:14:27",
+  "results": {
+    "version": 3,
+    "timestamp": "2026-06-10T15:14:27.315Z",
+    "prompts": [
+      {
+        "raw": "You are evaluating the `sdlc-orchestrator` skill. Apply these skill instructions as the source of truth before responding.\n\n# sdlc-orchestrator evaluation context\n\nThe assistant is acting as the `sdlc-orchestrator`: a thin SDLC orchestration layer that classifies task complexity, selects the right workflow path, and coordinates Roadmap, OpenSpec, EvalOps, Superpowers, and Memory gates without replacing them.\n\n## Route Classification\n\nScore signals:\n\n- Crosses 2+ modules or skill boundaries: +2\n- Alters public behavior, trigger boundaries, or user-visible output: +2\n- Changes data models, file models, schemas, or persistent artifact models: +2\n- Impacts skill, agent, prompt, or workflow behavior: +2\n- Needs explicit acceptance criteria from the user: +1\n- Single-file, low-risk local fix: -2\n- Pure typo, docs cleanup, or test-only maintenance: -3\n\nRoutes:\n\n- `score <= 0` -> `superpowers-direct`\n- `score 1-3` -> `spec-driven-propose-flow`\n- `score >= 4` -> `spec-driven-incremental-flow`\n- roadmap -> `roadmap-first`\n- AI behavior -> `evalops-gated`\n- durable fact -> `memory-sync`\n\n**Route decisions are action-binding.** Once the orchestrator selects a route, the immediate next action SHALL follow that route. The selected route determines what happens next. It is not a suggestion. The assistant may only bypass the route if the user explicitly says to skip OpenSpec or directs otherwise. Do not default to direct execution for `spec-driven-*` routes.\n\n## Routing Requirements\n\n- `superpowers-direct`: small, low-risk changes. No OpenSpec artifacts. Typo fixes may be directly executed.\n- `spec-driven-propose-flow`: medium formal changes. The bound next action is `openspec-propose`; direct execution is not the default.\n- `spec-driven-incremental-flow`: very complex changes. The bound next action is `openspec-new-change`; direct execution is not the default.\n- `evalops-gated`: AI behavior target changes require EvalOps before implementation.\n\n## Required Decision Output\n\nBefore delegating, produce a concise decision with:\n\n- Route\n- Reason\n- Required gates\n- Expected artifacts\n- Next action\n\n## Plan Mode Handoff\n\nWhen operating in Plan Mode and about to exit, the final handoff MUST match the selected route:\n\n- `spec-driven-propose-flow`: say that after leaving Plan Mode it can create an OpenSpec proposal/change via `openspec-propose`. Do not say it can directly execute the implementation plan.\n- `spec-driven-incremental-flow`: say that after leaving Plan Mode it can create or continue the OpenSpec change via `openspec-new-change`. Do not say it can directly execute the implementation plan.\n- `superpowers-direct`: may say that after leaving Plan Mode it can directly execute the task.\n\n## Ambiguous Execution Requests\n\nWhen the user says \"execute plan\", \"go ahead\", \"start\", or equivalent after a `spec-driven-*` route was selected:\n\n- Treat the request as an instruction to continue the selected route, not as permission to bypass governance.\n- For `spec-driven-propose-flow`, continue by invoking `openspec-propose`, or ask whether the user wants to explicitly skip OpenSpec.\n- If the user explicitly says to skip OpenSpec or directly execute despite the route, acknowledge the opt-out and proceed outside the selected route.\n\n## Execution Path Choices\n\nWhen asking the user to choose between mutually exclusive execution paths, use the `question` tool if available, with the recommended route listed first and marked \"(Recommended)\". If unavailable, present the same choices as concise text.\n\nUser input:\n\n{{input}}\n\nRespond as the assistant would after applying `sdlc-orchestrator`.\n",
+        "label": "evals/exports/promptfoo/skill.sdlc-orchestrator/prompt.md: You are evaluating the `sdlc-orchestrator` skill. ...",
+        "id": "bfc3e722c4642168b4f085ecf6e0342ef7d587f27292e22ff59920bd8645ddd8",
+        "provider": "opencode-deepseek-v4",
+        "metrics": {
+          "score": 6,
+          "testPassCount": 6,
+          "testFailCount": 0,
+          "testErrorCount": 0,
+          "assertPassCount": 8,
+          "assertFailCount": 0,
+          "totalLatencyMs": 44692,
+          "tokenUsage": {
+            "prompt": 25035,
+            "completion": 651,
+            "cached": 44032,
+            "total": 70415,
+            "numRequests": 6,
+            "completionDetails": {
+              "reasoning": 697,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 44032,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          },
+          "namedScores": {},
+          "namedScoresCount": {},
+          "namedScoreWeights": {},
+          "cost": 0
+        }
+      }
+    ],
+    "results": [
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "openspec-propose"
+              }
+            },
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "OpenSpec"
+              }
+            },
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "not-contains",
+                "value": "直接执行"
+              }
+            }
+          ]
+        },
+        "id": "16e58df6-1af0-41e3-9751-c11edcc89396",
+        "latencyMs": 12311,
+        "namedScores": {},
+        "prompt": {
+          "raw": "You are evaluating the `sdlc-orchestrator` skill. Apply these skill instructions as the source of truth before responding.\n\n# sdlc-orchestrator evaluation context\n\nThe assistant is acting as the `sdlc-orchestrator`: a thin SDLC orchestration layer that classifies task complexity, selects the right workflow path, and coordinates Roadmap, OpenSpec, EvalOps, Superpowers, and Memory gates without replacing them.\n\n## Route Classification\n\nScore signals:\n\n- Crosses 2+ modules or skill boundaries: +2\n- Alters public behavior, trigger boundaries, or user-visible output: +2\n- Changes data models, file models, schemas, or persistent artifact models: +2\n- Impacts skill, agent, prompt, or workflow behavior: +2\n- Needs explicit acceptance criteria from the user: +1\n- Single-file, low-risk local fix: -2\n- Pure typo, docs cleanup, or test-only maintenance: -3\n\nRoutes:\n\n- `score <= 0` -> `superpowers-direct`\n- `score 1-3` -> `spec-driven-propose-flow`\n- `score >= 4` -> `spec-driven-incremental-flow`\n- roadmap -> `roadmap-first`\n- AI behavior -> `evalops-gated`\n- durable fact -> `memory-sync`\n\n**Route decisions are action-binding.** Once the orchestrator selects a route, the immediate next action SHALL follow that route. The selected route determines what happens next. It is not a suggestion. The assistant may only bypass the route if the user explicitly says to skip OpenSpec or directs otherwise. Do not default to direct execution for `spec-driven-*` routes.\n\n## Routing Requirements\n\n- `superpowers-direct`: small, low-risk changes. No OpenSpec artifacts. Typo fixes may be directly executed.\n- `spec-driven-propose-flow`: medium formal changes. The bound next action is `openspec-propose`; direct execution is not the default.\n- `spec-driven-incremental-flow`: very complex changes. The bound next action is `openspec-new-change`; direct execution is not the default.\n- `evalops-gated`: AI behavior target changes require EvalOps before implementation.\n\n## Required Decision Output\n\nBefore delegating, produce a concise decision with:\n\n- Route\n- Reason\n- Required gates\n- Expected artifacts\n- Next action\n\n## Plan Mode Handoff\n\nWhen operating in Plan Mode and about to exit, the final handoff MUST match the selected route:\n\n- `spec-driven-propose-flow`: say that after leaving Plan Mode it can create an OpenSpec proposal/change via `openspec-propose`. Do not say it can directly execute the implementation plan.\n- `spec-driven-incremental-flow`: say that after leaving Plan Mode it can create or continue the OpenSpec change via `openspec-new-change`. Do not say it can directly execute the implementation plan.\n- `superpowers-direct`: may say that after leaving Plan Mode it can directly execute the task.\n\n## Ambiguous Execution Requests\n\nWhen the user says \"execute plan\", \"go ahead\", \"start\", or equivalent after a `spec-driven-*` route was selected:\n\n- Treat the request as an instruction to continue the selected route, not as permission to bypass governance.\n- For `spec-driven-propose-flow`, continue by invoking `openspec-propose`, or ask whether the user wants to explicitly skip OpenSpec.\n- If the user explicitly says to skip OpenSpec or directly execute despite the route, acknowledge the opt-out and proceed outside the selected route.\n\n## Execution Path Choices\n\nWhen asking the user to choose between mutually exclusive execution paths, use the `question` tool if available, with the recommended route listed first and marked \"(Recommended)\". If unavailable, present the same choices as concise text.\n\nUser input:\n\nAdd a dry-run mode to the backup CLI command. The scope is clear and limited to one module, but it changes user-visible behavior and needs acceptance criteria. How should I approach this?\n\nRespond as the assistant would after applying `sdlc-orchestrator`.\n",
+          "label": "evals/exports/promptfoo/skill.sdlc-orchestrator/prompt.md: You are evaluating the `sdlc-orchestrator` skill. ...",
+          "config": {}
+        },
+        "promptId": "bfc3e722c4642168b4f085ecf6e0342ef7d587f27292e22ff59920bd8645ddd8",
+        "promptIdx": 0,
+        "provider": {
+          "id": "opencode",
+          "label": "opencode-deepseek-v4"
+        },
+        "response": {
+          "output": "Route: `spec-driven-propose-flow`\n\nReason: Score `+3`\n\n- Changes user-visible CLI behavior: `+2`\n- Needs explicit acceptance criteria: `+1`\n- Scope is limited to one module, but not low-risk enough to bypass governance because CLI behavior changes\n\nRequired gates:\n\n- OpenSpec proposal before implementation\n- Acceptance criteria clarified before coding\n- Superpowers implementation workflow after proposal approval\n- Verification via CLI tests or command-level behavior checks\n\nExpected artifacts:\n\n- OpenSpec change/proposal for `backup` CLI dry-run mode\n- Acceptance criteria covering what dry-run prints, what it must not mutate, exit codes, and error behavior\n- Implementation and tests after the proposal path is accepted\n\nNext action:\n\nInvoke `openspec-propose` to draft the change proposal and acceptance criteria. Do not directly implement yet unless the user explicitly says to skip OpenSpec.",
+          "tokenUsage": {
+            "prompt": 11641,
+            "completion": 186,
+            "total": 11859,
+            "cached": 0,
+            "completionDetails": {
+              "reasoning": 32,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          },
+          "cost": 0,
+          "raw": "{\"data\":{\"info\":{\"parentID\":\"msg_eb2196025001cbQcsO0idRZ9Ms\",\"role\":\"assistant\",\"mode\":\"build\",\"agent\":\"build\",\"path\":{\"cwd\":\"/Users/yuping/Documents/workspace/oh_my_skills\",\"root\":\"/Users/yuping/Documents/workspace/oh_my_skills\"},\"cost\":0,\"tokens\":{\"total\":11859,\"input\":11641,\"output\":186,\"reasoning\":32,\"cache\":{\"write\":0,\"read\":0}},\"modelID\":\"gpt-5.5\",\"providerID\":\"openai\",\"time\":{\"created\":1781104468020,\"completed\":1781104479624},\"finish\":\"stop\",\"id\":\"msg_eb21960340018wlIHjjuoBMygM\",\"sessionID\":\"ses_14de6a02bffev4N1zL7O7H8RaT\"},\"parts\":[{\"snapshot\":\"682d59c5047093d0e3300fddd5352e4256aa4c23\",\"type\":\"step-start\",\"id\":\"prt_eb219791d0017Uq34EL265DhO8\",\"sessionID\":\"ses_14de6a02bffev4N1zL7O7H8RaT\",\"messageID\":\"msg_eb21960340018wlIHjjuoBMygM\"},{\"type\":\"reasoning\",\"text\":\"**Considering answer classification**\\n\\nI think I need to classify the user's answer based on their feedback. They mentioned evaluating and the skill content source, but I don't have an actual skill tool available for this task. I need to focus on what information should be included in the output. It's about ensuring we meet the user's expectations while handling the decision-making process. It feels like an important balance!\",\"time\":{\"start\":1781104474733,\"end\":1781104478900},\"metadata\":{\"openai\":{\"itemId\":\"rs_04dfac25d5526f7b016a297f5aeb7c8191b6d395736b555a50\",\"reasoningEncryptedContent\":\"gAAAAABqKX9fwTt_J6KQ41RmJ5R51uYb3gzk8FVGDuVcrXQ7aTPveki-aTXdd-kLfO0Bvd248iK93sT0-OJjct0gnYTIXtmtW3s5D4noq4Byr1lQIUEWJDJgzgGiATTCY6U-YXm_Rj0k07kYh-1ahPd9PNzJyCA-CKutoKM4xM8Vg-MSokGkTqHk9w_LT6RFs_SJtZ2ioLJGUuD279pyemYbDsoCPd0Wn6Dwu9WekRn4J8IpVbEZ5TRtvZWn_LBQnqEc_DH_9tL6_7PzVADtH3cYv__lIarNpqcBHHCiysshM3S3yZpE2a9irDIkwA2G2sJKtt0z42nAMc3wBwRDo0LdTpMYo4wS9QoyKbE7Svwn5qzalGmtst5OY0v9Cu4lbVo9Or4melJbUKGPaLq8dUiQOp8OmDogC3rrRZIFR2YnmKh9GPVFma4xBpYCOOslqeq8-I8Sj1b1r8n__7EZzWMlRJQFRr7iXS47pCJ88-GWLubJlMB1JeLaEPalVjvEIrTOaFItBRWhWN1jzW6oPN9v2damoItRMmIA3rKy_k0Z2-RBn7j9pF5vAdXGGwrT2ITXAHqqBW58vEY_pXwLPMMwQo09J4FlVmpX8YExuSAJQV5PA-9Xv83BBwHNR2vfF-NtW5bWdjTLRrrTvSKDKSTQy8ibGKgPAJ5ox-gknX-59iPLMqkq7zqmQLUoRFzJcLICPyh8SWsi7X0ty30xpBMizEq0dw9WHjOyaHVpce5NSdr3edG6mzRGUZ4N5YV2ZOWEVKEoQMPXKel_hdqF_OcmsqzjfaYftZozOBPzqhHjtU4cX_rlMt4QtSglmwHPMBgkpt7AcJY13DxZBHhbDFM1pR1yvhpqdS24DIi0OF_DlsG2HkMDxLNMXS8MPIG3xAtn_Z-x2rNUq4sw7mBK5togOQDAAjs4AADO0sKWjnL-Am_RxxNez7DTQ3oQfY4OVVd3dZL9cB4OSPzmTcS38ILV_Q5CQgc37mhIPjA0TksOkLXf0cjQCY5cQgQZKGOB4uSO5YZ3zxkldFzVhqN_3g0pZf3JSvIUI0fqdrPpNbXFlai-jvRg5Pdo53U79ywnPPBt6AKP2Vo--QJTzyZZheBi9zJEueycoI-pdbDQJ03Dph6VflQLA48=\"}},\"id\":\"prt_eb2197a6d001YEseEX7dJbIFDE\",\"sessionID\":\"ses_14de6a02bffev4N1zL7O7H8RaT\",\"messageID\":\"msg_eb21960340018wlIHjjuoBMygM\"},{\"type\":\"text\",\"text\":\"Route: `spec-driven-propose-flow`\\n\\nReason: Score `+3`\\n\\n- Changes user-visible CLI behavior: `+2`\\n- Needs explicit acceptance criteria: `+1`\\n- Scope is limited to one module, but not low-risk enough to bypass governance because CLI behavior changes\\n\\nRequired gates:\\n\\n- OpenSpec proposal before implementation\\n- Acceptance criteria clarified before coding\\n- Superpowers implementation workflow after proposal approval\\n- Verification via CLI tests or command-level behavior checks\\n\\nExpected artifacts:\\n\\n- OpenSpec change/proposal for `backup` CLI dry-run mode\\n- Acceptance criteria covering what dry-run prints, what it must not mutate, exit codes, and error behavior\\n- Implementation and tests after the proposal path is accepted\\n\\nNext action:\\n\\nInvoke `openspec-propose` to draft the change proposal and acceptance criteria. Do not directly implement yet unless the user explicitly says to skip OpenSpec.\",\"time\":{\"start\":1781104478901,\"end\":1781104479494},\"metadata\":{\"openai\":{\"itemId\":\"msg_04dfac25d5526f7b016a297f5f1adc819187d558b48f7e75c5\",\"phase\":\"final_answer\"}},\"id\":\"prt_eb2198ab5001wML8XosOYTiRtP\",\"sessionID\":\"ses_14de6a02bffev4N1zL7O7H8RaT\",\"messageID\":\"msg_eb21960340018wlIHjjuoBMygM\"},{\"reason\":\"stop\",\"snapshot\":\"682d59c5047093d0e3300fddd5352e4256aa4c23\",\"type\":\"step-finish\",\"tokens\":{\"total\":11859,\"input\":11641,\"output\":186,\"reasoning\":32,\"cache\":{\"write\":0,\"read\":0}},\"cost\":0,\"id\":\"prt_eb2198d5f001DXEa42mkt09yzg\",\"sessionID\":\"ses_14de6a02bffev4N1zL7O7H8RaT\",\"messageID\":\"msg_eb21960340018wlIHjjuoBMygM\"}]},\"request\":{\"timeout\":false},\"response\":{}}",
+          "sessionId": "ses_14de6a02bffev4N1zL7O7H8RaT"
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "vars": {
+            "input": "Add a dry-run mode to the backup CLI command. The scope is clear and limited to one module, but it changes user-visible behavior and needs acceptance criteria. How should I approach this?\n",
+            "sessionId": "ses_14de6a02bffev4N1zL7O7H8RaT"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "openspec-propose"
+            },
+            {
+              "type": "contains",
+              "value": "OpenSpec"
+            },
+            {
+              "type": "not-contains",
+              "value": "直接执行"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 0,
+        "tokenUsage": {
+          "prompt": 11641,
+          "completion": 186,
+          "cached": 0,
+          "total": 11859,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 32,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "input": "Add a dry-run mode to the backup CLI command. The scope is clear and limited to one module, but it changes user-visible behavior and needs acceptance criteria. How should I approach this?\n",
+          "sessionId": "ses_14de6a02bffev4N1zL7O7H8RaT"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {},
+          "sessionId": "ses_14de6a02bffev4N1zL7O7H8RaT"
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "openspec-propose"
+              }
+            }
+          ]
+        },
+        "id": "256ee9fd-112a-44f1-a1ec-27652c7b0988",
+        "latencyMs": 6578,
+        "namedScores": {},
+        "prompt": {
+          "raw": "You are evaluating the `sdlc-orchestrator` skill. Apply these skill instructions as the source of truth before responding.\n\n# sdlc-orchestrator evaluation context\n\nThe assistant is acting as the `sdlc-orchestrator`: a thin SDLC orchestration layer that classifies task complexity, selects the right workflow path, and coordinates Roadmap, OpenSpec, EvalOps, Superpowers, and Memory gates without replacing them.\n\n## Route Classification\n\nScore signals:\n\n- Crosses 2+ modules or skill boundaries: +2\n- Alters public behavior, trigger boundaries, or user-visible output: +2\n- Changes data models, file models, schemas, or persistent artifact models: +2\n- Impacts skill, agent, prompt, or workflow behavior: +2\n- Needs explicit acceptance criteria from the user: +1\n- Single-file, low-risk local fix: -2\n- Pure typo, docs cleanup, or test-only maintenance: -3\n\nRoutes:\n\n- `score <= 0` -> `superpowers-direct`\n- `score 1-3` -> `spec-driven-propose-flow`\n- `score >= 4` -> `spec-driven-incremental-flow`\n- roadmap -> `roadmap-first`\n- AI behavior -> `evalops-gated`\n- durable fact -> `memory-sync`\n\n**Route decisions are action-binding.** Once the orchestrator selects a route, the immediate next action SHALL follow that route. The selected route determines what happens next. It is not a suggestion. The assistant may only bypass the route if the user explicitly says to skip OpenSpec or directs otherwise. Do not default to direct execution for `spec-driven-*` routes.\n\n## Routing Requirements\n\n- `superpowers-direct`: small, low-risk changes. No OpenSpec artifacts. Typo fixes may be directly executed.\n- `spec-driven-propose-flow`: medium formal changes. The bound next action is `openspec-propose`; direct execution is not the default.\n- `spec-driven-incremental-flow`: very complex changes. The bound next action is `openspec-new-change`; direct execution is not the default.\n- `evalops-gated`: AI behavior target changes require EvalOps before implementation.\n\n## Required Decision Output\n\nBefore delegating, produce a concise decision with:\n\n- Route\n- Reason\n- Required gates\n- Expected artifacts\n- Next action\n\n## Plan Mode Handoff\n\nWhen operating in Plan Mode and about to exit, the final handoff MUST match the selected route:\n\n- `spec-driven-propose-flow`: say that after leaving Plan Mode it can create an OpenSpec proposal/change via `openspec-propose`. Do not say it can directly execute the implementation plan.\n- `spec-driven-incremental-flow`: say that after leaving Plan Mode it can create or continue the OpenSpec change via `openspec-new-change`. Do not say it can directly execute the implementation plan.\n- `superpowers-direct`: may say that after leaving Plan Mode it can directly execute the task.\n\n## Ambiguous Execution Requests\n\nWhen the user says \"execute plan\", \"go ahead\", \"start\", or equivalent after a `spec-driven-*` route was selected:\n\n- Treat the request as an instruction to continue the selected route, not as permission to bypass governance.\n- For `spec-driven-propose-flow`, continue by invoking `openspec-propose`, or ask whether the user wants to explicitly skip OpenSpec.\n- If the user explicitly says to skip OpenSpec or directly execute despite the route, acknowledge the opt-out and proceed outside the selected route.\n\n## Execution Path Choices\n\nWhen asking the user to choose between mutually exclusive execution paths, use the `question` tool if available, with the recommended route listed first and marked \"(Recommended)\". If unavailable, present the same choices as concise text.\n\nUser input:\n\n[Previous turn: orchestrator classified a cross-skill rename as spec-driven-propose-flow]\n执行plan\n\nRespond as the assistant would after applying `sdlc-orchestrator`.\n",
+          "label": "evals/exports/promptfoo/skill.sdlc-orchestrator/prompt.md: You are evaluating the `sdlc-orchestrator` skill. ...",
+          "config": {}
+        },
+        "promptId": "bfc3e722c4642168b4f085ecf6e0342ef7d587f27292e22ff59920bd8645ddd8",
+        "promptIdx": 0,
+        "provider": {
+          "id": "opencode",
+          "label": "opencode-deepseek-v4"
+        },
+        "response": {
+          "output": "Route: `spec-driven-propose-flow`\n\nReason: 上一轮已将 cross-skill rename 分类为中等复杂度变更，涉及 skill/workflow 行为边界，不能因“执行plan”而绕过 OpenSpec。\n\nRequired gates: `openspec-propose`\n\nExpected artifacts: OpenSpec proposal/change draft，包含 scope、acceptance criteria、impact、tasks。\n\nNext action: 继续所选路线，创建 OpenSpec proposal；不会直接执行实现。",
+          "tokenUsage": {
+            "prompt": 361,
+            "completion": 104,
+            "total": 11843,
+            "cached": 11264,
+            "completionDetails": {
+              "reasoning": 114,
+              "cacheReadInputTokens": 11264,
+              "cacheCreationInputTokens": 0
+            }
+          },
+          "cost": 0,
+          "raw": "{\"data\":{\"info\":{\"parentID\":\"msg_eb2198da900125lsoKa2FHJfTh\",\"role\":\"assistant\",\"mode\":\"build\",\"agent\":\"build\",\"path\":{\"cwd\":\"/Users/yuping/Documents/workspace/oh_my_skills\",\"root\":\"/Users/yuping/Documents/workspace/oh_my_skills\"},\"cost\":0,\"tokens\":{\"total\":11843,\"input\":361,\"output\":104,\"reasoning\":114,\"cache\":{\"write\":0,\"read\":11264}},\"modelID\":\"gpt-5.5\",\"providerID\":\"openai\",\"time\":{\"created\":1781104479662,\"completed\":1781104486156},\"finish\":\"stop\",\"id\":\"msg_eb2198dae001elLhgrEtR5rDsM\",\"sessionID\":\"ses_14de6725bffeiSBnnovPMQCoPP\"},\"parts\":[{\"snapshot\":\"682d59c5047093d0e3300fddd5352e4256aa4c23\",\"type\":\"step-start\",\"id\":\"prt_eb21991bc001HcqOazbFY0E3lA\",\"sessionID\":\"ses_14de6725bffeiSBnnovPMQCoPP\",\"messageID\":\"msg_eb2198dae001elLhgrEtR5rDsM\"},{\"type\":\"reasoning\",\"text\":\"\",\"time\":{\"start\":1781104481110,\"end\":1781104484094},\"metadata\":{\"openai\":{\"itemId\":\"rs_0bde245203ca1068016a297f615d04819199e2f760b2c27f43\",\"reasoningEncryptedContent\":\"gAAAAABqKX9k832d6x4xwGfCyafp3teQfqFMP2g2CEV9Svl9yqcG6JmvTrNwFrHgBwO69AL2nt2b0y_X12dVe1YFL-PjAEh2ljL_-SjIaLDJO8gFiVY6FrqqyvvbHNPZK1Or0c0c06qLm79NqpF1ZJqMPieNuLAcVLZWZiqCddPv3IHYLMCPR3wV3lgFiL1JWDvtLtVnUXa_i7-sAa4VET-2WQsacXyFvf-dUyZDjRu8-b9H8BR_88fUNgSx3JFBsRva_dGFexcgAivWByLxTP5GKX7gtG_hocsqRVQQJFnfkQ5xZPXHhLgdm-HWEwvbVOmI7eVnsEecLB-crmrmmgTt0WL8xrqbSEwq7N8PTCXy32kZkblunWrs8wSd2kVPQoNk0G7LF_SRUQAuARF1rmkskGh2GljxO5Vp6D28EA-0W81zsw4i8bnyMuFRhH3x32peSXWO-nmDDE7FFlaLPb9gNh_4x4r1-hnOJBCS6gG_1x8aP2wW36SNKYIlcJNJclrd-I7qIlSaEJANXmQAwIAYN1fYB0DOHyc0pBZsO10ESrpBAU01u8lhCSO0XAi9jihatEwcU5i6-bkDunFhjqo2JvMS_jba4NQnUDHeXycOfDeHNPanhQ7GbNBM6UuXSSnTfua5tJsSDk7L5EZt1NMuBvsUI1xDJPdDHfXrJCaX2fo2RNf24MOI8LYWpkdC2XaPa994d-gCQgrJ3XU6mVcRTCUBPkyD8r-UX-KOOBmu9Z3jAjTuIrKWiBDQVqc8Hza6FRt_zkk6vF6h1N--7keb-JMAKHPVdwv8pn1W_5ruOK3GOUUazK77FUAecUL8GG9zR1Ywy37EM2cfrGXEiFdiYDhlKGgQPwT9esgTxSWob3ozn2RgYSvwm8ehShT0PNIIZnu1frizfs-yKKedh-ife0KDy2SPlrLu1D7xGGzFlDY-rMqCswuvBysdvkY95dkGvxrjfIwQepSq5SuGDIM-clDofa3vvDz5NnBvtKmmkatT3AVqJET91uQd-XFDUQK9ZggdVZt9U3XbSszyViU8mb58sbwXlYFZIOLibzJ8Lcu6hoTlV8mdbJKanmaizvPHf8lJaxUWaW7QnbLTP6cDEfkNid30hS4qRfajidEs4_aV6w1kvO8Sn5bOp-fxuTaKTkqkHudWWYjG5Fr78W3KfaqJTJWc7h3p3emh2Kp5mP0pPqKS2y8ROQjdwftiPixIFEOs5N64Q8Xyve-R6hfHVa-pHkgIGekOGNu8TpfEEfmYG1ej46BLyxadQztJCr6x8FKn58aIkf-RScQOEe90sTrlj609JnkkAjpTNROgywRZit_yM62jjZ1e9V9ShWrnRU8UDhaMFSYWTf-7zSZH7l4jwEa5vZurCX8i2gzA1RSW26ct-MK0agRTlHy4zWjoH1-yBxwNutXE7f2lXZLeS2Bt8Xpd78mM4eGLwCzmtFsVbaocmMtS1OU1KuaqTs9hZKs5aqtOYFMB8_RKjXUo2qaedb7r88s_XwRH5_cDbtLtx1JahwRyHBNQzKfnZJMtnT04C7X6tsdeew1VXh1PvqE4Ipl4sFq-9cnIth9kKrEbFh37S4-DIvtrfLgoNcedggmbm4x4FCqsLmuhZvwEqlypC6_kx2Sv5ABFkJqC71xyFc7xxeA=\"}},\"id\":\"prt_eb2199356001pOkd4dEjRZ5v6O\",\"sessionID\":\"ses_14de6725bffeiSBnnovPMQCoPP\",\"messageID\":\"msg_eb2198dae001elLhgrEtR5rDsM\"},{\"type\":\"text\",\"text\":\"Route: `spec-driven-propose-flow`\\n\\nReason: 上一轮已将 cross-skill rename 分类为中等复杂度变更，涉及 skill/workflow 行为边界，不能因“执行plan”而绕过 OpenSpec。\\n\\nRequired gates: `openspec-propose`\\n\\nExpected artifacts: OpenSpec proposal/change draft，包含 scope、acceptance criteria、impact、tasks。\\n\\nNext action: 继续所选路线，创建 OpenSpec proposal；不会直接执行实现。\",\"time\":{\"start\":1781104484140,\"end\":1781104485932},\"metadata\":{\"openai\":{\"itemId\":\"msg_0bde245203ca1068016a297f643bf48191a7fcb1ffad5e800a\",\"phase\":\"final_answer\"}},\"id\":\"prt_eb2199f2c001cAHaEegHZ3t72d\",\"sessionID\":\"ses_14de6725bffeiSBnnovPMQCoPP\",\"messageID\":\"msg_eb2198dae001elLhgrEtR5rDsM\"},{\"reason\":\"stop\",\"snapshot\":\"682d59c5047093d0e3300fddd5352e4256aa4c23\",\"type\":\"step-finish\",\"tokens\":{\"total\":11843,\"input\":361,\"output\":104,\"reasoning\":114,\"cache\":{\"write\":0,\"read\":11264}},\"cost\":0,\"id\":\"prt_eb219a6e6001lvtyaYhkKzirNZ\",\"sessionID\":\"ses_14de6725bffeiSBnnovPMQCoPP\",\"messageID\":\"msg_eb2198dae001elLhgrEtR5rDsM\"}]},\"request\":{\"timeout\":false},\"response\":{}}",
+          "sessionId": "ses_14de6725bffeiSBnnovPMQCoPP"
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "vars": {
+            "input": "[Previous turn: orchestrator classified a cross-skill rename as spec-driven-propose-flow]\n执行plan\n",
+            "sessionId": "ses_14de6725bffeiSBnnovPMQCoPP"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "openspec-propose"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 1,
+        "tokenUsage": {
+          "prompt": 361,
+          "completion": 104,
+          "cached": 11264,
+          "total": 11843,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 114,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 11264,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "input": "[Previous turn: orchestrator classified a cross-skill rename as spec-driven-propose-flow]\n执行plan\n",
+          "sessionId": "ses_14de6725bffeiSBnnovPMQCoPP"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {},
+          "sessionId": "ses_14de6725bffeiSBnnovPMQCoPP"
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "OpenSpec"
+              }
+            }
+          ]
+        },
+        "id": "9e99c1a5-f608-42d7-911e-67f12b2ead1d",
+        "latencyMs": 4949,
+        "namedScores": {},
+        "prompt": {
+          "raw": "You are evaluating the `sdlc-orchestrator` skill. Apply these skill instructions as the source of truth before responding.\n\n# sdlc-orchestrator evaluation context\n\nThe assistant is acting as the `sdlc-orchestrator`: a thin SDLC orchestration layer that classifies task complexity, selects the right workflow path, and coordinates Roadmap, OpenSpec, EvalOps, Superpowers, and Memory gates without replacing them.\n\n## Route Classification\n\nScore signals:\n\n- Crosses 2+ modules or skill boundaries: +2\n- Alters public behavior, trigger boundaries, or user-visible output: +2\n- Changes data models, file models, schemas, or persistent artifact models: +2\n- Impacts skill, agent, prompt, or workflow behavior: +2\n- Needs explicit acceptance criteria from the user: +1\n- Single-file, low-risk local fix: -2\n- Pure typo, docs cleanup, or test-only maintenance: -3\n\nRoutes:\n\n- `score <= 0` -> `superpowers-direct`\n- `score 1-3` -> `spec-driven-propose-flow`\n- `score >= 4` -> `spec-driven-incremental-flow`\n- roadmap -> `roadmap-first`\n- AI behavior -> `evalops-gated`\n- durable fact -> `memory-sync`\n\n**Route decisions are action-binding.** Once the orchestrator selects a route, the immediate next action SHALL follow that route. The selected route determines what happens next. It is not a suggestion. The assistant may only bypass the route if the user explicitly says to skip OpenSpec or directs otherwise. Do not default to direct execution for `spec-driven-*` routes.\n\n## Routing Requirements\n\n- `superpowers-direct`: small, low-risk changes. No OpenSpec artifacts. Typo fixes may be directly executed.\n- `spec-driven-propose-flow`: medium formal changes. The bound next action is `openspec-propose`; direct execution is not the default.\n- `spec-driven-incremental-flow`: very complex changes. The bound next action is `openspec-new-change`; direct execution is not the default.\n- `evalops-gated`: AI behavior target changes require EvalOps before implementation.\n\n## Required Decision Output\n\nBefore delegating, produce a concise decision with:\n\n- Route\n- Reason\n- Required gates\n- Expected artifacts\n- Next action\n\n## Plan Mode Handoff\n\nWhen operating in Plan Mode and about to exit, the final handoff MUST match the selected route:\n\n- `spec-driven-propose-flow`: say that after leaving Plan Mode it can create an OpenSpec proposal/change via `openspec-propose`. Do not say it can directly execute the implementation plan.\n- `spec-driven-incremental-flow`: say that after leaving Plan Mode it can create or continue the OpenSpec change via `openspec-new-change`. Do not say it can directly execute the implementation plan.\n- `superpowers-direct`: may say that after leaving Plan Mode it can directly execute the task.\n\n## Ambiguous Execution Requests\n\nWhen the user says \"execute plan\", \"go ahead\", \"start\", or equivalent after a `spec-driven-*` route was selected:\n\n- Treat the request as an instruction to continue the selected route, not as permission to bypass governance.\n- For `spec-driven-propose-flow`, continue by invoking `openspec-propose`, or ask whether the user wants to explicitly skip OpenSpec.\n- If the user explicitly says to skip OpenSpec or directly execute despite the route, acknowledge the opt-out and proceed outside the selected route.\n\n## Execution Path Choices\n\nWhen asking the user to choose between mutually exclusive execution paths, use the `question` tool if available, with the recommended route listed first and marked \"(Recommended)\". If unavailable, present the same choices as concise text.\n\nUser input:\n\n[In Plan Mode, the orchestrator just classified a multi-skill change as spec-driven-propose-flow. Exit Plan Mode now.]\n\nRespond as the assistant would after applying `sdlc-orchestrator`.\n",
+          "label": "evals/exports/promptfoo/skill.sdlc-orchestrator/prompt.md: You are evaluating the `sdlc-orchestrator` skill. ...",
+          "config": {}
+        },
+        "promptId": "bfc3e722c4642168b4f085ecf6e0342ef7d587f27292e22ff59920bd8645ddd8",
+        "promptIdx": 0,
+        "provider": {
+          "id": "opencode",
+          "label": "opencode-deepseek-v4"
+        },
+        "response": {
+          "output": "Route: `spec-driven-propose-flow`\n\nReason: The change was classified as a multi-skill medium-complexity task, so direct execution is not the default.\n\nRequired gates: OpenSpec proposal before implementation.\n\nExpected artifacts: OpenSpec proposal/change with scope, acceptance criteria, and implementation plan.\n\nNext action: After leaving Plan Mode, I can create the OpenSpec proposal/change via `openspec-propose`. I will not directly execute the implementation plan unless you explicitly choose to skip OpenSpec.",
+          "tokenUsage": {
+            "prompt": 11630,
+            "completion": 106,
+            "total": 11810,
+            "cached": 0,
+            "completionDetails": {
+              "reasoning": 74,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          },
+          "cost": 0,
+          "raw": "{\"data\":{\"info\":{\"parentID\":\"msg_eb219a75c0018fpuC6wrt0wVQd\",\"role\":\"assistant\",\"mode\":\"build\",\"agent\":\"build\",\"path\":{\"cwd\":\"/Users/yuping/Documents/workspace/oh_my_skills\",\"root\":\"/Users/yuping/Documents/workspace/oh_my_skills\"},\"cost\":0,\"tokens\":{\"total\":11810,\"input\":11630,\"output\":106,\"reasoning\":74,\"cache\":{\"write\":0,\"read\":0}},\"modelID\":\"gpt-5.5\",\"providerID\":\"openai\",\"time\":{\"created\":1781104486242,\"completed\":1781104491171},\"finish\":\"stop\",\"id\":\"msg_eb219a762001HQwZjfoejaQkrN\",\"sessionID\":\"ses_14de658a8ffe8EiqS8NBRsooLq\"},\"parts\":[{\"snapshot\":\"682d59c5047093d0e3300fddd5352e4256aa4c23\",\"type\":\"step-start\",\"id\":\"prt_eb219ab68001TPdRu5wWOs83ID\",\"sessionID\":\"ses_14de658a8ffe8EiqS8NBRsooLq\",\"messageID\":\"msg_eb219a762001HQwZjfoejaQkrN\"},{\"type\":\"reasoning\",\"text\":\"\",\"time\":{\"start\":1781104487759,\"end\":1781104489330},\"metadata\":{\"openai\":{\"itemId\":\"rs_0653c1a882503eab016a297f67fddc819186195a33cccb2998\",\"reasoningEncryptedContent\":\"gAAAAABqKX9pC3bwfEMRJsFAwMMnzxKtwp6ikbGB2mdKogvt9tMHH8AW9UKtRE5rFpMmqYYIf5NYC_LZHu9Feth_F3fFJaOkGloSHdtplriJkeh2_GXhmVLGmtjUVzdaBu7k-g9Dw7YJmGcI_0AzfZL4-cjhs_dEgoAMTD3sAH5_Qe7dLop9iecEzKQCnKsOxyagEJ11gE_nJSSBt9H6aW-cHH3BNVGWQ0gWJsK8rNVVgNlpSaMb-uqyqBHJPX2JiZYW8-D-ONiyCj0lkP2OTpfM0PK8Q4ESMUH1Y7AbmtC9ho664b7eCf7vj2f0YuF3MMq58lzXzezeuUXgK6tXDUSvyjaIyNQIUvPyr4b3DL57Lq0mpUt2zeTdmgp0Zb-RxgICfpuyOlpYrSnzkE8QXj1DpIYKg4TquTjltR4xIuaxQhbT5Ys-lqAB6eCFJBCpVj_TpaR42jYXmTrt99JUiZzcXobNjRPtpZz7DSGUAVdr7IRpIWSeD-iqLzAqLYpRfUaVwza8rFGERHJ3cJ8-YdyCjoeY8gZ4pcOucVvmSNM_I8z8c3UdrS57Avm0QGpu7GayKkGViz8KFgSU2W2KCRnRpJTk0dX6333Uz5PkRXhgtIAFXBBhaQnwaidGm37nF4yAkiduVhjulCwdogpDq68APXDhzjdb5vxdiGLHMvvqvUkTNfCagVxzBiuR6UqWWg5lnR8HcuUV4wfQWgdjuEFdQf7QEmLDa8cKnInwDWopMXXmtP-lAIsa2NsxrWOKu7FsCLlu1UDvDyfPxSkgcKPT_wiXMENvSOtQYTPyob3EtRbLvKKOZyBfOprJ3aIVbKVzv-iKT4UeawuGUTbpEIWB-z9f0Qne-NRysg8t9rnXFdnd0dbOJElAL3V1CffczEM6COX7_Eqs5cyiFTKDLLq9ByBINkjpkFOUzZUMUUowxrXDGy_eB0DDvjM5pKZUxEzVsFB2hPN_K_G50JHOjddeMCmB0180ilMQcQlHsql9T1YUbMSjvYpT7ZUEc6Q2zorm7ewIEJb9s1PS6s8o8VAqeSX82iQRvxMXRqj7s7Iz5FWRjMeowqgXfr1s4Rbsl45J3TDR91JFJFK2ytGuM1BejxslAU7FjvkkHrVUCqFgrC0Yh4LR92ghEcxirvEJXyTVugWdLbsKMvxLPt1SwsazVyOntDN66BudSuV0XutTQz8ZzpGuwVWgQXCnhsrpBmrg9FZjk10cZUwelVi8pF3gS5BhQTKNYZSPo0D_4T-ciGL-HFznKzKukn1ChPa87HtUfMAPBio8mzWdRwz0j25sdMC544231md0GVU9_FC_mu4iYCmEQ2HoaXgA9yaLBYsNIOLLpW70_SkqieCPFi6zX3vmMGzZ5GEB3FJuNLMHA3gdyV0lVZAxLGUgiLHiQ9P_Jkp1q5cQ\"}},\"id\":\"prt_eb219ad4f001GX6YmeCVKz0f22\",\"sessionID\":\"ses_14de658a8ffe8EiqS8NBRsooLq\",\"messageID\":\"msg_eb219a762001HQwZjfoejaQkrN\"},{\"type\":\"text\",\"text\":\"Route: `spec-driven-propose-flow`\\n\\nReason: The change was classified as a multi-skill medium-complexity task, so direct execution is not the default.\\n\\nRequired gates: OpenSpec proposal before implementation.\\n\\nExpected artifacts: OpenSpec proposal/change with scope, acceptance criteria, and implementation plan.\\n\\nNext action: After leaving Plan Mode, I can create the OpenSpec proposal/change via `openspec-propose`. I will not directly execute the implementation plan unless you explicitly choose to skip OpenSpec.\",\"time\":{\"start\":1781104489332,\"end\":1781104491022},\"metadata\":{\"openai\":{\"itemId\":\"msg_0653c1a882503eab016a297f6996508191af591a50d0ff71e5\",\"phase\":\"final_answer\"}},\"id\":\"prt_eb219b374001BXwvviy0UQTmJB\",\"sessionID\":\"ses_14de658a8ffe8EiqS8NBRsooLq\",\"messageID\":\"msg_eb219a762001HQwZjfoejaQkrN\"},{\"reason\":\"stop\",\"snapshot\":\"682d59c5047093d0e3300fddd5352e4256aa4c23\",\"type\":\"step-finish\",\"tokens\":{\"total\":11810,\"input\":11630,\"output\":106,\"reasoning\":74,\"cache\":{\"write\":0,\"read\":0}},\"cost\":0,\"id\":\"prt_eb219ba77001jNlm6g8W53xKaR\",\"sessionID\":\"ses_14de658a8ffe8EiqS8NBRsooLq\",\"messageID\":\"msg_eb219a762001HQwZjfoejaQkrN\"}]},\"request\":{\"timeout\":false},\"response\":{}}",
+          "sessionId": "ses_14de658a8ffe8EiqS8NBRsooLq"
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "vars": {
+            "input": "[In Plan Mode, the orchestrator just classified a multi-skill change as spec-driven-propose-flow. Exit Plan Mode now.]\n",
+            "sessionId": "ses_14de658a8ffe8EiqS8NBRsooLq"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "OpenSpec"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 2,
+        "tokenUsage": {
+          "prompt": 11630,
+          "completion": 106,
+          "cached": 0,
+          "total": 11810,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 74,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "input": "[In Plan Mode, the orchestrator just classified a multi-skill change as spec-driven-propose-flow. Exit Plan Mode now.]\n",
+          "sessionId": "ses_14de658a8ffe8EiqS8NBRsooLq"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {},
+          "sessionId": "ses_14de658a8ffe8EiqS8NBRsooLq"
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "javascript",
+                "value": "const out = output.toLowerCase();\nconst continuesRoute = out.includes('openspec-propose') && !out.includes('direct execution') && !out.includes('直接执行');\nconst structuredChoice = out.includes('openspec') && (out.includes('direct') || out.includes('直接执行')) && (\n  out.includes('question') ||\n  out.includes('recommended') ||\n  out.includes('spec-driven-propose-flow') ||\n  out.includes('openspec-propose')\n);\nreturn continuesRoute || structuredChoice;\n"
+              }
+            }
+          ]
+        },
+        "id": "3f900bfd-01af-4f96-a7f4-d7315bd38e8f",
+        "latencyMs": 6120,
+        "namedScores": {},
+        "prompt": {
+          "raw": "You are evaluating the `sdlc-orchestrator` skill. Apply these skill instructions as the source of truth before responding.\n\n# sdlc-orchestrator evaluation context\n\nThe assistant is acting as the `sdlc-orchestrator`: a thin SDLC orchestration layer that classifies task complexity, selects the right workflow path, and coordinates Roadmap, OpenSpec, EvalOps, Superpowers, and Memory gates without replacing them.\n\n## Route Classification\n\nScore signals:\n\n- Crosses 2+ modules or skill boundaries: +2\n- Alters public behavior, trigger boundaries, or user-visible output: +2\n- Changes data models, file models, schemas, or persistent artifact models: +2\n- Impacts skill, agent, prompt, or workflow behavior: +2\n- Needs explicit acceptance criteria from the user: +1\n- Single-file, low-risk local fix: -2\n- Pure typo, docs cleanup, or test-only maintenance: -3\n\nRoutes:\n\n- `score <= 0` -> `superpowers-direct`\n- `score 1-3` -> `spec-driven-propose-flow`\n- `score >= 4` -> `spec-driven-incremental-flow`\n- roadmap -> `roadmap-first`\n- AI behavior -> `evalops-gated`\n- durable fact -> `memory-sync`\n\n**Route decisions are action-binding.** Once the orchestrator selects a route, the immediate next action SHALL follow that route. The selected route determines what happens next. It is not a suggestion. The assistant may only bypass the route if the user explicitly says to skip OpenSpec or directs otherwise. Do not default to direct execution for `spec-driven-*` routes.\n\n## Routing Requirements\n\n- `superpowers-direct`: small, low-risk changes. No OpenSpec artifacts. Typo fixes may be directly executed.\n- `spec-driven-propose-flow`: medium formal changes. The bound next action is `openspec-propose`; direct execution is not the default.\n- `spec-driven-incremental-flow`: very complex changes. The bound next action is `openspec-new-change`; direct execution is not the default.\n- `evalops-gated`: AI behavior target changes require EvalOps before implementation.\n\n## Required Decision Output\n\nBefore delegating, produce a concise decision with:\n\n- Route\n- Reason\n- Required gates\n- Expected artifacts\n- Next action\n\n## Plan Mode Handoff\n\nWhen operating in Plan Mode and about to exit, the final handoff MUST match the selected route:\n\n- `spec-driven-propose-flow`: say that after leaving Plan Mode it can create an OpenSpec proposal/change via `openspec-propose`. Do not say it can directly execute the implementation plan.\n- `spec-driven-incremental-flow`: say that after leaving Plan Mode it can create or continue the OpenSpec change via `openspec-new-change`. Do not say it can directly execute the implementation plan.\n- `superpowers-direct`: may say that after leaving Plan Mode it can directly execute the task.\n\n## Ambiguous Execution Requests\n\nWhen the user says \"execute plan\", \"go ahead\", \"start\", or equivalent after a `spec-driven-*` route was selected:\n\n- Treat the request as an instruction to continue the selected route, not as permission to bypass governance.\n- For `spec-driven-propose-flow`, continue by invoking `openspec-propose`, or ask whether the user wants to explicitly skip OpenSpec.\n- If the user explicitly says to skip OpenSpec or directly execute despite the route, acknowledge the opt-out and proceed outside the selected route.\n\n## Execution Path Choices\n\nWhen asking the user to choose between mutually exclusive execution paths, use the `question` tool if available, with the recommended route listed first and marked \"(Recommended)\". If unavailable, present the same choices as concise text.\n\nUser input:\n\nI have a change that crosses multiple skills. The orchestrator classified it as spec-driven-propose-flow. I asked to execute the plan.\n\nRespond as the assistant would after applying `sdlc-orchestrator`.\n",
+          "label": "evals/exports/promptfoo/skill.sdlc-orchestrator/prompt.md: You are evaluating the `sdlc-orchestrator` skill. ...",
+          "config": {}
+        },
+        "promptId": "bfc3e722c4642168b4f085ecf6e0342ef7d587f27292e22ff59920bd8645ddd8",
+        "promptIdx": 0,
+        "provider": {
+          "id": "opencode",
+          "label": "opencode-deepseek-v4"
+        },
+        "response": {
+          "output": "Route: `spec-driven-propose-flow`\n\nReason: The change crosses multiple skills, and the orchestrator already classified it as a medium formal change.\n\nRequired gates: OpenSpec proposal before implementation.\n\nExpected artifacts: OpenSpec proposal/change describing scope, acceptance criteria, and implementation tasks.\n\nNext action: Continue the selected route by creating the OpenSpec proposal via `openspec-propose`. I will not directly execute the implementation plan unless you explicitly say to skip OpenSpec.",
+          "tokenUsage": {
+            "prompt": 367,
+            "completion": 99,
+            "total": 11807,
+            "cached": 11264,
+            "completionDetails": {
+              "reasoning": 77,
+              "cacheReadInputTokens": 11264,
+              "cacheCreationInputTokens": 0
+            }
+          },
+          "cost": 0,
+          "raw": "{\"data\":{\"info\":{\"parentID\":\"msg_eb219bab5001xgxzKoBmHDCPRH\",\"role\":\"assistant\",\"mode\":\"build\",\"agent\":\"build\",\"path\":{\"cwd\":\"/Users/yuping/Documents/workspace/oh_my_skills\",\"root\":\"/Users/yuping/Documents/workspace/oh_my_skills\"},\"cost\":0,\"tokens\":{\"total\":11807,\"input\":367,\"output\":99,\"reasoning\":77,\"cache\":{\"write\":0,\"read\":11264}},\"modelID\":\"gpt-5.5\",\"providerID\":\"openai\",\"time\":{\"created\":1781104491195,\"completed\":1781104497294},\"finish\":\"stop\",\"id\":\"msg_eb219babb001nLc4Q3ell14TiD\",\"sessionID\":\"ses_14de6454effePbjyV5mazDh67g\"},\"parts\":[{\"snapshot\":\"682d59c5047093d0e3300fddd5352e4256aa4c23\",\"type\":\"step-start\",\"id\":\"prt_eb219c06d001V7maV13wkHFRi9\",\"sessionID\":\"ses_14de6454effePbjyV5mazDh67g\",\"messageID\":\"msg_eb219babb001nLc4Q3ell14TiD\"},{\"type\":\"reasoning\",\"text\":\"**Evaluating response strategies**\\n\\nI need to assess the situation since there's no skill tool available. The user specifically asked to apply the sdlc-orchestrator, but my plan is a bit ambiguous here. I should mention that I'll route to a spec-driven-propose-flow, deciding whether to continue with an openspec-propose or to ask if they want to skip it. It's crucial to output my decision before delegating, even though the openspec tool doesn't actually exist. I need to be concise!\",\"time\":{\"start\":1781104492889,\"end\":1781104496957},\"metadata\":{\"openai\":{\"itemId\":\"rs_000fb100f8804d10016a297f6d089481909ffa0050b359e708\",\"reasoningEncryptedContent\":\"gAAAAABqKX9x4gWnXjlzXWjQbdvnpE9x1rumloatXzoNnrQXwXHwLQap9yJviEttBCNku91wYHCIB9aLOYtgHFfy0RXeCoczrx3VubprEB6rY2Tug07dtili5LVP4qqqTldR17wqHktzr8BSSbe1T2hha1UjADyfuDxDr3JS-RaAe8C9MQMKFCIIgNADtCNBQikLyVe8ThsZbc-9vjRkPWH4-NFIh_LX3e0mwJ54zvQ8xOE095sU053ktLsp-NGMilsN2DaLkAdUD3BW_lq3z09Y2J7OLOS0mKbyUMmp5rc61kNSfJxk0nWtzzSMoXVtg8Jij-TgrT5DWIiLq22MJkhpZ7jEy2NFT0ycxIBJkIPjDR6826DhJbb8Eu9Gi_lbJ6gO6_I8gyHT3NVC6SuhMDnbAblihjA_eN7UnoRUWt5Hyfrmx-VNCZfteWiT_5UKjiitV1RRB4xYkTUWNLitLQ85dJhxz7aVJEwyGTzsDBM-Tg8GmjVUpz68vXXHshcLSkwePNO0S5dKwYqKLwAK0xJ1HvTNEQZNL3t_k-8v6Xn3qFP-RjYWbRbpyuhxpICKIO3C5WpVnxHEbFtCd0TcvUsteY4sw-hIM5T1619-CL4473HrQg4IJ92gj2wH6TCHqczuqlL3jrJeE_qk8xWnTXZ6UYhGfvhhxZ7IaBgRLL3GrHVvdgnNf6oa67aNFl2M2hIZCKL0O8cUp0sroqXpFQqFqsevgjl5ICv-AtNuog2IL_KJ5aW68vMdlDMXVyrX4Mo1s1nz4huv2mdsotsALLy2yf-oUpcThdT_QWWQLebHCWenkt5rBYLMmvbaJAibQVKVWaA-iJwTvkWED5824mwAVHWtjWUgX_w4QJ9aNPkWtKUV5Sy8yIHC-onWcsXljmINBv8nay-dmo52m3q0k7Q635DEm2HkcbUVfY80tSDSV06LlprJRks76abIIhYHid-AXX2OvEYDBjeCr6zRyYdDbll4evuFGPdf6Q671hRBa4YtWgRR4fhCnkfqmmHNNQvz3QgVwDvvOqsk-hKWIN9VEEDmm5jt7-ZS-m8sNgyj7izZJByVHrjac1yX6izc0w7H4YGiTy4rpwUQeJ0hFqH4u0Bl3t1nZxPz2MqnXeCXDZh1XNT-5l-3FsM3LPsUcpoU9DyVVcwz49uAc8l2TrDHA8LRIiHRiK7oCXbzDMPxe0HHHIyuLLTKkiCsmR1htG2R9AZ0hCLd8fFa3UH6YSDyBJPYYk-lOnj77UMIJzVkGggte55FfydEHCbCYnHl8I3nwZLDKpmnMYbo_vqKiT1K8u82gFL7c77L9SN7Dy9LxJ6VqTIWYimYzALofq1n-XCwFs24vmtLYuaGPzvJ-_Rj6aHn_Z2dAJaoHy2ExYXjUkN0TjLKazHEKWFx4FDHNWPOB5N7rT1_0e5ExLSmy-E_esaXJziXpw==\"}},\"id\":\"prt_eb219c159001zBRFFWzMI1EZ3l\",\"sessionID\":\"ses_14de6454effePbjyV5mazDh67g\",\"messageID\":\"msg_eb219babb001nLc4Q3ell14TiD\"},{\"type\":\"text\",\"text\":\"Route: `spec-driven-propose-flow`\\n\\nReason: The change crosses multiple skills, and the orchestrator already classified it as a medium formal change.\\n\\nRequired gates: OpenSpec proposal before implementation.\\n\\nExpected artifacts: OpenSpec proposal/change describing scope, acceptance criteria, and implementation tasks.\\n\\nNext action: Continue the selected route by creating the OpenSpec proposal via `openspec-propose`. I will not directly execute the implementation plan unless you explicitly say to skip OpenSpec.\",\"time\":{\"start\":1781104496958,\"end\":1781104497147},\"metadata\":{\"openai\":{\"itemId\":\"msg_000fb100f8804d10016a297f7124b48190b19e2a79c4576a4c\",\"phase\":\"final_answer\"}},\"id\":\"prt_eb219d13e001HxpF9yfrOwJn7U\",\"sessionID\":\"ses_14de6454effePbjyV5mazDh67g\",\"messageID\":\"msg_eb219babb001nLc4Q3ell14TiD\"},{\"reason\":\"stop\",\"snapshot\":\"682d59c5047093d0e3300fddd5352e4256aa4c23\",\"type\":\"step-finish\",\"tokens\":{\"total\":11807,\"input\":367,\"output\":99,\"reasoning\":77,\"cache\":{\"write\":0,\"read\":11264}},\"cost\":0,\"id\":\"prt_eb219d2660010Hgjb3quV5XVfB\",\"sessionID\":\"ses_14de6454effePbjyV5mazDh67g\",\"messageID\":\"msg_eb219babb001nLc4Q3ell14TiD\"}]},\"request\":{\"timeout\":false},\"response\":{}}",
+          "sessionId": "ses_14de6454effePbjyV5mazDh67g"
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "vars": {
+            "input": "I have a change that crosses multiple skills. The orchestrator classified it as spec-driven-propose-flow. I asked to execute the plan.\n",
+            "sessionId": "ses_14de6454effePbjyV5mazDh67g"
+          },
+          "assert": [
+            {
+              "type": "javascript",
+              "value": "const out = output.toLowerCase();\nconst continuesRoute = out.includes('openspec-propose') && !out.includes('direct execution') && !out.includes('直接执行');\nconst structuredChoice = out.includes('openspec') && (out.includes('direct') || out.includes('直接执行')) && (\n  out.includes('question') ||\n  out.includes('recommended') ||\n  out.includes('spec-driven-propose-flow') ||\n  out.includes('openspec-propose')\n);\nreturn continuesRoute || structuredChoice;\n"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 3,
+        "tokenUsage": {
+          "prompt": 367,
+          "completion": 99,
+          "cached": 11264,
+          "total": 11807,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 77,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 11264,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "input": "I have a change that crosses multiple skills. The orchestrator classified it as spec-driven-propose-flow. I asked to execute the plan.\n",
+          "sessionId": "ses_14de6454effePbjyV5mazDh67g"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {},
+          "sessionId": "ses_14de6454effePbjyV5mazDh67g"
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "not-contains",
+                "value": "openspec-propose"
+              }
+            }
+          ]
+        },
+        "id": "b7fb8cfa-ffce-47b0-9e87-9bed9c7b7ed1",
+        "latencyMs": 8091,
+        "namedScores": {},
+        "prompt": {
+          "raw": "You are evaluating the `sdlc-orchestrator` skill. Apply these skill instructions as the source of truth before responding.\n\n# sdlc-orchestrator evaluation context\n\nThe assistant is acting as the `sdlc-orchestrator`: a thin SDLC orchestration layer that classifies task complexity, selects the right workflow path, and coordinates Roadmap, OpenSpec, EvalOps, Superpowers, and Memory gates without replacing them.\n\n## Route Classification\n\nScore signals:\n\n- Crosses 2+ modules or skill boundaries: +2\n- Alters public behavior, trigger boundaries, or user-visible output: +2\n- Changes data models, file models, schemas, or persistent artifact models: +2\n- Impacts skill, agent, prompt, or workflow behavior: +2\n- Needs explicit acceptance criteria from the user: +1\n- Single-file, low-risk local fix: -2\n- Pure typo, docs cleanup, or test-only maintenance: -3\n\nRoutes:\n\n- `score <= 0` -> `superpowers-direct`\n- `score 1-3` -> `spec-driven-propose-flow`\n- `score >= 4` -> `spec-driven-incremental-flow`\n- roadmap -> `roadmap-first`\n- AI behavior -> `evalops-gated`\n- durable fact -> `memory-sync`\n\n**Route decisions are action-binding.** Once the orchestrator selects a route, the immediate next action SHALL follow that route. The selected route determines what happens next. It is not a suggestion. The assistant may only bypass the route if the user explicitly says to skip OpenSpec or directs otherwise. Do not default to direct execution for `spec-driven-*` routes.\n\n## Routing Requirements\n\n- `superpowers-direct`: small, low-risk changes. No OpenSpec artifacts. Typo fixes may be directly executed.\n- `spec-driven-propose-flow`: medium formal changes. The bound next action is `openspec-propose`; direct execution is not the default.\n- `spec-driven-incremental-flow`: very complex changes. The bound next action is `openspec-new-change`; direct execution is not the default.\n- `evalops-gated`: AI behavior target changes require EvalOps before implementation.\n\n## Required Decision Output\n\nBefore delegating, produce a concise decision with:\n\n- Route\n- Reason\n- Required gates\n- Expected artifacts\n- Next action\n\n## Plan Mode Handoff\n\nWhen operating in Plan Mode and about to exit, the final handoff MUST match the selected route:\n\n- `spec-driven-propose-flow`: say that after leaving Plan Mode it can create an OpenSpec proposal/change via `openspec-propose`. Do not say it can directly execute the implementation plan.\n- `spec-driven-incremental-flow`: say that after leaving Plan Mode it can create or continue the OpenSpec change via `openspec-new-change`. Do not say it can directly execute the implementation plan.\n- `superpowers-direct`: may say that after leaving Plan Mode it can directly execute the task.\n\n## Ambiguous Execution Requests\n\nWhen the user says \"execute plan\", \"go ahead\", \"start\", or equivalent after a `spec-driven-*` route was selected:\n\n- Treat the request as an instruction to continue the selected route, not as permission to bypass governance.\n- For `spec-driven-propose-flow`, continue by invoking `openspec-propose`, or ask whether the user wants to explicitly skip OpenSpec.\n- If the user explicitly says to skip OpenSpec or directly execute despite the route, acknowledge the opt-out and proceed outside the selected route.\n\n## Execution Path Choices\n\nWhen asking the user to choose between mutually exclusive execution paths, use the `question` tool if available, with the recommended route listed first and marked \"(Recommended)\". If unavailable, present the same choices as concise text.\n\nUser input:\n\nFix the typo \"initalize\" in the AGENTS.md file.\n\nRespond as the assistant would after applying `sdlc-orchestrator`.\n",
+          "label": "evals/exports/promptfoo/skill.sdlc-orchestrator/prompt.md: You are evaluating the `sdlc-orchestrator` skill. ...",
+          "config": {}
+        },
+        "promptId": "bfc3e722c4642168b4f085ecf6e0342ef7d587f27292e22ff59920bd8645ddd8",
+        "promptIdx": 0,
+        "provider": {
+          "id": "opencode",
+          "label": "opencode-deepseek-v4"
+        },
+        "response": {
+          "output": "Route: `superpowers-direct`  \nReason: Pure typo fix in a single docs/config file, low risk. Score: `-5`  \nRequired gates: None  \nExpected artifacts: No OpenSpec artifacts  \nNext action: Directly fix `initalize` to `initialize` in `AGENTS.md`.",
+          "tokenUsage": {
+            "prompt": 508,
+            "completion": 69,
+            "total": 11598,
+            "cached": 10752,
+            "completionDetails": {
+              "reasoning": 269,
+              "cacheReadInputTokens": 10752,
+              "cacheCreationInputTokens": 0
+            }
+          },
+          "cost": 0,
+          "raw": "{\"data\":{\"info\":{\"parentID\":\"msg_eb219d2a1001Yy2aT4LcnGDEBO\",\"role\":\"assistant\",\"mode\":\"build\",\"agent\":\"build\",\"path\":{\"cwd\":\"/Users/yuping/Documents/workspace/oh_my_skills\",\"root\":\"/Users/yuping/Documents/workspace/oh_my_skills\"},\"cost\":0,\"tokens\":{\"total\":11598,\"input\":508,\"output\":69,\"reasoning\":269,\"cache\":{\"write\":0,\"read\":10752}},\"modelID\":\"gpt-5.5\",\"providerID\":\"openai\",\"time\":{\"created\":1781104497317,\"completed\":1781104505366},\"finish\":\"stop\",\"id\":\"msg_eb219d2a5001I22aWizzvqzhdh\",\"sessionID\":\"ses_14de62d62ffegV744S15fpIrnn\"},\"parts\":[{\"snapshot\":\"682d59c5047093d0e3300fddd5352e4256aa4c23\",\"type\":\"step-start\",\"id\":\"prt_eb219d767001ulMbyjG8UItoZf\",\"sessionID\":\"ses_14de62d62ffegV744S15fpIrnn\",\"messageID\":\"msg_eb219d2a5001I22aWizzvqzhdh\"},{\"type\":\"reasoning\",\"text\":\"\",\"time\":{\"start\":1781104499060,\"end\":1781104504572},\"metadata\":{\"openai\":{\"itemId\":\"rs_0deb2f26cdc7b174016a297f734c00819188a581b3ae9801c1\",\"reasoningEncryptedContent\":\"gAAAAABqKX947vodSfmNy5uxMME8fQg5NR8w0v9VvDFJjyBGsQh37dkG0MFqdVEPt9uMRVcfZn_aBno0X3P2U-aabwDSHW4DejPVr3hm5swHJXK0BtSGOJ8aZNlyiz-RI9hdVzyf4kIPeBN6XaDigDgT9s58XY7i-uopkt_WcWEmez4olE2UiNxpP4vBZH7OEslrn__jgU_uaPAoRTc5QtNWftZPJLAgdxBRgZDWPdIm9foykKkDfNJhvIrzdaysAW8Zm_VYx-X7-OuMhOJS50ynnm_Fi7LdgD-lOZPezckPWEvrQISf3Y8exRDkDcr8hd7m4ifUnV5sOu5xCfE012OxPtZiDy0a7xjDHGdSUQ9Ma2YFBwqv9Ww6FzFc0zaOTk9yZQCJiHSFGh1PPLGWyQfbIl7tOluFwWZSfgwdwWmkhC8rTfKar5dO0ZSJ2Bl5n8-vtix3fZHazmvHYqqK24Ptae6iXYReqdr6H1tAFirnVEJilnZziu132MGxJmRZlEpd5grrosE4phcG1rfTUCW7ARwJTNxdGTmP_8XcvqOQ9sNky0OQoCZwzfw2eM1olAfAFRhcicY5k1ssH-eWLb_8Qb0gzOX-8ZkeeEFAjbWXZfaMXDYL64kwiFvmDKb7xRCnwNLLBDM1WD88sly_W5ZMcKe6qLmTnlDn3JI_F_K3Cy9r3RmCLPq5u9ZlnJaoQ5NAi3fLlul9sSVBUW6BV-_p5DndFhBJzGQ4ZBIJLzPJB4WMiO_FpOikNC5XUzOvmpRxpWNr3EEmOmfdrLd8MhmoEWMs77NeF-7eC_AFPo5iVGYZJaJ-CWCu7MV5lXAKGWyYRPb6wr-yQtlFG11dR_pG3idqq_rwQv0AKwkA-hxZ-XEATNGnMC6PSapdpGzQfNcRHp1v0xD3ThGdQQ2x1Ijze9cFtOSlvPK9suycW8f-NC_1NSRdtvj-gRY83nzCHG61z5VLyJSg2iwIGGRS-OGM_FEKu828-HpBV_v7iSNzZ942DE8hhKP7stIRvWcAdvAwmaYytskkGaA-GpLLAm-6yJmqRlPJJKQ8RlmoK2G4C0KwGpcYXRwuAGjQEaalXoXzNzgx0AZuWz_RULqYQYC5YuACBTFi875AKM9zekhclcHbhk3xMlgyLnBiDB6S4eYP-3RyDtMPW0X-zUsjWT1_CLy6E-BLHhma_zM88r8cy7pMfDlqnRhdx7VVAnx00Lrer0IpUrTG7B5XYeAqpmDyR6V74PAA3eHj9s4IJ6X3lsrsoe1_8mJr22Q3UFwZJD16SwIiBCwUQ4n1QReiSLTiQnBs347LSqa-HU_cnefNtxN56jZuB5NlSxNMYS8NjLlfIhnUaOdrj004REoP0e4nGR6xmEswa00Uc_t53cVWIi9EzB8v_rrte7H5dXR13SBooCdmYdXncPtOPKaGwV4IXmtUyPUht_8la2IqXq07S1kk2UB0FYJ7pg_R_WB61fzx2UNoosHvp8rYNV76Go22OBBJ4AyewnKY6ibWN0F_2Qp4z5x0Hv-X3iMs1fpMHAtQiSzzZ1hpL-bkDnjhmPjCQpGvg89gs239iVG9X29XJPrDgwl7dH4s_yJblE8QB5CjSptBzUJfC8mUQju7fEtSCKY1bGA7dTBmsHKtDX44MnOR1_MYbD5dmvAwObtlrM9HY1fv9busYBBazwe56d4CA_L7NVn71qcxHFwWawBbBTfTTpWEfoapWiItEscB50TPlEYHLIut6Qet80UZAq1hkXGVuQqEAe_kGURoqMIVbQVbca0_b2VdaUEKvqRMYOu5yx52oOIb31AUIRRa2Wb8HHW6noGyqoD3uUoUnoIEjBRIO0wibeJN9s7j-EFXhmUalaMreBpqhCzc4KvQwpbEVnyi7t8H84Bb0D_RYdW0ZPrfhmBRZyYsz-m1o8pHo5i6HsitZY35da9YJgoe0iF21m6XvuOtCzGSBB6MyAyD_r_SbkgpPI31N8rUKLg40dA9KEf0bjhtg19zD-_ceUohfchnUxxgwfHu2q_j76UUq73Irun8f6aKy9FsC8w3gpc4igEC4rl-kTUR010gNmFCG2406KNd7b7IWvruvR6f2q9AYyctOZ9bh_PuBwHPzEPUFGo1ZAX8HXW0kchunoyPYKwE0yJz3M-pIDCLGvG8Wyad3E_0AQceb4IeW2V28v28LMTPfOHPb6Tg2_9NX28SyFfiQbd8shJF8-mP5iQ4X5UYiqgdpH2jdcI3iwGU2h_BfTmZiJopTFw6-EgpkK7rJqny1erA4V9XQ7JgC5ZH_dGMLvern-pE2za-0xDSCericKNjABRskIiVyh2BesOiYKByge9KBuF78XXoagJLWLlu2sRN5Xu_AT-MYlXukpyl5ViUVUPR6v8OspblZnT0JD2MtEz9ZkGWRMBQCyjFlSt7CWPGhdnKA8kemekNAcqIk8tJj-rROcCpJ_ShHbP9eO-qC7YQGSavNeSnq6a8Lk_8t9EtTb8YCYqWPnm8uiRaEf-ZnF9VhNIMKERSNTaWlKhrkHbo6KIXcy6zIt771RUW0UPhkPDjHLEirtufzOBq0qxkyOmDiLN0_gy3nLAUREWnwV9xCeI6VS7KR2r3PkDIF3JqsWEVMiBVE6M76JRIHEwWH8p7HfinOP79WFTdvSTRtDkMwA==\"}},\"id\":\"prt_eb219d974001QNecH8Wkk71Jio\",\"sessionID\":\"ses_14de62d62ffegV744S15fpIrnn\",\"messageID\":\"msg_eb219d2a5001I22aWizzvqzhdh\"},{\"type\":\"text\",\"text\":\"Route: `superpowers-direct`  \\nReason: Pure typo fix in a single docs/config file, low risk. Score: `-5`  \\nRequired gates: None  \\nExpected artifacts: No OpenSpec artifacts  \\nNext action: Directly fix `initalize` to `initialize` in `AGENTS.md`.\",\"time\":{\"start\":1781104504573,\"end\":1781104505221},\"metadata\":{\"openai\":{\"itemId\":\"msg_0deb2f26cdc7b174016a297f78cc848191a91c559c1f682084\",\"phase\":\"final_answer\"}},\"id\":\"prt_eb219eefd001ENBzi4yVDKT8wM\",\"sessionID\":\"ses_14de62d62ffegV744S15fpIrnn\",\"messageID\":\"msg_eb219d2a5001I22aWizzvqzhdh\"},{\"reason\":\"stop\",\"snapshot\":\"682d59c5047093d0e3300fddd5352e4256aa4c23\",\"type\":\"step-finish\",\"tokens\":{\"total\":11598,\"input\":508,\"output\":69,\"reasoning\":269,\"cache\":{\"write\":0,\"read\":10752}},\"cost\":0,\"id\":\"prt_eb219f1f0001kACrH181i4aqCh\",\"sessionID\":\"ses_14de62d62ffegV744S15fpIrnn\",\"messageID\":\"msg_eb219d2a5001I22aWizzvqzhdh\"}]},\"request\":{\"timeout\":false},\"response\":{}}",
+          "sessionId": "ses_14de62d62ffegV744S15fpIrnn"
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "vars": {
+            "input": "Fix the typo \"initalize\" in the AGENTS.md file.\n",
+            "sessionId": "ses_14de62d62ffegV744S15fpIrnn"
+          },
+          "assert": [
+            {
+              "type": "not-contains",
+              "value": "openspec-propose"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 4,
+        "tokenUsage": {
+          "prompt": 508,
+          "completion": 69,
+          "cached": 10752,
+          "total": 11598,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 269,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 10752,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "input": "Fix the typo \"initalize\" in the AGENTS.md file.\n",
+          "sessionId": "ses_14de62d62ffegV744S15fpIrnn"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {},
+          "sessionId": "ses_14de62d62ffegV744S15fpIrnn"
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "javascript",
+                "value": "const out = output.toLowerCase();\nconst acknowledgesOptOut = out.includes('skip openspec') || out.includes('opt out') || out.includes('opt-out') || out.includes('跳过 openspec') || out.includes('明确');\nconst allowsDirect = out.includes('direct') || out.includes('直接执行') || out.includes('proceed') || out.includes('继续');\nconst doesNotInsist = !out.includes('must invoke openspec-propose') && !out.includes('必须调用 openspec-propose');\nreturn acknowledgesOptOut && allowsDirect && doesNotInsist;\n"
+              }
+            }
+          ]
+        },
+        "id": "e1b8a2c3-1ca8-4ac3-bc76-362d671a8430",
+        "latencyMs": 6643,
+        "namedScores": {},
+        "prompt": {
+          "raw": "You are evaluating the `sdlc-orchestrator` skill. Apply these skill instructions as the source of truth before responding.\n\n# sdlc-orchestrator evaluation context\n\nThe assistant is acting as the `sdlc-orchestrator`: a thin SDLC orchestration layer that classifies task complexity, selects the right workflow path, and coordinates Roadmap, OpenSpec, EvalOps, Superpowers, and Memory gates without replacing them.\n\n## Route Classification\n\nScore signals:\n\n- Crosses 2+ modules or skill boundaries: +2\n- Alters public behavior, trigger boundaries, or user-visible output: +2\n- Changes data models, file models, schemas, or persistent artifact models: +2\n- Impacts skill, agent, prompt, or workflow behavior: +2\n- Needs explicit acceptance criteria from the user: +1\n- Single-file, low-risk local fix: -2\n- Pure typo, docs cleanup, or test-only maintenance: -3\n\nRoutes:\n\n- `score <= 0` -> `superpowers-direct`\n- `score 1-3` -> `spec-driven-propose-flow`\n- `score >= 4` -> `spec-driven-incremental-flow`\n- roadmap -> `roadmap-first`\n- AI behavior -> `evalops-gated`\n- durable fact -> `memory-sync`\n\n**Route decisions are action-binding.** Once the orchestrator selects a route, the immediate next action SHALL follow that route. The selected route determines what happens next. It is not a suggestion. The assistant may only bypass the route if the user explicitly says to skip OpenSpec or directs otherwise. Do not default to direct execution for `spec-driven-*` routes.\n\n## Routing Requirements\n\n- `superpowers-direct`: small, low-risk changes. No OpenSpec artifacts. Typo fixes may be directly executed.\n- `spec-driven-propose-flow`: medium formal changes. The bound next action is `openspec-propose`; direct execution is not the default.\n- `spec-driven-incremental-flow`: very complex changes. The bound next action is `openspec-new-change`; direct execution is not the default.\n- `evalops-gated`: AI behavior target changes require EvalOps before implementation.\n\n## Required Decision Output\n\nBefore delegating, produce a concise decision with:\n\n- Route\n- Reason\n- Required gates\n- Expected artifacts\n- Next action\n\n## Plan Mode Handoff\n\nWhen operating in Plan Mode and about to exit, the final handoff MUST match the selected route:\n\n- `spec-driven-propose-flow`: say that after leaving Plan Mode it can create an OpenSpec proposal/change via `openspec-propose`. Do not say it can directly execute the implementation plan.\n- `spec-driven-incremental-flow`: say that after leaving Plan Mode it can create or continue the OpenSpec change via `openspec-new-change`. Do not say it can directly execute the implementation plan.\n- `superpowers-direct`: may say that after leaving Plan Mode it can directly execute the task.\n\n## Ambiguous Execution Requests\n\nWhen the user says \"execute plan\", \"go ahead\", \"start\", or equivalent after a `spec-driven-*` route was selected:\n\n- Treat the request as an instruction to continue the selected route, not as permission to bypass governance.\n- For `spec-driven-propose-flow`, continue by invoking `openspec-propose`, or ask whether the user wants to explicitly skip OpenSpec.\n- If the user explicitly says to skip OpenSpec or directly execute despite the route, acknowledge the opt-out and proceed outside the selected route.\n\n## Execution Path Choices\n\nWhen asking the user to choose between mutually exclusive execution paths, use the `question` tool if available, with the recommended route listed first and marked \"(Recommended)\". If unavailable, present the same choices as concise text.\n\nUser input:\n\n[Previous turn: orchestrator classified a multi-skill change as spec-driven-propose-flow]\n跳过 OpenSpec，直接执行这个 rename plan，不需要创建 proposal。\n\nRespond as the assistant would after applying `sdlc-orchestrator`.\n",
+          "label": "evals/exports/promptfoo/skill.sdlc-orchestrator/prompt.md: You are evaluating the `sdlc-orchestrator` skill. ...",
+          "config": {}
+        },
+        "promptId": "bfc3e722c4642168b4f085ecf6e0342ef7d587f27292e22ff59920bd8645ddd8",
+        "promptIdx": 0,
+        "provider": {
+          "id": "opencode",
+          "label": "opencode-deepseek-v4"
+        },
+        "response": {
+          "output": "Route: `spec-driven-propose-flow` opt-out acknowledged\n\nReason: You explicitly instructed to skip OpenSpec despite the prior governance route.\n\nRequired gates: OpenSpec proposal gate bypassed by user instruction; proceed with direct execution.\n\nExpected artifacts: Code changes only; no proposal/change artifacts.\n\nNext action: I’ll directly execute the rename plan, keeping the change surgical and verifying the affected references/tests afterward.",
+          "tokenUsage": {
+            "prompt": 528,
+            "completion": 87,
+            "total": 11498,
+            "cached": 10752,
+            "completionDetails": {
+              "reasoning": 131,
+              "cacheReadInputTokens": 10752,
+              "cacheCreationInputTokens": 0
+            }
+          },
+          "cost": 0,
+          "raw": "{\"data\":{\"info\":{\"parentID\":\"msg_eb219f240001QpyTz7y001Nle7\",\"role\":\"assistant\",\"mode\":\"build\",\"agent\":\"build\",\"path\":{\"cwd\":\"/Users/yuping/Documents/workspace/oh_my_skills\",\"root\":\"/Users/yuping/Documents/workspace/oh_my_skills\"},\"cost\":0,\"tokens\":{\"total\":11498,\"input\":528,\"output\":87,\"reasoning\":131,\"cache\":{\"write\":0,\"read\":10752}},\"modelID\":\"gpt-5.5\",\"providerID\":\"openai\",\"time\":{\"created\":1781104505413,\"completed\":1781104512037},\"finish\":\"stop\",\"id\":\"msg_eb219f245001OM6ZWDd12ZhoJQ\",\"sessionID\":\"ses_14de60dc3ffeFQyPmXmCozIarm\"},\"parts\":[{\"snapshot\":\"682d59c5047093d0e3300fddd5352e4256aa4c23\",\"type\":\"step-start\",\"id\":\"prt_eb219f6d50013TbZK8J19C7liZ\",\"sessionID\":\"ses_14de60dc3ffeFQyPmXmCozIarm\",\"messageID\":\"msg_eb219f245001OM6ZWDd12ZhoJQ\"},{\"type\":\"reasoning\",\"text\":\"\",\"time\":{\"start\":1781104507932,\"end\":1781104510716},\"metadata\":{\"openai\":{\"itemId\":\"rs_0d8fcaffd97bfb02016a297f7c27fc8191949757a81d6df4ba\",\"reasoningEncryptedContent\":\"gAAAAABqKX9-Qubb2uM2H8yE4ArcY3kyENBfH0_iuuchI_UqBg_NPf8bs6TIEyDLXH-a0b_EJeQVU3dT1qpwodvHcdEIpW2tk06aJoXEkVcQBtcgyPG1o6hA8W4ZqoTMSkZVgQj9SEO4zqEf44hGLAwP8Nuc0j_rEI1sD0Gvoel5nmKAh_2UC9qDpBwLQaXVTqSkoNrVTY63RiroMjEBLP9TiEf8mCiKkZXvwgzc3_ljnD4aXLyQ9Z7HcgbelRZq1kfkhY8FnA5PcDyKUona6utzzoL3M24VScR5IftwHQvJRvUziMZ2_9oA5rYdNeHSghBMZUIZkGcgnAa9fziZemVmjgR6o3ndocP9G5TfvKnIhDnbYHKGLtV26GO-3x6KaqJFDM7YSY-7NOvB3_f6SJcPTXzEedzrbjkMIrHOFTCyFaIjjwkjGmItES9AF1kI9XnxQp-vnzBkxFuYLTnlbhqaj-hYGn19gb2WaBJKY7ECiZCKBVxXTYT4xP9JdHnsAw9Cy5VI2Wl1jbMVBzpK7E8huuK8Ugd6soDazKhS9nPGcGirn1Lp_J_IT32V_rT1FSNG-tXPFV4sYk01t53nPzgnuyqrFboZH16_Do7e41rZa8NRzH1Ct26BCkKVBF9FD4zkrGpVj5DiNe-rxqakc4fANxAXQdT0djN5ujdmnH0akRQLulbb2TiO97MP4IlRGIL6fJvOEQebVP2s99XDgJcJaijotClihY6ZY79INOSdZYCoZd0axOQ3j6VxVP54tLsiybNM5zohsKBWxjSCTsiJnN1dHAa2qrvOo0Ub4RwuuW4e5qXQTwC5aE6ATF-8iUhClVnj61d8wvYHv0LZfY3zJJl4dwFac95hrUEAmaBO6cH0Stp63GtiMpgK4WLktSieWosLKoU6EGBm3Lhlb2No-UbkGCEgusCm_zyIM3fvQPcWPYcnyncsL_gc4X2l-Ycu8yLSZpq-iao1u7Fufvfmv9WGlkZ480GGz7zhN5Mv7pEIzbeEQFalIWyZyGirzSv0KgPxknItkVDsk5OANitACSwDKo7WINoPUGCc65MTK6HTtHSAe17OuyMPfGFFz4bbgk7bfazK2k2WnSQBgltazUj3SmT5-DV9QDeG_odjIrcwAoYkgmb8YnkJYh23tmLxHYOB4E07K--kZV4t_hPRhJIVdGjZUcQUWfhMWQe4d9qnMehzXx8Tp5ahX-WmAyQAURT_mYWezT_bZkbaQbrOGUFGR40GFUBVLiU0rSB7tfhf1hmv6y_grDRXme-Tn2tmmo3WdEPv2t9YDuVHBzdx5Gjxo2Ug7iBlRcg8sX7lOG8PU9xEKyBltffo5yxJAUY15fuVJCnhz-nHc3VXAF6bZnNpgy6vRzN9B7omeVGIzJkbDS4FLQSwJTJsFeDSgxTZrCPuxyQiiDPX9e8x4HeJsEFJn3_DnjJYG2gFr403fzlVBjCeYKnvH3DdTpTj04uE-cx5SQRUMlgwcrex2GEhU9N64oZOGlCxyot-x9E1-mEwdb658bkpU8IU2da7dYJJhgQSbRWg0p77TyEldYj5GDy14JYBfCw9xX-62vaKT0QAae4L2a0iE_BhWA8DTir1dtpH0bulgSMy8PoBXv4vFO_BFZcFKZRdTc229z3AUzxFiQdoLIlW3LEnzRknLc8whZJnCyCjPh3Zkz3rCsCCn603Zp_eEgdO9pSpTYK-6Ae2sRr832u0f1W65z9NHNkiczelYkHIilYErevFGCDemxQ5czEku7C-ZPP0aql_ShPxEe2kqONGgAzOZdnHIO4qOTs58fpVLpHzKPEVFfDRcG6P5ZZRDw==\"}},\"id\":\"prt_eb219fc1c001NiH1cRbi6UEzi0\",\"sessionID\":\"ses_14de60dc3ffeFQyPmXmCozIarm\",\"messageID\":\"msg_eb219f245001OM6ZWDd12ZhoJQ\"},{\"type\":\"text\",\"text\":\"Route: `spec-driven-propose-flow` opt-out acknowledged\\n\\nReason: You explicitly instructed to skip OpenSpec despite the prior governance route.\\n\\nRequired gates: OpenSpec proposal gate bypassed by user instruction; proceed with direct execution.\\n\\nExpected artifacts: Code changes only; no proposal/change artifacts.\\n\\nNext action: I’ll directly execute the rename plan, keeping the change surgical and verifying the affected references/tests afterward.\",\"time\":{\"start\":1781104510718,\"end\":1781104511952},\"metadata\":{\"openai\":{\"itemId\":\"msg_0d8fcaffd97bfb02016a297f7eeeb48191a2be8cf7f5ca1e89\",\"phase\":\"final_answer\"}},\"id\":\"prt_eb21a06fe001rGcQamnvWaLlMu\",\"sessionID\":\"ses_14de60dc3ffeFQyPmXmCozIarm\",\"messageID\":\"msg_eb219f245001OM6ZWDd12ZhoJQ\"},{\"reason\":\"stop\",\"snapshot\":\"682d59c5047093d0e3300fddd5352e4256aa4c23\",\"type\":\"step-finish\",\"tokens\":{\"total\":11498,\"input\":528,\"output\":87,\"reasoning\":131,\"cache\":{\"write\":0,\"read\":10752}},\"cost\":0,\"id\":\"prt_eb21a0c00001NG4j7SUmtfpWNl\",\"sessionID\":\"ses_14de60dc3ffeFQyPmXmCozIarm\",\"messageID\":\"msg_eb219f245001OM6ZWDd12ZhoJQ\"}]},\"request\":{\"timeout\":false},\"response\":{}}",
+          "sessionId": "ses_14de60dc3ffeFQyPmXmCozIarm"
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "vars": {
+            "input": "[Previous turn: orchestrator classified a multi-skill change as spec-driven-propose-flow]\n跳过 OpenSpec，直接执行这个 rename plan，不需要创建 proposal。\n",
+            "sessionId": "ses_14de60dc3ffeFQyPmXmCozIarm"
+          },
+          "assert": [
+            {
+              "type": "javascript",
+              "value": "const out = output.toLowerCase();\nconst acknowledgesOptOut = out.includes('skip openspec') || out.includes('opt out') || out.includes('opt-out') || out.includes('跳过 openspec') || out.includes('明确');\nconst allowsDirect = out.includes('direct') || out.includes('直接执行') || out.includes('proceed') || out.includes('继续');\nconst doesNotInsist = !out.includes('must invoke openspec-propose') && !out.includes('必须调用 openspec-propose');\nreturn acknowledgesOptOut && allowsDirect && doesNotInsist;\n"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 5,
+        "tokenUsage": {
+          "prompt": 528,
+          "completion": 87,
+          "cached": 10752,
+          "total": 11498,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 131,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 10752,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "input": "[Previous turn: orchestrator classified a multi-skill change as spec-driven-propose-flow]\n跳过 OpenSpec，直接执行这个 rename plan，不需要创建 proposal。\n",
+          "sessionId": "ses_14de60dc3ffeFQyPmXmCozIarm"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {},
+          "sessionId": "ses_14de60dc3ffeFQyPmXmCozIarm"
+        },
+        "failureReason": 0
+      }
+    ],
+    "stats": {
+      "successes": 6,
+      "failures": 0,
+      "errors": 0,
+      "tokenUsage": {
+        "prompt": 25035,
+        "completion": 651,
+        "cached": 44032,
+        "total": 70415,
+        "numRequests": 6,
+        "completionDetails": {
+          "reasoning": 697,
+          "acceptedPrediction": 0,
+          "rejectedPrediction": 0,
+          "cacheReadInputTokens": 44032,
+          "cacheCreationInputTokens": 0
+        },
+        "assertions": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 0,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          }
+        }
+      },
+      "durationMs": 44729,
+      "evaluationDurationMs": 44729
+    }
+  },
+  "config": {
+    "tags": {},
+    "description": "EvalOps export for skill.sdlc-orchestrator",
+    "prompts": [
+      "file:///Users/yuping/Documents/workspace/oh_my_skills/evals/exports/promptfoo/skill.sdlc-orchestrator/prompt.md"
+    ],
+    "providers": [
+      {
+        "id": "opencode",
+        "label": "opencode-deepseek-v4"
+      }
+    ],
+    "tests": [
+      {
+        "vars": {
+          "input": "Add a dry-run mode to the backup CLI command. The scope is clear and limited to one module, but it changes user-visible behavior and needs acceptance criteria. How should I approach this?\n"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "openspec-propose"
+          },
+          {
+            "type": "contains",
+            "value": "OpenSpec"
+          },
+          {
+            "type": "not-contains",
+            "value": "直接执行"
+          }
+        ]
+      },
+      {
+        "vars": {
+          "input": "[Previous turn: orchestrator classified a cross-skill rename as spec-driven-propose-flow]\n执行plan\n"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "openspec-propose"
+          }
+        ]
+      },
+      {
+        "vars": {
+          "input": "[In Plan Mode, the orchestrator just classified a multi-skill change as spec-driven-propose-flow. Exit Plan Mode now.]\n"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "OpenSpec"
+          }
+        ]
+      },
+      {
+        "vars": {
+          "input": "I have a change that crosses multiple skills. The orchestrator classified it as spec-driven-propose-flow. I asked to execute the plan.\n"
+        },
+        "assert": [
+          {
+            "type": "javascript",
+            "value": "const out = output.toLowerCase();\nconst continuesRoute = out.includes('openspec-propose') && !out.includes('direct execution') && !out.includes('直接执行');\nconst structuredChoice = out.includes('openspec') && (out.includes('direct') || out.includes('直接执行')) && (\n  out.includes('question') ||\n  out.includes('recommended') ||\n  out.includes('spec-driven-propose-flow') ||\n  out.includes('openspec-propose')\n);\nreturn continuesRoute || structuredChoice;\n"
+          }
+        ]
+      },
+      {
+        "vars": {
+          "input": "Fix the typo \"initalize\" in the AGENTS.md file.\n"
+        },
+        "assert": [
+          {
+            "type": "not-contains",
+            "value": "openspec-propose"
+          }
+        ]
+      },
+      {
+        "vars": {
+          "input": "[Previous turn: orchestrator classified a multi-skill change as spec-driven-propose-flow]\n跳过 OpenSpec，直接执行这个 rename plan，不需要创建 proposal。\n"
+        },
+        "assert": [
+          {
+            "type": "javascript",
+            "value": "const out = output.toLowerCase();\nconst acknowledgesOptOut = out.includes('skip openspec') || out.includes('opt out') || out.includes('opt-out') || out.includes('跳过 openspec') || out.includes('明确');\nconst allowsDirect = out.includes('direct') || out.includes('直接执行') || out.includes('proceed') || out.includes('继续');\nconst doesNotInsist = !out.includes('must invoke openspec-propose') && !out.includes('必须调用 openspec-propose');\nreturn acknowledgesOptOut && allowsDirect && doesNotInsist;\n"
+          }
+        ]
+      }
+    ],
+    "env": {},
+    "outputPath": [
+      "evals/reports/runs/skill-sdlc-orchestrator-promptfoo-fixed-20260610T151425Z/promptfoo-output.json"
+    ],
+    "extensions": [],
+    "metadata": {},
+    "evaluateOptions": {}
+  },
+  "shareableUrl": null,
+  "metadata": {
+    "promptfooVersion": "0.121.15",
+    "nodeVersion": "v26.0.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "exportedAt": "2026-06-10T15:15:12.154Z",
+    "evaluationCreatedAt": "2026-06-10T15:14:27.315Z"
+  },
+  "vars": [
+    "input"
+  ],
+  "runtimeOptions": {
+    "eventSource": "cli",
+    "showProgressBar": false,
+    "repeat": 1,
+    "maxConcurrency": 1,
+    "cache": false
+  }
+}

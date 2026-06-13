@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Rebuild index.json from .roadmap/items/*.md frontmatter. Backs up existing index."""
+"""Rebuild index.json from roadmap items.
+
+Supports area-based layout: aggregates areas/*/items/*.md into global index.json.
+Falls back to legacy flat layout: items/*.md.
+"""
 
 import json
 import re
@@ -11,7 +15,14 @@ LIB_DIR = Path(__file__).resolve().parents[2] / "_lib"
 if str(LIB_DIR) not in sys.path:
     sys.path.insert(0, str(LIB_DIR))
 
-from sdlc_runtime_paths import find_project_root, resolve_roadmap_dir  # noqa: E402
+from sdlc_runtime_paths import (  # noqa: E402
+    discover_areas,
+    find_project_root,
+    has_area_layout,
+    has_flat_layout,
+    resolve_roadmap_dir,
+    roadmap_area_items_dir,
+)
 
 
 def parse_frontmatter(content: str) -> dict:
@@ -65,26 +76,11 @@ def parse_frontmatter(content: str) -> dict:
     return result
 
 
-def main():
-    root = find_project_root()
-    roadmap_dir = resolve_roadmap_dir(root).path
-    items_dir = roadmap_dir / "items"
-    index_path = roadmap_dir / "index.json"
-
-    if not items_dir.is_dir():
-        print("ERROR: .ai/roadmap/items/ directory not found")
-        return 1
-
-    # Backup existing index if present
-    if index_path.exists():
-        backup_path = roadmap_dir / "index.json.bak"
-        shutil.copy2(index_path, backup_path)
-        print(f"Backed up existing index.json to index.json.bak")
-
-    item_files = sorted(items_dir.glob("*.md"))
+def collect_items_from(items_dir: Path, area_id: str) -> list[dict]:
     items = []
-
-    for item_file in item_files:
+    if not items_dir.is_dir():
+        return items
+    for item_file in sorted(items_dir.glob("*.md")):
         content = item_file.read_text()
         fm = parse_frontmatter(content)
         item_id = fm.get("id", "")
@@ -109,10 +105,38 @@ def main():
                 "depends_on": fm.get("depends_on", []) or [],
                 "openspec_change": fm.get("openspec_change"),
                 "patches": fm.get("patches", []) or [],
+                "area": area_id,
             }
         )
+    return items
 
-    # Sort by order
+
+def main():
+    root = find_project_root()
+    roadmap_dir = resolve_roadmap_dir(root).path
+    index_path = roadmap_dir / "index.json"
+
+    if index_path.exists():
+        backup_path = roadmap_dir / "index.json.bak"
+        shutil.copy2(index_path, backup_path)
+        print("Backed up existing index.json to index.json.bak")
+
+    items = []
+
+    if has_area_layout(root):
+        for area_id in discover_areas(root):
+            items_dir = roadmap_area_items_dir(root, area_id)
+            area_items = collect_items_from(items_dir, area_id)
+            items.extend(area_items)
+            print(f"Collected {len(area_items)} item(s) from area '{area_id}'")
+    elif has_flat_layout(root):
+        items_dir = roadmap_dir / "items"
+        items = collect_items_from(items_dir, "")
+        print(f"Collected {len(items)} item(s) from flat layout")
+    else:
+        print("No roadmap items directory found.")
+        items = []
+
     items.sort(key=lambda x: x["order"])
 
     index = {"version": 1, "items": items}

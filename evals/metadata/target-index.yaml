@@ -1,0 +1,5 @@
+targets:
+  - id: skill.sdlc-orchestrator
+    type: skill
+    path: skills/sdlc-orchestrator/SKILL.md
+    description: Pre-OpenSpec routing and gate coordination skill

@@ -1,5 +1,5 @@
 ---
-id: RM-XXX
+id: RM-PREFIX-XXX
 title: "<item-title>"
 status: planned
 stage: mvp

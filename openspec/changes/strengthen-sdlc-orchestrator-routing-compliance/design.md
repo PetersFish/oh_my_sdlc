@@ -12,6 +12,7 @@ This gap showed up when a cross-skill rename was classified as `spec-driven-prop
 - Prevent ambiguous execution commands from bypassing OpenSpec after a `spec-driven-*` route.
 - Add Plan Mode handoff language that matches the chosen route.
 - Prefer the `question` tool for mutually exclusive execution-path choices when available.
+- Add reviewed EvalOps coverage and golden regression cases for `skill.sdlc-orchestrator` before changing the skill instructions.
 - Preserve direct execution for `superpowers-direct` tasks.
 
 **Non-Goals:**
@@ -47,8 +48,25 @@ When the assistant offers mutually exclusive paths such as "OpenSpec proposal" v
 
 Alternative considered: require text-only choices for portability. This was rejected because OpenCode provides a choice tool and the skill can gracefully fall back to text if unavailable.
 
+### Decision 5: Add EvalOps assets before instruction changes
+
+This change will create EvalOps assets for target `skill.sdlc-orchestrator` before updating the skill text. The coverage matrix will focus on route binding, Plan Mode handoff compliance, ambiguous execution request handling, execution-path choice UX, explicit opt-out handling, and orchestrator boundary preservation.
+
+Golden cases will cover at least these regression patterns:
+
+- A `spec-driven-propose-flow` decision must not hand off to direct execution.
+- An "execute plan" request after a `spec-driven-propose-flow` decision must continue with OpenSpec or ask for explicit opt-out.
+- A Plan Mode final response for a `spec-driven-*` route must name OpenSpec proposal/change creation, not direct implementation.
+- A mutually exclusive OpenSpec-vs-direct choice must use the `question` tool when available.
+
+Positive/edge cases will cover direct execution for `superpowers-direct` and explicit user opt-out from OpenSpec. The golden set is not a replacement for deterministic content tests; it verifies model-facing behavior that unit tests cannot prove.
+
+Alternative considered: rely only on tests that assert `SKILL.md` contains the new rules. This was rejected because the observed failure was not missing text alone; it was instruction-following drift across a multi-turn planning-to-build transition.
+
 ## Risks / Trade-offs
 
 - More routing rigidity could slow small changes misclassified as `spec-driven-*` -> Mitigation: keep `superpowers-direct` intact and allow explicit user opt-out from OpenSpec.
 - `question` tool behavior differs by model -> Mitigation: phrase it as "use if available" and keep text fallback acceptable.
 - Stronger route binding may conflict with an explicit user instruction -> Mitigation: user opt-out remains authoritative when explicit.
+- Golden cases can become brittle if they assert exact wording -> Mitigation: use behavioral must-include/must-not-include checks and rubrics rather than exact full-response matching.
+- Eval infrastructure may not exist yet in the repository -> Mitigation: add tasks to initialize `evals/` metadata and target directories as part of this change.

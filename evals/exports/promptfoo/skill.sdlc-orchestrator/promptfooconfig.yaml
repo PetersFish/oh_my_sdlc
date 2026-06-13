@@ -1,0 +1,10 @@
+description: "EvalOps export for skill.sdlc-orchestrator"
+
+prompts:
+  - file://prompt.md
+
+providers:
+  - id: opencode
+    label: opencode-deepseek-v4
+
+tests: cases.yaml

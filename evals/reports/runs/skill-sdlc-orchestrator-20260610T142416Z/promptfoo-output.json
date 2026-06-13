@@ -1,0 +1,1005 @@
+{
+  "evalId": "eval-p1J-2026-06-10T14:27:06",
+  "results": {
+    "version": 3,
+    "timestamp": "2026-06-10T14:27:06.848Z",
+    "prompts": [
+      {
+        "id": "146b33ced217be53420a9244c0ad8ec843483bbab4f32ac28e803b45b42891ba",
+        "raw": "{{input}}",
+        "label": "{{input}}",
+        "provider": "opencode-deepseek-v4",
+        "metrics": {
+          "score": 1.3333333333333333,
+          "testPassCount": 0,
+          "testFailCount": 6,
+          "testErrorCount": 0,
+          "assertPassCount": 3,
+          "assertFailCount": 10,
+          "totalLatencyMs": 31,
+          "tokenUsage": {
+            "prompt": 28310,
+            "completion": 1169,
+            "cached": 43520,
+            "total": 73262,
+            "numRequests": 6,
+            "completionDetails": {
+              "reasoning": 263,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 43520,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          },
+          "namedScores": {},
+          "namedScoresCount": {},
+          "namedScoreWeights": {},
+          "cost": 0
+        }
+      }
+    ],
+    "results": [
+      {
+        "cost": 0,
+        "error": "Expected output to contain \"openspec-propose\"",
+        "gradingResult": {
+          "pass": false,
+          "score": 0.3333333333333333,
+          "reason": "Expected output to contain \"openspec-propose\"",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Expected output to contain \"openspec-propose\"",
+              "assertion": {
+                "type": "contains",
+                "value": "openspec-propose"
+              }
+            },
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Expected output to contain \"openspec-propose\"",
+              "assertion": {
+                "type": "contains",
+                "value": "openspec-propose"
+              }
+            },
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "not-contains",
+                "value": "直接执行"
+              }
+            }
+          ]
+        },
+        "id": "da74a16b-cbcc-47e3-865f-01e45b758ed0",
+        "latencyMs": 8,
+        "namedScores": {},
+        "prompt": {
+          "raw": "I want to rename sdlc-repository-memory-init to sdlc-memory-init, this crosses multiple skills, scripts, tests, and distributed copies. How should I approach this?",
+          "label": "{{input}}",
+          "config": {}
+        },
+        "promptId": "146b33ced217be53420a9244c0ad8ec843483bbab4f32ac28e803b45b42891ba",
+        "promptIdx": 0,
+        "provider": {
+          "id": "opencode",
+          "label": "opencode-deepseek-v4"
+        },
+        "response": {
+          "output": "The index points at duplicate/legacy init test files and a distributed-copy test, which is exactly the risky area for this rename. I’ll give you a migration sequence that preserves behavior while making the rename verifiable.\nApproach it as a compatibility-sensitive rename, not a simple search/replace.\n\n1. **Inventory all references first**\n   - Search for exact `sdlc-repository-memory-init`.\n   - Search for derived names like `repository_memory_init`, `repository-memory-init`, `TestRepositoryMemoryInit`.\n   - Include generated/distributed copies, skill manifests, docs, tests, scripts, and install packaging.\n\n2. **Identify the source of truth**\n   - Find which file actually defines the skill/script.\n   - Find which copies are generated or distributed.\n   - Update the source first, then regenerate/copy outward if the repo has a distribution process.\n\n3. **Rename the primary artifact**\n   - Rename the skill/script from `sdlc-repository-memory-init` to `sdlc-memory-init`.\n   - Update metadata, manifest entries, command names, examples, and test expectations.\n   - Rename test files/classes only if that matches repo conventions.\n\n4. **Decide whether to keep a compatibility alias**\n   - If users may already call `sdlc-repository-memory-init`, keep a thin deprecated alias that forwards to `sdlc-memory-init`.\n   - If this is internal/unreleased, remove the old name completely.\n   - Since this crosses distributed copies, I would strongly consider a temporary alias unless you know there are no external consumers.\n\n5. **Update tests in layers**\n   - Existing behavior tests should now target `sdlc-memory-init`.\n   - Add or update distributed-copy tests so every shipped copy uses the new name.\n   - If keeping compatibility, add one explicit test that the old name still resolves and forwards.\n\n6. **Verify with exact-name checks**\n   - After edits, run tests.\n   - Then grep for the old name.\n   - Remaining matches should be intentional only: changelog, migration note, compatibility alias, or deprecation test.\n\n7. **Commit as one focused migration**\n   - Keep unrelated cleanup out.\n   - Mention whether the old command remains as a deprecated alias or is removed.\n\nGiven the files CodeGraph surfaced, I would specifically inspect/update:\n\n- `tests/testrepository_memory_init.py`\n- `tests/test_memory_init.py`\n- `tests/test_memory_skill_copies.py`\n- skill definitions/manifests containing `sdlc-repository-memory-init`\n- any scripts or distributed copies that mirror the skill name\n\nThe safest success criterion is:\n\n`rg \"sdlc-repository-memory-init\"` returns only intentional compatibility/deprecation references, and all init/distributed-copy tests pass.",
+          "tokenUsage": {
+            "prompt": 2056,
+            "completion": 574,
+            "total": 11860,
+            "cached": 9216,
+            "completionDetails": {
+              "reasoning": 14,
+              "cacheReadInputTokens": 9216,
+              "cacheCreationInputTokens": 0
+            }
+          },
+          "cost": 0,
+          "raw": "{\"data\":{\"info\":{\"parentID\":\"msg_eb1eb71e30017SjccfH3LnsdSp\",\"role\":\"assistant\",\"mode\":\"build\",\"agent\":\"build\",\"path\":{\"cwd\":\"/Users/yuping/Documents/workspace/oh_my_skills\",\"root\":\"/Users/yuping/Documents/workspace/oh_my_skills\"},\"cost\":0,\"tokens\":{\"total\":11860,\"input\":2056,\"output\":574,\"reasoning\":14,\"cache\":{\"write\":0,\"read\":9216}},\"modelID\":\"gpt-5.5\",\"providerID\":\"openai\",\"time\":{\"created\":1781101468803,\"completed\":1781101481435},\"finish\":\"stop\",\"id\":\"msg_eb1eb9c83001CXapvZB8SrPsJ3\",\"sessionID\":\"ses_14e148f2cffe9exd8ds1KoOZWD\"},\"parts\":[{\"snapshot\":\"088923c705a0ee1e66ec6c92b634f90d28723642\",\"type\":\"step-start\",\"id\":\"prt_eb1eba1db00182xwZ5XaT8aDoE\",\"sessionID\":\"ses_14e148f2cffe9exd8ds1KoOZWD\",\"messageID\":\"msg_eb1eb9c83001CXapvZB8SrPsJ3\"},{\"type\":\"reasoning\",\"text\":\"\",\"time\":{\"start\":1781101470649,\"end\":1781101471161},\"metadata\":{\"openai\":{\"itemId\":\"rs_0cb9582608a83067016a29739eda48819a90dcc4d3bfccddce\",\"reasoningEncryptedContent\":\"gAAAAABqKXOf6wOSYdw_RRf0yiOHovHX5IKLFBTnJ61vJ-4AWG7YUM0H2TCRi4s6ny9uf2Nw2mOiofuObG5hCHks9pv0j71W7oIG2iPWtUpYrng4wCO1Cjbsgzn58SdmvADxY_y_LL8j9nPZTuNVEgUviTqy6HK5EW83fYjotGQxyP4xxr9xOYPTIR9wTSluC81PawM2DVws6oWicidgcix2uF8tGaAxhk1stZEAM-fmBj5EIHk3JFy_UYz7Y4Q4Jt5t2hVrGHf9n-i3XqYGF2NcBsdtGCSiaenvdMZ1J70K6_0vrhx-m2pDtXIGlVwSsIPI2vdNdLcKow_CVoSQSehkP6Hdb_mHWYyYvulAGhugeEVPinALEISjKBdRt2_wOTI_Rr07gmaILHrdjS3hXpHnO575tXthqySZV9QR9zJWayKjgcWRmVY65k1vOjOH86-xeMZuh0hDzbarHCPIL9x_L-vCN2B3GYt9FFRL35RVHe8yMGl9vWJMW3pF8klHHRGMDsvVrtSDmHAxW4SCAmmG_COW3kE8l-TVEmRkZMNQp2Sr75PL-JpHT6ww1jkQdFCMJvG_newmW1pwJUkx1AMRcOltM9t1S03P08NQJ2D77VXmg8S7a3mf5dzcrEwQeC7BRSzcA12HCuJ6byxOpDC1NPBobmPn3k08iQstt-Z0a9qTuZKnBRi2bMyNaMqUe4l2irvlmbgzR_5dJzh8IhMjJ_FxNcL5Nc3VeAxHGrgh4BBGCe_6RGePd7RimgmvmKrHnc--uDI3s3YMVOnmrUcEvampSz9dpZ3KfbIc7yU4x2qJkOeOW9GbguRUrUGmQ_GFMsm0vxZD0Kh7_OhIqZqfag7MiuNieDzuqWO1KwHGsAc7ekApLUqKuLiRjqqh_uiJ73KNKRSf6-Bo99c3U1DwSr13EhOLOU627UJUPmSj_G_KR5yFbmHQ7YDT5_U1crrmv1xpyGL8yA4uc2snRjJglrJIRtxSJw==\"}},\"id\":\"prt_eb1eba3b9001jJOH8haVSSlf5d\",\"sessionID\":\"ses_14e148f2cffe9exd8ds1KoOZWD\",\"messageID\":\"msg_eb1eb9c83001CXapvZB8SrPsJ3\"},{\"type\":\"text\",\"text\":\"The index points at duplicate/legacy init test files and a distributed-copy test, which is exactly the risky area for this rename. I’ll give you a migration sequence that preserves behavior while making the rename verifiable.\",\"time\":{\"start\":1781101471185,\"end\":1781101471774},\"metadata\":{\"openai\":{\"itemId\":\"msg_0cb9582608a83067016a29739f6aa4819a81b770469fb1adee\",\"phase\":\"commentary\"}},\"id\":\"prt_eb1eba5d1001Wjqf5A7Ffi0CzJ\",\"sessionID\":\"ses_14e148f2cffe9exd8ds1KoOZWD\",\"messageID\":\"msg_eb1eb9c83001CXapvZB8SrPsJ3\"},{\"type\":\"text\",\"text\":\"Approach it as a compatibility-sensitive rename, not a simple search/replace.\\n\\n1. **Inventory all references first**\\n   - Search for exact `sdlc-repository-memory-init`.\\n   - Search for derived names like `repository_memory_init`, `repository-memory-init`, `TestRepositoryMemoryInit`.\\n   - Include generated/distributed copies, skill manifests, docs, tests, scripts, and install packaging.\\n\\n2. **Identify the source of truth**\\n   - Find which file actually defines the skill/script.\\n   - Find which copies are generated or distributed.\\n   - Update the source first, then regenerate/copy outward if the repo has a distribution process.\\n\\n3. **Rename the primary artifact**\\n   - Rename the skill/script from `sdlc-repository-memory-init` to `sdlc-memory-init`.\\n   - Update metadata, manifest entries, command names, examples, and test expectations.\\n   - Rename test files/classes only if that matches repo conventions.\\n\\n4. **Decide whether to keep a compatibility alias**\\n   - If users may already call `sdlc-repository-memory-init`, keep a thin deprecated alias that forwards to `sdlc-memory-init`.\\n   - If this is internal/unreleased, remove the old name completely.\\n   - Since this crosses distributed copies, I would strongly consider a temporary alias unless you know there are no external consumers.\\n\\n5. **Update tests in layers**\\n   - Existing behavior tests should now target `sdlc-memory-init`.\\n   - Add or update distributed-copy tests so every shipped copy uses the new name.\\n   - If keeping compatibility, add one explicit test that the old name still resolves and forwards.\\n\\n6. **Verify with exact-name checks**\\n   - After edits, run tests.\\n   - Then grep for the old name.\\n   - Remaining matches should be intentional only: changelog, migration note, compatibility alias, or deprecation test.\\n\\n7. **Commit as one focused migration**\\n   - Keep unrelated cleanup out.\\n   - Mention whether the old command remains as a deprecated alias or is removed.\\n\\nGiven the files CodeGraph surfaced, I would specifically inspect/update:\\n\\n- `tests/testrepository_memory_init.py`\\n- `tests/test_memory_init.py`\\n- `tests/test_memory_skill_copies.py`\\n- skill definitions/manifests containing `sdlc-repository-memory-init`\\n- any scripts or distributed copies that mirror the skill name\\n\\nThe safest success criterion is:\\n\\n`rg \\\"sdlc-repository-memory-init\\\"` returns only intentional compatibility/deprecation references, and all init/distributed-copy tests pass.\",\"time\":{\"start\":1781101471776,\"end\":1781101481325},\"metadata\":{\"openai\":{\"itemId\":\"msg_0cb9582608a83067016a2973a0079c819aa34db6d945c203e1\",\"phase\":\"final_answer\"}},\"id\":\"prt_eb1eba820001VryKyP636j2YBQ\",\"sessionID\":\"ses_14e148f2cffe9exd8ds1KoOZWD\",\"messageID\":\"msg_eb1eb9c83001CXapvZB8SrPsJ3\"},{\"reason\":\"stop\",\"snapshot\":\"088923c705a0ee1e66ec6c92b634f90d28723642\",\"type\":\"step-finish\",\"tokens\":{\"total\":11860,\"input\":2056,\"output\":574,\"reasoning\":14,\"cache\":{\"write\":0,\"read\":9216}},\"cost\":0,\"id\":\"prt_eb1ebcda8001UMEQvL9bmGHFQr\",\"sessionID\":\"ses_14e148f2cffe9exd8ds1KoOZWD\",\"messageID\":\"msg_eb1eb9c83001CXapvZB8SrPsJ3\"}]},\"request\":{\"timeout\":false},\"response\":{}}",
+          "sessionId": "ses_14e148f2cffe9exd8ds1KoOZWD",
+          "cached": true
+        },
+        "score": 0.3333333333333333,
+        "success": false,
+        "testCase": {
+          "vars": {
+            "input": "I want to rename sdlc-repository-memory-init to sdlc-memory-init, this crosses multiple skills, scripts, tests, and distributed copies. How should I approach this?\n",
+            "sessionId": "ses_14e148f2cffe9exd8ds1KoOZWD"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "openspec-propose"
+            },
+            {
+              "type": "contains",
+              "value": "openspec-propose"
+            },
+            {
+              "type": "not-contains",
+              "value": "直接执行"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 0,
+        "tokenUsage": {
+          "prompt": 2056,
+          "completion": 574,
+          "cached": 9216,
+          "total": 11860,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 14,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 9216,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "input": "I want to rename sdlc-repository-memory-init to sdlc-memory-init, this crosses multiple skills, scripts, tests, and distributed copies. How should I approach this?\n",
+          "sessionId": "ses_14e148f2cffe9exd8ds1KoOZWD"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {},
+          "sessionId": "ses_14e148f2cffe9exd8ds1KoOZWD"
+        },
+        "failureReason": 1
+      },
+      {
+        "cost": 0,
+        "error": "Expected output to contain \"openspec-propose\"",
+        "gradingResult": {
+          "pass": false,
+          "score": 0,
+          "reason": "Expected output to contain \"openspec-propose\"",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Expected output to contain \"openspec-propose\"",
+              "assertion": {
+                "type": "contains",
+                "value": "openspec-propose"
+              }
+            },
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Expected output to contain \"openspec-propose\"",
+              "assertion": {
+                "type": "contains",
+                "value": "openspec-propose"
+              }
+            }
+          ]
+        },
+        "id": "7cef90ce-23a6-4d9c-bbf1-9bca68c87411",
+        "latencyMs": 7,
+        "namedScores": {},
+        "prompt": {
+          "raw": "[Previous turn: orchestrator classified a cross-skill rename as spec-driven-propose-flow]\n执行plan",
+          "label": "{{input}}",
+          "config": {}
+        },
+        "promptId": "146b33ced217be53420a9244c0ad8ec843483bbab4f32ac28e803b45b42891ba",
+        "promptIdx": 0,
+        "provider": {
+          "id": "opencode",
+          "label": "opencode-deepseek-v4"
+        },
+        "response": {
+          "output": "无法执行计划：当前会话没有文件读写或测试执行工具，子代理也确认只能访问 CodeGraph/OCR/web 类工具，不能用 `apply_patch` 或运行测试。\n\n已定位到的线索：\n\n- OpenSpec change 目录：`openspec/changes/clipboard-ocr-multimodal-routing`\n- 相关测试：`tests/test_ocr_router_skill.py`、`tests/test_project_bootstrap_skills.py`\n- 推测计划涉及跨 skill 重命名：`clipboard-ocr` / clipboard OCR skill → `media-ocr-router`\n\n未做任何文件修改，未运行测试。\n\n要继续执行，需要当前会话提供文件编辑和命令执行能力，例如 `apply_patch`/shell，或你把计划内容贴出来并启用可写工具后我继续实现。",
+          "tokenUsage": {
+            "prompt": 2986,
+            "completion": 178,
+            "total": 14018,
+            "cached": 10752,
+            "completionDetails": {
+              "reasoning": 102,
+              "cacheReadInputTokens": 10752,
+              "cacheCreationInputTokens": 0
+            }
+          },
+          "cost": 0,
+          "raw": "{\"data\":{\"info\":{\"parentID\":\"msg_eb1eb71f0001ulZtMtVbevR45L\",\"role\":\"assistant\",\"mode\":\"build\",\"agent\":\"build\",\"path\":{\"cwd\":\"/Users/yuping/Documents/workspace/oh_my_skills\",\"root\":\"/Users/yuping/Documents/workspace/oh_my_skills\"},\"cost\":0,\"tokens\":{\"total\":14018,\"input\":2986,\"output\":178,\"reasoning\":102,\"cache\":{\"write\":0,\"read\":10752}},\"modelID\":\"gpt-5.5\",\"providerID\":\"openai\",\"time\":{\"created\":1781101528052,\"completed\":1781101535604},\"finish\":\"stop\",\"id\":\"msg_eb1ec83f400193VKr19u0DN76N\",\"sessionID\":\"ses_14e148f2cffe1B3RYnRwUKgfZq\"},\"parts\":[{\"snapshot\":\"088923c705a0ee1e66ec6c92b634f90d28723642\",\"type\":\"step-start\",\"id\":\"prt_eb1ec8971001VvvtzszSxIJZze\",\"sessionID\":\"ses_14e148f2cffe1B3RYnRwUKgfZq\",\"messageID\":\"msg_eb1ec83f400193VKr19u0DN76N\"},{\"type\":\"reasoning\",\"text\":\"\",\"time\":{\"start\":1781101530287,\"end\":1781101532594},\"metadata\":{\"openai\":{\"itemId\":\"rs_0b0ddae3aeb5113a016a2973da86848191bf5c67268f925187\",\"reasoningEncryptedContent\":\"gAAAAABqKXPchNFyvjbWNwPWQDWx3N8qOX2AHaYCda-EnIz5NY5K7-fT0UwCvfQAn2veXiVR0eKMZt_nzGtnMKntV8fp6TLl7S8bkuyZBFnFvmcn_24HVBDvxmXSNKB7GP8z8VFl81qeVrgWtdR5A3S9YjBo2LGpsL7N7SrFJCcPqvZVH0LbNT0i4QjB_kkbFJrq0paayOvlhV9fXBPbHtJBacLzYkAlILqut3J5WuUBzCPPK1BmcZpB3MOhpUUEWpEtHJ02Lrx74fmpxmxZOS87EbabA2gtpDEn5H-UJFRO-wl1mzDcJKpmmXGG7A8GWhvdtzxnQzjt85hv7YozzOK8thrS9MsD3OOcsE7JXML12PxiqL1ck69riodxvFBWU0FPJhRMYhfpCIjAqOjnI_hyxli6Sf99jAhBlWUO3LcVxOOrmE9tlwR4v1MGMMDwtsAhIch8KVhREoA8u4BnFPhJEtCq5E6HKLohg6fSLIG0K6lQcERmHCgjNlT06FDEZRb1LLjOOrS0fjSD0_OW-DijuBOEHtRNEuy93vHVVHR3CPIqFCYrxI8ZCsDX7_FBaOoN_KPkkrSBEXsIhdyOYYAZp3gCeIVie2GJoT7Yl0obDP4LQoirjeYyc6OjLPkDFk5FK6BqjQ4-fGAmmAa8IGzRwDqtvX5VRoHIwvk3ZBsDfdWWI8PmHs4Nt4PAs6IguQw1s_rshsSeFZqTFl0ukd63eQ2HVg0PSV3313AZrEEYs-aMZvb_r9iDN1rAM5ZuhX2IijjSYx969Qq_D76eDu1k2HKdczCJq4ya8_dSXuJ3iVcX4CQyhzNy0nX29pMEyZtKACuF51X0pvqoD6rLmQFE14BoN1uSm8RBVI_0MSTxEr6_LMpg4ZAhjFLuxuN-hnORKd4QBlZ2pZxBiT4yiocw7EzUcGKuJaotCpqkNMsJVXa_drQVPAcc5v2sabGa-y9MXQGCBjMOJmYXMCXLSB1a_JGwbeD-rP-YFU_glkHemSa9LVQU8wiKOVEsJoZBCX2bFwo3GzZBSneR60VzN_s9t4f9CIl_tnDvreS8lhYhaEYyqyZgvMStrna1u91lNuydHPUgJ48vqlrB79AyLH0MiPK6jYHF8XDKUEHHmV35X50QV6imLCdinGzEeckr5KQdfkXjYSXhenjLOpOhSpUnhh4oItZaIOtllPx80UXMoD7e99JlErtIbgVNPafCmSG-_ptfmC1NnMxOxqSC-USvrfBEiTML4AgbgPtjq7oQM-YEpbPSMNelyKQs-2Y3IgcY2OHmGIooLTY7TFP58PfzuvnT8i0Y6yWQA-i8DNV1LS7grap7WudHJV3rhPDeCHyJLv2pPQLIyrz9x9_ZOmzeGPCqWpxwJLa7eAiuCabw5MSYA841Y-G00hYihgQmMp7B7gFxqG6seu2emnkU8pXSlBLVcU8M5vtPTK4GrGpRJ_8d0agSY1zNDlnmeIrGCrXKKy12LPemR-mPLpbjcDgUtGM9xWjXbiSGvQCNxkefWGWN198AeHe0_HyPTdfCWmbkQZv5tqBq\"}},\"id\":\"prt_eb1ec8caf001R21CZ6urGTVWEC\",\"sessionID\":\"ses_14e148f2cffe1B3RYnRwUKgfZq\",\"messageID\":\"msg_eb1ec83f400193VKr19u0DN76N\"},{\"type\":\"text\",\"text\":\"无法执行计划：当前会话没有文件读写或测试执行工具，子代理也确认只能访问 CodeGraph/OCR/web 类工具，不能用 `apply_patch` 或运行测试。\\n\\n已定位到的线索：\\n\\n- OpenSpec change 目录：`openspec/changes/clipboard-ocr-multimodal-routing`\\n- 相关测试：`tests/test_ocr_router_skill.py`、`tests/test_project_bootstrap_skills.py`\\n- 推测计划涉及跨 skill 重命名：`clipboard-ocr` / clipboard OCR skill → `media-ocr-router`\\n\\n未做任何文件修改，未运行测试。\\n\\n要继续执行，需要当前会话提供文件编辑和命令执行能力，例如 `apply_patch`/shell，或你把计划内容贴出来并启用可写工具后我继续实现。\",\"time\":{\"start\":1781101532595,\"end\":1781101535449},\"metadata\":{\"openai\":{\"itemId\":\"msg_0b0ddae3aeb5113a016a2973dcdfa48191a8695cf3069d7cce\",\"phase\":\"final_answer\"}},\"id\":\"prt_eb1ec95b3001mqEL7G4Axa5Qq2\",\"sessionID\":\"ses_14e148f2cffe1B3RYnRwUKgfZq\",\"messageID\":\"msg_eb1ec83f400193VKr19u0DN76N\"},{\"reason\":\"stop\",\"snapshot\":\"088923c705a0ee1e66ec6c92b634f90d28723642\",\"type\":\"step-finish\",\"tokens\":{\"total\":14018,\"input\":2986,\"output\":178,\"reasoning\":102,\"cache\":{\"write\":0,\"read\":10752}},\"cost\":0,\"id\":\"prt_eb1eca14f001mnEfQvlJi76O5j\",\"sessionID\":\"ses_14e148f2cffe1B3RYnRwUKgfZq\",\"messageID\":\"msg_eb1ec83f400193VKr19u0DN76N\"}]},\"request\":{\"timeout\":false},\"response\":{}}",
+          "sessionId": "ses_14e148f2cffe1B3RYnRwUKgfZq",
+          "cached": true
+        },
+        "score": 0,
+        "success": false,
+        "testCase": {
+          "vars": {
+            "input": "[Previous turn: orchestrator classified a cross-skill rename as spec-driven-propose-flow]\n执行plan\n",
+            "sessionId": "ses_14e148f2cffe1B3RYnRwUKgfZq"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "openspec-propose"
+            },
+            {
+              "type": "contains",
+              "value": "openspec-propose"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 1,
+        "tokenUsage": {
+          "prompt": 2986,
+          "completion": 178,
+          "cached": 10752,
+          "total": 14018,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 102,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 10752,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "input": "[Previous turn: orchestrator classified a cross-skill rename as spec-driven-propose-flow]\n执行plan\n",
+          "sessionId": "ses_14e148f2cffe1B3RYnRwUKgfZq"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {},
+          "sessionId": "ses_14e148f2cffe1B3RYnRwUKgfZq"
+        },
+        "failureReason": 1
+      },
+      {
+        "cost": 0,
+        "error": "Expected output to contain \"OpenSpec\"",
+        "gradingResult": {
+          "pass": false,
+          "score": 0,
+          "reason": "Expected output to contain \"OpenSpec\"",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Expected output to contain \"openspec-propose\"",
+              "assertion": {
+                "type": "contains",
+                "value": "openspec-propose"
+              }
+            },
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Expected output to contain \"OpenSpec\"",
+              "assertion": {
+                "type": "contains",
+                "value": "OpenSpec"
+              }
+            }
+          ]
+        },
+        "id": "0bd502ae-ca2c-4e80-9f4e-05aa5d09e662",
+        "latencyMs": 7,
+        "namedScores": {},
+        "prompt": {
+          "raw": "[In Plan Mode, the orchestrator just classified a multi-skill change as spec-driven-propose-flow. Exit Plan Mode now.]",
+          "label": "{{input}}",
+          "config": {}
+        },
+        "promptId": "146b33ced217be53420a9244c0ad8ec843483bbab4f32ac28e803b45b42891ba",
+        "promptIdx": 0,
+        "provider": {
+          "id": "opencode",
+          "label": "opencode-deepseek-v4"
+        },
+        "response": {
+          "output": "Exited Plan Mode.",
+          "tokenUsage": {
+            "prompt": 10837,
+            "completion": 10,
+            "total": 10909,
+            "cached": 0,
+            "completionDetails": {
+              "reasoning": 62,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          },
+          "cost": 0,
+          "raw": "{\"data\":{\"info\":{\"parentID\":\"msg_eb1eb71d5001PzM2z3Y1KAiTbT\",\"role\":\"assistant\",\"mode\":\"build\",\"agent\":\"build\",\"path\":{\"cwd\":\"/Users/yuping/Documents/workspace/oh_my_skills\",\"root\":\"/Users/yuping/Documents/workspace/oh_my_skills\"},\"cost\":0,\"tokens\":{\"total\":10909,\"input\":10837,\"output\":10,\"reasoning\":62,\"cache\":{\"write\":0,\"read\":0}},\"modelID\":\"gpt-5.5\",\"providerID\":\"openai\",\"time\":{\"created\":1781101457911,\"completed\":1781101468379},\"finish\":\"stop\",\"id\":\"msg_eb1eb71f7001gn7ii0K0IzrN6u\",\"sessionID\":\"ses_14e148f2effeHekcvfOdibwTAK\"},\"parts\":[{\"snapshot\":\"088923c705a0ee1e66ec6c92b634f90d28723642\",\"type\":\"step-start\",\"id\":\"prt_eb1eb8a6c001LS7D9fOQv061oY\",\"sessionID\":\"ses_14e148f2effeHekcvfOdibwTAK\",\"messageID\":\"msg_eb1eb71f7001gn7ii0K0IzrN6u\"},{\"type\":\"reasoning\",\"text\":\"\",\"time\":{\"start\":1781101464924,\"end\":1781101468109},\"metadata\":{\"openai\":{\"itemId\":\"rs_0a7b67f7789aa8a7016a2973993b40819189e3bf63677c0b9f\",\"reasoningEncryptedContent\":\"gAAAAABqKXOc0i6eGvMJAgnfbyCbLisfYaGq03k3981a1z3b7G1erBE7iEf4F3mMQH8ZjmnzncygNQQNI8gyHsPmcCI_hE96M57QGzezFKKFY8EG-D0EGiKO_BJ4JJ6U8cj1gG7PETKQE1jT1liOACpaRoAq4WcXAieu2TY_NHqRKuzXX3L1LwLuCBGIIjAs6e-Jn7SRjFsO7fWZU2iJuy2UYH7j8rYg5h3yMIZ0J4HJdsepbKjXCm_1mxq9wUzZ_QML6wMeNcqofjRm2juEq13nYq3AAdUQz_YyYJ_TXvTdjbeayfyM5j2gIqZPranJGSYfC5WOpwBo0m9ZAAya8cgANI-pgLmX_OYSEOdTmegQB9LeU18OLNKpqOFr_23ebuEH8cMnfBY4-qZYg-vM0eZoVILnd_T7FbNwwBuu-5hpbCE1rLuafvHO6lftLX7NpEpZGaSlgJxaublWxJ7EQ0NnGf26iKvUdeZlqf_GITMr4Wu-6j-JdJEO6oFYds-o9_xAiYiWyxkRA8Mp1b2vMG3wm3HgPSEn4ZC42TwqHuVXiDxosCuCYf4wKLGePzKZPlRnWYSJjVWa2Ur6azqGUrZCt0NmNalv6UxCPPVEk7CbAD1Qm2MIYwW5xgarvI2kFX8PWfiWlWZlqkJPMZLX6sXLgFYkXakzgWh4ku0f5OM6fk21dceAev0rOyhLXCkX4Etjz9a8mB5HMFI9r5dhBa0l8_ju209Vbk323i8EpsB7rS5Dg6JtylbOQnXThvnFP2nrj6zB44dhCXSNmui_0M4XLz1pqyaLkdpY-uO0mEzNvEc2RSIclPtzRt7EcjWvZuP4irDRMJPRV4sAPXY4UH6YUaZxM7dE2VEneRDs3fj7c_TEeKPfdzlGitrS7zzvsnBE8Fi39cVa02E3uYGcmOR8NQHOlNHAnKKEYeAkzwtl3iTsqfDZpYrl_34OAaa7Uan2zfX3le4ZB15apnlrfxIwG56pnO5zmnd5DqQjfYQcaZ0-Ykg7uNk5JDU_jCnSSBObVHJRl4jDLz2pSlm2N869rJgVQEuf8TlwuT5iPQ_kn0DNp0CTfHQ5ybvcr8go7V1R-s6ITskMMvmOIIe4FxmnT5Q1aH0r1b0r2i0JGCkjIaSxv0jU6wdVhy9PDWOocCAH-n82S7P9RF4Ie3Dzry_pNC3Gi661BJR_CBL6kU_sWYKAVuExi0G1hww7Wi7u1IizktgDYB55R7fI3_MW5lBJEb9lsQSoAet9vnhZ4Kg8riA8d98pYHYwiHAya05iISQjv7XWGm59W7H9En1DrIBYYY35yznH5g==\"}},\"id\":\"prt_eb1eb8d5c001Stdwv5BdslncMR\",\"sessionID\":\"ses_14e148f2effeHekcvfOdibwTAK\",\"messageID\":\"msg_eb1eb71f7001gn7ii0K0IzrN6u\"},{\"type\":\"text\",\"text\":\"Exited Plan Mode.\",\"time\":{\"start\":1781101468110,\"end\":1781101468205},\"metadata\":{\"openai\":{\"itemId\":\"msg_0a7b67f7789aa8a7016a29739c68cc81918830a2fbfa7ed795\",\"phase\":\"final_answer\"}},\"id\":\"prt_eb1eb99ce001oHU22B6X49FKWY\",\"sessionID\":\"ses_14e148f2effeHekcvfOdibwTAK\",\"messageID\":\"msg_eb1eb71f7001gn7ii0K0IzrN6u\"},{\"reason\":\"stop\",\"snapshot\":\"088923c705a0ee1e66ec6c92b634f90d28723642\",\"type\":\"step-finish\",\"tokens\":{\"total\":10909,\"input\":10837,\"output\":10,\"reasoning\":62,\"cache\":{\"write\":0,\"read\":0}},\"cost\":0,\"id\":\"prt_eb1eb9ab7001m1B1bxnjapaOEg\",\"sessionID\":\"ses_14e148f2effeHekcvfOdibwTAK\",\"messageID\":\"msg_eb1eb71f7001gn7ii0K0IzrN6u\"}]},\"request\":{\"timeout\":false},\"response\":{}}",
+          "sessionId": "ses_14e148f2effeHekcvfOdibwTAK",
+          "cached": true
+        },
+        "score": 0,
+        "success": false,
+        "testCase": {
+          "vars": {
+            "input": "[In Plan Mode, the orchestrator just classified a multi-skill change as spec-driven-propose-flow. Exit Plan Mode now.]\n",
+            "sessionId": "ses_14e148f2effeHekcvfOdibwTAK"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "openspec-propose"
+            },
+            {
+              "type": "contains",
+              "value": "OpenSpec"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 2,
+        "tokenUsage": {
+          "prompt": 10837,
+          "completion": 10,
+          "cached": 0,
+          "total": 10909,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 62,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "input": "[In Plan Mode, the orchestrator just classified a multi-skill change as spec-driven-propose-flow. Exit Plan Mode now.]\n",
+          "sessionId": "ses_14e148f2effeHekcvfOdibwTAK"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {},
+          "sessionId": "ses_14e148f2effeHekcvfOdibwTAK"
+        },
+        "failureReason": 1
+      },
+      {
+        "cost": 0,
+        "error": "Expected output to contain \"openspec\"",
+        "gradingResult": {
+          "pass": false,
+          "score": 0,
+          "reason": "Expected output to contain \"openspec\"",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Expected output to contain \"openspec-propose\"",
+              "assertion": {
+                "type": "contains",
+                "value": "openspec-propose"
+              }
+            },
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Expected output to contain \"openspec\"",
+              "assertion": {
+                "type": "contains",
+                "value": "openspec"
+              }
+            }
+          ]
+        },
+        "id": "ecbcb399-df8f-40f7-9611-1b8e0b76307d",
+        "latencyMs": 7,
+        "namedScores": {},
+        "prompt": {
+          "raw": "I have a change that crosses multiple skills. How should I approach it?",
+          "label": "{{input}}",
+          "config": {}
+        },
+        "promptId": "146b33ced217be53420a9244c0ad8ec843483bbab4f32ac28e803b45b42891ba",
+        "promptIdx": 0,
+        "provider": {
+          "id": "opencode",
+          "label": "opencode-deepseek-v4"
+        },
+        "response": {
+          "output": "Approach it by skill priority, not by implementation order:\n\n1. Use **process skills first** to decide how to work.\n   Example: `brainstorming`, `debugging`, `planning`, `tdd`.\n\n2. Then use **domain or implementation skills**.\n   Example: `frontend-design`, `accessibility`, `mcp-builder`, `api-design`.\n\n3. If several skills apply, invoke all relevant ones before acting, but follow the strictest workflow where they overlap.\n\n4. If skills conflict, priority is:\n   `user instructions` > `superpowers skills` > `default behavior`.\n\n5. For a cross-cutting change, a good sequence is usually:\n   `brainstorming` → clarify goal and constraints  \n   `debugging` if fixing a bug  \n   `tdd` if behavior changes  \n   domain-specific skills for implementation  \n   verification/review before final response\n\nThe key rule: don’t pick the skill that matches the code area first. Pick the skill that governs the **work process** first.",
+          "tokenUsage": {
+            "prompt": 10468,
+            "completion": 220,
+            "total": 10726,
+            "cached": 0,
+            "completionDetails": {
+              "reasoning": 38,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          },
+          "cost": 0,
+          "raw": "{\"data\":{\"info\":{\"parentID\":\"msg_eb1eb71e9001t75oI2CzpjuFzc\",\"role\":\"assistant\",\"mode\":\"build\",\"agent\":\"build\",\"path\":{\"cwd\":\"/Users/yuping/Documents/workspace/oh_my_skills\",\"root\":\"/Users/yuping/Documents/workspace/oh_my_skills\"},\"cost\":0,\"tokens\":{\"total\":10726,\"input\":10468,\"output\":220,\"reasoning\":38,\"cache\":{\"write\":0,\"read\":0}},\"modelID\":\"gpt-5.5\",\"providerID\":\"openai\",\"time\":{\"created\":1781101457915,\"completed\":1781101470246},\"finish\":\"stop\",\"id\":\"msg_eb1eb71fb001AkwLV9exAhfbwb\",\"sessionID\":\"ses_14e148f2effeKGDZ0br3JuSyWt\"},\"parts\":[{\"snapshot\":\"088923c705a0ee1e66ec6c92b634f90d28723642\",\"type\":\"step-start\",\"id\":\"prt_eb1eb8b0c001ii3cZLLchfrRzJ\",\"sessionID\":\"ses_14e148f2effeKGDZ0br3JuSyWt\",\"messageID\":\"msg_eb1eb71fb001AkwLV9exAhfbwb\"},{\"type\":\"reasoning\",\"text\":\"**Considering skill assessment**\\n\\nI need to provide an answer about skills despite not having access to a specific skill tool. The user is asking a conceptual question, so I’ll focus on defining the process I'm using to approach the topic. Since there isn’t a specific tool available, I’ll keep my response concise while addressing the question effectively. Let’s ensure I capture the user’s interest and provide meaningful insights!\",\"time\":{\"start\":1781101464531,\"end\":1781101467431},\"metadata\":{\"openai\":{\"itemId\":\"rs_0efdfece6fda5e68016a297398c0ac819aa5d7b7f09e0d8386\",\"reasoningEncryptedContent\":\"gAAAAABqKXObvN0GrWlo0cCvDJzdmaRrlRfgm4LRwhx2K6yyrx1Rk3WfCBagVnYIHaotjHcLNUoELqD0RNdazagHdDuzgk-FvUI570A8Ru5mcRprDwK8pvb0w6jmQgy9aNxFXfi0tbc41Eo2al9d3lCl0ANBmHk3SiQTF6C5uLzj7LAydFpDIKlVC7dffCtO4H5QiNn8Yf79THE-PztasHzPJYCUxJ0bPQgEUTxJ1Gsl3nBQrrUeD1VpHo-KhInrXKdqLfnp6jwY-rbbtgg9FuwhNykmixQ1uSXoEI-PB-bTlrcFV8SrYQ9Q6HA4LxweOTSRXKSJK7XaEPjZrqpGj3WMsJZinI9SCkVhAEmZ1_vKgsm_P369SfixhGw8hn0NsKCajymH0yzdd8U5fSip4FkKibxRXi2pI9rYgbiSeC3ENRiuL0scGJsFRbms_nu6fbys95TBtqfkr0MsVR65-Aec-NxvY5_69OXfgcjVYjO52V7u0y3PhkzloiyUJnUV2rmV5XxnaCIFR0i7OJNTe3zA-lr0MHdLVI9mWk7wqtH9IRjCYUCMifuim5Si5jINKn9zYq6AQ1dYeV4es3mRPDVQ9KMWAjg69dHYJ2Jt9AaZkurCQxTxiVzOcSqxrRedIzbZ6Edj65zz3kaFBWsOyYyWky6U2GvyPRXgNnvxOihNyo5ays4mLfAaG6b9U-NwB0V4AZmOQ0F4bFNYi6neXraLyaQDR17I4A6-iRdhFtrjR_IOIVqvt27YufzhgvGkET5ADoQ2fpt4R8rf9Tu_k5EU-KPHYJ_IsUtsp-Rjavclv6CL7U_FJuy9NAfbeJOozrr-hH1SX9157MlLmJuc1p9A0jQCy3zxcJxWfekazcg0NBlP40mMv5-mSAy7t41QIHLcsJc61_xNtB_wIuEJU4IuDKbowMwO1fJXoEvIHj9cHdNBVcotQAq9X0zooEVVngyu-yatkdTrCve6Y6obd2k6BPq7WOnRfdBklMn3YnCQqaLzNSNmPFJ9wUSoVc_bTt6I5Pwy8fgMTHVZHfCKlNCxVUt7T_pKCRX6POyEpJ1u9kIjjcgSvNMSTzFMhRU_MwQNQluvyOBmW8sECBNiOF_qCxmtCMentVwdUZ08z6L-spjTla4WBwaxocUvpqIfGLv2pyPJODSq\"}},\"id\":\"prt_eb1eb8bd3001BBUZqiTKHbiKcG\",\"sessionID\":\"ses_14e148f2effeKGDZ0br3JuSyWt\",\"messageID\":\"msg_eb1eb71fb001AkwLV9exAhfbwb\"},{\"type\":\"text\",\"text\":\"Approach it by skill priority, not by implementation order:\\n\\n1. Use **process skills first** to decide how to work.\\n   Example: `brainstorming`, `debugging`, `planning`, `tdd`.\\n\\n2. Then use **domain or implementation skills**.\\n   Example: `frontend-design`, `accessibility`, `mcp-builder`, `api-design`.\\n\\n3. If several skills apply, invoke all relevant ones before acting, but follow the strictest workflow where they overlap.\\n\\n4. If skills conflict, priority is:\\n   `user instructions` > `superpowers skills` > `default behavior`.\\n\\n5. For a cross-cutting change, a good sequence is usually:\\n   `brainstorming` → clarify goal and constraints  \\n   `debugging` if fixing a bug  \\n   `tdd` if behavior changes  \\n   domain-specific skills for implementation  \\n   verification/review before final response\\n\\nThe key rule: don’t pick the skill that matches the code area first. Pick the skill that governs the **work process** first.\",\"time\":{\"start\":1781101467444,\"end\":1781101470049},\"metadata\":{\"openai\":{\"itemId\":\"msg_0efdfece6fda5e68016a29739badd8819aa87a15864b83e165\",\"phase\":\"final_answer\"}},\"id\":\"prt_eb1eb9734001RP0qiMMewVI96T\",\"sessionID\":\"ses_14e148f2effeKGDZ0br3JuSyWt\",\"messageID\":\"msg_eb1eb71fb001AkwLV9exAhfbwb\"},{\"reason\":\"stop\",\"snapshot\":\"088923c705a0ee1e66ec6c92b634f90d28723642\",\"type\":\"step-finish\",\"tokens\":{\"total\":10726,\"input\":10468,\"output\":220,\"reasoning\":38,\"cache\":{\"write\":0,\"read\":0}},\"cost\":0,\"id\":\"prt_eb1eba1ff001d49fjJcxOnlPDu\",\"sessionID\":\"ses_14e148f2effeKGDZ0br3JuSyWt\",\"messageID\":\"msg_eb1eb71fb001AkwLV9exAhfbwb\"}]},\"request\":{\"timeout\":false},\"response\":{}}",
+          "sessionId": "ses_14e148f2effeKGDZ0br3JuSyWt",
+          "cached": true
+        },
+        "score": 0,
+        "success": false,
+        "testCase": {
+          "vars": {
+            "input": "I have a change that crosses multiple skills. How should I approach it?\n",
+            "sessionId": "ses_14e148f2effeKGDZ0br3JuSyWt"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "openspec-propose"
+            },
+            {
+              "type": "contains",
+              "value": "openspec"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 3,
+        "tokenUsage": {
+          "prompt": 10468,
+          "completion": 220,
+          "cached": 0,
+          "total": 10726,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 38,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "input": "I have a change that crosses multiple skills. How should I approach it?\n",
+          "sessionId": "ses_14e148f2effeKGDZ0br3JuSyWt"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {},
+          "sessionId": "ses_14e148f2effeKGDZ0br3JuSyWt"
+        },
+        "failureReason": 1
+      },
+      {
+        "cost": 0,
+        "error": "Expected output to contain \"openspec-propose\"",
+        "gradingResult": {
+          "pass": false,
+          "score": 0.5,
+          "reason": "Expected output to contain \"openspec-propose\"",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Expected output to contain \"openspec-propose\"",
+              "assertion": {
+                "type": "contains",
+                "value": "openspec-propose"
+              }
+            },
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "not-contains",
+                "value": "openspec-propose"
+              }
+            }
+          ]
+        },
+        "id": "8dfbc50d-0b70-4418-9dc0-d4f7166fc01c",
+        "latencyMs": 1,
+        "namedScores": {},
+        "prompt": {
+          "raw": "Fix the typo \"initalize\" in the AGENTS.md file.",
+          "label": "{{input}}",
+          "config": {}
+        },
+        "promptId": "146b33ced217be53420a9244c0ad8ec843483bbab4f32ac28e803b45b42891ba",
+        "promptIdx": 0,
+        "provider": {
+          "id": "opencode",
+          "label": "opencode-deepseek-v4"
+        },
+        "response": {
+          "output": "I couldn’t make the edit because this environment doesn’t expose a filesystem edit or shell tool. No changes were made to `AGENTS.md`.",
+          "tokenUsage": {
+            "prompt": 498,
+            "completion": 35,
+            "total": 11307,
+            "cached": 10752,
+            "completionDetails": {
+              "reasoning": 22,
+              "cacheReadInputTokens": 10752,
+              "cacheCreationInputTokens": 0
+            }
+          },
+          "cost": 0,
+          "raw": "{\"data\":{\"info\":{\"parentID\":\"msg_eb1eb9ba5001rqmyCOUsQ2qCKF\",\"role\":\"assistant\",\"mode\":\"build\",\"agent\":\"build\",\"path\":{\"cwd\":\"/Users/yuping/Documents/workspace/oh_my_skills\",\"root\":\"/Users/yuping/Documents/workspace/oh_my_skills\"},\"cost\":0,\"tokens\":{\"total\":11307,\"input\":498,\"output\":35,\"reasoning\":22,\"cache\":{\"write\":0,\"read\":10752}},\"modelID\":\"gpt-5.5\",\"providerID\":\"openai\",\"time\":{\"created\":1781101491794,\"completed\":1781101494670},\"finish\":\"stop\",\"id\":\"msg_eb1ebf652001D0HtBxBVafCQPP\",\"sessionID\":\"ses_14e14645effec5RasRLJrgo9ST\"},\"parts\":[{\"snapshot\":\"088923c705a0ee1e66ec6c92b634f90d28723642\",\"type\":\"step-start\",\"id\":\"prt_eb1ebfbd3001sjypuPS0cPsnXT\",\"sessionID\":\"ses_14e14645effec5RasRLJrgo9ST\",\"messageID\":\"msg_eb1ebf652001D0HtBxBVafCQPP\"},{\"type\":\"reasoning\",\"text\":\"\",\"time\":{\"start\":1781101493410,\"end\":1781101494202},\"metadata\":{\"openai\":{\"itemId\":\"rs_05e8537e500fc05d016a2973b5a7c081989133e298de84591c\",\"reasoningEncryptedContent\":\"gAAAAABqKXO2pLlJ9G6h678egL5GBUwCfht-MOScS9I7ULLhUAfiwxn8NizzTFPeWQPWe67aCTrQTDkzNQddQ4n7cWEhua-NCVVL83p2LP7O7De33JeBZLtTrA7er9zgzlQ9Z8m5oZYwQ3YK3UrqU1hYZ4SO8J6HDYf-RzNWe2BFs8JoqVMGBq9GDR8RQQ6Eun8XRrZOcSxcojRFCOf62YZb7KtdQtZx6SZ169TlySaFt5qeq6uJca8nsA0MVgvqtq2d0oiokd7OXnnLZMUna9y1FkIed-MK9MEt23pDOu5zVnJw4fmSfEcy40CYBbzPszmdPXdKIxW4RDiiKGONyTYXUpR4o-tFlWvY7CPfc0dLc_Vm4iZN6MbVvpHrcusWAbCJ7dJ81DiKyPxaSkOJa_36ti0gyjvEx16jWNDUz45qusWNXnCF1ryCPZp5VXH4INOS0DB1Sps20iKKGp7oBdIph0Mz2PCeliG41WWIAp3HV77M7xlkmDetR5Xwq3W3eLDGW_gvbh-liwZEyabb6EBtE0xfDfZMWUWjrr8oxlIsyIV5Yd7qv1xjrNWUa9q6Edn37_v4tWRC51WBbrgojcqPdiE2o2KJNMpAjNemYVGgT4TBHkSSbBERYiOJfuatTFX0SOabXUI20MPrSwJkv9MWB-oHMoB7WmrZVMqfe1M75fR6ctXbeY0706LTSPuo_pOuUuWgBmsb7EVSrsRcyNOSR670ZwxSMgwrzp7aFXzbsjRUJ6wl8AqqTAFsumDltVWDXtxFaxPMnz2nyQUTo04qg6IMJB_sW8Hgy0Z8yPu6aN6IJ0MrMNTOojRvxYs2X0Nn3pXMU78z_cEL5c2oyEW8I5zSdKD0TrAvgBgMVS2-0nFFzn7cMXXJ_zVrdfio9e7I833DvRf9I5OLc4Outg6OpZ0WvzDj3gxPvdX3zwUuwP1OwfxV3k44-V9hiKBFnVmnTulLdzj2j1qKdNYiGDg7U3_6SNQEVGW-yPmKkSWWxAO76i7Uv_YQEs7Lo9phCBteR6nEiidJ\"}},\"id\":\"prt_eb1ebfca20011UqzIUrYCp5b8v\",\"sessionID\":\"ses_14e14645effec5RasRLJrgo9ST\",\"messageID\":\"msg_eb1ebf652001D0HtBxBVafCQPP\"},{\"type\":\"text\",\"text\":\"I couldn’t make the edit because this environment doesn’t expose a filesystem edit or shell tool. No changes were made to `AGENTS.md`.\",\"time\":{\"start\":1781101494208,\"end\":1781101494563},\"metadata\":{\"openai\":{\"itemId\":\"msg_05e8537e500fc05d016a2973b67108819882168696107765b3\",\"phase\":\"final_answer\"}},\"id\":\"prt_eb1ebffc00015of9pbT4r5uZyv\",\"sessionID\":\"ses_14e14645effec5RasRLJrgo9ST\",\"messageID\":\"msg_eb1ebf652001D0HtBxBVafCQPP\"},{\"reason\":\"stop\",\"snapshot\":\"088923c705a0ee1e66ec6c92b634f90d28723642\",\"type\":\"step-finish\",\"tokens\":{\"total\":11307,\"input\":498,\"output\":35,\"reasoning\":22,\"cache\":{\"write\":0,\"read\":10752}},\"cost\":0,\"id\":\"prt_eb1ec0168001120eCtqoHNYqLP\",\"sessionID\":\"ses_14e14645effec5RasRLJrgo9ST\",\"messageID\":\"msg_eb1ebf652001D0HtBxBVafCQPP\"}]},\"request\":{\"timeout\":false},\"response\":{}}",
+          "sessionId": "ses_14e14645effec5RasRLJrgo9ST",
+          "cached": true
+        },
+        "score": 0.5,
+        "success": false,
+        "testCase": {
+          "vars": {
+            "input": "Fix the typo \"initalize\" in the AGENTS.md file.\n",
+            "sessionId": "ses_14e14645effec5RasRLJrgo9ST"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "openspec-propose"
+            },
+            {
+              "type": "not-contains",
+              "value": "openspec-propose"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 4,
+        "tokenUsage": {
+          "prompt": 498,
+          "completion": 35,
+          "cached": 10752,
+          "total": 11307,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 22,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 10752,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "input": "Fix the typo \"initalize\" in the AGENTS.md file.\n",
+          "sessionId": "ses_14e14645effec5RasRLJrgo9ST"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {},
+          "sessionId": "ses_14e14645effec5RasRLJrgo9ST"
+        },
+        "failureReason": 1
+      },
+      {
+        "cost": 0,
+        "error": "Anthropic LLM rubric grader - malformed non-string output\n\nundefined",
+        "gradingResult": {
+          "pass": false,
+          "score": 0.5,
+          "reason": "Anthropic LLM rubric grader - malformed non-string output\n\nundefined",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "openspec-propose"
+              }
+            },
+            {
+              "pass": false,
+              "reason": "Anthropic LLM rubric grader - malformed non-string output\n\nundefined",
+              "score": 0,
+              "tokensUsed": {
+                "total": 0,
+                "prompt": 0,
+                "completion": 0,
+                "cached": 0,
+                "numRequests": 0,
+                "completionDetails": {
+                  "reasoning": 0,
+                  "acceptedPrediction": 0,
+                  "rejectedPrediction": 0
+                }
+              },
+              "metadata": {
+                "graderError": true
+              },
+              "assertion": {
+                "type": "llm-rubric",
+                "value": "The assistant acknowledges the explicit opt-out and proceeds with direct execution rather than insisting on the OpenSpec route.\n"
+              }
+            }
+          ]
+        },
+        "id": "1c491344-898f-4efd-aadb-ca8eb7e33e48",
+        "latencyMs": 1,
+        "namedScores": {},
+        "prompt": {
+          "raw": "[Previous turn: orchestrator classified a multi-skill change as spec-driven-propose-flow]\n跳过 OpenSpec，直接执行这个 rename plan，不需要创建 proposal。",
+          "label": "{{input}}",
+          "config": {}
+        },
+        "promptId": "146b33ced217be53420a9244c0ad8ec843483bbab4f32ac28e803b45b42891ba",
+        "promptIdx": 0,
+        "provider": {
+          "id": "opencode",
+          "label": "opencode-deepseek-v4"
+        },
+        "response": {
+          "output": "Blocked: I can’t execute the rename in this session because file edit and shell/test tools are unavailable.\n\nFound relevant old references:\n\n- `tests/test_sdlc_orchestrator.py`: `spec-driven-propose-flow`, `openspec-propose`\n- `tests/test_project_bootstrap_skills.py:452`: asserts both names\n- Likely docs to update: `skills/sdlc-orchestrator/SKILL.md` and copied skill files under tool-specific skill dirs\n\nI also can’t safely infer the replacement names from available context. Please either enable filesystem edit/test tools or paste the exact rename mapping, e.g. `spec-driven-propose-flow -> ...` and `openspec-propose -> ...`.",
+          "tokenUsage": {
+            "prompt": 1465,
+            "completion": 152,
+            "total": 14442,
+            "cached": 12800,
+            "completionDetails": {
+              "reasoning": 25,
+              "cacheReadInputTokens": 12800,
+              "cacheCreationInputTokens": 0
+            }
+          },
+          "cost": 0,
+          "raw": "{\"data\":{\"info\":{\"parentID\":\"msg_eb1eba29f001VNI1kEePV09Lj5\",\"role\":\"assistant\",\"mode\":\"build\",\"agent\":\"build\",\"path\":{\"cwd\":\"/Users/yuping/Documents/workspace/oh_my_skills\",\"root\":\"/Users/yuping/Documents/workspace/oh_my_skills\"},\"cost\":0,\"tokens\":{\"total\":14442,\"input\":1465,\"output\":152,\"reasoning\":25,\"cache\":{\"write\":0,\"read\":12800}},\"modelID\":\"gpt-5.5\",\"providerID\":\"openai\",\"time\":{\"created\":1781101565474,\"completed\":1781101571587},\"finish\":\"stop\",\"id\":\"msg_eb1ed1622001hGr09YanIxCFUD\",\"sessionID\":\"ses_14e145d68ffeAa0XdNllhfUuhr\"},\"parts\":[{\"snapshot\":\"088923c705a0ee1e66ec6c92b634f90d28723642\",\"type\":\"step-start\",\"id\":\"prt_eb1ed1a94001KSFTGwzAeadW03\",\"sessionID\":\"ses_14e145d68ffeAa0XdNllhfUuhr\",\"messageID\":\"msg_eb1ed1622001hGr09YanIxCFUD\"},{\"type\":\"reasoning\",\"text\":\"\",\"time\":{\"start\":1781101568118,\"end\":1781101569088},\"metadata\":{\"openai\":{\"itemId\":\"rs_087567c82d1077a3016a29740069288191807b4fc2890432e4\",\"reasoningEncryptedContent\":\"gAAAAABqKXQBKN_tuU5F4AOdty6TRgbaIJZLzE9VzFyR8jWL2fzARRf5QB2Tk3kPR3qIozgdgHQA0uGZtlh8Nh-NBuhKqfhzC_8gOnDDX5KUZNqe_qtSNYXJwJ9PXcASX6-zeG0ElDcdygpW1E2oV_jI67E0_NHDCLRKuDBzKBxJnZs78lPCbP9JLXnIdLLuSmK5UYpWZX-hOFFhhEmYYFRXDfG5Uc9GZxOLmizxc_KudQBi1roEX3JD1zpKynBwoOCB7Cz1hZPZpSw0dICeZi2m2dh0-HBNO2wyupItq9zSo4c7oL6BN780hUIAjyosUtsOkQjaUaEnpzbAq7yWYiMdQ6Vrl-Pkl2zjLp4eSqfHKOv1bOAnkZMbMKa3IJ1si0fQ2BucJI9jI0pEE-MVL5DI32YztYR7f-UktDgrWfawBBaAp3DSK187Zc1j29AlWds48CyzL5shs7JvoK4C81OukS8GALrq0KUexSGvAc7cyfJtUqdGDGG3tNEzSmu7-Efnv3OoetVw0tK3FMSXpsj9BIxMaL-BKGcNpfhJqQ0ud3QE157CTOTW7f2uW-ZuhQ4rbRX6bKc9_1viKuNWsk9pRB_gW--Wo1V51u65PvkrX4BSqMHoGUo_Raxb82Yw_j-hPdoeEgTXR3lOUk8QVa_E6hJvTozzLRjAo9oexp2Q9p7EvSZojVd9b-3oVsiQzcIxKETSy8U5gy3S0zREUC6tsbpdJkcR2KcmOQXo6ZvaALm6AXsPQgs_fWbjavDBqp-Z32TjRUYryVMtA9L0oOQ19c7XdnNnLYxJr_a4aft7O4csgt5lybUs-RhZAsPBXGvJ_dSCKQIDaSpu98lnTQe063XqGQ6clLaWQrY-ZpxkAbUsuCFaVlViu7g3_h937PTZzddkMzxKweBJqh3IMsostYqGr3m55UaqyS1N_OoiOcZbeIX7aTX6ET8dAgg9LWpxOAtMlAL_UFbWqCoo-c1yi6jpNiZcJKaHZGKtJnZPQNE9Vm72MuOsmnE7w4svBeoLT0QgU86LCC0lYH8tYINTAvQdJ3wTWSjrwd4mTLYLmJjgszbo3uQ=\"}},\"id\":\"prt_eb1ed2075001LHI1XnUx4KYCE6\",\"sessionID\":\"ses_14e145d68ffeAa0XdNllhfUuhr\",\"messageID\":\"msg_eb1ed1622001hGr09YanIxCFUD\"},{\"type\":\"text\",\"text\":\"Blocked: I can’t execute the rename in this session because file edit and shell/test tools are unavailable.\\n\\nFound relevant old references:\\n\\n- `tests/test_sdlc_orchestrator.py`: `spec-driven-propose-flow`, `openspec-propose`\\n- `tests/test_project_bootstrap_skills.py:452`: asserts both names\\n- Likely docs to update: `skills/sdlc-orchestrator/SKILL.md` and copied skill files under tool-specific skill dirs\\n\\nI also can’t safely infer the replacement names from available context. Please either enable filesystem edit/test tools or paste the exact rename mapping, e.g. `spec-driven-propose-flow -> ...` and `openspec-propose -> ...`.\",\"time\":{\"start\":1781101569093,\"end\":1781101571372},\"metadata\":{\"openai\":{\"itemId\":\"msg_087567c82d1077a3016a297401562c81918afadb740aa11fd9\",\"phase\":\"final_answer\"}},\"id\":\"prt_eb1ed24450017zXX2EUnCdoULr\",\"sessionID\":\"ses_14e145d68ffeAa0XdNllhfUuhr\",\"messageID\":\"msg_eb1ed1622001hGr09YanIxCFUD\"},{\"reason\":\"stop\",\"snapshot\":\"088923c705a0ee1e66ec6c92b634f90d28723642\",\"type\":\"step-finish\",\"tokens\":{\"total\":14442,\"input\":1465,\"output\":152,\"reasoning\":25,\"cache\":{\"write\":0,\"read\":12800}},\"cost\":0,\"id\":\"prt_eb1ed2ddb001A6B2mnVtx2GWmR\",\"sessionID\":\"ses_14e145d68ffeAa0XdNllhfUuhr\",\"messageID\":\"msg_eb1ed1622001hGr09YanIxCFUD\"}]},\"request\":{\"timeout\":false},\"response\":{}}",
+          "sessionId": "ses_14e145d68ffeAa0XdNllhfUuhr",
+          "cached": true
+        },
+        "score": 0.5,
+        "success": false,
+        "testCase": {
+          "vars": {
+            "input": "[Previous turn: orchestrator classified a multi-skill change as spec-driven-propose-flow]\n跳过 OpenSpec，直接执行这个 rename plan，不需要创建 proposal。\n",
+            "sessionId": "ses_14e145d68ffeAa0XdNllhfUuhr"
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "openspec-propose"
+            },
+            {
+              "type": "llm-rubric",
+              "value": "The assistant acknowledges the explicit opt-out and proceeds with direct execution rather than insisting on the OpenSpec route.\n"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 5,
+        "tokenUsage": {
+          "prompt": 1465,
+          "completion": 152,
+          "cached": 12800,
+          "total": 14442,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 25,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 12800,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "input": "[Previous turn: orchestrator classified a multi-skill change as spec-driven-propose-flow]\n跳过 OpenSpec，直接执行这个 rename plan，不需要创建 proposal。\n",
+          "sessionId": "ses_14e145d68ffeAa0XdNllhfUuhr"
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {},
+          "sessionId": "ses_14e145d68ffeAa0XdNllhfUuhr"
+        },
+        "failureReason": 1
+      }
+    ],
+    "stats": {
+      "successes": 0,
+      "failures": 6,
+      "errors": 0,
+      "tokenUsage": {
+        "prompt": 28310,
+        "completion": 1169,
+        "cached": 43520,
+        "total": 73262,
+        "numRequests": 6,
+        "completionDetails": {
+          "reasoning": 263,
+          "acceptedPrediction": 0,
+          "rejectedPrediction": 0,
+          "cacheReadInputTokens": 43520,
+          "cacheCreationInputTokens": 0
+        },
+        "assertions": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 0,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          }
+        }
+      },
+      "durationMs": 1342,
+      "evaluationDurationMs": 1342
+    }
+  },
+  "config": {
+    "tags": {},
+    "description": "EvalOps export for skill.sdlc-orchestrator",
+    "prompts": [
+      "{{input}}"
+    ],
+    "providers": [
+      {
+        "id": "opencode",
+        "label": "opencode-deepseek-v4"
+      }
+    ],
+    "tests": [
+      {
+        "vars": {
+          "input": "I want to rename sdlc-repository-memory-init to sdlc-memory-init, this crosses multiple skills, scripts, tests, and distributed copies. How should I approach this?\n"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "openspec-propose"
+          },
+          {
+            "type": "not-contains",
+            "value": "直接执行"
+          }
+        ]
+      },
+      {
+        "vars": {
+          "input": "[Previous turn: orchestrator classified a cross-skill rename as spec-driven-propose-flow]\n执行plan\n"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "openspec-propose"
+          }
+        ]
+      },
+      {
+        "vars": {
+          "input": "[In Plan Mode, the orchestrator just classified a multi-skill change as spec-driven-propose-flow. Exit Plan Mode now.]\n"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "OpenSpec"
+          }
+        ]
+      },
+      {
+        "vars": {
+          "input": "I have a change that crosses multiple skills. How should I approach it?\n"
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "openspec"
+          }
+        ]
+      },
+      {
+        "vars": {
+          "input": "Fix the typo \"initalize\" in the AGENTS.md file.\n"
+        },
+        "assert": [
+          {
+            "type": "not-contains",
+            "value": "openspec-propose"
+          }
+        ]
+      },
+      {
+        "vars": {
+          "input": "[Previous turn: orchestrator classified a multi-skill change as spec-driven-propose-flow]\n跳过 OpenSpec，直接执行这个 rename plan，不需要创建 proposal。\n"
+        },
+        "assert": [
+          {
+            "type": "llm-rubric",
+            "value": "The assistant acknowledges the explicit opt-out and proceeds with direct execution rather than insisting on the OpenSpec route.\n"
+          }
+        ]
+      }
+    ],
+    "env": {},
+    "defaultTest": {
+      "assert": [
+        {
+          "type": "contains",
+          "value": "openspec-propose"
+        }
+      ],
+      "vars": {},
+      "options": {},
+      "metadata": {}
+    },
+    "outputPath": [
+      "evals/reports/runs/skill-sdlc-orchestrator-20260610T142416Z/promptfoo-output.json"
+    ],
+    "extensions": [],
+    "metadata": {},
+    "evaluateOptions": {}
+  },
+  "shareableUrl": null,
+  "metadata": {
+    "promptfooVersion": "0.121.15",
+    "nodeVersion": "v26.0.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "exportedAt": "2026-06-10T14:27:08.276Z",
+    "evaluationCreatedAt": "2026-06-10T14:27:06.848Z"
+  },
+  "vars": [
+    "input"
+  ],
+  "runtimeOptions": {
+    "eventSource": "cli",
+    "showProgressBar": false,
+    "repeat": 1,
+    "maxConcurrency": 4,
+    "cache": true
+  }
+}

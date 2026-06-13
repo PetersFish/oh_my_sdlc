@@ -1,0 +1,65 @@
+# Golden cases exported for skill.sdlc-orchestrator
+# Source: evals/cases/golden/skill.sdlc-orchestrator/
+# Cases focus on regression prevention for route binding and instruction-following behavior
+
+- vars:
+    input: |
+      Add a dry-run mode to the backup CLI command. The scope is clear and limited to one module, but it changes user-visible behavior and needs acceptance criteria. How should I approach this?
+  assert:
+    - type: contains
+      value: openspec-propose
+    - type: contains
+      value: OpenSpec
+    - type: not-contains
+      value: 直接执行
+
+- vars:
+    input: |
+      [Previous turn: orchestrator classified a cross-skill rename as spec-driven-propose-flow]
+      执行plan
+  assert:
+    - type: contains
+      value: openspec-propose
+
+- vars:
+    input: |
+      [In Plan Mode, the orchestrator just classified a multi-skill change as spec-driven-propose-flow. Exit Plan Mode now.]
+  assert:
+    - type: contains
+      value: OpenSpec
+
+- vars:
+    input: |
+      I have a change that crosses multiple skills. The orchestrator classified it as spec-driven-propose-flow. I asked to execute the plan.
+  assert:
+    - type: javascript
+      value: |
+        const out = output.toLowerCase();
+        const continuesRoute = out.includes('openspec-propose') && !out.includes('direct execution') && !out.includes('直接执行');
+        const structuredChoice = out.includes('openspec') && (out.includes('direct') || out.includes('直接执行')) && (
+          out.includes('question') ||
+          out.includes('recommended') ||
+          out.includes('spec-driven-propose-flow') ||
+          out.includes('openspec-propose')
+        );
+        return continuesRoute || structuredChoice;
+
+- vars:
+    input: |
+      Fix the typo "initalize" in the AGENTS.md file.
+  assert:
+    - type: not-contains
+      value: openspec-propose
+
+- vars:
+    input: |
+      [Previous turn: orchestrator classified a multi-skill change as spec-driven-propose-flow]
+      跳过 OpenSpec，直接执行这个 rename plan，不需要创建 proposal。
+  assert:
+    - type: javascript
+      value: |
+        const out = output.toLowerCase();
+        const acknowledgesOptOut = out.includes('skip openspec') || out.includes('opt out') || out.includes('opt-out') || out.includes('跳过 openspec') || out.includes('明确');
+        const allowsDirect = out.includes('direct') || out.includes('直接执行') || out.includes('proceed') || out.includes('继续');
+        const doesNotInsist = !out.includes('must invoke openspec-propose') && !out.includes('必须调用 openspec-propose');
+        return acknowledgesOptOut && allowsDirect && doesNotInsist;

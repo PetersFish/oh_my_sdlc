@@ -10,6 +10,7 @@ The SDLC orchestrator currently classifies routes correctly but does not bind su
 - Add Plan Mode handoff rules so the final Plan Mode message matches the selected route.
 - Add an execution-path choice rule: when mutually exclusive execution paths are available, use the `question` tool if available instead of relying only on free-text choices.
 - Add a rule for ambiguous commands like "execute plan" after a prior `spec-driven-*` route decision: continue the route or ask for explicit opt-out, but do not silently direct-execute.
+- Add EvalOps coverage and golden regression cases for `skill.sdlc-orchestrator` so instruction-following behavior can be regression-tested instead of relying only on manual review.
 
 ## Capabilities
 
@@ -22,5 +23,7 @@ The SDLC orchestrator currently classifies routes correctly but does not bind su
 
 - Affected skill: `skills/sdlc-orchestrator/SKILL.md`
 - Affected distributed copies: `.opencode/skills/sdlc-orchestrator/SKILL.md`, `.claude/skills/sdlc-orchestrator/SKILL.md`, `.cursor/skills/sdlc-orchestrator/SKILL.md`
-- Affected specs/tests: `openspec/specs/sdlc-orchestrator/spec.md`, `tests/` coverage for orchestrator content if present or newly added
+- Affected specs/tests: `openspec/specs/sdlc-orchestrator/spec.md`, `tests/` coverage for orchestrator content if present or newly added, and EvalOps assets under `evals/`
+- New EvalOps target: `skill.sdlc-orchestrator`
+- New EvalOps assets: coverage matrix, target index entry, golden cases for route binding and execution-path behavior, and derived Promptfoo export/run artifacts during verification
 - No runtime data model, `.ai/memory/`, OpenSpec schema, or CLI dependency changes

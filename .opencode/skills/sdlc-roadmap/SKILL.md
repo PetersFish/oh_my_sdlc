@@ -28,38 +28,84 @@ Thin orchestration layer between long-term product roadmap and single formal Ope
 
 `.ai/roadmap/` lives at the project root, sibling to `openspec/`, `.ai/memory/`, `skills/`.
 
+Uses an **area-based layout**: each functional area (skill, workflow, domain, etc.) owns its own roadmap items.
+
 ```
 .ai/roadmap/
-  roadmap.md          # Human-readable overview
-  index.json          # Machine index (derived, not the source of truth)
-  items/              # RM-XXX-slug.md, one per item
-  revisions/          # Roadmap adjustment records (V2+)
-  patches/            # Lightweight patch records (V2+)
-  decisions.md        # Cross-item decision records
+  manifest.json       # Root manifest: declares areas, global view settings
+  roadmap.md          # Global human-readable overview (derived, not source of truth)
+  index.json          # Global derived index aggregating all area items
+  decisions.md        # Cross-area decision records
+  areas/
+    <area-id>/        # One directory per functional area
+      manifest.json   # Area manifest: id, kind, title, id_prefix, owner_path
+      roadmap.md      # Area-specific roadmap overview
+      decisions.md    # Area-specific decision records
+      items/          # Area-specific item files: RM-PREFIX-XXX-slug.md
+      revisions/      # Roadmap adjustment records (V2+)
+      patches/        # Lightweight patch records (V2+)
 ```
 
 The canonical runtime path is `.ai/roadmap/`. For existing projects, scripts will read legacy `.roadmap/` when `.ai/roadmap/` is absent. New initialization writes only to `.ai/roadmap/` — do not create new `.roadmap/` directories.
 
-For manual path migration from `.roadmap/` to `.ai/roadmap/`, follow `docs/sdlc-runtime-layout.md`. Do not merge canonical and legacy directories automatically.
+Legacy flat layout (`.ai/roadmap/items/` directly under roadmap root) is read by scripts as a fallback with a migration warning, but new init creates area layout.
 
 **Markdown item files are the source of truth.** `index.json` is a derived index. When they disagree, item files win. Use `rebuild_index.py` to repair with explicit user confirmation after reporting the diff.
+
+### Root Manifest (`.ai/roadmap/manifest.json`)
+
+```json
+{
+  "version": 1,
+  "default_area": "<area-id>",
+  "areas": [
+    {
+      "id": "<area-id>",
+      "kind": "skill|workflow|agent|project|domain",
+      "title": "<human-readable name>",
+      "path": "areas/<area-id>",
+      "owner_path": "<source-path>",
+      "id_prefix": "<RM-PREFIX>"
+    }
+  ],
+  "global_view": {
+    "include_statuses": ["active", "ready", "planned"],
+    "sort": ["priority", "order"]
+  }
+}
+```
+
+### Area Manifest (`areas/<area-id>/manifest.json`)
+
+```json
+{
+  "version": 1,
+  "id": "<area-id>",
+  "kind": "skill|workflow|agent|project|domain",
+  "title": "<human-readable name>",
+  "owner_path": "<source-path>",
+  "id_prefix": "<RM-PREFIX>"
+}
+```
 
 ### Roadmap Item Frontmatter Fields
 
 ```yaml
-id: RM-001           # Unique identifier
-title: "..."         # Human-readable title
+id: RM-PREFIX-001     # Unique identifier with area prefix
+title: "..."          # Human-readable title
 status: idea | planned | ready | active | done | deferred | cancelled | superseded
 stage: mvp | v2 | v3 | v4 | later
 priority: p0 | p1 | p2 | p3
-order: 10            # Numeric ordering key for sequencing
-depends_on: []       # List of prerequisite item IDs
+order: 10             # Numeric ordering key for sequencing (scoped within area)
+depends_on: []        # List of prerequisite item IDs (may reference other areas)
 openspec_change: null | "change-id"
 created_at: YYYY-MM-DD
 started_at: null | YYYY-MM-DD
 completed_at: null | YYYY-MM-DD
-patches: []          # List of patch IDs (V2+)
+patches: []           # List of patch IDs (V2+)
 ```
+
+Item IDs are scoped within their area using the area's `id_prefix`. Cross-area dependencies use the full prefixed ID (e.g., `RM-SDLC-001`).
 
 ### Roadmap Item Body Sections
 
@@ -81,12 +127,11 @@ Initialize the `.ai/roadmap/` directory structure at project root.
 **Produces:**
 ```
 .ai/roadmap/
+  manifest.json (from template)
   roadmap.md (from template)
   index.json (empty version 1)
-  items/
-  revisions/
-  patches/
   decisions.md (from template)
+  areas/
 ```
 
 **Rules:**
@@ -101,20 +146,23 @@ Extract MVP/V2/V3/Later planning from conversation context and generate roadmap 
 
 **Workflow:**
 1. Read current conversation context for phased planning.
-2. Identify each phase (MVP, V2, V3, Later) with goal, scope, and acceptance criteria.
-3. For each phase, create `.ai/roadmap/items/RM-XX-slug.md` with frontmatter populated:
+2. Identify which area the items belong to. If unclear, ask the user or use `default_area` from root manifest.
+3. Identify each phase (MVP, V2, V3, Later) with goal, scope, and acceptance criteria.
+4. For each phase, create `.ai/roadmap/areas/<area-id>/items/RM-PREFIX-XX-slug.md` with frontmatter populated:
    - `status`: `ready` for MVP, `planned` for later phases.
    - `stage`: match the phase label.
    - `order`: assign increments of 10 (10, 20, 30...) to allow insertion.
+   - `id`: use the area's `id_prefix` (e.g., `RM-SDLC-001`).
    - Create frontmatter with all required fields.
-4. Update `roadmap.md` overview table.
-5. Run `rebuild_index.py` to regenerate `index.json`.
-6. Output summary: "Created: RM-001 <title>, RM-002 <title>, ..."
+5. Update the area `roadmap.md` overview table.
+6. Run `rebuild_index.py` to regenerate global `index.json`.
+7. Output summary: "Created: RM-PREFIX-001 <title>, RM-PREFIX-002 <title>, ..."
 
 **Rules:**
-- Assign IDs sequentially: RM-001, RM-002, ...
+- Assign IDs sequentially within the area: RM-PREFIX-001, RM-PREFIX-002, ...
 - If `.ai/roadmap/` not initialized, run init first.
 - Only items that change product capability boundaries should enter roadmap. One-off bugfixes and prompt tweaks do not.
+- If no area exists for the topic, prompt the user to create one (create `.ai/roadmap/areas/<area-id>/manifest.json` first).
 
 ### roadmap list
 
@@ -123,11 +171,12 @@ Show the current roadmap as a structured summary.
 **Trigger:** User asks "what's the roadmap status", "roadmap list", or equivalent.
 
 **Workflow:**
-1. Read items from `.ai/roadmap/items/*.md` frontmatter.
-2. Output a table: ID, Status, Title, Stage, Order.
+1. Read items from `.ai/roadmap/areas/<area-id>/items/*.md` frontmatter (area view) or all areas (global view).
+2. Output a table: ID, Area, Status, Title, Stage, Order.
 3. Sort by `order` ascending.
 4. Highlight or mark the `active` item if any.
 5. If no items, say "No roadmap items found. Use roadmap capture to create items."
+6. `roadmap list` defaults to global view (all areas); `roadmap list <area-id>` shows a single area.
 
 ### roadmap promote RM-XXX
 

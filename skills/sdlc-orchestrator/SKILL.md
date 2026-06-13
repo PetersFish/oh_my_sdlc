@@ -51,6 +51,8 @@ AI behavior  -> evalops-gated (before implementation)
 durable fact -> memory-sync (after completion)
 ```
 
+**Route decisions are action-binding.** Once the orchestrator selects a route, the immediate next action SHALL follow that route. The selected route determines what happens next — it is not a suggestion. The assistant may only bypass the route if the user explicitly says to skip OpenSpec or directs otherwise. Do not default to direct execution for `spec-driven-*` routes.
+
 ## Routing Paths
 
 ### superpowers-direct
@@ -67,25 +69,25 @@ Small, low-risk changes. No OpenSpec artifacts.
 
 ### spec-driven-propose-flow
 
-Medium formal changes that benefit from OpenSpec artifacts but do not need step-by-step human review during planning.
+Medium formal changes that benefit from OpenSpec artifacts but do not need step-by-step human review during planning. Route decisions are binding: the immediate next action SHALL be `openspec-propose`. Direct execution is not presented as the default for this route.
 
 **Example:** feature addition with clear scope, single-module behavior change, improvement with well-understood acceptance criteria.
 
 **Action:**
 
-1. Route to `openspec-propose` to generate all artifacts in one step.
+1. Route to `openspec-propose` to generate all artifacts in one step. This is the bound next action — do not offer direct execution unless the user explicitly opts out.
 2. After generation, output a **review-focus summary** for the user.
 3. Delegate implementation to `openspec-apply-change` when the user is ready.
 
 ### spec-driven-incremental-flow
 
-Very complex formal changes that need iterative human review during planning.
+Very complex formal changes that need iterative human review during planning. Route decisions are binding: the immediate next action SHALL be `openspec-new-change`. Direct execution is not presented as the default for this route.
 
 **Example:** ambiguous scope, high-risk architecture, cross-module changes, schema/data model changes, roadmap item promotion, or scope that may shift during design.
 
 **Action:**
 
-1. Route to `openspec-new-change` to create the change.
+1. Route to `openspec-new-change` to create the change. This is the bound next action — do not offer direct execution unless the user explicitly opts out.
 2. For each subsequent artifact, route to `openspec-continue-change`.
 3. After each artifact is created, output a **review-focus summary** for the user.
 4. Delegate implementation to `openspec-apply-change`.
@@ -136,6 +138,32 @@ Expected artifacts:
 Next action:
 - ...
 ```
+
+## Plan Mode Handoff
+
+When the orchestrator is operating in Plan Mode and is about to exit, the final handoff MUST match the selected route:
+
+- **spec-driven-propose-flow**: say that after leaving Plan Mode it can create an OpenSpec proposal/change via `openspec-propose`. Do not say it can directly execute the implementation plan.
+- **spec-driven-incremental-flow**: say that after leaving Plan Mode it can create or continue the OpenSpec change via `openspec-new-change`. Do not say it can directly execute the implementation plan.
+- **superpowers-direct**: may say that after leaving Plan Mode it can directly execute the task.
+- **roadmap-first / evalops-gated / memory-sync**: say the respective route action (e.g., "route to sdlc-roadmap", "set up EvalOps coverage", "run memory sync").
+
+## Ambiguous Execution Requests
+
+When the user says "execute plan", "go ahead", "start", or equivalent after the orchestrator selected a `spec-driven-*` route:
+
+- These requests SHALL be treated as instructions to **continue the selected route**, not as permission to bypass route governance.
+- For `spec-driven-propose-flow`: continue by invoking `openspec-propose`, or ask whether the user wants to explicitly skip OpenSpec.
+- For `spec-driven-incremental-flow`: continue by invoking `openspec-new-change`, or ask whether the user wants to explicitly skip OpenSpec.
+- If the user explicitly says to skip OpenSpec or directly execute despite the route, the orchestrator may proceed outside the selected route after acknowledging the opt-out.
+
+## Execution Path Choices
+
+When the orchestrator must ask the user to choose between execution paths (e.g., OpenSpec governance vs. direct execution):
+
+- Use the `question` tool if available, with the recommended route listed first and marked "(Recommended)".
+- If the `question` tool is unavailable, present the same mutually exclusive choices as concise text and ask the user to choose explicitly.
+- Do not rely only on free-text descriptions when the choice is mutually exclusive and the tool is available.
 
 ## Review Summary Requirements
 
