@@ -9,6 +9,14 @@
       "path": "areas/skill.sdlc-roadmap",
       "owner_path": "skills/sdlc-roadmap",
       "id_prefix": "RM-SDLC"
+    },
+    {
+      "id": "workflow.ai-evalops",
+      "kind": "workflow",
+      "title": "AI EvalOps Target Workspaces",
+      "path": "areas/workflow.ai-evalops",
+      "owner_path": ".ai/evals",
+      "id_prefix": "RM-EVAL"
     }
   ],
   "global_view": {

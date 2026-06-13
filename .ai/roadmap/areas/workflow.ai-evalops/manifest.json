@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "id": "workflow.ai-evalops",
+  "kind": "workflow",
+  "title": "AI EvalOps Target Workspaces",
+  "owner_path": ".ai/evals",
+  "id_prefix": "RM-EVAL"
+}

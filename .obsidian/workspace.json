@@ -182,6 +182,15 @@
   },
   "active": "3dd6162e08d108df",
   "lastOpenFiles": [
+    "openspec/changes/standardize-ai-evalops-target-workspaces/tasks.md",
+    "openspec/changes/standardize-ai-evalops-target-workspaces/specs/sdlc-orchestrator/spec.md",
+    "openspec/changes/standardize-ai-evalops-target-workspaces/specs/sdlc-evalops/spec.md",
+    "openspec/changes/standardize-ai-evalops-target-workspaces/specs/sdlc-orchestrator",
+    "openspec/changes/standardize-ai-evalops-target-workspaces/specs/sdlc-evalops",
+    "openspec/changes/standardize-ai-evalops-target-workspaces/specs",
+    "openspec/changes/standardize-ai-evalops-target-workspaces/design.md",
+    "openspec/changes/standardize-ai-evalops-target-workspaces/proposal.md",
+    "openspec/changes/standardize-ai-evalops-target-workspaces",
     "skills/sdlc-roadmap/templates/area-roadmap.md",
     "skills/sdlc-roadmap/templates/area-manifest.json",
     "skills/sdlc-roadmap/templates/manifest.json",
@@ -190,10 +199,6 @@
     "evals/reports/runs/skill-sdlc-orchestrator-promptfoo-fixed-20260610T151425Z",
     "evals/reports/runs/skill-sdlc-orchestrator-promptfoo-fixed-20260610T151242Z/promptfoo-output.json",
     "evals/reports/runs/skill-sdlc-orchestrator-promptfoo-fixed-20260610T151242Z",
-    "evals/reports/runs/skill-sdlc-orchestrator-promptfoo-fixed-first-20260610T151214Z/promptfoo-output.json",
-    "evals/reports/runs/skill-sdlc-orchestrator-promptfoo-fixed-first-20260610T151214Z",
-    "evals/reports/runs/skill-sdlc-orchestrator-promptfoo-fixed-20260610T151050Z/promptfoo-output.json",
-    "evals/reports/runs/skill-sdlc-orchestrator-promptfoo-fixed-20260610T151050Z",
     "evals/exports/promptfoo/skill.sdlc-orchestrator/prompt.md",
     "evals/reports/runs/skill-sdlc-orchestrator-session-20260610T145500Z/summary.md",
     "evals/reports/runs/skill-sdlc-orchestrator-20260610T142416Z/summary.md",
@@ -212,11 +217,6 @@
     "skills/sdlc-evalops/SKILL.md",
     "skills/sdlc-orchestrator/SKILL.md",
     "openspec/specs/sdlc-orchestrator/spec.md",
-    "openspec/changes/archive/2026-06-10-simplify-sdlc-routing-schemas/specs/sdlc-orchestrator/spec.md",
-    "openspec/changes/archive/2026-06-10-simplify-sdlc-routing-schemas/specs/openspec-workflow-schema/spec.md",
-    "openspec/changes/archive/2026-06-10-simplify-sdlc-routing-schemas/tasks.md",
-    "openspec/changes/archive/2026-06-10-simplify-sdlc-routing-schemas/proposal.md",
-    "openspec/changes/archive/2026-06-10-simplify-sdlc-routing-schemas/design.md",
-    "docs/manual/design/roadmap.md"
+    "openspec/changes/archive/2026-06-10-simplify-sdlc-routing-schemas/specs/sdlc-orchestrator/spec.md"
   ]
 }
