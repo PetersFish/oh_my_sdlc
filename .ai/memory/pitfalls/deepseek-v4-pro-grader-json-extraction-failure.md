@@ -16,7 +16,7 @@ evidence:
   - grader_model: deepseek-v4-pro
   - target_model: deepseek-v4-pro
 tags: [promptfoo, llm-rubric, grader, deepseek, json, reasoning]
-updated_at: 2026-06-13T08:50:00Z
+updated_at: 2026-06-13T17:00:00Z
 confidence: high
 ---
 
@@ -46,14 +46,26 @@ models:
     provider: opencode-go
     model: deepseek-v4-pro
     promptfoo:
-      id: file://../../../../runners/opencode_go_provider.py
+      id: openai:chat:deepseek-v4-pro
       config:
-        model: deepseek-v4-pro
+        apiBaseUrl: https://opencode.ai/zen/go/v1
+        apiKeyEnvar: OPENCODE_GO_API_KEY
+        headers:
+          Accept-Encoding: identity
+        temperature: 0
+        max_tokens: 4096
     grader:
-      id: file://../../../../runners/opencode_go_provider.py
+      id: openai:chat:glm-5.1
       config:
-        model: glm-5.1
+        apiBaseUrl: https://opencode.ai/zen/go/v1
+        apiKeyEnvar: OPENCODE_GO_API_KEY
+        headers:
+          Accept-Encoding: identity
+        temperature: 0
+        max_tokens: 4096
 ```
+
+Note: `apiBaseUrl` must be the base URL only; Promptfoo appends `/chat/completions`. `headers.Accept-Encoding: identity` prevents `TypeError: terminated` from Node/undici decompress interceptor.
 
 Recommended grader models: GLM-5.1, Qwen3.7 Max, Kimi K2.7.
 

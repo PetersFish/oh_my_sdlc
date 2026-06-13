@@ -18,7 +18,7 @@ alternatives_considered:
 linked_commits: []
 linked_specs: [standardize-ai-evalops-target-workspaces]
 tags: [promptfoo, grader, model-matrix, evalops, deepseek, glm]
-updated_at: 2026-06-13T08:50:00Z
+updated_at: 2026-06-13T17:00:00Z
 confidence: high
 ---
 
@@ -35,7 +35,7 @@ Promptfoo `promptfooconfig.yaml` has two model configuration points:
 Target model: `deepseek-v4-pro` (reasoning model, good at task classification)
 Grader model: `glm-5.1` (non-reasoning model, stable JSON output)
 
-Both use the same Python provider (`.ai/evals/runners/opencode_go_provider.py`) calling the OpenAI-compatible endpoint.
+Both use Promptfoo's built-in OpenAI-compatible provider (`openai:chat:<model>`) calling the OpenAI-compatible endpoint at `https://opencode.ai/zen/go/v1`. No custom Python provider is needed.
 
 ## Configuration
 
@@ -47,15 +47,21 @@ models:
     provider: opencode-go
     model: deepseek-v4-pro
     promptfoo:
-      id: file://../../../../runners/opencode_go_provider.py
+      id: openai:chat:deepseek-v4-pro
       config:
-        model: deepseek-v4-pro
+        apiBaseUrl: https://opencode.ai/zen/go/v1
+        apiKeyEnvar: OPENCODE_GO_API_KEY
+        headers:
+          Accept-Encoding: identity
         temperature: 0
         max_tokens: 4096
     grader:
-      id: file://../../../../runners/opencode_go_provider.py
+      id: openai:chat:glm-5.1
       config:
-        model: glm-5.1
+        apiBaseUrl: https://opencode.ai/zen/go/v1
+        apiKeyEnvar: OPENCODE_GO_API_KEY
+        headers:
+          Accept-Encoding: identity
         temperature: 0
         max_tokens: 4096
 ```
@@ -66,5 +72,6 @@ models:
 
 - Target model can be upgraded independently (e.g., to a newer DeepSeek version)
 - Grader model can be swapped if JSON stability degrades
-- Same Python provider code works for both
+- Both use the built-in `openai:chat:` provider; no custom Python provider required
 - `max_tokens` can differ between target and grader if needed
+- `headers.Accept-Encoding: identity` is required for opencode-go endpoint to prevent Node/undici `TypeError: terminated`
