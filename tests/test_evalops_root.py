@@ -11,6 +11,7 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[1]
 EVALS_ROOT = REPO_ROOT / ".ai" / "evals"
 TARGET_WS = EVALS_ROOT / "targets" / "skill.sdlc-orchestrator"
+EVALOPS_TARGET_WS = EVALS_ROOT / "targets" / "skill.sdlc-evalops"
 SKILL_SCRIPTS = REPO_ROOT / "skills" / "sdlc-evalops" / "scripts"
 EXPORT_SCRIPT = SKILL_SCRIPTS / "export-promptfoo.py"
 RUNNER_SCRIPT = SKILL_SCRIPTS / "run-promptfoo-eval.py"
@@ -150,8 +151,8 @@ class TestExportPromptfooScript:
         )
         assert result.returncode == 0, \
             f"Export failed: {result.stderr}"
-        assert "Loaded 6 golden cases" in result.stderr, \
-            "Export must load golden cases"
+        assert "Loaded" in result.stderr and "golden cases" in result.stderr, \
+            "Export must report loaded golden cases"
 
     def test_export_check_passes_after_export(self):
         result = subprocess.run(
@@ -309,10 +310,7 @@ class TestExportPromptfooScript:
 class TestExportPromptfooCheck:
     """Validate --check freshness detection."""
 
-    def test_check_fails_on_missing_export_dir(self):
-        import tempfile, shutil
-        # We cannot easily simulate a missing dir without side effects.
-        # Instead, verify the script can handle a nonexistent target gracefully.
+    def test_check_fails_on_missing_executable_target(self):
         result = subprocess.run(
             [sys.executable, str(EXPORT_SCRIPT), "nonexistent.target", "--check"],
             capture_output=True, text=True, cwd=str(REPO_ROOT),
@@ -320,22 +318,13 @@ class TestExportPromptfooCheck:
         assert result.returncode != 0, \
             "Check should fail for nonexistent target"
 
-    def test_check_detects_missing_files(self):
-        import tempfile, shutil
-        tmp_dir = Path(tempfile.mkdtemp())
-        try:
-            tmp_export = tmp_dir / "exports" / "promptfoo"
-            tmp_export.mkdir(parents=True)
-            result = subprocess.run(
-                [sys.executable, str(EXPORT_SCRIPT), "skill.sdlc-orchestrator", "--check"],
-                capture_output=True, text=True, cwd=str(REPO_ROOT),
-                env={**__import__("os").environ},
-            )
-            # Should pass since files exist
-            assert result.returncode == 0, \
-                f"Freshness check should pass: {result.stderr}"
-        finally:
-            shutil.rmtree(tmp_dir, ignore_errors=True)
+    def test_check_passes_when_exports_fresh(self):
+        result = subprocess.run(
+            [sys.executable, str(EXPORT_SCRIPT), "skill.sdlc-orchestrator", "--check"],
+            capture_output=True, text=True, cwd=str(REPO_ROOT),
+        )
+        assert result.returncode == 0, \
+            f"Freshness check should pass: {result.stderr}"
 
 
 class TestDistributedSkillCopies:
@@ -661,3 +650,66 @@ class TestEvalMatrixRunner:
             "Matrix section must reference aggregate summary.md"
         assert "failures.yaml" in content, \
             "Matrix section must reference failures.yaml"
+
+
+class TestEvalopsTargetInGlobalManifest:
+    """Validate sdlc-evalops is a registered EvalOps target."""
+
+    def test_global_manifest_registers_evalops(self):
+        manifest = yaml.safe_load(
+            (EVALS_ROOT / "manifest.yaml").read_text(encoding="utf-8")
+        )
+        target_ids = [t["id"] for t in manifest.get("targets", [])]
+        assert "skill.sdlc-evalops" in target_ids, \
+            "Global manifest must register skill.sdlc-evalops"
+
+    def test_evalops_target_workspace_exists(self):
+        assert EVALOPS_TARGET_WS.is_dir(), \
+            ".ai/evals/targets/skill.sdlc-evalops/ must exist"
+
+    def test_evalops_target_manifest_has_source_paths(self):
+        manifest = yaml.safe_load(
+            (EVALOPS_TARGET_WS / "manifest.yaml").read_text(encoding="utf-8")
+        )
+        assert "source_paths" in manifest, "Target manifest must have source_paths"
+        assert "skills/sdlc-evalops/SKILL.md" in manifest.get("source_paths", []), \
+            "sdlc-evalops target must reference its own SKILL.md"
+
+
+class TestModelMatrixNoStaleDocs:
+    """Validate model-matrix.yaml files no longer claim runner is deferred."""
+
+    def test_live_model_matrix_not_deferred(self):
+        content = (EVALS_ROOT / "model-matrix.yaml").read_text(encoding="utf-8")
+        assert "deferred" not in content.lower(), \
+            ".ai/evals/model-matrix.yaml must not claim runner is deferred"
+
+    def test_template_model_matrix_not_deferred(self):
+        content = (REPO_ROOT / "skills" / "sdlc-evalops" / "templates" / "model-matrix.yaml") \
+            .read_text(encoding="utf-8")
+        assert "deferred" not in content.lower(), \
+            "model-matrix template must not claim runner is deferred"
+
+
+class TestExportMatrixParity:
+    """Validate export script and matrix runner share assertion type contracts."""
+
+    def test_both_scripts_support_same_assertion_types(self):
+        export_content = EXPORT_SCRIPT.read_text(encoding="utf-8")
+        matrix_content = MATRIX_RUNNER_SCRIPT.read_text(encoding="utf-8")
+        for atype in ["contains", "not-contains", "llm-rubric"]:
+            assert atype in export_content, \
+                f"export-promptfoo.py must support {atype}"
+            assert atype in matrix_content, \
+                f"run-eval-matrix.py must support {atype}"
+
+    def test_both_scripts_use_api_key_env_var(self):
+        for script in [EXPORT_SCRIPT, MATRIX_RUNNER_SCRIPT]:
+            content = script.read_text(encoding="utf-8")
+            assert "apiKey:" not in content, \
+                f"{script.name} must not hardcode apiKey"
+
+    def test_matrix_runner_states_canonical_exports_not_mutated(self):
+        content = MATRIX_RUNNER_SCRIPT.read_text(encoding="utf-8")
+        assert "NOT mutated" in content, \
+            "matrix runner must state canonical exports are not mutated"

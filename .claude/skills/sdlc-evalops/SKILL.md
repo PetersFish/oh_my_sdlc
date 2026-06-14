@@ -1,12 +1,13 @@
 ---
 name: sdlc-evalops
-description: Manage AI eval assets across skill, agent, workflow, RAG, and project targets. Use when the user wants to create eval cases, define coverage for a target's quality dimensions, capture real failures for regression, manage a golden dataset, export to Promptfoo, or run eval. Triggers include: building an eval suite, capturing a regression case, running eval for a target, defining quality coverage, managing an inbox/golden case pipeline, managing target workspaces under .ai/evals/targets/, or phrases like 评测体系, 评估用例, 回归测试, eval case, golden dataset, coverage matrix. Do NOT use for debugging a single code failure (use systematic-debugging), writing unit tests (use test-driven-development), or one-off model comparisons without durable case management.
-compatibility: Requires filesystem access for reading/writing .ai/evals/ directory, bash for promptfoo eval, Python for <sdlc-evalops-skill-dir>/scripts/export-promptfoo.py, and access to the target's source. Uses qa-ai-architecture for evaluator design discussions and brainstorming for coverage exploration when available.
+description: Use when managing durable AI eval assets under .ai/evals/: creating eval suites, capturing regression cases, defining coverage, triaging inbox/accepted/golden cases, exporting/running Promptfoo evals, or managing target workspaces. Trigger for eval case, golden dataset, coverage matrix, regression case, Promptfoo eval, 评测体系/评估用例/回归测试. Do NOT use for unit tests, single-bug debugging, or one-off model comparison without durable cases.
 ---
 
 # EvalOps Skill
 
-Manage AI eval assets as version-controlled, tool-neutral artifacts. The skill defines three natural-language workflows (create-eval-suite, capture-regression, run-regression) backed by seven internal commands. EvalOps root is `.ai/evals/` with target-scoped workspaces under `.ai/evals/targets/<target-id>/`. Internal case schema is the source of truth; Promptfoo exports are derived via `<sdlc-evalops-skill-dir>/scripts/export-promptfoo.py`.
+Manage AI eval assets as version-controlled, tool-neutral artifacts under `.ai/evals/`. The skill defines three natural-language workflows (create-eval-suite, capture-regression, run-regression) backed by seven internal commands. Internal case YAML is canonical; Promptfoo exports are derived via `<sdlc-evalops-skill-dir>/scripts/export-promptfoo.py`.
+
+Compatibility: Requires filesystem access for `.ai/evals/`, bash for promptfoo eval, Python for bundled scripts under `<sdlc-evalops-skill-dir>/scripts/`, and access to target source files. Uses qa-ai-architecture for evaluator design and brainstorming for coverage exploration when available.
 
 ## When to Use
 
@@ -92,11 +93,9 @@ Trigger: user modified a target and wants to run eval.
 ```
 1. Locate target-id from user context or scan `.ai/evals/manifest.yaml`.
 2. Verify `.ai/evals/targets/<target-id>/cases/golden/` has cases.
-3. Export Promptfoo configs via `<sdlc-evalops-skill-dir>/scripts/export-promptfoo.py <target-id>`.
-4. Run `promptfoo eval -c <config-path>`.
-5. Save run report to `.ai/evals/targets/<target-id>/reports/<run-id>/`.
-6. Summarize: pass/fail counts, failed cases with severity.
-7. If failures exist: suggest capture for new patterns, do NOT auto-fix.
+3. Run `<sdlc-evalops-skill-dir>/scripts/run-promptfoo-eval.py <target-id>` which chains export freshness, promptfoo eval, and structured report writing.
+4. Summarize: pass/fail counts, failed cases with severity.
+5. If failures exist: suggest capture for new patterns, do NOT auto-fix.
 ```
 
 ### Proactive Capture
@@ -133,7 +132,7 @@ The skill maintains assets under `.ai/evals/` at the project root:
 .ai/evals/
   .gitignore              # auto-generated; ignores local run artifacts
   manifest.yaml           # global target registry and default policy
-  model-matrix.yaml       # model matrix schema (runner deferred)
+  model-matrix.yaml       # model matrix inputs for runner
   targets/
     <target-id>/
       manifest.yaml       # target metadata, source paths, export/report policy
@@ -203,14 +202,14 @@ Template at `templates/default-case.yaml`. Key fields:
 
 ### Model Matrix Schema
 
-`.ai/evals/model-matrix.yaml` defines the schema contract for future multi-model validation:
+`.ai/evals/model-matrix.yaml` defines the inputs for the matrix runner. It declares:
 
-- `models`: named model entries with provider and config
+- `models`: named model entries with provider, config, and grader blocks
 - `environments`: where evals can run
 - `target_selection`: which targets to include by default
 - `run_policy`: sequential/parallel, fail_fast, timeout, retry_count
 
-A matrix runner (`<sdlc-evalops-skill-dir>/scripts/run-eval-matrix.py`) executes targets across configured model entries. See [Matrix Eval](#matrix-eval) below.
+The matrix runner (`<sdlc-evalops-skill-dir>/scripts/run-eval-matrix.py`) executes target golden cases across every configured model entry. See [Matrix Eval](#matrix-eval) below.
 
 ## Matrix Eval
 

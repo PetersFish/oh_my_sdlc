@@ -1,0 +1,35 @@
+target:
+  id: skill.sdlc-evalops
+  type: skill
+  path: skills/sdlc-evalops/SKILL.md
+
+coverage:
+  functional:
+    - trigger-routing
+    - workflow-selection
+    - durable-case-management
+    - human-confirmation-gates
+    - promptfoo-run-path
+    - target-workspace-management
+  quality:
+    - description-trigger-stability
+    - near-miss-non-trigger-boundaries
+  edge_cases:
+    - chinese-trigger-phrases
+    - mixed-language-inputs
+    - competing-skill-boundary
+  output_constraints:
+    - must-not-trigger-on-single-bug-debugging
+    - must-not-trigger-on-unit-test-requests
+    - must-not-trigger-on-one-off-model-comparison
+
+risk_focus:
+  critical_failures:
+    - evals.json remaining after migration
+    - missing golden cases for trigger or non-trigger coverage
+    - description not starting with Use when
+
+review:
+  status: reviewed
+  reviewed_by_user: true
+  last_reviewed_at: 2026-06-14T00:00:00Z

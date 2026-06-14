@@ -1,0 +1,25 @@
+description: EvalOps export for skill.sdlc-evalops
+prompts:
+- file://prompt.md
+providers:
+- id: openai:chat:deepseek-v4-pro
+  label: opencode-go/deepseek-v4-pro
+  config:
+    apiBaseUrl: https://opencode.ai/zen/go/v1
+    apiKeyEnvar: OPENCODE_GO_API_KEY
+    headers:
+      Accept-Encoding: identity
+    temperature: 0
+    max_tokens: 4096
+tests: cases.yaml
+defaultTest:
+  options:
+    provider:
+      id: openai:chat:glm-5.1
+      config:
+        apiBaseUrl: https://opencode.ai/zen/go/v1
+        apiKeyEnvar: OPENCODE_GO_API_KEY
+        headers:
+          Accept-Encoding: identity
+        temperature: 0
+        max_tokens: 4096

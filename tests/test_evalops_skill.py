@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -43,9 +42,23 @@ class TestEvalopsSkillFrontmatter:
         assert "skill" in desc or "agent" in desc or "target" in desc, \
             "description must reference eval targets"
 
-    def test_skill_md_has_compatibility(self):
+    def test_description_starts_with_use_when(self):
         fm = _read_frontmatter(EVALOPS_SKILL / "SKILL.md")
-        assert "compatibility" in fm, "compatibility must exist in frontmatter"
+        desc = fm["description"]
+        assert desc.startswith("Use when"), \
+            f"description must start with 'Use when', got: {desc[:80]}"
+
+    def test_description_is_not_too_long(self):
+        fm = _read_frontmatter(EVALOPS_SKILL / "SKILL.md")
+        assert len(fm["description"]) < 800, \
+            f"description too long: {len(fm['description'])} chars (max 800)"
+
+    def test_description_has_trigger_keywords(self):
+        fm = _read_frontmatter(EVALOPS_SKILL / "SKILL.md")
+        desc = fm["description"].lower()
+        assert "eval" in desc, "description must reference eval"
+        assert "skill" in desc or "agent" in desc or "target" in desc, \
+            "description must reference eval targets"
 
     def test_skill_md_mentions_all_seven_commands(self):
         content = (EVALOPS_SKILL / "SKILL.md").read_text(encoding="utf-8")
@@ -284,31 +297,60 @@ class TestEvalopsSkillScripts:
 
 
 class TestEvalopsSkillEvals:
-    """Validate evals/evals.json covers routing scenarios."""
+    """Validate canonical eval target workspace at .ai/evals/targets/skill.sdlc-evalops/."""
 
-    def test_evals_json_exists(self):
+    EVALS_TARGET = REPO_ROOT / ".ai" / "evals" / "targets" / "skill.sdlc-evalops"
+
+    def test_target_workspace_exists(self):
+        assert self.EVALS_TARGET.is_dir(), \
+            ".ai/evals/targets/skill.sdlc-evalops/ must exist"
+
+    def test_target_manifest_exists(self):
+        assert (self.EVALS_TARGET / "manifest.yaml").is_file(), \
+            "Target manifest.yaml must exist"
+
+    def test_target_coverage_exists(self):
+        assert (self.EVALS_TARGET / "coverage.yaml").is_file(), \
+            "Target coverage.yaml must exist"
+
+    def test_target_has_required_directories(self):
+        for d in ["cases/inbox", "cases/accepted", "cases/rejected",
+                   "cases/golden", "exports/promptfoo", "reports"]:
+            assert (self.EVALS_TARGET / d).is_dir(), \
+                f"Missing directory: {d}"
+
+    def test_golden_cases_exist(self):
+        golden = self.EVALS_TARGET / "cases" / "golden"
+        cases = list(golden.glob("*.yaml"))
+        assert len(cases) >= 3, \
+            f"Expected at least 3 golden cases, found {len(cases)}"
+
+    def test_golden_cases_cover_trigger_scenarios(self):
+        golden = self.EVALS_TARGET / "cases" / "golden"
+        content = ""
+        for cf in sorted(golden.glob("*.yaml")):
+            content += cf.read_text(encoding="utf-8").lower()
+        assert "create-eval-suite" in content, \
+            "Golden cases must cover create-eval-suite"
+        assert "capture" in content, \
+            "Golden cases must cover capture-regression"
+        assert "run" in content, \
+            "Golden cases must cover run-regression"
+
+    def test_golden_cases_cover_non_trigger_scenarios(self):
+        golden = self.EVALS_TARGET / "cases" / "golden"
+        content = ""
+        for cf in sorted(golden.glob("*.yaml")):
+            content += cf.read_text(encoding="utf-8").lower()
+        assert "debugging" in content, \
+            "Golden cases must cover should-not-trigger: debugging"
+        assert "unit test" in content or "tdd" in content, \
+            "Golden cases must cover should-not-trigger: unit tests"
+
+    def test_evals_json_is_deleted(self):
         path = EVALOPS_SKILL / "evals" / "evals.json"
-        assert path.is_file(), f"Missing: {path}"
-
-    def test_evals_json_has_three_scenarios(self):
-        data = json.loads(
-            (EVALOPS_SKILL / "evals" / "evals.json").read_text(encoding="utf-8")
-        )
-        assert data["skill_name"] == "sdlc-evalops"
-        assert len(data["evals"]) >= 3, \
-            f"Expected at least 3 eval scenarios, got {len(data['evals'])}"
-
-    def test_evals_cover_all_three_workflows(self):
-        data = json.loads(
-            (EVALOPS_SKILL / "evals" / "evals.json").read_text(encoding="utf-8")
-        )
-        outputs = " ".join(e["expected_output"] for e in data["evals"]).lower()
-        assert "create-eval-suite" in outputs, \
-            "Evals must cover create-eval-suite workflow"
-        assert "capture" in outputs, \
-            "Evals must cover capture-regression workflow"
-        assert "run" in outputs, \
-            "Evals must cover run-regression workflow"
+        assert not path.is_file(), \
+            f"evals.json must be deleted, canonical source is .ai/evals/targets/skill.sdlc-evalops/"
 
 
 class TestEvalopsSkillWorkflowIntegration:

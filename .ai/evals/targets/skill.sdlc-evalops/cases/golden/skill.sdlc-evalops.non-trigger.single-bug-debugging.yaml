@@ -1,0 +1,32 @@
+id: skill.sdlc-evalops.non-trigger.single-bug-debugging
+target:
+  id: skill.sdlc-evalops
+  type: skill
+  path: skills/sdlc-evalops/SKILL.md
+status: golden
+case_type: negative
+source: ai_suggested
+severity: high
+created_at: 2026-06-14
+coverage:
+  quality:
+    - near-miss-non-trigger-boundaries
+  output_constraints:
+    - must-not-trigger-on-single-bug-debugging
+input: |
+  My API endpoint is returning a 500 error when I pass an empty request body. Help me debug this.
+expected:
+  must_include:
+    - debugging
+  must_not_include:
+    - evals
+    - eval case
+    - coverage
+    - golden
+  rubric: |
+    This is a single-code-bug debugging request. The assistant must route to systematic-debugging, NOT to sdlc-evalops. EvalOps is for durable eval asset management, not one-off bug fixes.
+evaluators:
+  llm_judge:
+    enabled: true
+    rubric: |
+      Verify the assistant does NOT activate sdlc-evalops for a single-code-bug debugging request. This should route to systematic-debugging or general debugging, not eval asset management.

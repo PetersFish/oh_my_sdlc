@@ -1,0 +1,30 @@
+id: skill.sdlc-evalops.trigger.chinese-phrases
+target:
+  id: skill.sdlc-evalops
+  type: skill
+  path: skills/sdlc-evalops/SKILL.md
+status: golden
+case_type: positive
+source: ai_suggested
+severity: medium
+created_at: 2026-06-14
+coverage:
+  functional:
+    - trigger-routing
+  edge_cases:
+    - chinese-trigger-phrases
+input: |
+  请为 research skill 建立一套评测体系，覆盖回归测试和评估用例。
+expected:
+  must_include:
+    - target
+  must_not_include:
+    - debugging
+    - unit test
+  rubric: |
+    Chinese trigger phrases 评测体系, 评估用例, 回归测试 must activate sdlc-evalops for durable eval asset management, not route to systematic-debugging or test-driven-development.
+evaluators:
+  llm_judge:
+    enabled: true
+    rubric: |
+      Verify that Chinese trigger phrases correctly activate the sdlc-evalops skill for durable eval asset management rather than routing to debugging or unit test skills.

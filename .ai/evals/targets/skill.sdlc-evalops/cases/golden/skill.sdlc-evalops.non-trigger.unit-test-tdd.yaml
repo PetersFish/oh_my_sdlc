@@ -1,0 +1,31 @@
+id: skill.sdlc-evalops.non-trigger.unit-test-tdd
+target:
+  id: skill.sdlc-evalops
+  type: skill
+  path: skills/sdlc-evalops/SKILL.md
+status: golden
+case_type: negative
+source: ai_suggested
+severity: high
+created_at: 2026-06-14
+coverage:
+  quality:
+    - near-miss-non-trigger-boundaries
+  output_constraints:
+    - must-not-trigger-on-unit-test-requests
+input: |
+  Write unit tests for this calculateDiscount function that handles edge cases for negative prices and zero quantities.
+expected:
+  must_include:
+    - test
+  must_not_include:
+    - evals
+    - golden dataset
+    - promptfoo
+  rubric: |
+    This is a unit test request. The assistant must route to test-driven-development, NOT to sdlc-evalops. EvalOps manages durable AI behavior eval assets, not code unit tests.
+evaluators:
+  llm_judge:
+    enabled: true
+    rubric: |
+      Verify the assistant does NOT activate sdlc-evalops for a unit test request. This should route to test-driven-development, not eval asset management.

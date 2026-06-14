@@ -40,10 +40,8 @@ run_policy:
   parallel: false
 
 note: >
-  Full multi-model matrix runner implementation is deferred.
-  This schema contract defines the model, provider, environment,
-  target selection, and run policy fields for future runner work.
-  The default model (opencode-go-deepseek-v4-pro) uses Promptfoo's
-  built-in OpenAI-compatible provider with apiBaseUrl, apiKeyEnvar,
-  and headers.Accept-Encoding: identity. No custom Python provider
-  is required or distributed.
+  The matrix runner is available via skills/sdlc-evalops/scripts/run-eval-matrix.py.
+  This file defines the model, provider, grader, environment, target selection,
+  and run policy inputs for the runner. The default model (opencode-go-deepseek-v4-pro)
+  uses Promptfoo's built-in OpenAI-compatible provider with apiBaseUrl, apiKeyEnvar,
+  and headers.Accept-Encoding: identity. No custom Python provider is required or distributed.

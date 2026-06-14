@@ -1,0 +1,33 @@
+id: skill.sdlc-evalops.trigger.capture-regression
+target:
+  id: skill.sdlc-evalops
+  type: skill
+  path: skills/sdlc-evalops/SKILL.md
+status: golden
+case_type: positive
+source: ai_suggested
+severity: high
+created_at: 2026-06-14
+coverage:
+  functional:
+    - trigger-routing
+    - human-confirmation-gates
+input: |
+  刚才 research skill 又遗漏了成本分析，帮我把这个失败沉淀下来。
+expected:
+  must_include:
+    - capture
+    - inbox
+  must_not_include:
+    - golden
+  rubric: |
+    The assistant must recognize the capture-regression intent, extract context from conversation, ask for confirmation before writing, and default to inbox (not golden).
+evaluators:
+  rule_based:
+    contains:
+      - capture
+      - inbox
+  llm_judge:
+    enabled: true
+    rubric: |
+      Verify the assistant identifies this as a capture-regression task, extracts the failure context, asks for user confirmation, and defaults the case to inbox (not golden).

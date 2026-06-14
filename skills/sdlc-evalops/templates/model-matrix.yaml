@@ -58,8 +58,8 @@ run_policy:
 # --- Rules ---
 # - API keys MUST NOT be written into this file. Use apiKeyEnvar instead.
 # - headers.Accept-Encoding: identity is REQUIRED for opencode-go endpoint compatibility.
-# - The first model in `models[]` is the default. Its `promptfoo` block is used verbatim
+# - The matrix runner is available via scripts/run-eval-matrix.py. The first model
+#   in `models[]` is the default. Its `promptfoo` block is used verbatim
 #   by scripts/export-promptfoo.py. The `grader` block is used for llm-rubric assertions.
-# - Full multi-model matrix runner implementation is deferred.
 # - Temperature and max_tokens can differ between target and grader.
 # - Use a non-reasoning model as the grader for reliable JSON output.

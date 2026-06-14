@@ -1,0 +1,30 @@
+id: skill.sdlc-evalops.non-trigger.skill-wording-review
+target:
+  id: skill.sdlc-evalops
+  type: skill
+  path: skills/sdlc-evalops/SKILL.md
+status: golden
+case_type: negative
+source: ai_suggested
+severity: medium
+created_at: 2026-06-14
+coverage:
+  quality:
+    - near-miss-non-trigger-boundaries
+input: |
+  Review the wording of this skill's description and suggest improvements to make it clearer. Don't change any eval assets.
+expected:
+  must_include:
+    - review
+    - description
+  must_not_include:
+    - evals
+    - .ai/evals
+    - target workspace
+  rubric: |
+    This is a skill wording review without any request to manage durable eval assets. The assistant must NOT activate sdlc-evalops. Skill creation/modification should route to meta-skill-lifecycle-governance or general review.
+evaluators:
+  llm_judge:
+    enabled: true
+    rubric: |
+      Verify the assistant does NOT activate sdlc-evalops for a skill wording review that does not involve managing durable eval assets. This is a documentation review, not eval asset management.

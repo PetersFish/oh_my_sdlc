@@ -1,0 +1,32 @@
+id: skill.sdlc-evalops.trigger.create-eval-suite
+target:
+  id: skill.sdlc-evalops
+  type: skill
+  path: skills/sdlc-evalops/SKILL.md
+status: golden
+case_type: positive
+source: ai_suggested
+severity: high
+created_at: 2026-06-14
+coverage:
+  functional:
+    - trigger-routing
+    - workflow-selection
+input: |
+  帮我给 research-general skill 建一套 eval case，用于回归测试。
+expected:
+  must_include:
+    - create-eval-suite
+    - coverage
+  must_not_include: []
+  rubric: |
+    The assistant must recognize this as a create-eval-suite intent, check if .ai/evals/ is initialized, and lead into coverage brainstorming. It must not directly write golden cases.
+evaluators:
+  rule_based:
+    contains:
+      - create-eval-suite
+      - coverage
+  llm_judge:
+    enabled: true
+    rubric: |
+      Verify the assistant recognizes the create-eval-suite workflow, checks initialization, and routes to coverage brainstorming rather than directly writing cases.

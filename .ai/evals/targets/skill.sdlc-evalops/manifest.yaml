@@ -1,0 +1,33 @@
+target_id: skill.sdlc-evalops
+target_type: skill
+description: AI eval asset management skill for durable case management under .ai/evals/
+
+source_paths:
+  - skills/sdlc-evalops/SKILL.md
+
+canonical_case_directories:
+  inbox: cases/inbox
+  accepted: cases/accepted
+  rejected: cases/rejected
+  golden: cases/golden
+
+coverage_file: coverage.yaml
+
+promptfoo_export_outputs:
+  directory: exports/promptfoo
+  config: exports/promptfoo/promptfooconfig.yaml
+  cases: exports/promptfoo/cases.yaml
+  prompt: exports/promptfoo/prompt.md
+
+report_directory: reports
+
+assertion_policy:
+  prefer_deterministic: true
+  allow_llm_rubric: true
+  prohibit_global_assertions: true
+
+export_freshness_inputs:
+  - golden_cases
+  - source_paths
+  - templates
+  - coverage_file

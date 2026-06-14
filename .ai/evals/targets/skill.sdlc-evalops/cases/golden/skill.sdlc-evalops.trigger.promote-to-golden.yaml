@@ -1,0 +1,31 @@
+id: skill.sdlc-evalops.trigger.promote-to-golden
+target:
+  id: skill.sdlc-evalops
+  type: skill
+  path: skills/sdlc-evalops/SKILL.md
+status: golden
+case_type: positive
+source: ai_suggested
+severity: medium
+created_at: 2026-06-14
+coverage:
+  functional:
+    - durable-case-management
+    - human-confirmation-gates
+input: |
+  promote 这个 accepted case 到 golden dataset。
+expected:
+  must_include:
+    - promote
+    - confirmation
+  must_not_include: []
+  rubric: |
+    The assistant must recognize promote intent, verify pre-checks, and require explicit user confirmation before promoting to golden. It must not silently promote.
+evaluators:
+  rule_based:
+    contains:
+      - promote
+  llm_judge:
+    enabled: true
+    rubric: |
+      Verify the assistant identifies this as a promote task, checks that the case is in accepted status, and requires explicit user confirmation before moving to golden.
