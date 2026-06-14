@@ -3,7 +3,7 @@
   "items": [
     {
       "id": "RM-SDLC-001",
-      "status": "ready",
+      "status": "done",
       "title": "sdlc-roadmap Skill MVP",
       "stage": "mvp",
       "priority": "p0",
@@ -68,20 +68,6 @@
       "area": "skill.sdlc-roadmap"
     },
     {
-      "id": "RM-EVAL-003",
-      "status": "planned",
-      "title": "Integrate EvalOps With Skill Creation",
-      "stage": "v2",
-      "priority": "p2",
-      "order": 30,
-      "depends_on": [
-        "RM-EVAL-001"
-      ],
-      "openspec_change": null,
-      "patches": [],
-      "area": "workflow.ai-evalops"
-    },
-    {
       "id": "RM-SDLC-004",
       "status": "planned",
       "title": "Backlog / GitHub Issues Integration",
@@ -94,20 +80,6 @@
       "openspec_change": null,
       "patches": [],
       "area": "skill.sdlc-roadmap"
-    },
-    {
-      "id": "RM-EVAL-004",
-      "status": "planned",
-      "title": "Integrate EvalOps With Skill Lifecycle Release",
-      "stage": "v3",
-      "priority": "p2",
-      "order": 40,
-      "depends_on": [
-        "RM-EVAL-001"
-      ],
-      "openspec_change": null,
-      "patches": [],
-      "area": "workflow.ai-evalops"
     }
   ]
 }

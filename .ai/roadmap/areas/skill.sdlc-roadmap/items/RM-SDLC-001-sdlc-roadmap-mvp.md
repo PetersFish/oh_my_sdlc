@@ -1,15 +1,15 @@
 ---
 id: RM-SDLC-001
 title: sdlc-roadmap Skill MVP
-status: ready
+status: done
 stage: mvp
 priority: p0
 order: 10
 depends_on: []
 openspec_change: add-sdlc-roadmap-skill
 created_at: 2026-06-09
-started_at: null
-completed_at: null
+started_at: 2026-06-09
+completed_at: 2026-06-14
 patches: []
 ---
 
@@ -61,3 +61,21 @@ patches: []
 # Design Reference
 
 详见 `design/roadmap.md` 审核结论。
+
+# Completion Notes
+
+OpenSpec change `add-sdlc-roadmap-skill` 已完成全部 tasks（6 个大类、13 个测试用例）并通过验证。
+
+**Completed:**
+- `skills/sdlc-roadmap/SKILL.md`：定义 skill 触发条件、命令语义（init/capture/list/promote/done）、状态机、边界规则。
+- 模板：`roadmap.md`、`item.md`、`area-roadmap.md`、`decisions.md`、`manifest.json`、`area-manifest.json`。
+- 脚本：`validate.py`（frontmatter 校验 + index 一致性 + 状态合法性）、`rebuild_index.py`（从 item 重建 index）、`list.py`（路线图摘要输出）。
+- 区-based roadmap 布局（`areas/<area-id>/items/`）替代原 flat layout。
+- 运行时分布：同步到 `.opencode/skills/sdlc-roadmap/`、`.claude/skills/sdlc-roadmap/`。
+- 13 个测试覆盖 SKILL.md 合法性、模板完整性、validate/rebuild/list 核心路径。
+- `tests/test_sdlc_roadmap.py` 全部通过。
+
+**Deferred to V2 (RM-SDLC-002):**
+- replan / defer / cancel / supersede 调整流。
+- patch log（轻量优化记录）。
+- Web UI / Kanban / GitHub Issues 集成。
