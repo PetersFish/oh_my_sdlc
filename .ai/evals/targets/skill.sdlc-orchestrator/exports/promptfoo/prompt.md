@@ -169,7 +169,7 @@ For EvalOps-gated changes, the final implementation summary SHALL report:
 
 - Target id
 - Case counts (total, passed, failed)
-- Export freshness status (via `scripts/export-promptfoo.py <target-id> --check`)
+- Export freshness status (via `<sdlc-evalops-skill-dir>/scripts/export-promptfoo.py <target-id> --check`)
 - Eval command used
 - Pass/fail result count
 - Report path (when available)

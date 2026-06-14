@@ -11,9 +11,13 @@
   "files": [
     "SKILL.md",
     "evals/evals.json",
+    "scripts/export-promptfoo.py",
+    "scripts/run-eval-matrix.py",
+    "scripts/run-promptfoo-eval.py",
     "templates/default-case.yaml",
     "templates/default-coverage.yaml",
     "templates/eval-policy.yaml",
+    "templates/model-matrix.yaml",
     "templates/promptfoo-cases.yaml",
     "templates/promptfooconfig.yaml",
     "templates/target-index.yaml"

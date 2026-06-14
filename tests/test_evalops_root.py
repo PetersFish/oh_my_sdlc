@@ -11,9 +11,10 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[1]
 EVALS_ROOT = REPO_ROOT / ".ai" / "evals"
 TARGET_WS = EVALS_ROOT / "targets" / "skill.sdlc-orchestrator"
-EXPORT_SCRIPT = REPO_ROOT / "scripts" / "export-promptfoo.py"
-RUNNER_SCRIPT = REPO_ROOT / "scripts" / "run-promptfoo-eval.py"
-MATRIX_RUNNER_SCRIPT = REPO_ROOT / "scripts" / "run-eval-matrix.py"
+SKILL_SCRIPTS = REPO_ROOT / "skills" / "sdlc-evalops" / "scripts"
+EXPORT_SCRIPT = SKILL_SCRIPTS / "export-promptfoo.py"
+RUNNER_SCRIPT = SKILL_SCRIPTS / "run-promptfoo-eval.py"
+MATRIX_RUNNER_SCRIPT = SKILL_SCRIPTS / "run-eval-matrix.py"
 
 
 class TestEvalsRoot:
@@ -136,11 +137,11 @@ class TestTargetWorkspace:
 
 
 class TestExportPromptfooScript:
-    """Validate scripts/export-promptfoo.py behavior."""
+    """Validate skills/sdlc-evalops/scripts/export-promptfoo.py behavior."""
 
     def test_script_exists(self):
         assert EXPORT_SCRIPT.is_file(), \
-            "scripts/export-promptfoo.py must exist"
+            "skills/sdlc-evalops/scripts/export-promptfoo.py must exist"
 
     def test_export_generates_from_golden_cases(self):
         result = subprocess.run(
@@ -468,11 +469,14 @@ class TestOrchestratorSkillMentionsTargetWorkspaces:
 
 
 class TestEvalRunnerScript:
-    """Validate scripts/run-promptfoo-eval.py and report writing contracts."""
+    """Validate skills/sdlc-evalops/scripts/run-promptfoo-eval.py and report writing contracts."""
+
+
+
 
     def test_runner_script_exists(self):
         assert RUNNER_SCRIPT.is_file(), \
-            "scripts/run-promptfoo-eval.py must exist"
+            "skills/sdlc-evalops/scripts/run-promptfoo-eval.py must exist"
 
     def test_runner_script_references_reports_dir(self):
         content = RUNNER_SCRIPT.read_text(encoding="utf-8")
@@ -534,11 +538,11 @@ class TestEvalRunnerScript:
 
 
 class TestEvalMatrixRunner:
-    """Validate scripts/run-eval-matrix.py behavior and output contracts."""
+    """Validate skills/sdlc-evalops/scripts/run-eval-matrix.py behavior and output contracts."""
 
-    def test_matrix_runner_script_exists(self):
+    def test_runner_script_exists(self):
         assert MATRIX_RUNNER_SCRIPT.is_file(), \
-            "scripts/run-eval-matrix.py must exist"
+            "skills/sdlc-evalops/scripts/run-eval-matrix.py must exist"
 
     def test_matrix_runner_reads_model_matrix(self):
         content = MATRIX_RUNNER_SCRIPT.read_text(encoding="utf-8")

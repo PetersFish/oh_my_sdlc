@@ -1,12 +1,12 @@
 ---
 name: sdlc-evalops
 description: Manage AI eval assets across skill, agent, workflow, RAG, and project targets. Use when the user wants to create eval cases, define coverage for a target's quality dimensions, capture real failures for regression, manage a golden dataset, export to Promptfoo, or run eval. Triggers include: building an eval suite, capturing a regression case, running eval for a target, defining quality coverage, managing an inbox/golden case pipeline, managing target workspaces under .ai/evals/targets/, or phrases like 评测体系, 评估用例, 回归测试, eval case, golden dataset, coverage matrix. Do NOT use for debugging a single code failure (use systematic-debugging), writing unit tests (use test-driven-development), or one-off model comparisons without durable case management.
-compatibility: Requires filesystem access for reading/writing .ai/evals/ directory, bash for promptfoo eval, Python for scripts/export-promptfoo.py, and access to the target's source. Uses qa-ai-architecture for evaluator design discussions and brainstorming for coverage exploration when available.
+compatibility: Requires filesystem access for reading/writing .ai/evals/ directory, bash for promptfoo eval, Python for <sdlc-evalops-skill-dir>/scripts/export-promptfoo.py, and access to the target's source. Uses qa-ai-architecture for evaluator design discussions and brainstorming for coverage exploration when available.
 ---
 
 # EvalOps Skill
 
-Manage AI eval assets as version-controlled, tool-neutral artifacts. The skill defines three natural-language workflows (create-eval-suite, capture-regression, run-regression) backed by seven internal commands. EvalOps root is `.ai/evals/` with target-scoped workspaces under `.ai/evals/targets/<target-id>/`. Internal case schema is the source of truth; Promptfoo exports are derived via `scripts/export-promptfoo.py`.
+Manage AI eval assets as version-controlled, tool-neutral artifacts. The skill defines three natural-language workflows (create-eval-suite, capture-regression, run-regression) backed by seven internal commands. EvalOps root is `.ai/evals/` with target-scoped workspaces under `.ai/evals/targets/<target-id>/`. Internal case schema is the source of truth; Promptfoo exports are derived via `<sdlc-evalops-skill-dir>/scripts/export-promptfoo.py`.
 
 ## When to Use
 
@@ -49,7 +49,7 @@ Each AI behavior target gets a workspace at `.ai/evals/targets/<target-id>/`. Th
 - `exports/promptfoo/`: generated Promptfoo files (derived, not canonical)
 - `reports/`: eval outputs and final golden eval summaries
 
-The target manifest makes `scripts/export-promptfoo.py <target-id>` self-contained: it locates canonical golden cases, injects source files, and writes exports without scanning unrelated targets.
+The target manifest makes `<sdlc-evalops-skill-dir>/scripts/export-promptfoo.py <target-id>` self-contained: it locates canonical golden cases, injects source files, and writes exports without scanning unrelated targets.
 
 ## Interaction Model
 
@@ -69,7 +69,7 @@ Trigger: user wants to build an eval suite for a target.
 7. Ask: continue iterating, accept selected, or stop?
 8. Triage accepted candidates.
 9. Promote selected to golden (requires explicit user confirmation).
-10. Run `scripts/export-promptfoo.py <target-id>` to generate Promptfoo exports.
+10. Run `<sdlc-evalops-skill-dir>/scripts/export-promptfoo.py <target-id>` to generate Promptfoo exports.
 11. Run golden eval and summarize.
 ```
 
@@ -92,7 +92,7 @@ Trigger: user modified a target and wants to run eval.
 ```
 1. Locate target-id from user context or scan `.ai/evals/manifest.yaml`.
 2. Verify `.ai/evals/targets/<target-id>/cases/golden/` has cases.
-3. Export Promptfoo configs via `scripts/export-promptfoo.py <target-id>`.
+3. Export Promptfoo configs via `<sdlc-evalops-skill-dir>/scripts/export-promptfoo.py <target-id>`.
 4. Run `promptfoo eval -c <config-path>`.
 5. Save run report to `.ai/evals/targets/<target-id>/reports/<run-id>/`.
 6. Summarize: pass/fail counts, failed cases with severity.
@@ -209,20 +209,20 @@ Template at `templates/default-case.yaml`. Key fields:
 - `target_selection`: which targets to include by default
 - `run_policy`: sequential/parallel, fail_fast, timeout, retry_count
 
-A matrix runner (`scripts/run-eval-matrix.py`) executes targets across configured model entries. See [Matrix Eval](#matrix-eval) below.
+A matrix runner (`<sdlc-evalops-skill-dir>/scripts/run-eval-matrix.py`) executes targets across configured model entries. See [Matrix Eval](#matrix-eval) below.
 
 ## Matrix Eval
 
-The `scripts/run-eval-matrix.py` runner executes EvalOps target golden cases across every model entry configured in `.ai/evals/model-matrix.yaml`.
+The `<sdlc-evalops-skill-dir>/scripts/run-eval-matrix.py` runner executes EvalOps target golden cases across every model entry configured in `.ai/evals/model-matrix.yaml`.
 
 ### Matrix Runner Command
 
 ```bash
 export OPENCODE_GO_API_KEY=<key>
-python scripts/run-eval-matrix.py <target-id>
-python scripts/run-eval-matrix.py --all
-python scripts/run-eval-matrix.py <target-id> --dry-run
-python scripts/run-eval-matrix.py <target-id> --from-auth
+python <sdlc-evalops-skill-dir>/scripts/run-eval-matrix.py <target-id>
+python <sdlc-evalops-skill-dir>/scripts/run-eval-matrix.py --all
+python <sdlc-evalops-skill-dir>/scripts/run-eval-matrix.py <target-id> --dry-run
+python <sdlc-evalops-skill-dir>/scripts/run-eval-matrix.py <target-id> --from-auth
 ```
 
 ### Matrix Report Layout
@@ -260,7 +260,7 @@ Reports are written under the target workspace with a matrix run id and per-mode
 
 | Matrix Runner | Single-Model Runner |
 |---|---|
-| `scripts/run-eval-matrix.py <target-id>` | `scripts/run-promptfoo-eval.py <target-id>` |
+| `<sdlc-evalops-skill-dir>/scripts/run-eval-matrix.py <target-id>` | `<sdlc-evalops-skill-dir>/scripts/run-promptfoo-eval.py <target-id>` |
 | Runs all model entries | Runs default model entry only |
 | Reports under `reports/<matrix-run-id>/<model-name>/` | Reports under `reports/<run-id>/` |
 | Generates run-scoped Promptfoo configs | Uses canonical `exports/promptfoo/` configs |
@@ -276,7 +276,7 @@ Interactive evaluation during development. Captures real failures, drafts candid
 
 ### Promptfoo Eval
 
-Generated evaluation using `scripts/export-promptfoo.py <target-id>`. Derives Promptfoo configs from canonical golden cases, injects target skill source, and runs deterministic exports. Promptfoo eval SHALL run canonical golden exports when implementation changes affect an AI behavior target. If the runner is unavailable, the blocked dependency MUST be reported explicitly.
+Generated evaluation using `<sdlc-evalops-skill-dir>/scripts/export-promptfoo.py <target-id>`. Derives Promptfoo configs from canonical golden cases, injects target skill source, and runs deterministic exports. Promptfoo eval SHALL run canonical golden exports when implementation changes affect an AI behavior target. If the runner is unavailable, the blocked dependency MUST be reported explicitly.
 
 ## Assertion Policy
 
@@ -319,9 +319,6 @@ Initialize `.ai/evals/` directory at the project root.
 - `.ai/evals/manifest.yaml`
 - `.ai/evals/model-matrix.yaml` (from `templates/model-matrix.yaml` scaffold)
 - `.ai/evals/targets/`
-- `scripts/export-promptfoo.py`
-- `scripts/run-promptfoo-eval.py`
-- `scripts/run-eval-matrix.py`
 
 **Model Matrix Configuration (interactive)**:
 
@@ -352,6 +349,23 @@ Before writing `.ai/evals/model-matrix.yaml`, the assistant SHALL ask the user f
 - The `headers.Accept-Encoding: identity` is pre-filled and MUST NOT be removed.
 - If the user leaves a field blank, use the default for that field only; do not override other filled fields.
 - After writing `model-matrix.yaml`, the assistant SHALL confirm the final values to the user.
+
+### Script Path Resolution
+
+All script paths in this skill use the placeholder `<sdlc-evalops-skill-dir>`. This placeholder MUST be resolved at runtime to the **directory containing this SKILL.md** (the installed location of this skill). The skill directory varies by installation target:
+
+| Installation | Skill Directory |
+|---|---|
+| Canonical repo | `skills/sdlc-evalops/` |
+| opencode project | `.opencode/skills/sdlc-evalops/` |
+| Claude Code project | `.claude/skills/sdlc-evalops/` |
+| Cursor project | `.cursor/skills/sdlc-evalops/` |
+| Global install | `~/.config/opencode/skills/sdlc-evalops/` or `~/.claude/skills/sdlc-evalops/` |
+
+**Rules:**
+- Do NOT hardcode `skills/sdlc-evalops/` in executed commands. Resolve `<sdlc-evalops-skill-dir>` to the actual installed path.
+- All three scripts (`export-promptfoo.py`, `run-promptfoo-eval.py`, `run-eval-matrix.py`) are siblings under `<sdlc-evalops-skill-dir>/scripts/`.
+- Scripts discover the project root by walking up from the current working directory to find `.ai/evals/manifest.yaml`. They do not depend on being at a fixed depth from the project root.
 
 ### define-coverage
 
@@ -450,18 +464,18 @@ Run golden eval for a target using Promptfoo.
 
 **Steps**:
 1. Read golden cases from `.ai/evals/targets/<target-id>/cases/golden/`.
-2. Run `scripts/run-promptfoo-eval.py <target-id>` which chains: export freshness → `promptfoo eval -c <config-path> -o <reports-dir>/promptfoo-output.json` → parse output → write `summary.md` and `failures.yaml`.
+2. Run `<sdlc-evalops-skill-dir>/scripts/run-promptfoo-eval.py <target-id>` which chains: export freshness → `promptfoo eval -c <config-path> -o <reports-dir>/promptfoo-output.json` → parse output → write `summary.md` and `failures.yaml`.
 3. Summarize for user: pass count, fail count, failed case ids with severity.
 4. If failures: suggest capture for new patterns. Do NOT auto-fix.
 
 **Rules**:
 - Only run golden cases. Do not run inbox or accepted.
-- Export is derived via `scripts/export-promptfoo.py`; internal case YAML remains source of truth.
+- Export is derived via `<sdlc-evalops-skill-dir>/scripts/export-promptfoo.py`; internal case YAML remains source of truth.
 - Do not modify target, case, or coverage on failure.
 
 ## Promptfoo Export Mapping
 
-When `scripts/export-promptfoo.py <target-id>` generates Promptfoo exports from canonical golden cases:
+When `<sdlc-evalops-skill-dir>/scripts/export-promptfoo.py <target-id>` generates Promptfoo exports from canonical golden cases:
 
 | Internal Field | Promptfoo Mapping |
 |----------------|-------------------|
@@ -476,7 +490,7 @@ Supported assertions: `contains`, `not-contains`, `regex`, `llm-rubric` (configu
 
 Export generation reads source files declared in the target manifest and injects them into the prompt. Golden cases describe scenario input and expected behavior; they SHALL NOT duplicate the full target skill source.
 
-The `--check` flag (`scripts/export-promptfoo.py <target-id> --check`) exits non-zero when exports are missing or stale, enabling CI-style freshness validation.
+The `--check` flag (`<sdlc-evalops-skill-dir>/scripts/export-promptfoo.py <target-id> --check`) exits non-zero when exports are missing or stale, enabling CI-style freshness validation.
 
 ## Promptfoo Provider Configuration
 
@@ -550,7 +564,7 @@ The `defaultTest.options.provider` block is the grader for `llm-rubric` assertio
 
 ```bash
 export OPENCODE_GO_API_KEY=<key>
-python scripts/run-promptfoo-eval.py <target-id>
+python <sdlc-evalops-skill-dir>/scripts/run-promptfoo-eval.py <target-id>
 ```
 
 This chains export freshness, `promptfoo eval` with `-o` report output, and structured `summary.md`/`failures.yaml` writing under `.ai/evals/targets/<target-id>/reports/<run-id>/`.
@@ -577,7 +591,7 @@ These rules override any contextual ambiguity. Violating them produces an incorr
 2. **AI-generated cases MUST enter inbox first.** Never write directly to accepted or golden.
 3. **Golden Dataset MUST require human confirmation.** Promote only after user explicitly approves each case.
 4. **Coverage MUST be user-reviewed before candidate generation.** If `review.reviewed_by_user` is not true, stop and require review.
-5. **Promptfoo exports are derived artifacts, not source of truth.** Internal case YAML is canonical. Use `scripts/export-promptfoo.py` to derive Promptfoo configs.
+5. **Promptfoo exports are derived artifacts, not source of truth.** Internal case YAML is canonical. Use `<sdlc-evalops-skill-dir>/scripts/export-promptfoo.py` to derive Promptfoo configs.
 6. **Eval failure MUST NOT trigger automatic fixes in MVP.** Failure may be caused by the target, the case, the expected, the evaluator, the context, or model variance.
 7. **capture defaults to inbox.** Even if the user calls it "regression-critical", it goes to inbox. Triage and promote are separate gates.
 8. **Global assertion pollution is prohibited.** Promptfoo exports MUST NOT add hidden `defaultTest.assert` that applies to all targets. Assertions belong in canonical cases or target policy.
@@ -631,7 +645,7 @@ openspec propose
 → inspect existing coverage and golden cases
 → update coverage/cases if behavior scope changed
 → apply + TDD where applicable
-→ scripts/export-promptfoo.py <target-id>
+→ <sdlc-evalops-skill-dir>/scripts/export-promptfoo.py <target-id>
 → evalops run
 → capture new failures to inbox if found
 → openspec verify

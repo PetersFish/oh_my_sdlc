@@ -238,6 +238,36 @@ class TestEvalopsSkillTemplates:
             "model-matrix template must forbid raw API keys"
 
 
+class TestEvalopsSkillScripts:
+    """Validate sdlc-evalops ships its own runtime scripts."""
+
+    def test_export_script_exists(self):
+        path = EVALOPS_SKILL / "scripts" / "export-promptfoo.py"
+        assert path.is_file(), f"Missing script: {path}"
+
+    def test_runner_script_exists(self):
+        path = EVALOPS_SKILL / "scripts" / "run-promptfoo-eval.py"
+        assert path.is_file(), f"Missing script: {path}"
+
+    def test_matrix_runner_script_exists(self):
+        path = EVALOPS_SKILL / "scripts" / "run-eval-matrix.py"
+        assert path.is_file(), f"Missing script: {path}"
+
+    def test_skill_md_uses_placeholder_not_hardcoded_path(self):
+        content = (EVALOPS_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        assert "<sdlc-evalops-skill-dir>/scripts/" in content, \
+            "SKILL.md must use <sdlc-evalops-skill-dir> placeholder, not hardcoded canonical path"
+        assert "Script Path Resolution" in content, \
+            "SKILL.md must have Script Path Resolution section"
+
+    def test_skill_md_mentions_skill_dir_resolution_table(self):
+        content = (EVALOPS_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        assert ".opencode/skills/sdlc-evalops/" in content, \
+            "Script Path Resolution must list opencode install path"
+        assert ".claude/skills/sdlc-evalops/" in content, \
+            "Script Path Resolution must list claude install path"
+
+
 class TestEvalopsSkillEvals:
     """Validate evals/evals.json covers routing scenarios."""
 

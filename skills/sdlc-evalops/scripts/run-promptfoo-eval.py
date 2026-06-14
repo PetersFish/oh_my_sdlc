@@ -3,13 +3,13 @@
 
 Usage:
   export OPENCODE_GO_API_KEY=<key>
-  python scripts/run-promptfoo-eval.py <target-id>
+  python skills/sdlc-evalops/scripts/run-promptfoo-eval.py <target-id>
 
   Or run directly from auth.json:
-  python scripts/run-promptfoo-eval.py <target-id> --from-auth
+  python skills/sdlc-evalops/scripts/run-promptfoo-eval.py <target-id> --from-auth
 
 Chains:
-  1. scripts/export-promptfoo.py <target-id>  (ensures exports fresh)
+  1. skills/sdlc-evalops/scripts/export-promptfoo.py <target-id>  (ensures exports fresh)
   2. promptfoo eval -c <config> -o <report-path> --max-concurrency 1 --no-cache
   3. Writes summary.md and failures.yaml
 
@@ -26,7 +26,17 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+def find_repo_root() -> Path:
+    p = Path.cwd().resolve()
+    while True:
+        if (p / ".ai" / "evals" / "manifest.yaml").is_file():
+            return p
+        if p.parent == p:
+            break
+        p = p.parent
+    return Path.cwd().resolve()
+
+REPO_ROOT = find_repo_root()
 EVALS_ROOT = REPO_ROOT / ".ai" / "evals"
 
 
@@ -39,7 +49,7 @@ def error(msg: str) -> None:
 
 
 def run_export(target_id: str) -> int:
-    export_script = REPO_ROOT / "scripts" / "export-promptfoo.py"
+    export_script = Path(__file__).resolve().parent / "export-promptfoo.py"
     log(f"Running export: {export_script} {target_id}")
     result = subprocess.run(
         [sys.executable, str(export_script), target_id],

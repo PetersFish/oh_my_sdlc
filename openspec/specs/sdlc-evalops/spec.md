@@ -40,7 +40,7 @@ The `sdlc-evalops` skill SHALL define global and target manifests that make targ
 - **THEN** it SHALL declare the target id, target type, target source paths, canonical case directories, coverage file, Promptfoo export outputs, report directory, assertion policy, and export freshness inputs
 
 #### Scenario: Export script uses manifests rather than broad scanning
-- **WHEN** `scripts/export-promptfoo.py <target-id>` runs
+- **WHEN** `<sdlc-evalops-skill-dir>/scripts/export-promptfoo.py <target-id>` runs
 - **THEN** it SHALL resolve the target from `.ai/evals/manifest.yaml` and the target workspace `manifest.yaml`
 - **AND** it SHALL NOT depend on scanning unrelated targets for canonical inputs
 
@@ -52,15 +52,15 @@ The `sdlc-evalops` skill SHALL treat canonical golden cases as source artifacts 
 - **THEN** the canonical case SHALL live under `.ai/evals/targets/<target-id>/cases/golden/`
 
 #### Scenario: Promptfoo export is generated from golden cases
-- **WHEN** `scripts/export-promptfoo.py <target-id>` runs
+- **WHEN** `<sdlc-evalops-skill-dir>/scripts/export-promptfoo.py <target-id>` runs
 - **THEN** it SHALL generate Promptfoo export files under `.ai/evals/targets/<target-id>/exports/promptfoo/` from canonical golden cases
 
 #### Scenario: Export freshness check detects stale outputs
-- **WHEN** `scripts/export-promptfoo.py <target-id> --check` runs and generated Promptfoo outputs are missing or stale
+- **WHEN** `<sdlc-evalops-skill-dir>/scripts/export-promptfoo.py <target-id> --check` runs and generated Promptfoo outputs are missing or stale
 - **THEN** the command SHALL fail with a clear freshness error
 
 #### Scenario: Export freshness check passes for current outputs
-- **WHEN** `scripts/export-promptfoo.py <target-id> --check` runs and generated Promptfoo outputs match canonical inputs
+- **WHEN** `<sdlc-evalops-skill-dir>/scripts/export-promptfoo.py <target-id> --check` runs and generated Promptfoo outputs match canonical inputs
 - **THEN** the command SHALL exit successfully without rewriting files
 
 ### Requirement: Skill Source Injection
@@ -118,18 +118,18 @@ The `sdlc-evalops` skill SHALL store eval reports under target workspaces and re
 The `sdlc-evalops` skill SHALL provide a runner script that chains export generation, Promptfoo eval, and structured report writing.
 
 #### Scenario: Runner script chains export, eval, and report writing
-- **WHEN** `scripts/run-promptfoo-eval.py <target-id>` is executed
-- **THEN** it SHALL run `scripts/export-promptfoo.py <target-id>` first to ensure exports are fresh
+- **WHEN** `<sdlc-evalops-skill-dir>/scripts/run-promptfoo-eval.py <target-id>` is executed
+- **THEN** it SHALL run `<sdlc-evalops-skill-dir>/scripts/export-promptfoo.py <target-id>` first to ensure exports are fresh
 - **AND** it SHALL run `promptfoo eval -c <config-path> -o <report-path> --max-concurrency 1 --no-cache`
 - **AND** it SHALL write `summary.md` and `failures.yaml` under `.ai/evals/targets/<target-id>/reports/<run-id>/`
 
 #### Scenario: Runner script produces required report files
-- **WHEN** `scripts/run-promptfoo-eval.py <target-id>` completes
+- **WHEN** `<sdlc-evalops-skill-dir>/scripts/run-promptfoo-eval.py <target-id>` completes
 - **THEN** `.ai/evals/targets/<target-id>/reports/<run-id>/` SHALL contain `promptfoo-output.json`, `summary.md`, and `failures.yaml`
 - **AND** `summary.md` SHALL include target id, case counts, export freshness status, eval command, pass/fail result count, and report path
 
 #### Scenario: Runner script uses API key from environment
-- **WHEN** `scripts/run-promptfoo-eval.py <target-id>` launches `promptfoo eval`
+- **WHEN** `<sdlc-evalops-skill-dir>/scripts/run-promptfoo-eval.py <target-id>` launches `promptfoo eval`
 - **THEN** it SHALL pass the `OPENCODE_GO_API_KEY` environment variable to the subprocess
 - **AND** it SHALL NOT write the API key value into any file
 
@@ -146,7 +146,7 @@ The `sdlc-evalops` skill SHALL document the canonical eval command with the requ
 
 #### Scenario: Runner script is the canonical eval path
 - **WHEN** the `sdlc-evalops` skill documents how to run eval
-- **THEN** it SHALL reference `scripts/run-promptfoo-eval.py <target-id>` as the canonical runner
+- **THEN** it SHALL reference `<sdlc-evalops-skill-dir>/scripts/run-promptfoo-eval.py <target-id>` as the canonical runner
 - **AND** it SHALL include the raw `promptfoo eval` command as a fallback with `-o` flag
 
 ### Requirement: Model Matrix Schema
@@ -158,11 +158,11 @@ The `sdlc-evalops` skill SHALL define a `.ai/evals/model-matrix.yaml` schema con
 
 #### Scenario: Full matrix runner is implemented
 - **WHEN** the `add-eval-matrix-runner` change is applied
-- **THEN** the system SHALL provide `scripts/run-eval-matrix.py` as the canonical matrix runner
+- **THEN** the system SHALL provide `<sdlc-evalops-skill-dir>/scripts/run-eval-matrix.py` as the canonical matrix runner
 - **AND** the matrix runner SHALL execute golden evals across all configured model entries in `.ai/evals/model-matrix.yaml`
 
 #### Scenario: Promptfoo provider is generated from model matrix
-- **WHEN** `scripts/export-promptfoo.py <target-id>` generates a `promptfooconfig.yaml`
+- **WHEN** `<sdlc-evalops-skill-dir>/scripts/export-promptfoo.py <target-id>` generates a `promptfooconfig.yaml`
 - **THEN** the providers section SHALL be derived from `.ai/evals/model-matrix.yaml` default model's `promptfoo` block
 - **AND** the generated provider SHALL use `openai:chat:<model>` as the id
 - **AND** the generated provider SHALL include `apiBaseUrl: https://opencode.ai/zen/go/v1` in config
@@ -196,7 +196,7 @@ The `sdlc-evalops` skill SHALL include a minimal Promptfoo smoke test config tha
 The `sdlc-evalops` workflow SHALL provide a matrix runner that executes canonical golden evals across configured model matrix entries.
 
 #### Scenario: Matrix runner reads configured model entries
-- **WHEN** `scripts/run-eval-matrix.py <target-id>` is executed
+- **WHEN** `<sdlc-evalops-skill-dir>/scripts/run-eval-matrix.py <target-id>` is executed
 - **THEN** it SHALL read `.ai/evals/model-matrix.yaml`
 - **AND** it SHALL use `models[]` entries as the provider matrix
 - **AND** it SHALL fail with a clear error if no model entries are configured
