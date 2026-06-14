@@ -22,15 +22,20 @@ actual: |
   <<actual-output-if-applicable>>
 
 expected:
-  must_include: []
-  must_not_include: []
   rubric: |
-    <<evaluation-rubric>>
+    <<semantic-evaluation-rubric>>
 
 evaluators:
-  rule_based:
-    contains: []
   llm_judge:
-    enabled: false
+    enabled: true
     rubric: |
       <<llm-judge-rubric>>
+
+# Optional deterministic checks for exact literals/structure only:
+# expected:
+#   must_include: []
+#   must_not_include: []
+# evaluators:
+#   rule_based:
+#     contains: []
+#     not_contains: []

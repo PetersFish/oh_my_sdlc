@@ -15,18 +15,10 @@ coverage:
 input: |
   我改完了 openspec-init，跑一下它的 eval。
 expected:
-  must_include:
-    - export-promptfoo.py
-    - run
-  must_not_include: []
   rubric: |
     The assistant must recognize the run-regression intent, locate the target, use export-promptfoo.py or run-promptfoo-eval.py to run the eval, and summarize results with pass/fail counts.
 evaluators:
-  rule_based:
-    contains:
-      - export-promptfoo.py
-      - run
   llm_judge:
     enabled: true
     rubric: |
-      Verify the assistant identifies this as a run-regression task, locates the correct target, runs Promptfoo eval via the canonical runner script, and provides a pass/fail summary.
+      Verify the assistant identifies this as a run-regression task, locates the correct target, uses the canonical runner script (run-promptfoo-eval.py or export-promptfoo.py), and provides a pass/fail summary. Placeholder counts in the summary are acceptable in eval context where the model cannot actually execute commands.

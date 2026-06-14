@@ -2,5 +2,6 @@
     input: |
       <<user-input>>
   assert:
-    - type: contains
-      value: <<expected-substring>>
+    - type: llm-rubric
+      value: |
+        <<semantic-evaluation-rubric>>

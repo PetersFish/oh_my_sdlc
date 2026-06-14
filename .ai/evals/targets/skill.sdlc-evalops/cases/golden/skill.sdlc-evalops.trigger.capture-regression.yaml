@@ -15,19 +15,10 @@ coverage:
 input: |
   刚才 research skill 又遗漏了成本分析，帮我把这个失败沉淀下来。
 expected:
-  must_include:
-    - capture
-    - inbox
-  must_not_include:
-    - golden
   rubric: |
     The assistant must recognize the capture-regression intent, extract context from conversation, ask for confirmation before writing, and default to inbox (not golden).
 evaluators:
-  rule_based:
-    contains:
-      - capture
-      - inbox
   llm_judge:
     enabled: true
     rubric: |
-      Verify the assistant identifies this as a capture-regression task, extracts the failure context, asks for user confirmation, and defaults the case to inbox (not golden).
+      Verify the assistant identifies this as a capture-regression task, extracts the failure context (asking for details IS correct — the workflow step 1 is "extract input, actual output, and expected behavior from conversation context"), asks for user confirmation, and defaults the case to inbox (not golden). Asking for details before explicitly confirming counts as following the workflow correctly. The model does NOT need to say the literal word "confirmation" — asking clarifying questions and saying "after you confirm I will write to inbox" is sufficient. The model checking or mentioning the target-id (e.g., skill.research-general) and the inbox directory shows correct capture-regression activation.

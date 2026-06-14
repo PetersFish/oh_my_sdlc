@@ -16,12 +16,6 @@ coverage:
 input: |
   Write unit tests for this calculateDiscount function that handles edge cases for negative prices and zero quantities.
 expected:
-  must_include:
-    - test
-  must_not_include:
-    - evals
-    - golden dataset
-    - promptfoo
   rubric: |
     This is a unit test request. The assistant must route to test-driven-development, NOT to sdlc-evalops. EvalOps manages durable AI behavior eval assets, not code unit tests.
 evaluators:

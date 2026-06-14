@@ -16,13 +16,6 @@ coverage:
 input: |
   Compare how Claude 4.5, GPT-5, and Gemini 3 handle this Python refactoring task. Which one gives the cleanest output?
 expected:
-  must_include:
-    - compare
-  must_not_include:
-    - evals
-    - .ai/evals
-    - target workspace
-    - golden dataset
   rubric: |
     This is a one-off model comparison without any durable case management request. The assistant must NOT activate sdlc-evalops. EvalOps requires durable case lifecycle management under .ai/evals/.
 evaluators:

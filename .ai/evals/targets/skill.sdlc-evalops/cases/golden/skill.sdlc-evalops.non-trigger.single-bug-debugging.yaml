@@ -16,13 +16,6 @@ coverage:
 input: |
   My API endpoint is returning a 500 error when I pass an empty request body. Help me debug this.
 expected:
-  must_include:
-    - debugging
-  must_not_include:
-    - evals
-    - eval case
-    - coverage
-    - golden
   rubric: |
     This is a single-code-bug debugging request. The assistant must route to systematic-debugging, NOT to sdlc-evalops. EvalOps is for durable eval asset management, not one-off bug fixes.
 evaluators:

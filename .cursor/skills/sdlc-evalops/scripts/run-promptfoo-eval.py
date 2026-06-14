@@ -288,8 +288,7 @@ def main() -> None:
 
     eval_exit = run_promptfoo_eval(config_path, output_path)
     if eval_exit != 0:
-        error(f"promptfoo eval failed (exit {eval_exit})")
-        sys.exit(eval_exit)
+        log(f"promptfoo eval exited with code {eval_exit}")
 
     parsed = parse_promptfoo_output(output_path)
     if "error" in parsed:

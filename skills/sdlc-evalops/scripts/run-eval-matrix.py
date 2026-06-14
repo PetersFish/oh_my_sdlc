@@ -163,7 +163,7 @@ User input:
 
 {{{{input}}}}
 
-Respond as the assistant would after applying `{target_id}`.
+Provide only the assistant's final user-facing reply — one natural message as the user would see it. Do NOT output chain of thought, hidden reasoning, "Thinking:" text, or any other internal deliberation. Output the direct reply only.
 """
 
 

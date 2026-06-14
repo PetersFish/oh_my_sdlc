@@ -15,16 +15,9 @@ coverage:
 input: |
   promote 这个 accepted case 到 golden dataset。
 expected:
-  must_include:
-    - promote
-    - confirmation
-  must_not_include: []
   rubric: |
     The assistant must recognize promote intent, verify pre-checks, and require explicit user confirmation before promoting to golden. It must not silently promote.
 evaluators:
-  rule_based:
-    contains:
-      - promote
   llm_judge:
     enabled: true
     rubric: |

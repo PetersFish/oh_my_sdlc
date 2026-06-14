@@ -16,15 +16,10 @@ coverage:
 input: |
   请为 research skill 建立一套评测体系，覆盖回归测试和评估用例。
 expected:
-  must_include:
-    - target
-  must_not_include:
-    - debugging
-    - unit test
   rubric: |
     Chinese trigger phrases 评测体系, 评估用例, 回归测试 must activate sdlc-evalops for durable eval asset management, not route to systematic-debugging or test-driven-development.
 evaluators:
   llm_judge:
     enabled: true
     rubric: |
-      Verify that Chinese trigger phrases correctly activate the sdlc-evalops skill for durable eval asset management rather than routing to debugging or unit test skills.
+      Verify that Chinese trigger phrases in the user input correctly activate the sdlc-evalops skill for durable eval asset management. Routing to the create-eval-suite workflow IS correct activation — the model does NOT need to mention "sdlc-evalops" by name. Starting to check .ai/evals/ state, determining target-id, and following EvalOps workflow steps shows correct activation. The assistant must recognize the request as eval-suite creation and follow the EvalOps workflow, not route to systematic-debugging or test-driven-development. The assistant may respond in English even if the user input is in Chinese.

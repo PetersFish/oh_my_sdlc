@@ -204,8 +204,10 @@ Template at `templates/default-case.yaml`. Key fields:
 - `coverage`: functional and quality dimensions this case exercises
 - `input`: the user input to the target
 - `actual`: the actual output (for failure cases)
-- `expected`: must_include (list), must_not_include (list), rubric (text)
-- `evaluators`: rule_based (contains list), llm_judge (enabled, rubric)
+- `expected.rubric`: primary semantic expectation for AI behavior cases (required)
+- `expected.must_include` / `expected.must_not_include`: optional deterministic checks for exact literals, structural constraints, or hard safety exclusions only — do not use for semantic behavior
+- `evaluators.llm_judge`: recommended default for semantic AI behavior cases (enable + provide rubric)
+- `evaluators.rule_based`: optional deterministic checks for exact strings, structures, or safety exclusions only
 
 ### Model Matrix Schema
 
@@ -287,9 +289,22 @@ Generated evaluation using `<sdlc-evalops-skill-dir>/scripts/export-promptfoo.py
 
 ## Assertion Policy
 
-### Deterministic Assertions Preferred
+### Rubric-First For Semantic AI Behavior
 
-Canonical cases SHOULD use deterministic assertions: `contains`, `not-contains`, `regex`, structural checks, explicit tool-use checks, or exact-value checks where appropriate.
+For semantic AI behavior evaluation — including skill routing, intent classification, workflow selection, assistant behavior quality, and multilingual trigger handling — canonical cases SHOULD use `expected.rubric` + `evaluators.llm_judge` as the primary assertion. The grader evaluates intent and workflow correctness, not substring presence.
+
+Deterministic assertions (`contains`, `not-contains`, `regex`, `javascript`) are allowed only for:
+- Exact required output literals (e.g., a specific tool/script name that must appear)
+- Structural constraints (e.g., output must be valid JSON)
+- Machine-readable fields
+- Hard safety exclusions where any occurrence of a forbidden phrase constitutes failure
+- Code generation outputs where specific identifiers or patterns are contractually required
+
+Do NOT use broad `must_include` or `must_not_include` keyword checks for semantic behavior. A model correctly explaining why it should NOT activate a workflow may use words from the target domain (e.g., "evals", "coverage", "golden") during its explanation — that is correct behavior, not a failure.
+
+### Rubric-Only Cases Are Valid
+
+If `expected.rubric` is present and `evaluators.llm_judge.enabled` is true, the export script generates an `llm-rubric` assertion even when no deterministic assertions exist. Rubric-only cases are the recommended default for semantic AI behavior targets.
 
 ### No Global Assertion Pollution
 
@@ -507,6 +522,8 @@ When `<sdlc-evalops-skill-dir>/scripts/export-promptfoo.py <target-id>` generate
 
 Supported assertions: `contains`, `not-contains`, `regex`, `llm-rubric` (configured only), `javascript`.
 
+Rubric-only cases are valid and recommended for semantic AI behavior. If `expected.rubric` is present and `evaluators.llm_judge.enabled` is true, the export generates an `llm-rubric` assertion even when no deterministic assertions exist. Do not add `must_include`/`must_not_include` merely to make a case "more testable"; only add them when literal string presence/absence is itself the behavior under test.
+
 Export generation reads source files declared in the target manifest and injects them into the prompt. Golden cases describe scenario input and expected behavior; they SHALL NOT duplicate the full target skill source.
 
 The `--check` flag (`<sdlc-evalops-skill-dir>/scripts/export-promptfoo.py <target-id> --check`) exits non-zero when exports are missing or stale, enabling CI-style freshness validation.
@@ -617,6 +634,7 @@ These rules override any contextual ambiguity. Violating them produces an incorr
 9. **Unconfigured llm-rubric is prohibited.** If a case uses `llm-rubric`, it MUST explicitly configure rubric text. Empty rubric assertions SHALL NOT be exported.
 10. **Session eval is not a substitute for Promptfoo golden eval.** Session eval captures and reviews cases; Promptfoo eval runs canonical golden exports. Final golden eval is required for EvalOps-gated AI behavior changes.
 11. **Reports are local audit artifacts, not canonical source.** Reports under `targets/*/reports/` are git-ignored by default via `.ai/evals/.gitignore`. Do NOT version reports — version `manifest.yaml`, `coverage.yaml`, `cases/`, and `exports/`.
+13. **Semantic AI behavior cases MUST be rubric-first.** For skill routing, intent classification, workflow selection, and similar semantic behavior targets, use `expected.rubric` + `evaluators.llm_judge` as the primary assertion. Do NOT use broad `must_include`/`must_not_include` keyword checks for semantic behavior. Deterministic assertions are reserved for exact literals, structural constraints, and hard safety exclusions.
 
 ## Workflow Integration
 
@@ -714,4 +732,4 @@ User input:
 
 {{input}}
 
-Respond as the assistant would after applying `skill.sdlc-evalops`.
+Provide only the assistant's final user-facing reply — one natural message as the user would see it. Do NOT output chain of thought, hidden reasoning, "Thinking:" text, or any other internal deliberation. Output the direct reply only.

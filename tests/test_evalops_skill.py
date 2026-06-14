@@ -171,6 +171,23 @@ class TestEvalopsSkillHardRules:
         assert "canonical" in lower, \
             "Hard rule: must distinguish canonical from local artifacts"
 
+    def test_evalops_skill_does_not_have_internal_pytest_disambiguation(self):
+        content = (EVALOPS_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        lower = content.lower()
+        assert "## disambiguation protocol" not in lower, \
+            "sdlc-evalops should not own pytest-vs-promptfoo disambiguation"
+        assert "promptfoo golden eval cases, or the pytest unit tests" not in lower, \
+            "sdlc-evalops should not ask pytest-vs-promptfoo clarification questions"
+
+    def test_evalops_coverage_does_not_include_internal_disambiguation(self):
+        content = (REPO_ROOT / ".ai" / "evals" / "targets" / "skill.sdlc-evalops" / "coverage.yaml") \
+            .read_text(encoding="utf-8")
+        lower = content.lower()
+        assert "ambiguous-phrase-disambiguation" not in lower, \
+            "coverage should not include internal evalops disambiguation coverage"
+        assert "silently executing pytest when user meant promptfoo golden eval" not in lower, \
+            "risk focus should not model pytest-vs-promptfoo confusion inside evalops"
+
 
 class TestEvalopsSkillTemplates:
     """Validate bundled templates exist and are well-formed."""

@@ -15,17 +15,9 @@ coverage:
 input: |
   帮我给 research-general skill 建一套 eval case，用于回归测试。
 expected:
-  must_include:
-    - create-eval-suite
-    - coverage
-  must_not_include: []
   rubric: |
     The assistant must recognize this as a create-eval-suite intent, check if .ai/evals/ is initialized, and lead into coverage brainstorming. It must not directly write golden cases.
 evaluators:
-  rule_based:
-    contains:
-      - create-eval-suite
-      - coverage
   llm_judge:
     enabled: true
     rubric: |
