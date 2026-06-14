@@ -64,6 +64,18 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
 
+## Skill Frontmatter
+
+When writing or editing skill `SKILL.md` frontmatter, use folded block scalar syntax for long `description` values:
+
+```yaml
+description: >-
+  Use when ...
+  Trigger for ...
+```
+
+Do not use unquoted plain scalar descriptions for long natural-language text. `: ` inside values such as `Triggers include: ...` or `.ai/evals/: ...` breaks YAML parsing and causes skills to be silently filtered out.
+
 ## Repository Memory
 
 If `.ai/memory/index.json` exists and the task involves planning, editing, reviewing, or continuing work in this repository, load relevant repository memory first using `sdlc-repository-memory-load`.

@@ -1,6 +1,6 @@
 ---
 name: transform-markdown-svg
-description: Use this skill whenever the task involves generating any diagram, illustration, chart, flowchart, or visual from markdown or text descriptions — even if the user doesn't explicitly say "SVG". This is the REQUIRED approach for all diagram/visual generation tasks. Do NOT use native image generation or other tools to create diagrams; always consult this skill first. Triggers include: "generate a diagram", "create a flowchart", "visualize this", "add an illustration", "make a chart from this", or any request to produce a visual embedded in a document.
+description: "Use this skill whenever the task involves generating any diagram, illustration, chart, flowchart, or visual from markdown or text descriptions — even if the user doesn't explicitly say \"SVG\". This is the REQUIRED approach for all diagram/visual generation tasks. Do NOT use native image generation or other tools to create diagrams; always consult this skill first. Triggers include: \"generate a diagram\", \"create a flowchart\", \"visualize this\", \"add an illustration\", \"make a chart from this\", or any request to produce a visual embedded in a document."
 ---
 
 # transform-markdown-svg

@@ -1,6 +1,6 @@
 ---
 name: sdlc-evalops
-description: Use when managing durable AI eval assets under .ai/evals/: creating eval suites, capturing regression cases, defining coverage, triaging inbox/accepted/golden cases, exporting/running Promptfoo evals, or managing target workspaces. Trigger for eval case, golden dataset, coverage matrix, regression case, Promptfoo eval, 评测体系/评估用例/回归测试. Do NOT use for unit tests, single-bug debugging, or one-off model comparison without durable cases.
+description: "Use when managing durable AI eval assets under .ai/evals/: creating eval suites, capturing regression cases, defining coverage, triaging inbox/accepted/golden cases, exporting/running Promptfoo evals, or managing target workspaces. Trigger for eval case, golden dataset, coverage matrix, regression case, Promptfoo eval, 评测体系/评估用例/回归测试. Do NOT use for unit tests, single-bug debugging, or one-off model comparison without durable cases."
 ---
 
 # EvalOps Skill
