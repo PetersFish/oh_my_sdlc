@@ -1,0 +1,65 @@
+schema_version: "1.0"
+
+models:
+  # --- Target Provider ---
+  # Leave any <<field>> empty to use the documented default.
+  # Default provider name: opencode-go
+  # Default model name: deepseek-v4-pro
+  # Default Promptfoo provider id: openai:chat:deepseek-v4-pro
+  # Default apiBaseUrl: https://opencode.ai/zen/go/v1
+  # Default apiKeyEnvar: OPENCODE_GO_API_KEY
+  # Default temperature: 0
+  # Default max_tokens: 4096
+  - name: <<name>>  # default: opencode-go-deepseek-v4-pro
+    provider: <<provider>>  # default: opencode-go
+    model: <<model>>  # default: deepseek-v4-pro
+    promptfoo:
+      id: <<promptfoo-provider-id>>  # default: openai:chat:deepseek-v4-pro
+      label: <<label>>  # default: opencode-go/deepseek-v4-pro
+      config:
+        apiBaseUrl: <<api-base-url>>  # default: https://opencode.ai/zen/go/v1
+        apiKeyEnvar: <<api-key-env-var>>  # default: OPENCODE_GO_API_KEY
+        headers:
+          Accept-Encoding: identity
+        temperature: <<temperature>>  # default: 0
+        max_tokens: <<max-tokens>>  # default: 4096
+
+    # --- Grader Provider (for llm-rubric assertions) ---
+    # Leave any <<field>> empty to use the documented default.
+    # Default grader provider id: openai:chat:glm-5.1
+    # Default grader model name: glm-5.1
+    # Default grader apiBaseUrl: https://opencode.ai/zen/go/v1
+    # Default grader apiKeyEnvar: OPENCODE_GO_API_KEY
+    grader:
+      id: <<grader-provider-id>>  # default: openai:chat:glm-5.1
+      config:
+        apiBaseUrl: <<grader-api-base-url>>  # default: https://opencode.ai/zen/go/v1
+        apiKeyEnvar: <<grader-api-key-env-var>>  # default: OPENCODE_GO_API_KEY
+        headers:
+          Accept-Encoding: identity
+        temperature: <<grader-temperature>>  # default: 0
+        max_tokens: <<grader-max-tokens>>  # default: 4096
+
+environments:
+  primary: cli
+  additional: []
+
+target_selection:
+  default: all
+  filter_by_type: []
+
+run_policy:
+  mode: sequential
+  fail_fast: false
+  timeout_seconds: 300
+  retry_count: 0
+  parallel: false
+
+# --- Rules ---
+# - API keys MUST NOT be written into this file. Use apiKeyEnvar instead.
+# - headers.Accept-Encoding: identity is REQUIRED for opencode-go endpoint compatibility.
+# - The first model in `models[]` is the default. Its `promptfoo` block is used verbatim
+#   by scripts/export-promptfoo.py. The `grader` block is used for llm-rubric assertions.
+# - Full multi-model matrix runner implementation is deferred.
+# - Temperature and max_tokens can differ between target and grader.
+# - Use a non-reasoning model as the grader for reliable JSON output.

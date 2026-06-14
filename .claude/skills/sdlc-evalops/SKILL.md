@@ -209,7 +209,62 @@ Template at `templates/default-case.yaml`. Key fields:
 - `target_selection`: which targets to include by default
 - `run_policy`: sequential/parallel, fail_fast, timeout, retry_count
 
-The full multi-model matrix runner is deferred. This schema exists so future work has a stable contract.
+A matrix runner (`scripts/run-eval-matrix.py`) executes targets across configured model entries. See [Matrix Eval](#matrix-eval) below.
+
+## Matrix Eval
+
+The `scripts/run-eval-matrix.py` runner executes EvalOps target golden cases across every model entry configured in `.ai/evals/model-matrix.yaml`.
+
+### Matrix Runner Command
+
+```bash
+export OPENCODE_GO_API_KEY=<key>
+python scripts/run-eval-matrix.py <target-id>
+python scripts/run-eval-matrix.py --all
+python scripts/run-eval-matrix.py <target-id> --dry-run
+python scripts/run-eval-matrix.py <target-id> --from-auth
+```
+
+### Matrix Report Layout
+
+Reports are written under the target workspace with a matrix run id and per-model subdirectories:
+
+```
+.ai/evals/targets/<target-id>/reports/<matrix-run-id>/
+  summary.md                    # aggregate: results grouped by model
+  <model-name>/
+    summary.md                  # per-model: configured + observed metadata, pass/fail counts
+    failures.yaml               # per-model: failed case details
+    promptfoo-output.json       # raw Promptfoo eval output
+    promptfoo/
+      promptfooconfig.yaml      # run-scoped config for this model entry
+      prompt.md                 # generated prompt with target skill source
+      cases.yaml                # generated test cases from golden cases
+```
+
+### Matrix Behavior
+
+| Behavior | Details |
+|---|---|
+| Model entries | Uses every entry in `.ai/evals/model-matrix.yaml` `models[]` |
+| Target selection | Explicit `<target-id>` or `--all` (respects `target_selection` defaults) |
+| Per-model config | Generated from each model entry's `promptfoo` and `grader` blocks |
+| Canonical exports | NOT mutated; run-scoped configs live under reports |
+| `apiKeyEnvar` | Preserved from model matrix; raw keys never written |
+| `headers.Accept-Encoding: identity` | Preserved in all generated configs |
+| `fail_fast` | Honored from `run_policy.fail_fast`; defaults to false |
+| Exit code | Non-zero if any model run fails or returns errors |
+| Metadata | Per-model summary records both configured and observed provider/model |
+
+### Matrix vs Single-Model Runner
+
+| Matrix Runner | Single-Model Runner |
+|---|---|
+| `scripts/run-eval-matrix.py <target-id>` | `scripts/run-promptfoo-eval.py <target-id>` |
+| Runs all model entries | Runs default model entry only |
+| Reports under `reports/<matrix-run-id>/<model-name>/` | Reports under `reports/<run-id>/` |
+| Generates run-scoped Promptfoo configs | Uses canonical `exports/promptfoo/` configs |
+| Aggregate per-model comparison summary | Single summary with default model results |
 
 ## Session Eval vs Promptfoo Eval
 
@@ -262,15 +317,41 @@ Initialize `.ai/evals/` directory at the project root.
 
 **Produces**:
 - `.ai/evals/manifest.yaml`
-- `.ai/evals/model-matrix.yaml` (with default opencode-go provider)
+- `.ai/evals/model-matrix.yaml` (from `templates/model-matrix.yaml` scaffold)
 - `.ai/evals/targets/`
 - `scripts/export-promptfoo.py`
 - `scripts/run-promptfoo-eval.py`
+- `scripts/run-eval-matrix.py`
+
+**Model Matrix Configuration (interactive)**:
+
+Before writing `.ai/evals/model-matrix.yaml`, the assistant SHALL ask the user for each configurable field. The assistant MUST show the default value for each field and state that pressing Enter / leaving the field blank uses the default. Fields and their defaults:
+
+| Field | Default |
+|---|---|
+| Provider name (`models[].provider`) | `opencode-go` |
+| Model name (`models[].model`) | `deepseek-v4-pro` |
+| Model entry name (`models[].name`) | `opencode-go-deepseek-v4-pro` |
+| Promptfoo provider id (`models[].promptfoo.id`) | `openai:chat:deepseek-v4-pro` |
+| Promptfoo label (`models[].promptfoo.label`) | `opencode-go/deepseek-v4-pro` |
+| API base URL (`models[].promptfoo.config.apiBaseUrl`) | `https://opencode.ai/zen/go/v1` |
+| API key env var (`models[].promptfoo.config.apiKeyEnvar`) | `OPENCODE_GO_API_KEY` |
+| Temperature (`models[].promptfoo.config.temperature`) | `0` |
+| Max tokens (`models[].promptfoo.config.max_tokens`) | `4096` |
+| Grader provider id (`models[].grader.id`) | `openai:chat:glm-5.1` |
+| Grader API base URL (`models[].grader.config.apiBaseUrl`) | `https://opencode.ai/zen/go/v1` |
+| Grader API key env var (`models[].grader.config.apiKeyEnvar`) | `OPENCODE_GO_API_KEY` |
+| Grader temperature (`models[].grader.config.temperature`) | `0` |
+| Grader max tokens (`models[].grader.config.max_tokens`) | `4096` |
 
 **Rules**:
 - Do NOT create cases during init.
 - Do NOT auto-scan project targets.
 - Do NOT migrate old root `evals/` automatically; migration is a separate step.
+- Do NOT ask for or write raw API key values; always use `apiKeyEnvar`.
+- The `headers.Accept-Encoding: identity` is pre-filled and MUST NOT be removed.
+- If the user leaves a field blank, use the default for that field only; do not override other filled fields.
+- After writing `model-matrix.yaml`, the assistant SHALL confirm the final values to the user.
 
 ### define-coverage
 
@@ -580,6 +661,7 @@ These templates are bundled with the skill package (`skills/sdlc-evalops/templat
 | `target-index.yaml` | Target registry scaffold |
 | `promptfooconfig.yaml` | Promptfoo config export |
 | `promptfoo-cases.yaml` | Promptfoo test cases export |
+| `model-matrix.yaml` | Model matrix scaffold with placeholder defaults |
 
 ## File Naming Convention
 

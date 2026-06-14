@@ -13,6 +13,7 @@ EVALS_ROOT = REPO_ROOT / ".ai" / "evals"
 TARGET_WS = EVALS_ROOT / "targets" / "skill.sdlc-orchestrator"
 EXPORT_SCRIPT = REPO_ROOT / "scripts" / "export-promptfoo.py"
 RUNNER_SCRIPT = REPO_ROOT / "scripts" / "run-promptfoo-eval.py"
+MATRIX_RUNNER_SCRIPT = REPO_ROOT / "scripts" / "run-eval-matrix.py"
 
 
 class TestEvalsRoot:
@@ -530,3 +531,121 @@ class TestEvalRunnerScript:
             .read_text(encoding="utf-8")
         assert "run-promptfoo-eval.py" in content, \
             "sdlc-evalops run steps must reference run-promptfoo-eval.py"
+
+
+class TestEvalMatrixRunner:
+    """Validate scripts/run-eval-matrix.py behavior and output contracts."""
+
+    def test_matrix_runner_script_exists(self):
+        assert MATRIX_RUNNER_SCRIPT.is_file(), \
+            "scripts/run-eval-matrix.py must exist"
+
+    def test_matrix_runner_reads_model_matrix(self):
+        content = MATRIX_RUNNER_SCRIPT.read_text(encoding="utf-8")
+        assert "model-matrix.yaml" in content, \
+            "matrix runner must read model-matrix.yaml"
+        assert "models" in content, \
+            "matrix runner must reference models[]"
+
+    def test_matrix_runner_dry_run_generates_plan(self):
+        result = subprocess.run(
+            [sys.executable, str(MATRIX_RUNNER_SCRIPT),
+             "skill.sdlc-orchestrator", "--dry-run"],
+            capture_output=True, text=True, cwd=str(REPO_ROOT),
+        )
+        assert result.returncode == 0, \
+            f"Matrix dry-run failed: {result.stderr}"
+        assert "Dry-run" in result.stderr, \
+            "Dry-run must print Dry-run mode indicator"
+        assert "skill.sdlc-orchestrator" in result.stderr, \
+            "Dry-run must reference the target"
+
+    def test_matrix_runner_dry_run_does_not_mutate_canonical_exports(self):
+        export_dir = TARGET_WS / "exports" / "promptfoo"
+        config_before = (export_dir / "promptfooconfig.yaml").read_text(encoding="utf-8")
+        cases_before = (export_dir / "cases.yaml").read_text(encoding="utf-8")
+        prompt_before = (export_dir / "prompt.md").read_text(encoding="utf-8")
+
+        result = subprocess.run(
+            [sys.executable, str(MATRIX_RUNNER_SCRIPT),
+             "skill.sdlc-orchestrator", "--dry-run"],
+            capture_output=True, text=True, cwd=str(REPO_ROOT),
+        )
+        assert result.returncode == 0
+
+        config_after = (export_dir / "promptfooconfig.yaml").read_text(encoding="utf-8")
+        cases_after = (export_dir / "cases.yaml").read_text(encoding="utf-8")
+        prompt_after = (export_dir / "prompt.md").read_text(encoding="utf-8")
+
+        assert config_before == config_after, \
+            "Canonical promptfooconfig.yaml must not be mutated by matrix dry-run"
+        assert cases_before == cases_after, \
+            "Canonical cases.yaml must not be mutated by matrix dry-run"
+        assert prompt_before == prompt_after, \
+            "Canonical prompt.md must not be mutated by matrix dry-run"
+
+    def test_matrix_runner_mentions_api_key_env_var_not_raw_key(self):
+        content = MATRIX_RUNNER_SCRIPT.read_text(encoding="utf-8")
+        assert "OPENCODE_GO_API_KEY" in content, \
+            "matrix runner must reference OPENCODE_GO_API_KEY"
+        assert "apiKey:" not in content, \
+            "matrix runner must not hardcode raw apiKey values"
+        assert "Canonical exports" in content, \
+            "matrix runner must state canonical exports are not mutated"
+
+    def test_matrix_runner_supports_all_flag(self):
+        content = MATRIX_RUNNER_SCRIPT.read_text(encoding="utf-8")
+        assert "--all" in content, \
+            "matrix runner must support --all flag"
+
+    def test_matrix_runner_mentions_from_auth(self):
+        content = MATRIX_RUNNER_SCRIPT.read_text(encoding="utf-8")
+        assert "--from-auth" in content, \
+            "matrix runner must support --from-auth"
+
+    def test_matrix_runner_handles_fail_fast(self):
+        content = MATRIX_RUNNER_SCRIPT.read_text(encoding="utf-8")
+        assert "fail_fast" in content, \
+            "matrix runner must read run_policy.fail_fast"
+
+    def test_matrix_runner_exits_nonzero_on_missing_target(self):
+        result = subprocess.run(
+            [sys.executable, str(MATRIX_RUNNER_SCRIPT),
+             "nonexistent.target", "--dry-run"],
+            capture_output=True, text=True, cwd=str(REPO_ROOT),
+        )
+        assert result.returncode != 0, \
+            "matrix runner must exit non-zero for nonexistent target"
+
+    def test_matrix_runner_exits_nonzero_on_missing_args(self):
+        result = subprocess.run(
+            [sys.executable, str(MATRIX_RUNNER_SCRIPT)],
+            capture_output=True, text=True, cwd=str(REPO_ROOT),
+        )
+        assert result.returncode != 0, \
+            "matrix runner must exit non-zero when no target or --all provided"
+
+    def test_evalops_skill_mentions_matrix_runner(self):
+        skill_paths = [
+            REPO_ROOT / "skills" / "sdlc-evalops" / "SKILL.md",
+            REPO_ROOT / ".opencode" / "skills" / "sdlc-evalops" / "SKILL.md",
+            REPO_ROOT / ".claude" / "skills" / "sdlc-evalops" / "SKILL.md",
+            REPO_ROOT / ".cursor" / "skills" / "sdlc-evalops" / "SKILL.md",
+        ]
+        for sp in skill_paths:
+            if sp.is_file():
+                content = sp.read_text(encoding="utf-8")
+                assert "run-eval-matrix.py" in content, \
+                    f"{sp.relative_to(REPO_ROOT)} must mention run-eval-matrix.py"
+
+    def test_evalops_skill_matrix_section_has_report_layout(self):
+        content = (REPO_ROOT / "skills" / "sdlc-evalops" / "SKILL.md") \
+            .read_text(encoding="utf-8")
+        assert "## Matrix Eval" in content, \
+            "SKILL.md must have Matrix Eval section"
+        assert "matrix-run-id" in content or "<matrix-run-id>" in content, \
+            "Matrix section must describe matrix run-id report layout"
+        assert "summary.md" in content, \
+            "Matrix section must reference aggregate summary.md"
+        assert "failures.yaml" in content, \
+            "Matrix section must reference failures.yaml"

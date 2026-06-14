@@ -14,6 +14,18 @@
       "area": "skill.sdlc-roadmap"
     },
     {
+      "id": "RM-EVAL-001",
+      "status": "done",
+      "title": "Standardize EvalOps Target Workspaces",
+      "stage": "mvp",
+      "priority": "p0",
+      "order": 10,
+      "depends_on": [],
+      "openspec_change": "standardize-ai-evalops-target-workspaces",
+      "patches": [],
+      "area": "workflow.ai-evalops"
+    },
+    {
       "id": "RM-SDLC-002",
       "status": "planned",
       "title": "Replan & Patch",
@@ -26,6 +38,20 @@
       "openspec_change": null,
       "patches": [],
       "area": "skill.sdlc-roadmap"
+    },
+    {
+      "id": "RM-EVAL-002",
+      "status": "done",
+      "title": "Add Eval Matrix Runner",
+      "stage": "v2",
+      "priority": "p1",
+      "order": 20,
+      "depends_on": [
+        "RM-EVAL-001"
+      ],
+      "openspec_change": "add-eval-matrix-runner",
+      "patches": [],
+      "area": "workflow.ai-evalops"
     },
     {
       "id": "RM-SDLC-003",
@@ -42,46 +68,6 @@
       "area": "skill.sdlc-roadmap"
     },
     {
-      "id": "RM-SDLC-004",
-      "status": "planned",
-      "title": "Backlog / GitHub Issues Integration",
-      "stage": "v4",
-      "priority": "p3",
-      "order": 40,
-      "depends_on": [
-        "RM-SDLC-003"
-      ],
-      "openspec_change": null,
-      "patches": [],
-      "area": "skill.sdlc-roadmap"
-    },
-    {
-      "id": "RM-EVAL-001",
-      "status": "ready",
-      "title": "Standardize EvalOps Target Workspaces",
-      "stage": "mvp",
-      "priority": "p0",
-      "order": 10,
-      "depends_on": [],
-      "openspec_change": "standardize-ai-evalops-target-workspaces",
-      "patches": [],
-      "area": "workflow.ai-evalops"
-    },
-    {
-      "id": "RM-EVAL-002",
-      "status": "planned",
-      "title": "Add Eval Matrix Runner",
-      "stage": "v2",
-      "priority": "p1",
-      "order": 20,
-      "depends_on": [
-        "RM-EVAL-001"
-      ],
-      "openspec_change": null,
-      "patches": [],
-      "area": "workflow.ai-evalops"
-    },
-    {
       "id": "RM-EVAL-003",
       "status": "planned",
       "title": "Integrate EvalOps With Skill Creation",
@@ -94,6 +80,20 @@
       "openspec_change": null,
       "patches": [],
       "area": "workflow.ai-evalops"
+    },
+    {
+      "id": "RM-SDLC-004",
+      "status": "planned",
+      "title": "Backlog / GitHub Issues Integration",
+      "stage": "v4",
+      "priority": "p3",
+      "order": 40,
+      "depends_on": [
+        "RM-SDLC-003"
+      ],
+      "openspec_change": null,
+      "patches": [],
+      "area": "skill.sdlc-roadmap"
     },
     {
       "id": "RM-EVAL-004",

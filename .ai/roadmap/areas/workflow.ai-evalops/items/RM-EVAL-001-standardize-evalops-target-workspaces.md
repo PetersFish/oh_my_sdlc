@@ -1,7 +1,7 @@
 ---
 id: RM-EVAL-001
 title: Standardize EvalOps Target Workspaces
-status: ready
+status: done
 stage: mvp
 priority: p0
 order: 10
@@ -9,7 +9,7 @@ depends_on: []
 openspec_change: standardize-ai-evalops-target-workspaces
 created_at: 2026-06-13
 started_at: null
-completed_at: null
+completed_at: 2026-06-14
 patches: []
 ---
 
@@ -63,4 +63,22 @@ Key decisions confirmed:
 
 # Completion Notes
 
-<filled when the item is marked done>
+OpenSpec change `standardize-ai-evalops-target-workspaces` archived 2026-06-13.
+
+**Completed:**
+- `.ai/evals/` root with `manifest.yaml`, `model-matrix.yaml`, and `targets/`.
+- `skill.sdlc-orchestrator` reference target workspace with 6 golden cases.
+- `scripts/export-promptfoo.py` and `scripts/run-promptfoo-eval.py`.
+- Promptfoo provider uses `openai:chat:` with `Accept-Encoding: identity`.
+- Target model (deepseek-v4-pro) and grader model (glm-5.1) separated.
+- All tests pass, 6/6 golden eval passes.
+
+**Scope changes from original plan:**
+- `.ai/evals/templates/` and `.ai/evals/schemas/` were removed (deferred until scripts consume them). Skill-owned templates remain at `skills/sdlc-evalops/templates/`.
+- `.ai/evals/runners/` was removed after `Accept-Encoding: identity` fix eliminated the need for a Python fallback provider.
+- Skill-owned `templates/model-matrix.yaml` was deferred to a follow-up fix (RM-EVAL-001 gap).
+
+**Deferred to later roadmap items:**
+- Full multi-model matrix runner → RM-EVAL-002
+- `skill-creator` integration → RM-EVAL-003
+- `meta-skill-lifecycle-governance` integration → RM-EVAL-004

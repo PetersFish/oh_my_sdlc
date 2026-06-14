@@ -270,8 +270,20 @@ Deviations:
 
 If satisfied, next step: `openspec-archive-change`.
 
-Consider: `sdlc-openspec-memory-sync` for durable facts, `sdlc-roadmap done RM-XXX` for roadmap items, or `sdlc-repository-memory-sync` for non-OpenSpec changes.
+Consider: `sdlc-openspec-memory-sync` for durable facts, or `sdlc-repository-memory-sync` for non-OpenSpec changes.
 ```
+
+### Post-Archive Roadmap Sync
+
+After `openspec-archive-change` completes and the change is moved to `openspec/changes/archive/`, the orchestrator SHALL check whether the archived change is linked to a roadmap item:
+
+1. Read `.ai/roadmap/areas/*/items/*.md` frontmatter fields.
+2. Find any item whose `openspec_change` matches the archived change id.
+3. If exactly one match is found: route to `sdlc-roadmap done <item-id>` to mark the roadmap item as done.
+4. If multiple matches are found: ask the user which item to mark done, then route to `sdlc-roadmap done <selected-id>`.
+5. If no match is found: report "No linked roadmap item found for this change" and continue.
+
+**This is a binding post-archive gate.** Do not skip it when the archived change has a roadmap link. The roadmap item's `status` SHALL transition to `done` and `completed_at` SHALL be set before the orchestrator considers the full lifecycle complete.
 
 ## Boundary Rules
 

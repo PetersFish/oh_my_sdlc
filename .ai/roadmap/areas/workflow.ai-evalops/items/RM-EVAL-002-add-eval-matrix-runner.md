@@ -1,16 +1,16 @@
 ---
 id: RM-EVAL-002
 title: Add Eval Matrix Runner
-status: planned
+status: done
 stage: v2
 priority: p1
 order: 20
 depends_on:
   - RM-EVAL-001
-openspec_change: null
+openspec_change: add-eval-matrix-runner
 created_at: 2026-06-13
-started_at: null
-completed_at: null
+started_at: 2026-06-14
+completed_at: 2026-06-14
 patches: []
 ---
 
@@ -45,4 +45,17 @@ Promote after RM-EVAL-001 establishes `.ai/evals/model-matrix.yaml` and target w
 
 # Completion Notes
 
-<filled when the item is marked done>
+OpenSpec change `add-eval-matrix-runner` archived 2026-06-14.
+
+**Completed:**
+- `scripts/run-eval-matrix.py` with CLI, manifest/model matrix loading, target/model resolution.
+- Per-model run-scoped Promptfoo config generation under reports (canonical exports preserved).
+- Per-model `summary.md`/`failures.yaml` and aggregate matrix summary with configured + observed metadata.
+- `run_policy.fail_fast` honored; non-zero exit on failures.
+- Matrix Eval section added to `sdlc-evalops` SKILL.md; distributed to all CLI copies.
+- 12 new tests in `TestEvalMatrixRunner`; 116/116 pytest pass.
+- Live matrix eval for `skill.sdlc-orchestrator`: 6/6 pass (3m7s).
+
+**Deferred:**
+- CI integration.
+- Model performance analytics beyond pass/fail counts.

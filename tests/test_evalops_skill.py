@@ -198,6 +198,45 @@ class TestEvalopsSkillTemplates:
         assert "ai_generated_cases_default_status: inbox" in content, \
             "Policy must default AI cases to inbox"
 
+    def test_model_matrix_template_exists(self):
+        path = EVALOPS_SKILL / "templates" / "model-matrix.yaml"
+        assert path.is_file(), f"Missing template: {path}"
+
+    def test_model_matrix_template_has_required_sections(self):
+        content = (EVALOPS_SKILL / "templates" / "model-matrix.yaml") \
+            .read_text(encoding="utf-8")
+        for section in ["schema_version", "models:", "environments:",
+                         "target_selection:", "run_policy:"]:
+            assert section in content, \
+                f"model-matrix template must have {section}"
+
+    def test_model_matrix_template_uses_placeholders(self):
+        content = (EVALOPS_SKILL / "templates" / "model-matrix.yaml") \
+            .read_text(encoding="utf-8")
+        assert "<<name>>" in content, "model-matrix template must use placeholder for name"
+        assert "<<provider>>" in content, "model-matrix template must use placeholder for provider"
+        assert "<<model>>" in content, "model-matrix template must use placeholder for model"
+        assert "<<promptfoo-provider-id>>" in content, \
+            "model-matrix template must use placeholder for promptfoo provider id"
+        assert "<<api-key-env-var>>" in content, \
+            "model-matrix template must use placeholder for apiKeyEnvar"
+
+    def test_model_matrix_template_has_accept_encoding_identity(self):
+        content = (EVALOPS_SKILL / "templates" / "model-matrix.yaml") \
+            .read_text(encoding="utf-8")
+        assert "Accept-Encoding: identity" in content, \
+            "model-matrix template must include Accept-Encoding: identity"
+
+    def test_model_matrix_template_uses_api_key_env_var_not_raw_key(self):
+        content = (EVALOPS_SKILL / "templates" / "model-matrix.yaml") \
+            .read_text(encoding="utf-8")
+        assert "apiKeyEnvar" in content, \
+            "model-matrix template must use apiKeyEnvar"
+        assert "apiKey:" not in content, \
+            "model-matrix template must not contain raw apiKey value"
+        assert "must not be written" in content.lower(), \
+            "model-matrix template must forbid raw API keys"
+
 
 class TestEvalopsSkillEvals:
     """Validate evals/evals.json covers routing scenarios."""
@@ -295,3 +334,19 @@ class TestEvalopsSkillWorkflowIntegration:
         lower = content.lower()
         assert "must not be written" in lower or "shall not" in lower, \
             "SKILL.md must forbid writing API keys to repo"
+
+    def test_skill_owned_templates_includes_model_matrix(self):
+        content = (EVALOPS_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        assert "| `model-matrix.yaml` |" in content, \
+            "Skill-Owned Templates table must include model-matrix.yaml"
+
+    def test_init_mentions_interactive_provider_configuration(self):
+        content = (EVALOPS_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        assert "Model Matrix Configuration (interactive)" in content, \
+            "init section must mention interactive model matrix configuration"
+        assert "openai:chat:deepseek-v4-pro" in content, \
+            "init section must list default promptfoo provider id"
+        assert "openai:chat:glm-5.1" in content, \
+            "init section must list default grader provider id"
+        assert "OPENCODE_GO_API_KEY" in content, \
+            "init section must list default apiKeyEnvar"
