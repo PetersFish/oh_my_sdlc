@@ -32,6 +32,29 @@
 
       '
 - vars:
+    input: '请验证 sdlc-evalops 相关的所有用例
+
+      '
+  assert:
+  - type: contains
+    value: eval
+  - type: contains
+    value: pytest
+  - type: not-contains
+    value: test_evalops_root.py
+  - type: contains
+    value: Promptfoo
+  - type: llm-rubric
+    value: 'The phrase "验证用例" is ambiguous: it could mean Promptfoo golden eval cases
+      under .ai/evals/targets/skill.sdlc-evalops/ OR pytest unit tests under tests/.
+      The orchestrator MUST recognize this ambiguity, STOP, and ask the user to disambiguate
+      ("Do you mean the Promptfoo golden eval cases or the pytest unit tests?") BEFORE
+      taking any action. It must NOT silently pick one and execute. This disambiguation
+      must happen at the route classification layer, not after the wrong route has
+      already been taken.
+
+      '
+- vars:
     input: '[Previous turn: orchestrator classified a cross-skill rename task as spec-driven-propose-flow]
 
       执行plan

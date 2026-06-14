@@ -195,6 +195,34 @@ When the user says "execute plan", "go ahead", "start", or equivalent after the 
 - For `spec-driven-incremental-flow`: continue by invoking `openspec-new-change`, or ask whether the user wants to explicitly skip OpenSpec.
 - If the user explicitly says to skip OpenSpec or directly execute despite the route, the orchestrator may proceed outside the selected route after acknowledging the opt-out.
 
+## Ambiguous Verification Requests
+
+When the user asks to verify, run cases, or test something using ambiguous phrasing that could refer to either EvalOps Promptfoo golden eval or pytest unit tests, the orchestrator MUST NOT silently pick one. It SHALL ask the user to disambiguate.
+
+### Trigger Signals
+
+The orchestrator SHALL check for ambiguity when the user's request contains BOTH of:
+
+1. An action word: "验证", "跑一下", "run", "verify", "test", "check", "eval"
+2. A target that appears in multiple domains: e.g., the name matches both an EvalOps target under `.ai/evals/targets/` and a test file under `tests/`, or the user mentions "用例"/"cases" without specifying "golden" or "pytest"
+
+### Disambiguation Table
+
+| Phrase | Could Mean | Ask |
+|--------|-----------|-----|
+| "验证 X 的用例" / "run X cases" | Promptfoo golden eval cases under `.ai/evals/targets/X/` OR pytest test files under `tests/test_X*.py` | "Do you mean the Promptfoo golden eval cases under `.ai/evals/`, or the pytest unit tests under `tests/`?" |
+| "跑一下 X 的评测" / "run X eval" | Promptfoo eval via `run-promptfoo-eval.py X` OR general code testing | "Run Promptfoo golden eval for this target, or something else?" |
+| "测试一下 X" / "test X" | pytest unit tests OR Promptfoo eval if X matches an EvalOps target | "Run pytest unit tests, or Promptfoo golden eval cases?" |
+
+### Rule
+
+If the domain of action (EvalOps vs pytest) is unclear from the user's phrasing, STOP and ask. Do NOT guess. The orchestrator SHALL explicitly list both possibilities in the question. After the user clarifies, proceed with the corresponding route:
+
+- User says "Promptfoo / golden eval / .ai/evals" → route as evalops-gated or delegate to `sdlc-evalops`.
+- User says "pytest / unit tests / tests/" → route as superpowers-direct or `test-driven-development`.
+
+This disambiguation SHALL happen BEFORE route classification, because the correct route depends on which kind of verification the user wants.
+
 ## Execution Path Choices
 
 When the orchestrator must ask the user to choose between execution paths (e.g., OpenSpec governance vs. direct execution):
@@ -415,4 +443,4 @@ User input:
 
 {{input}}
 
-Respond as the assistant would after applying `skill.sdlc-orchestrator`.
+Provide only the assistant's final user-facing reply — one natural message as the user would see it. Do NOT output chain of thought, hidden reasoning, "Thinking:" text, or any other internal deliberation. Output the direct reply only.
