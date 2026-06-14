@@ -131,6 +131,7 @@ The skill maintains assets under `.ai/evals/` at the project root:
 
 ```
 .ai/evals/
+  .gitignore              # auto-generated; ignores local run artifacts
   manifest.yaml           # global target registry and default policy
   model-matrix.yaml       # model matrix schema (runner deferred)
   targets/
@@ -144,7 +145,7 @@ The skill maintains assets under `.ai/evals/` at the project root:
         golden/
       exports/
         promptfoo/         # generated Promptfoo configs (derived)
-      reports/             # eval run outputs and summaries
+      reports/             # eval run outputs and summaries (git-ignored)
 ```
 
 `target-id` format: `<target-type>.<name>`. Examples:
@@ -296,6 +297,8 @@ Promptfoo exports MUST NOT rely on hidden global assertions (`defaultTest.assert
 
 Eval run outputs and final summaries live under `.ai/evals/targets/<target-id>/reports/`.
 
+Reports are local audit artifacts — they are written to repo-pinned paths for traceability and reproducibility, but are excluded from Git by `.ai/evals/.gitignore` (generated during init, pattern: `targets/*/reports/`). The canonical versioned assets are `manifest.yaml`, `coverage.yaml`, `cases/`, and `exports/`.
+
 The final golden eval report summary for an EvalOps-gated change SHALL include:
 - Target id
 - Case counts (total, passed, failed)
@@ -318,7 +321,17 @@ Initialize `.ai/evals/` directory at the project root.
 **Produces**:
 - `.ai/evals/manifest.yaml`
 - `.ai/evals/model-matrix.yaml` (from `templates/model-matrix.yaml` scaffold)
+- `.ai/evals/.gitignore` (see [Git-Ignored Artifacts](#git-ignored-artifacts))
 - `.ai/evals/targets/`
+
+**`.ai/evals/.gitignore` content**:
+
+```gitignore
+# EvalOps run outputs are local audit artifacts, not canonical source.
+targets/*/reports/
+```
+
+This file SHALL be created during init. It covers all EvalOps targets so that run reports stay repo-pinned on disk for local traceability but are excluded from Git by default.
 
 **Model Matrix Configuration (interactive)**:
 
@@ -597,6 +610,7 @@ These rules override any contextual ambiguity. Violating them produces an incorr
 8. **Global assertion pollution is prohibited.** Promptfoo exports MUST NOT add hidden `defaultTest.assert` that applies to all targets. Assertions belong in canonical cases or target policy.
 9. **Unconfigured llm-rubric is prohibited.** If a case uses `llm-rubric`, it MUST explicitly configure rubric text. Empty rubric assertions SHALL NOT be exported.
 10. **Session eval is not a substitute for Promptfoo golden eval.** Session eval captures and reviews cases; Promptfoo eval runs canonical golden exports. Final golden eval is required for EvalOps-gated AI behavior changes.
+11. **Reports are local audit artifacts, not canonical source.** Reports under `targets/*/reports/` are git-ignored by default via `.ai/evals/.gitignore`. Do NOT version reports — version `manifest.yaml`, `coverage.yaml`, `cases/`, and `exports/`.
 
 ## Workflow Integration
 

@@ -143,6 +143,21 @@ class TestEvalopsSkillHardRules:
         assert "golden" in lower, \
             "Pre-implementation gate must reference golden cases"
 
+    def test_reports_are_git_ignored(self):
+        content = (EVALOPS_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        assert "targets/*/reports/" in content, \
+            "SKILL.md must document git-ignore pattern for reports"
+        assert ".ai/evals/.gitignore" in content, \
+            "SKILL.md must mention .ai/evals/.gitignore"
+
+    def test_reports_are_local_not_canonical(self):
+        content = (EVALOPS_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        lower = content.lower()
+        assert "reports are local" in lower or "local audit" in lower, \
+            "Hard rule: reports are local audit artifacts"
+        assert "canonical" in lower, \
+            "Hard rule: must distinguish canonical from local artifacts"
+
 
 class TestEvalopsSkillTemplates:
     """Validate bundled templates exist and are well-formed."""
@@ -380,3 +395,8 @@ class TestEvalopsSkillWorkflowIntegration:
             "init section must list default grader provider id"
         assert "OPENCODE_GO_API_KEY" in content, \
             "init section must list default apiKeyEnvar"
+
+    def test_init_produces_gitignore(self):
+        content = (EVALOPS_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        assert "`.ai/evals/.gitignore` content" in content, \
+            "init Produces must list .gitignore with its content"

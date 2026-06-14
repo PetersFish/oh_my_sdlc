@@ -445,6 +445,14 @@ class TestOrchestratorSkillMentionsTargetWorkspaces:
         assert "model-matrix" in content.lower(), \
             "sdlc-evalops must mention model-matrix.yaml"
 
+    def test_evalops_skill_init_produces_gitignore(self):
+        content = (REPO_ROOT / "skills" / "sdlc-evalops" / "SKILL.md") \
+            .read_text(encoding="utf-8")
+        assert ".ai/evals/.gitignore" in content, \
+            "sdlc-evalops init must produce .ai/evals/.gitignore"
+        assert "targets/*/reports/" in content, \
+            "sdlc-evalops .gitignore must ignore targets/*/reports/"
+
     def test_orchestrator_skill_mentions_evalops_target_id(self):
         content = (REPO_ROOT / "skills" / "sdlc-orchestrator" / "SKILL.md") \
             .read_text(encoding="utf-8")

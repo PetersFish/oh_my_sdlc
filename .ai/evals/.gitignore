@@ -1,0 +1,2 @@
+# EvalOps run outputs are local audit artifacts, not canonical source.
+targets/*/reports/
