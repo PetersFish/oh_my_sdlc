@@ -139,6 +139,48 @@
       "parent_id": "skills",
       "confirmed_at": "2026-05-30T11:47:00Z"
     },
+    "skills/sdlc-evalops": {
+      "status": "accepted",
+      "memory_id": "skills/sdlc",
+      "memory_path": "modules/skills/sdlc.md",
+      "parent_id": "skills",
+      "confirmed_at": "2026-06-14T07:00:00Z"
+    },
+    "skills/sdlc-openspec-init": {
+      "status": "accepted",
+      "memory_id": "skills/sdlc",
+      "memory_path": "modules/skills/sdlc.md",
+      "parent_id": "skills",
+      "confirmed_at": "2026-06-14T07:00:00Z"
+    },
+    "skills/sdlc-orchestrator": {
+      "status": "accepted",
+      "memory_id": "skills/sdlc",
+      "memory_path": "modules/skills/sdlc.md",
+      "parent_id": "skills",
+      "confirmed_at": "2026-06-14T07:00:00Z"
+    },
+    "skills/sdlc-project-bootstrap": {
+      "status": "accepted",
+      "memory_id": "skills/sdlc",
+      "memory_path": "modules/skills/sdlc.md",
+      "parent_id": "skills",
+      "confirmed_at": "2026-06-14T07:00:00Z"
+    },
+    "skills/sdlc-roadmap": {
+      "status": "accepted",
+      "memory_id": "skills/sdlc",
+      "memory_path": "modules/skills/sdlc.md",
+      "parent_id": "skills",
+      "confirmed_at": "2026-06-14T07:00:00Z"
+    },
+    "skills/refresh-tech-article": {
+      "status": "accepted",
+      "memory_id": "skills/refresh-tech-article",
+      "memory_path": "modules/skills/refresh-tech-article.md",
+      "parent_id": "skills",
+      "confirmed_at": "2026-06-14T07:00:00Z"
+    },
     "tests": {
       "status": "accepted",
       "memory_id": "tests",

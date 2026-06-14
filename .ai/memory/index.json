@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-05-31T03:27:27.648221Z",
+  "generated_at": "2026-06-14T03:39:51.028666Z",
   "entries": [
     {
       "id": "skills/integration-notion-sync",
@@ -153,6 +153,34 @@
       "spec_paths": []
     },
     {
+      "id": "skills/refresh-tech-article",
+      "type": "module",
+      "path": "modules/skills/refresh-tech-article.md",
+      "title": "Refresh Tech Article Skill",
+      "summary": "Refreshes technical articles and local Markdown technical documents with current web research, generating timestamped refreshed copies and refresh reports.",
+      "tags": [
+        "tech-article",
+        "refresh",
+        "research",
+        "web"
+      ],
+      "updated_at": "2026-06-14T00:00:00Z",
+      "confidence": "high",
+      "status": "synced",
+      "parent_id": "skills",
+      "owned_paths": "",
+      "path_hints": "",
+      "keywords": [
+        "refresh",
+        "tech-article",
+        "web-research",
+        "document",
+        "outdated"
+      ],
+      "test_paths": [],
+      "spec_paths": []
+    },
+    {
       "id": "skills/research-general",
       "type": "module",
       "path": "modules/skills/research-general.md",
@@ -185,15 +213,18 @@
       "type": "module",
       "path": "modules/skills/sdlc.md",
       "title": "SDLC Workflow Skills",
-      "summary": "SDLC lifecycle management skills covering project bootstrap, OpenSpec init, repository memory init/load/sync/reset, and OpenSpec memory sync.",
+      "summary": "SDLC lifecycle management skills covering project bootstrap, OpenSpec init, workflow orchestration and routing, evalops quality gates, roadmap planning, repository memory init/load/sync/reset, and OpenSpec memory sync.",
       "tags": [
         "sdlc",
         "openspec",
         "bootstrap",
         "memory",
-        "workflow"
+        "workflow",
+        "orchestration",
+        "roadmap",
+        "evalops"
       ],
-      "updated_at": "2026-05-31T11:10:00Z",
+      "updated_at": "2026-06-14T07:00:00Z",
       "confidence": "high",
       "status": "synced",
       "parent_id": "skills",
@@ -209,9 +240,12 @@
         "init",
         "load",
         "sync",
-        "reset"
+        "reset",
+        "orchestration",
+        "roadmap",
+        "evalops"
       ],
-      "test_paths": [],
+      "test_paths": "",
       "spec_paths": []
     },
     {
@@ -329,6 +363,112 @@
         "tests/"
       ],
       "spec_paths": []
+    },
+    {
+      "id": "decisions/schema-simplification",
+      "type": "decisions",
+      "path": "decisions/schema-simplification.md",
+      "title": "Remove sdd-plus-superpowers custom schema",
+      "summary": "Replaced the custom sdd-plus-superpowers OpenSpec schema with the package-provided spec-driven schema. Workflow complexity (small/medium/large) is now handled by the sdlc-orchestrator skill via interaction flow (direct, propose, incremental) instead of custom schema variation.",
+      "tags": [
+        "schema",
+        "openspec",
+        "sdlc",
+        "orchestration"
+      ],
+      "updated_at": "2026-06-10T04:00:00Z",
+      "confidence": "high",
+      "status": "synced"
+    },
+    {
+      "id": "decisions/target-grader-model-separation",
+      "type": "decisions",
+      "path": "decisions/target-grader-model-separation.md",
+      "title": "Separate target eval model from grader model in Promptfoo config",
+      "summary": "The target model (deepseek-v4-pro) and the llm-rubric grader model (glm-5.1) are configured independently in model-matrix.yaml, driven by separate `promptfoo` and `grader` blocks. This avoids JSON extraction failures when reasoning models are used as graders.",
+      "tags": [
+        "promptfoo",
+        "grader",
+        "model-matrix",
+        "evalops",
+        "deepseek",
+        "glm"
+      ],
+      "updated_at": "2026-06-13T17:00:00Z",
+      "confidence": "high",
+      "status": "synced"
+    },
+    {
+      "id": "pitfalls/accept-encoding-identity-required",
+      "type": "pitfalls",
+      "path": "pitfalls/accept-encoding-identity-required.md",
+      "title": "opencode-go OpenAI-compatible provider fails with TypeError terminated without Accept-Encoding identity",
+      "summary": "Promptfoo's built-in openai:chat provider throws `TypeError: terminated` in 2-4 seconds when calling opencode-go endpoint if `Accept-Encoding: identity` is not set in provider config headers.",
+      "tags": [
+        "promptfoo",
+        "openai",
+        "opencode-go",
+        "undici",
+        "TypeError",
+        "Accept-Encoding",
+        "compression",
+        "node"
+      ],
+      "updated_at": "2026-06-13T17:00:00Z",
+      "confidence": "high",
+      "status": "synced"
+    },
+    {
+      "id": "pitfalls/deepseek-v4-pro-grader-json-extraction-failure",
+      "type": "pitfalls",
+      "path": "pitfalls/deepseek-v4-pro-grader-json-extraction-failure.md",
+      "title": "DeepSeek V4 Pro causes llm-rubric JSON extraction failures",
+      "summary": "Reasoning models like deepseek-v4-pro put output in `reasoning_content` instead of `content`, causing Promptfoo llm-rubric to fail with \"Could not extract JSON from llm-rubric response\".",
+      "tags": [
+        "promptfoo",
+        "llm-rubric",
+        "grader",
+        "deepseek",
+        "json",
+        "reasoning"
+      ],
+      "updated_at": "2026-06-13T17:00:00Z",
+      "confidence": "high",
+      "status": "synced"
+    },
+    {
+      "id": "pitfalls/exact-contains-assertions-brittle",
+      "type": "pitfalls",
+      "path": "pitfalls/exact-contains-assertions-brittle.md",
+      "title": "Exact phrase contains assertions are brittle for LLM outputs",
+      "summary": "Deterministic `contains` assertions like `\"OpenSpec proposal\"` fail when the model uses semantically equivalent but lexically different terms (e.g. \"OpenSpec change\", \"OpenSpec artifacts\").",
+      "tags": [
+        "promptfoo",
+        "assertion",
+        "contains",
+        "robustness",
+        "llm"
+      ],
+      "updated_at": "2026-06-13T08:50:00Z",
+      "confidence": "high",
+      "status": "synced"
+    },
+    {
+      "id": "pitfalls/reasoning-model-max-tokens-truncation",
+      "type": "pitfalls",
+      "path": "pitfalls/reasoning-model-max-tokens-truncation.md",
+      "title": "Low max_tokens causes output truncation for reasoning models",
+      "summary": "DeepSeek V4 Pro consumes reasoning tokens from the max_tokens budget, leaving insufficient quota for content. With max_tokens=2000, outputs can be truncated to as few as 136 characters.",
+      "tags": [
+        "promptfoo",
+        "max_tokens",
+        "deepseek",
+        "reasoning",
+        "truncation"
+      ],
+      "updated_at": "2026-06-13T08:50:00Z",
+      "confidence": "high",
+      "status": "synced"
     },
     {
       "id": "pitfalls/stale-global-skill-copies-break-openspec-init",

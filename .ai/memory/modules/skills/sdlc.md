@@ -6,10 +6,10 @@ summary: SDLC lifecycle management skills covering project bootstrap, OpenSpec i
 parent_id: skills
 sync_status: synced
 evidence_mode: discovery
-linked_commits: []
-linked_specs: [add-project-bootstrap-skill, sdlc-repository-memory-sync, sdlc-repository-memory-load, sdlc-repository-memory-init, sdlc-repository-memory-reset, sdlc-openspec-memory-sync, add-sdlc-roadmap-skill, simplify-sdlc-routing-schemas, standardize-ai-evalops-target-workspaces]
+linked_commits: [c23d413, c590d26]
+linked_specs: [add-project-bootstrap-skill, sdlc-repository-memory-sync, sdlc-repository-memory-load, sdlc-repository-memory-init, sdlc-repository-memory-reset, sdlc-openspec-memory-sync, add-sdlc-roadmap-skill, simplify-sdlc-routing-schemas, standardize-ai-evalops-target-workspaces, add-eval-matrix-runner]
 linked_sessions: []
-updated_at: 2026-06-13T08:50:00Z
+updated_at: 2026-06-14T07:00:00Z
 confidence: high
 tags: [sdlc, openspec, bootstrap, memory, workflow, orchestration, roadmap, evalops]
 owned_paths:
@@ -97,3 +97,4 @@ First sync after memory reset. Created from prefix-based child module discovery.
 Updated after `add-project-bootstrap-skill`: added bootstrap/init ownership and stale-global-copy pitfall.
 Updated after `simplify-sdlc-routing-schemas`: added sdlc-orchestrator and sdlc-roadmap ownership; removed sdd-plus-superpowers custom schema; OpenSpec defaults to package-provided spec-driven; schema installation step removed from sdlc-openspec-init.
 Updated after `standardize-ai-evalops-target-workspaces`: added sdlc-evalops ownership; recorded 3 Promptfoo eval pitfalls (grader model selection, max_tokens sizing, assertion design).
+Updated after `add-eval-matrix-runner` and `strengthen-sdlc-orchestrator-routing-compliance`: sdlc-evalops gained run-eval-matrix.py, run-promptfoo-eval.py, and model-matrix.yaml template; sdlc-orchestrator gained post-archive roadmap sync gate.
