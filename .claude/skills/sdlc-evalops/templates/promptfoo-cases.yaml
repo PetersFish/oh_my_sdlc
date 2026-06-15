@@ -1,7 +1,0 @@
-- vars:
-    input: |
-      <<user-input>>
-  assert:
-    - type: llm-rubric
-      value: |
-        <<semantic-evaluation-rubric>>
