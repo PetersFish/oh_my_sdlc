@@ -103,19 +103,46 @@ When the task involves long-term product planning.
 
 When an AI behavior target is being created or modified. New AI skill development and material AI behavior changes must pass through EvalOps gates before implementation.
 
-**EvalOps Gate Phases for AI Behavior Changes:**
+**EvalOps Lifecycle State Machine:**
 
-1. **Identify the target.** Determine the target id (e.g., `skill.sdlc-evalops`). If the target id is not yet known, target identification becomes the next EvalOps step.
-2. **Coverage before implementation.** Route to `sdlc-evalops` for coverage definition under `.ai/evals/targets/<target-id>/`. Implementation SHALL NOT begin before coverage is user-reviewed, unless the user explicitly confirms an EvalOps exception.
-3. **Human confirmation for golden promotion.** Candidate cases drafted by the assistant require human confirmation before promotion to golden. The orchestrator SHALL distinguish assistant-generated drafts from user-approved decisions for target registration, coverage acceptance, golden case promotion, and EvalOps exceptions.
-4. **Implementation.** Once EvalOps coverage is reviewed and required golden cases exist, route implementation through the selected OpenSpec or Superpowers path.
-5. **Final golden eval.** After implementation, run final golden eval for the affected target or explicitly report the blocked runner dependency before claiming completion.
+The orchestrator tracks EvalOps state across the full lifecycle for EvalOps-gated changes:
 
-**Action for specific scenarios:**
+```
+No coverage
+  → coverage reviewed (gate: user confirms coverage.yaml review)
+  → cases in inbox (gate: sdlc-evalops define-coverage + generate-cases)
+Cases in inbox
+  → cases accepted (gate: mandatory triage via sdlc-evalops)
+Cases accepted
+  → cases golden (gate: user confirms golden promotion)
+Coverage + golden cases
+  → implementation (gate: pre-implementation eval assets ready)
+Implementation
+  → pytest pass (gate: TDD verification)
+Pytest pass
+  → golden eval run (gate: run Promptfoo golden eval)
+Golden eval run
+  → golden eval pass → completion (gate: all evals green)
+Golden eval run
+  → golden eval fail → failure analysis (gate: user-confirmed fix plan)
+```
 
-- New target: `sdlc-evalops` coverage review and case generation.
-- Modified target: run existing golden eval if available.
-- Failure observed: offer `capture-regression` from `sdlc-evalops`.
+Each transition requires either:
+- **Human confirmation** (human gates: coverage acceptance, golden promotion, fix plan approval).
+- **Tool evidence** (automated gates: pytest output, golden eval output, export freshness check).
+
+**Gate Rules:**
+
+- **Coverage before implementation.** The orchestrator SHALL route to `sdlc-evalops` for coverage definition and review under `.ai/evals/targets/<target-id>/` before routing to implementation. Implementation SHALL NOT begin before coverage is user-reviewed, unless the user explicitly confirms an EvalOps exception.
+- **Triage before implementation.** The orchestrator SHALL NOT route to implementation until triage is complete for inbox cases in the current session. If unsorted inbox cases exist for the target, the orchestrator SHALL pause and ask whether to proceed to triage or continue without triaging the new cases.
+- **Pytest + golden eval before completion.** The orchestrator SHALL require both pytest pass and golden eval run before claiming completion for EvalOps-gated changes. If pytest fails, route to `systematic-debugging` or `test-driven-development`. If golden eval passes, proceed to completion with evidence.
+- **Golden eval failure blocks forward progress.** The orchestrator SHALL route to `sdlc-evalops` for failure classification and a user-confirmed fix plan. The orchestrator SHALL NOT permit direct fix or modification until the fix plan is confirmed.
+- **Completion cannot be claimed before golden eval pass.** The final implementation summary SHALL NOT claim completion if the EvalOps state is before `golden-eval-pass`. If golden eval has not been run, report "Golden eval not yet run for target `<target-id>`".
+
+**Exception handling:**
+- **User explicitly opts out**: the orchestrator MAY proceed after acknowledging the exception and naming the residual risk.
+- **No golden cases exist**: report "no golden cases available" as a blocked state (not a failure). Ask whether the user wants to proceed without golden eval.
+- **User accepts residual eval risk**: the orchestrator MAY proceed only as an explicit EvalOps exception; report the change as completed with known eval failures, not as golden-eval-pass.
 
 ### memory-sync
 
@@ -158,7 +185,11 @@ EvalOps exceptions MUST be explicit and human-confirmed:
 
 ## Final Golden Eval Reporting
 
-For EvalOps-gated changes, the final implementation summary SHALL report:
+For EvalOps-gated changes, the final implementation summary SHALL report golden eval status in one of three states:
+
+### Pass State (all golden cases pass)
+
+When golden eval passes and completion is claimed, the summary SHALL include:
 
 - Target id
 - Case counts (total, passed, failed)
@@ -166,9 +197,26 @@ For EvalOps-gated changes, the final implementation summary SHALL report:
 - Eval command used
 - Pass/fail result count
 - Report path (when available)
-- Any blocked runner dependency (if applicable)
 
-This evidence SHALL be included before claiming completion of an EvalOps-gated change.
+### Blocked State (golden eval cannot run)
+
+When golden eval cannot run, the summary SHALL report the specific blocked dependency and SHALL NOT claim the eval passed:
+
+- No golden cases exist for this target
+- Runner unavailable (Promptfoo not installed or not found)
+- API key not set (e.g., `OPENCODE_GO_API_KEY` environment variable missing)
+- Export script missing or failed
+
+The orchestrator SHALL ask whether the user wants to proceed without golden eval as an explicit EvalOps exception.
+
+### Failure State (golden eval returns failures)
+
+When golden eval returns failures, the summary SHALL report:
+
+- Failure count (total failed / total cases)
+- Reference to the failure classification from `sdlc-evalops` `eval-failure-analysis` workflow
+- The orchestrator SHALL NOT claim completion
+- The orchestrator SHALL route to `sdlc-evalops` for failure classification and a user-confirmed fix plan
 
 ## Plan Mode Handoff
 
@@ -347,6 +395,8 @@ Roadmap items that are ready for implementation return to the orchestrator for O
 | Classifies AI behavior targets | Defines coverage, cases, golden datasets |
 
 **Rule:** The orchestrator gates on EvalOps for AI behavior targets but does not manage eval assets itself.
+
+**Hard Rule:** The orchestrator SHALL NOT claim completion for an EvalOps-gated change if the EvalOps state is before `golden-eval-pass`. If golden eval has not been run, the blocked state MUST be reported explicitly ("Golden eval not yet run for target `<target-id>`"). Only the user may grant an explicit EvalOps exception to bypass this rule.
 
 ### Orchestrator vs Memory
 

@@ -168,6 +168,43 @@ class TestEvalopsSkillHardRules:
         assert "canonical" in lower, \
             "Hard rule: must distinguish canonical from local artifacts"
 
+    def test_capture_regression_has_mandatory_triage(self):
+        content = (EVALOPS_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        lower = content.lower()
+        assert "mandatory triage" in lower, \
+            "capture-regression workflow must reference mandatory triage step"
+        assert "question tool" in lower, \
+            "capture-regression workflow must reference question tool"
+
+    def test_capture_regression_has_separate_promotion(self):
+        content = (EVALOPS_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        lower = content.lower()
+        assert "separately ask whether to promote" in lower or \
+               "separate" in lower and "promote" in lower and "golden" in lower, \
+            "capture-regression must have separate golden promotion confirmation step"
+
+    def test_eval_failure_analysis_defines_five_categories(self):
+        content = (EVALOPS_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        lower = content.lower()
+        categories = [
+            "target-behavior-bug",
+            "case-expectation-bug",
+            "evaluator-issue",
+            "runner-config-issue",
+            "model-variance",
+        ]
+        for cat in categories:
+            assert cat.lower() in lower, \
+                f"eval-failure-analysis must define category: {cat}"
+
+    def test_hard_rule_eval_failure_classification_before_modification(self):
+        content = (EVALOPS_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        lower = content.lower()
+        assert "classification" in lower and "fix plan" in lower, \
+            "Hard rule must require classification + fix plan before modification"
+        assert "user-confirmed" in lower or "user confirmed" in lower, \
+            "Hard rule must require user confirmation before modification"
+
     def test_evalops_skill_does_not_have_internal_pytest_disambiguation(self):
         content = (EVALOPS_SKILL / "SKILL.md").read_text(encoding="utf-8")
         lower = content.lower()

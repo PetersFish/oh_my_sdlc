@@ -51,6 +51,33 @@
 
       '
 - vars:
+    input: 'research skill 的搜索结果又丢失了 ArXiv 来源。帮我把这个回归问题 capture 下来。
+
+      '
+  assert:
+  - type: llm-rubric
+    value: 'The assistant must recognize this as a capture-regression task. It must
+      follow the capture-regression workflow: identify the target, extract failure
+      context, ask for confirmation before writing, and default the case to inbox
+      (not golden). The assistant SHALL NOT skip ahead to implementation or unrelated
+      tasks.
+
+      '
+- vars:
+    input: 'promptfoo eval 跑完了，有两个 case failed。你帮我看看怎么修。
+
+      '
+  assert:
+  - type: llm-rubric
+    value: 'When golden eval returns failures, the assistant MUST classify each failure
+      into one of five categories (target-behavior-bug, case-expectation-bug, evaluator-issue,
+      runner-config-issue, model-variance), present a suggested fix plan, and require
+      user confirmation before modifying the target, case, evaluator, or runner config.
+      The assistant SHALL NOT auto-fix or modify any file until the user confirms
+      the fix plan.
+
+      '
+- vars:
     input: '刚才 research skill 又遗漏了成本分析，帮我把这个失败沉淀下来。
 
       '

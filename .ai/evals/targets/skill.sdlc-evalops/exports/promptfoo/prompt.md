@@ -7,7 +7,7 @@ The assistant is acting as the `skill.sdlc-evalops`.
 # Source: skills/sdlc-evalops/SKILL.md
 ---
 name: sdlc-evalops
-description: Use when managing durable AI eval assets under .ai/evals/: creating eval suites, capturing regression cases, defining coverage, triaging inbox/accepted/golden cases, exporting/running Promptfoo evals, or managing target workspaces. Trigger for eval case, golden dataset, coverage matrix, regression case, Promptfoo eval, 评测体系/评估用例/回归测试. Do NOT use for unit tests, single-bug debugging, or one-off model comparison without durable cases.
+description: "Use when managing durable AI eval assets under .ai/evals/: creating eval suites, capturing regression cases, defining coverage, triaging inbox/accepted/golden cases, exporting/running Promptfoo evals, or managing target workspaces. Trigger for eval case, golden dataset, coverage matrix, regression case, Promptfoo eval, 评测体系/评估用例/回归测试. Do NOT use for unit tests, single-bug debugging, or one-off model comparison without durable cases."
 ---
 
 # EvalOps Skill
@@ -89,8 +89,16 @@ Trigger: user reports a failure or unexpected behavior from a target.
 1. Extract input, actual output, and expected behavior from conversation context.
 2. Ask user: "Should I capture this as a regression case for <target-id>?"
 3. If confirmed: write to `.ai/evals/targets/<target-id>/cases/inbox/<case-id>.yaml`.
-4. Optionally offer to triage accept (not golden).
-5. Remind: promote is a separate step for golden.
+4. Mandatory triage: ask user to accept, revise, reject, or keep in inbox.
+   Use the question tool when available:
+   - Accept: move case to cases/accepted/.
+   - Revise: keep in inbox, ask user for specific changes needed.
+   - Reject: move case to cases/rejected/ with a reason recorded.
+   - Keep in inbox: leave case in inbox for later review.
+5. After accept: separately ask whether to promote the case to golden.
+   Use the question tool to present: "Promote <case-id> to golden?"
+   Promotion requires explicit user confirmation.
+6. Promote only on user confirmation; remind that accept does NOT equal golden.
 ```
 
 ### Workflow 3: run-regression
@@ -102,7 +110,41 @@ Trigger: user modified a target and wants to run eval.
 2. Verify `.ai/evals/targets/<target-id>/cases/golden/` has cases.
 3. Run `<sdlc-evalops-skill-dir>/scripts/run-promptfoo-eval.py <target-id>` which chains export freshness, promptfoo eval, and structured report writing.
 4. Summarize: pass/fail counts, failed cases with severity.
-5. If failures exist: suggest capture for new patterns, do NOT auto-fix.
+5. If failures exist: execute the [eval-failure-analysis](#workflow-4-eval-failure-analysis)
+   workflow. Classify each failure into one of five categories, present
+   a suggested fix plan, and require user confirmation before modifying
+   the target or eval assets. Do NOT auto-fix.
+```
+
+### Workflow 4: eval-failure-analysis
+
+Trigger: golden eval run returns failures (some cases did not pass).
+
+```
+1. Parse eval output to identify each failed case and its assertion results.
+2. Classify each failure into one of five categories:
+   - target-behavior-bug: The target skill/agent/prompt output is incorrect;
+     the eval expectation is correct.
+   - case-expectation-bug: The eval case's expected behavior is incorrect;
+     the target behavior is correct.
+   - evaluator-issue: The rubric, grader model, or assertion mechanism
+     produces invalid results (e.g., grader JSON extraction failure,
+     rubric-parsing error).
+   - runner-config-issue: The Promptfoo config, provider, API key,
+     or environment is misconfigured.
+   - model-variance: The target model output varies within acceptable
+     semantic range; the case assertion is too brittle.
+3. Present the classification with evidence from eval output.
+4. Propose a fix plan based on the classification:
+   - target-behavior-bug → fix the target skill/agent.
+   - case-expectation-bug → update the case expected section.
+   - evaluator-issue → fix rubric, grader, or assertion config.
+   - runner-config-issue → fix provider config, API key, environment.
+   - model-variance → loosen assertion (use rubric instead of contains).
+5. Present fix plan and require user confirmation before modifying anything.
+   Use the question tool when available to ask: "Proceed with this fix plan?"
+6. The assistant SHALL NOT modify target, case, evaluator, or runner config
+   until the user confirms the fix plan.
 ```
 
 ### Proactive Capture
@@ -444,11 +486,14 @@ Generate candidate eval cases from a coverage matrix.
 - If `coverage.review.reviewed_by_user` is not true: stop, ask user to review/refine coverage first.
 - If coverage is reviewed: generate candidates.
 
-**After generation, ask**:
-- Continue iterating on a coverage dimension?
-- Delete similar/overlapping candidates?
-- Supplement with real-failure-style cases?
-- Accept selected candidates?
+**After generation, mandatorily present a triage interaction**:
+- Summarize each candidate: id, coverage dimensions, severity.
+- Ask user to select one of (use question tool when available):
+  - Continue iterating: generate more candidates for a coverage dimension.
+  - Accept selected: specify which candidate ids to accept.
+  - Stop: end candidate generation without accepting any.
+- The assistant SHALL NOT auto-accept or skip triage even when coverage is reviewed.
+- After accept: separately ask whether to promote accepted cases to golden (requires explicit user confirmation).
 
 **Rules**:
 - AI-generated cases MUST enter inbox, never golden.
@@ -462,8 +507,10 @@ Sort inbox cases: accept, reject, revise, merge, split, or defer.
 
 **Produces**: Moves cases between inbox/ accepted/ rejected/ directories.
 
+**Mandatory**: After every `capture` or `generate-cases` that writes to inbox, triage is mandatory before proceeding to any other task. Use the question tool when available to present mutually exclusive options (accept/revise/reject/keep-in-inbox).
+
 **Rules**:
-- accept does NOT equal golden. Promote is a separate step.
+- accept does NOT equal golden. Promote is a separate step requiring separate explicit user confirmation.
 - Reject must record the reason.
 - Accepted cases must have at minimum: non-empty expected (must_include or rubric), non-empty coverage, and a severity.
 
@@ -628,12 +675,13 @@ These rules override any contextual ambiguity. Violating them produces an incorr
 3. **Golden Dataset MUST require human confirmation.** Promote only after user explicitly approves each case.
 4. **Coverage MUST be user-reviewed before candidate generation.** If `review.reviewed_by_user` is not true, stop and require review.
 5. **Promptfoo exports are derived artifacts, not source of truth.** Internal case YAML is canonical. Use `<sdlc-evalops-skill-dir>/scripts/export-promptfoo.py` to derive Promptfoo configs.
-6. **Eval failure MUST NOT trigger automatic fixes in MVP.** Failure may be caused by the target, the case, the expected, the evaluator, the context, or model variance.
+6. **Eval failure MUST trigger classification and a user-confirmed fix plan before any modification.** When golden eval returns failures, the assistant MUST classify each failure into one of five categories (target-behavior-bug, case-expectation-bug, evaluator-issue, runner-config-issue, model-variance), present a suggested fix plan, and require user confirmation before modifying the target, case, evaluator, or runner config. Failure may be caused by the target, the case, the expected, the evaluator, the context, or model variance.
 7. **capture defaults to inbox.** Even if the user calls it "regression-critical", it goes to inbox. Triage and promote are separate gates.
 8. **Global assertion pollution is prohibited.** Promptfoo exports MUST NOT add hidden `defaultTest.assert` that applies to all targets. Assertions belong in canonical cases or target policy.
 9. **Unconfigured llm-rubric is prohibited.** If a case uses `llm-rubric`, it MUST explicitly configure rubric text. Empty rubric assertions SHALL NOT be exported.
 10. **Session eval is not a substitute for Promptfoo golden eval.** Session eval captures and reviews cases; Promptfoo eval runs canonical golden exports. Final golden eval is required for EvalOps-gated AI behavior changes.
 11. **Reports are local audit artifacts, not canonical source.** Reports under `targets/*/reports/` are git-ignored by default via `.ai/evals/.gitignore`. Do NOT version reports — version `manifest.yaml`, `coverage.yaml`, `cases/`, and `exports/`.
+12. **Triage is mandatory after every capture or generate-cases.** After writing a case to inbox via `capture` or `generate-cases`, the assistant MUST offer triage (accept/revise/reject/keep-in-inbox) before proceeding to any other task. The assistant SHALL NOT proceed to implementation, golden eval, or any downstream workflow without first completing the triage interaction.
 13. **Semantic AI behavior cases MUST be rubric-first.** For skill routing, intent classification, workflow selection, and similar semantic behavior targets, use `expected.rubric` + `evaluators.llm_judge` as the primary assertion. Do NOT use broad `must_include`/`must_not_include` keyword checks for semantic behavior. Deterministic assertions are reserved for exact literals, structural constraints, and hard safety exclusions.
 
 ## Workflow Integration

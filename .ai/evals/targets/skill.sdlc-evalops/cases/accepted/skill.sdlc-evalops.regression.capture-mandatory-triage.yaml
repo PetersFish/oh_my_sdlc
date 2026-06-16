@@ -1,0 +1,26 @@
+id: skill.sdlc-evalops.regression.capture-mandatory-triage
+target:
+  id: skill.sdlc-evalops
+  type: skill
+  path: skills/sdlc-evalops/SKILL.md
+status: golden
+case_type: regression
+source: ai_suggested
+severity: high
+created_at: 2026-06-16
+coverage:
+  functional:
+    - trigger-routing
+    - human-confirmation-gates
+  quality:
+    - guardrail-enforcement
+input: |
+  research skill 的搜索结果又丢失了 ArXiv 来源。帮我把这个回归问题 capture 下来。
+expected:
+  rubric: |
+    The assistant must recognize this as a capture-regression task, extract failure context, and after capturing (or offering to capture) the case to inbox, MUST offer triage actions (accept/revise/reject/keep-in-inbox) before proceeding to any other task. The assistant SHALL NOT skip triage and move on to another topic. The assistant SHOULD use the question tool or present explicit numbered choices for triage.
+evaluators:
+  llm_judge:
+    enabled: true
+    rubric: |
+      Verify the assistant identifies this as capture-regression, extracts the failure context from the conversation, and after capturing writes to inbox. Critically: the assistant MUST then present triage actions (accept/revise/reject/keep-in-inbox) as a mandatory next step — either via a question tool interaction or explicit numbered text choices. Simply acknowledging the issue or offering to capture without presenting specific triage options is a failure. The assistant must demonstrate that triage follows capture as a mandatory gate, not an optional afterthought.

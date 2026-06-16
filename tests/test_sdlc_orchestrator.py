@@ -115,6 +115,41 @@ class TestOrchestratorQuestionTool:
             "SKILL.md must document text fallback when question tool is unavailable"
 
 
+class TestOrchestratorEvalOpsGates:
+    """Validate EvalOps lifecycle gate enforcement in SKILL.md."""
+
+    def test_evalops_gated_section_has_lifecycle_states(self):
+        content = (ORCHESTRATOR_SKILL / "SKILL.md").read_text(encoding="utf-8").lower()
+        assert "cases in inbox" in content, \
+            "evalops-gated must reference cases in inbox state"
+        assert "cases accepted" in content, \
+            "evalops-gated must reference cases accepted state"
+        assert "cases golden" in content, \
+            "evalops-gated must reference cases golden state"
+        assert "triage" in content, \
+            "evalops-gated must reference triage gate"
+        assert "golden eval" in content, \
+            "evalops-gated must reference golden eval gate"
+
+    def test_evalops_gated_mandates_golden_eval_before_completion(self):
+        content = (ORCHESTRATOR_SKILL / "SKILL.md").read_text(encoding="utf-8").lower()
+        assert "pytest" in content and "golden eval" in content, \
+            "evalops-gated must require both pytest and golden eval before completion"
+        assert "completion cannot be claimed" in content or \
+               "shall not claim completion" in content, \
+            "evalops-gated must forbid completion claim before golden eval pass"
+
+    def test_evalops_gated_blocks_on_golden_eval_failure(self):
+        content = (ORCHESTRATOR_SKILL / "SKILL.md").read_text(encoding="utf-8").lower()
+        assert "failure analysis" in content, \
+            "evalops-gated must route to failure analysis when golden eval fails"
+        assert "fix plan" in content, \
+            "evalops-gated must require fix plan after golden eval failure"
+        assert "shall not permit direct fix" in content or \
+               "not permit direct" in content, \
+            "evalops-gated must prohibit direct fix without failure analysis"
+
+
 class TestOrchestratorEvalOpsAssets:
     """Validate EvalOps coverage and golden cases exist for orchestrator."""
 

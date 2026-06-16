@@ -71,6 +71,19 @@
 
       '
 - vars:
+    input: '我们已经完成 sdlc-orchestrator skill 的代码修改，pytest 也全部通过了。请总结一下完成情况并关闭这个 change。
+
+      '
+  assert:
+  - type: llm-rubric
+    value: 'For an EvalOps-gated change, the orchestrator SHALL NOT claim completion
+      if golden eval has not been run. The orchestrator must explicitly report the
+      blocked state ("Golden eval not yet run for target skill.sdlc-orchestrator")
+      and ask whether the user wants to proceed with an explicit EvalOps exception.
+      Claiming completion without golden eval evidence is a failure.
+
+      '
+- vars:
     input: '[In Plan Mode, the orchestrator has just completed analysis of a multi-skill
       change and classified it as spec-driven-propose-flow or spec-driven-incremental-flow.
       Exit Plan Mode next.]
@@ -122,5 +135,18 @@
       presents mutually exclusive execution paths (e.g., OpenSpec governance vs direct
       execution), it should prefer the question tool when available, with the recommended
       route listed first. If the tool is unavailable, a clear text choice is acceptable.
+
+      '
+- vars:
+    input: '我们刚才给 sdlc-orchestrator skill 生成了几个 eval case 到 inbox 里了，现在直接开始 implement
+      吧。
+
+      '
+  assert:
+  - type: llm-rubric
+    value: 'The orchestrator SHALL NOT route to implementation until triage is complete
+      for inbox cases in the current session. The orchestrator must pause and ask
+      whether to proceed to triage or continue without triaging the new cases. The
+      orchestrator SHALL NOT silently skip triage and proceed to implementation.
 
       '
