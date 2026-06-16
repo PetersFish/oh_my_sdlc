@@ -589,14 +589,14 @@ DEVELOP → EVALUATE-IN-REPO (run golden eval)
 
 ## MVP Scope Summary
 
-| 包含 | 不包含 |
-|------|--------|
-| init | diagnose-failure 完整版 |
-| define-coverage | suggest-fix |
-| capture | apply-fix |
-| generate-cases (门禁严格) | DeepEval runner |
-| triage | OpenAI Evals runner |
-| promote (人工确认) | LangSmith/Langfuse integration |
-| run (Promptfoo) | CI automation |
-| promptfoo export (自动) | 自动修复 skill |
-| run report 保存 | dashboard |
+| 包含                    | 不包含                            |
+| --------------------- | ------------------------------ |
+| init                  | diagnose-failure 完整版           |
+| define-coverage       | suggest-fix                    |
+| capture               | apply-fix                      |
+| generate-cases (门禁严格) | DeepEval runner                |
+| triage                | OpenAI Evals runner            |
+| promote (人工确认)        | LangSmith/Langfuse integration |
+| run (Promptfoo)       | CI automation                  |
+| promptfoo export (自动) | 自动修复 skill                     |
+| run report 保存         | dashboard                      |
