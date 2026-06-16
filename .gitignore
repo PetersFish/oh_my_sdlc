@@ -30,6 +30,9 @@ htmlcov/
 .idea/
 .vscode/
 
+# Local git worktrees
+.worktrees/
+
 # Generated roadmap backup
 .ai/roadmap/index.json.bak
 
