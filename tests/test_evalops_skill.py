@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import yaml
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 EVALOPS_SKILL = REPO_ROOT / "skills" / "sdlc-evalops"
 
@@ -10,17 +12,12 @@ def _read_frontmatter(path: Path) -> dict:
     text = path.read_text(encoding="utf-8")
     if not text.startswith("---"):
         return {}
-    end = text.find("---", 3)
+    end = text.find("\n---", 3)
     if end == -1:
         return {}
-    raw = text[3:end].strip()
-    result = {}
-    for line in raw.split("\n"):
-        line = line.strip()
-        if ":" in line:
-            key, _, value = line.partition(":")
-            result[key.strip()] = value.strip()
-    return result
+    frontmatter = text[3:end].strip()
+    data = yaml.safe_load(frontmatter)
+    return data if isinstance(data, dict) else {}
 
 
 class TestEvalopsSkillFrontmatter:
@@ -331,10 +328,9 @@ class TestEvalopsSkillEvals:
             "Target coverage.yaml must exist"
 
     def test_target_has_required_directories(self):
-        for d in ["cases/inbox", "cases/accepted", "cases/rejected",
-                   "cases/golden", "exports/promptfoo", "reports"]:
+        for d in ["cases/golden", "exports/promptfoo"]:
             assert (self.EVALS_TARGET / d).is_dir(), \
-                f"Missing directory: {d}"
+                f"Missing tracked directory: {d}"
 
     def test_golden_cases_exist(self):
         golden = self.EVALS_TARGET / "cases" / "golden"
