@@ -1,0 +1,50 @@
+id: skill.sdlc-roadmap.regression.roadmap-status-query-triggering
+
+target:
+  id: skill.sdlc-roadmap
+  type: skill
+  path: skills/sdlc-roadmap/SKILL.md
+
+status: inbox
+case_type: regression
+source: observed
+severity: critical
+created_at: 2026-06-16
+
+coverage:
+  functional:
+    - roadmap-status-query-routing
+    - canonical-ai-roadmap-source
+    - avoid-design-doc-example-fallback
+    - completed-and-incomplete-status-reporting
+  edge_cases:
+    - chinese-status-query
+
+input: |
+  请列举未完成的roadmap
+
+actual: |
+  未找到实际 .ai/roadmap/ 目录，只能根据 docs/manual/design/roadmap.md 中的示例路线图列出未完成项，给出了 RM-004/RM-002/RM-003 示例数据。
+
+expected:
+  must_include:
+    - list.py
+    - .ai/roadmap
+  must_not_include:
+    - docs/manual/design/roadmap.md
+    - 示例
+    - RM-004
+  rubric: |
+    When the user asks about roadmap status or incomplete roadmap items in Chinese (e.g., "请列举未完成的roadmap"), the assistant must trigger the sdlc-roadmap skill, call skills/sdlc-roadmap/scripts/list.py --incomplete, and report real items from .ai/roadmap/. The assistant must NOT fall back to reading docs/manual/design/roadmap.md, OpenSpec history, or example tables. It must NOT invent item IDs from design documents when .ai/roadmap/ exists.
+
+evaluators:
+  rule_based:
+    contains:
+      - list.py
+    not_contains:
+      - docs/manual/design/roadmap.md
+      - RM-004
+  llm_judge:
+    enabled: true
+    rubric: |
+      Evaluate whether the response triggers sdlc-roadmap skill and uses list.py --incomplete to report real .ai/roadmap items. The response must not fall back to design doc examples, must not invent item IDs, and must correctly identify only non-done/non-cancelled/non-superseded items as incomplete. Real items from .ai/roadmap like RM-SDLC-002, RM-SDLC-003, RM-SDLC-004 should appear if they are not done.

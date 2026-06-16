@@ -46,9 +46,7 @@ Uses an **area-based layout**: each functional area (skill, workflow, domain, et
       patches/        # Lightweight patch records (V2+)
 ```
 
-The canonical runtime path is `.ai/roadmap/`. For existing projects, scripts will read legacy `.roadmap/` when `.ai/roadmap/` is absent. New initialization writes only to `.ai/roadmap/` — do not create new `.roadmap/` directories.
-
-Legacy flat layout (`.ai/roadmap/items/` directly under roadmap root) is read by scripts as a fallback with a migration warning, but new init creates area layout.
+The canonical runtime path is `.ai/roadmap/`. Only the area-based layout is supported.
 
 **Markdown item files are the source of truth.** `index.json` is a derived index. When they disagree, item files win. Use `rebuild_index.py` to repair with explicit user confirmation after reporting the diff.
 
@@ -168,15 +166,19 @@ Extract MVP/V2/V3/Later planning from conversation context and generate roadmap 
 
 Show the current roadmap as a structured summary.
 
-**Trigger:** User asks "what's the roadmap status", "roadmap list", or equivalent.
+**Trigger:** User asks "what's the roadmap status", "roadmap list", "列出未完成的roadmap", "roadmap有哪些", "列举roadmap", or equivalent.
+
+**Hard Rule:** The ONLY way to answer roadmap status questions is to run `skills/sdlc-roadmap/scripts/list.py` with appropriate flags. You MUST NOT read `.ai/roadmap/**/*.md` directly, read `index.json`, or infer status from design docs, OpenSpec history, or example tables. The script is the single source of truth for status queries.
 
 **Workflow:**
-1. Read items from `.ai/roadmap/areas/<area-id>/items/*.md` frontmatter (area view) or all areas (global view).
-2. Output a table: ID, Area, Status, Title, Stage, Order.
-3. Sort by `order` ascending.
-4. Highlight or mark the `active` item if any.
-5. If no items, say "No roadmap items found. Use roadmap capture to create items."
-6. `roadmap list` defaults to global view (all areas); `roadmap list <area-id>` shows a single area.
+1. Run `python3 skills/sdlc-roadmap/scripts/list.py` with appropriate flags:
+   - No flags: global view, all items (done + incomplete).
+   - `--incomplete`: exclude done, cancelled, superseded (returns ready/active/planned/idea/deferred).
+   - `--done`: show only done items.
+   - `--status planned,ready`: exact status match.
+   - `python3 skills/sdlc-roadmap/scripts/list.py <area-id>`: single area view, can combine with flags.
+2. Report the results to the user. Do not supplement from other sources.
+3. If the script outputs "No roadmap found", say "No roadmap found. Use 'roadmap init' to create the roadmap structure."
 
 ### roadmap promote RM-XXX
 

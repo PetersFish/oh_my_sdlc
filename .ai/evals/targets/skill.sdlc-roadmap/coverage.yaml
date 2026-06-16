@@ -1,0 +1,33 @@
+target:
+  id: skill.sdlc-roadmap
+  type: skill
+  path: skills/sdlc-roadmap/SKILL.md
+
+coverage:
+  functional:
+    - roadmap-status-query-routing
+    - canonical-ai-roadmap-source
+    - completed-and-incomplete-status-reporting
+    - avoid-design-doc-example-fallback
+    - list-py-status-filtering
+  quality:
+    - description-trigger-stability
+    - trigger-for-chinese-phrases
+  edge_cases:
+    - missing-ai-roadmap-causes-init-suggestion
+    - chinese-status-query
+  output_constraints:
+    - must-not-read-markdown-files-directly-for-status
+    - must-not-infer-from-docs-manual-design-roadmap
+    - must-call-list-py-for-status-queries
+
+risk_focus:
+  critical_failures:
+    - answering roadmap status without running list.py
+    - reading docs/manual/design/roadmap.md examples instead of real data
+    - failing to trigger sdlc-roadmap skill for status queries
+
+review:
+  status: reviewed
+  reviewed_by_user: true
+  last_reviewed_at: 2026-06-16T00:00:00Z

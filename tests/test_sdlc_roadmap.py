@@ -34,9 +34,12 @@ def _read_frontmatter(path: Path) -> dict:
     return result
 
 
-def _run_script(script: str, cwd: str, check: bool = False) -> subprocess.CompletedProcess:
+def _run_script(script: str, cwd: str, check: bool = False, args: list[str] | None = None) -> subprocess.CompletedProcess:
+    cmd = [sys.executable, str(SCRIPTS_DIR / script)]
+    if args:
+        cmd.extend(args)
     return subprocess.run(
-        [sys.executable, str(SCRIPTS_DIR / script)],
+        cmd,
         cwd=cwd,
         capture_output=True,
         text=True,
@@ -165,6 +168,17 @@ class TestRoadmapSkillFrontmatter(unittest.TestCase):
         self.assertIn("validate.py", content)
         self.assertIn("rebuild_index.py", content)
         self.assertIn("list.py", content)
+
+    def test_skill_md_mandates_list_py_for_status_queries(self) -> None:
+        content = (ROADMAP_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("list.py", content)
+        content_lower = content.lower()
+        self.assertTrue(
+            "the only way" in content_lower and "list.py" in content_lower,
+            "SKILL.md must mandate using list.py for status queries",
+        )
+        self.assertIn("no roadmap found", content_lower)
+        self.assertNotIn(".roadmap/", content)
 
 
 class TestTemplates(unittest.TestCase):
@@ -364,6 +378,68 @@ class TestListScript(unittest.TestCase):
         result = _run_script("list.py", self.tmpdir)
         self.assertEqual(result.returncode, 0)
         self.assertIn("No roadmap items", result.stdout)
+
+    def test_incomplete_filter_excludes_done(self) -> None:
+        _make_area_item(self.items_dir, "RM-TST-001", status="done", order=10)
+        _make_area_item(self.items_dir, "RM-TST-002", status="planned", order=20)
+        _make_area_item(self.items_dir, "RM-TST-003", status="ready", order=30)
+        result = _run_script("list.py", self.tmpdir, args=["--incomplete"])
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("RM-TST-002", result.stdout)
+        self.assertIn("RM-TST-003", result.stdout)
+        self.assertNotIn("RM-TST-001", result.stdout)
+
+    def test_incomplete_filter_excludes_cancelled_and_superseded(self) -> None:
+        _make_area_item(self.items_dir, "RM-TST-001", status="done", order=10)
+        _make_area_item(self.items_dir, "RM-TST-002", status="cancelled", order=20)
+        _make_area_item(self.items_dir, "RM-TST-003", status="superseded", order=30)
+        _make_area_item(self.items_dir, "RM-TST-004", status="planned", order=40)
+        result = _run_script("list.py", self.tmpdir, args=["--incomplete"])
+        self.assertEqual(result.returncode, 0)
+        self.assertNotIn("RM-TST-001", result.stdout)
+        self.assertNotIn("RM-TST-002", result.stdout)
+        self.assertNotIn("RM-TST-003", result.stdout)
+        self.assertIn("RM-TST-004", result.stdout)
+
+    def test_done_filter_only_shows_done(self) -> None:
+        _make_area_item(self.items_dir, "RM-TST-001", status="done", order=10)
+        _make_area_item(self.items_dir, "RM-TST-002", status="planned", order=20)
+        result = _run_script("list.py", self.tmpdir, args=["--done"])
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("RM-TST-001", result.stdout)
+        self.assertNotIn("RM-TST-002", result.stdout)
+
+    def test_status_filter_exact_match(self) -> None:
+        _make_area_item(self.items_dir, "RM-TST-001", status="planned", order=10)
+        _make_area_item(self.items_dir, "RM-TST-002", status="ready", order=20)
+        _make_area_item(self.items_dir, "RM-TST-003", status="done", order=30)
+        result = _run_script("list.py", self.tmpdir, args=["--status", "planned,ready"])
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("RM-TST-001", result.stdout)
+        self.assertIn("RM-TST-002", result.stdout)
+        self.assertNotIn("RM-TST-003", result.stdout)
+
+    def test_no_legacy_roadmap_fallback(self) -> None:
+        legacy_dir = Path(self.tmpdir) / ".roadmap"
+        (legacy_dir / "items").mkdir(parents=True)
+        (legacy_dir / "items" / "RM-LEGACY-001-test.md").write_text(
+            "---\nid: RM-LEGACY-001\ntitle: Legacy Item\nstatus: planned\n"
+            "stage: v1\npriority: p0\norder: 10\ndepends_on: []\n"
+            "openspec_change: null\npatches: []\n---\n# Goal\nLegacy.\n",
+        )
+        shutil.rmtree(self.roadmap_dir)
+        result = _run_script("list.py", self.tmpdir)
+        self.assertEqual(result.returncode, 0)
+        self.assertNotIn("RM-LEGACY-001", result.stdout)
+        self.assertIn("No roadmap found", result.stdout)
+
+    def test_default_list_shows_done_and_incomplete(self) -> None:
+        _make_area_item(self.items_dir, "RM-TST-001", status="done", order=10)
+        _make_area_item(self.items_dir, "RM-TST-002", status="planned", order=20)
+        result = _run_script("list.py", self.tmpdir)
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("RM-TST-001", result.stdout)
+        self.assertIn("RM-TST-002", result.stdout)
 
 
 class TestDistribution(unittest.TestCase):

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -10,7 +9,6 @@ AI_DIR = ".ai"
 MEMORY_SUBDIR = "memory"
 ROADMAP_SUBDIR = "roadmap"
 LEGACY_MEMORY_DIR = ".ai-memory"
-LEGACY_ROADMAP_DIR = ".roadmap"
 ROADMAP_AREAS_SUBDIR = "areas"
 ROADMAP_MANIFEST_FILE = "manifest.json"
 
@@ -35,16 +33,6 @@ def resolve_memory_dir(root: Path) -> RuntimePath:
     if canonical.exists():
         return RuntimePath(canonical, "canonical", False)
     legacy = root / LEGACY_MEMORY_DIR
-    if legacy.exists():
-        return RuntimePath(legacy, "legacy", True)
-    return RuntimePath(canonical, "canonical", False)
-
-
-def resolve_roadmap_dir(root: Path) -> RuntimePath:
-    canonical = canonical_roadmap_dir(root)
-    if canonical.exists():
-        return RuntimePath(canonical, "canonical", False)
-    legacy = root / LEGACY_ROADMAP_DIR
     if legacy.exists():
         return RuntimePath(legacy, "legacy", True)
     return RuntimePath(canonical, "canonical", False)
@@ -90,11 +78,6 @@ def has_area_layout(root: Path) -> bool:
     return roadmap_manifest_path(root).exists() and roadmap_areas_dir(root).is_dir()
 
 
-def has_flat_layout(root: Path) -> bool:
-    rdir = resolve_roadmap_dir(root).path
-    return (rdir / "items").is_dir()
-
-
 def discover_areas(root: Path) -> list[str]:
     areas_dir = roadmap_areas_dir(root)
     if not areas_dir.is_dir():
@@ -114,8 +97,6 @@ def find_project_root(start: Path | None = None) -> Path:
         if (parent / AI_DIR / ROADMAP_SUBDIR).is_dir():
             return parent
         if (parent / LEGACY_MEMORY_DIR).is_dir():
-            return parent
-        if (parent / LEGACY_ROADMAP_DIR).is_dir():
             return parent
         if (parent / "openspec").is_dir():
             return parent

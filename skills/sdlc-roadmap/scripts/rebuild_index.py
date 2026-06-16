@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Rebuild index.json from roadmap items.
 
-Supports area-based layout: aggregates areas/*/items/*.md into global index.json.
-Falls back to legacy flat layout: items/*.md.
+Aggregates .ai/roadmap/areas/*/items/*.md into global index.json.
+No legacy .roadmap/ fallback.
 """
 
 import json
@@ -16,11 +16,10 @@ if str(LIB_DIR) not in sys.path:
     sys.path.insert(0, str(LIB_DIR))
 
 from sdlc_runtime_paths import (  # noqa: E402
+    canonical_roadmap_dir,
     discover_areas,
     find_project_root,
     has_area_layout,
-    has_flat_layout,
-    resolve_roadmap_dir,
     roadmap_area_items_dir,
 )
 
@@ -113,7 +112,7 @@ def collect_items_from(items_dir: Path, area_id: str) -> list[dict]:
 
 def main():
     root = find_project_root()
-    roadmap_dir = resolve_roadmap_dir(root).path
+    roadmap_dir = canonical_roadmap_dir(root)
     index_path = roadmap_dir / "index.json"
 
     if index_path.exists():
@@ -129,12 +128,8 @@ def main():
             area_items = collect_items_from(items_dir, area_id)
             items.extend(area_items)
             print(f"Collected {len(area_items)} item(s) from area '{area_id}'")
-    elif has_flat_layout(root):
-        items_dir = roadmap_dir / "items"
-        items = collect_items_from(items_dir, "")
-        print(f"Collected {len(items)} item(s) from flat layout")
     else:
-        print("No roadmap items directory found.")
+        print("No .ai/roadmap/ area layout found. Use 'roadmap init' to create.")
         items = []
 
     items.sort(key=lambda x: x["order"])

@@ -5,6 +5,8 @@ targets:
     workspace: targets/skill.sdlc-orchestrator
   - id: skill.sdlc-evalops
     workspace: targets/skill.sdlc-evalops
+  - id: skill.sdlc-roadmap
+    workspace: targets/skill.sdlc-roadmap
 
 default_export_policy:
   promptfoo:

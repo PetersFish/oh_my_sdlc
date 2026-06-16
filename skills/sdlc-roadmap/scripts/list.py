@@ -2,13 +2,17 @@
 """Output a roadmap summary table from roadmap items.
 
 Usage:
-  list.py              # Global view: all areas
-  list.py <area-id>    # Single area view
+  list.py                     # Global view: all items
+  list.py <area-id>           # Single area view
+  list.py --incomplete        # Exclude done/cancelled/superseded
+  list.py --done              # Only done items
+  list.py --status planned,ready  # Only items with matching statuses
+  list.py <area-id> --incomplete  # Combined area + status filter
 
-Supports area-based layout (.ai/roadmap/areas/<area-id>/items/) and
-legacy flat layout (.ai/roadmap/items/) with a migration warning.
+Reads only from .ai/roadmap/ areas/ layout. No legacy .roadmap/ fallback.
 """
 
+import argparse
 import re
 import sys
 from pathlib import Path
@@ -18,13 +22,14 @@ if str(LIB_DIR) not in sys.path:
     sys.path.insert(0, str(LIB_DIR))
 
 from sdlc_runtime_paths import (  # noqa: E402
+    canonical_roadmap_dir,
     discover_areas,
     find_project_root,
     has_area_layout,
-    has_flat_layout,
-    resolve_roadmap_dir,
     roadmap_area_items_dir,
 )
+
+COMPLETED_STATUSES = {"done", "cancelled", "superseded"}
 
 
 def parse_frontmatter(content: str) -> dict:
@@ -102,6 +107,18 @@ def collect_items_from(items_dir: Path, area_id: str | None) -> list[dict]:
     return items
 
 
+def apply_status_filter(items: list[dict], status_filter: str | None,
+                        incomplete: bool, done_only: bool) -> list[dict]:
+    if incomplete:
+        return [i for i in items if i["status"] not in COMPLETED_STATUSES]
+    if done_only:
+        return [i for i in items if i["status"] == "done"]
+    if status_filter:
+        wanted = set(s.strip() for s in status_filter.split(","))
+        return [i for i in items if i["status"] in wanted]
+    return items
+
+
 def print_table(items: list[dict], title: str | None = None):
     if not items:
         print("No roadmap items found. Use 'roadmap capture' to create items.")
@@ -143,40 +160,48 @@ def print_table(items: list[dict], title: str | None = None):
 
 
 def main():
+    parser = argparse.ArgumentParser(description="List roadmap items from .ai/roadmap/")
+    parser.add_argument("area", nargs="?", default=None, help="Single area ID")
+    parser.add_argument("--incomplete", action="store_true",
+                        help="Exclude done/cancelled/superseded items")
+    parser.add_argument("--done", action="store_true",
+                        help="Show only done items")
+    parser.add_argument("--status", default=None,
+                        help="Comma-separated statuses (e.g. planned,ready)")
+    args = parser.parse_args()
+
+    if sum([bool(args.incomplete), bool(args.done), bool(args.status)]) > 1:
+        print("ERROR: --incomplete, --done, and --status are mutually exclusive")
+        return 1
+
     root = find_project_root()
 
-    area_filter = sys.argv[1] if len(sys.argv) > 1 else None
-
-    if has_area_layout(root):
-        if area_filter:
-            items = collect_items_from(roadmap_area_items_dir(root, area_filter), area_filter)
-            if not items:
-                print(f"Area '{area_filter}' not found or has no items.")
-                print(f"Available areas: {', '.join(discover_areas(root))}")
-                return 1
-            print_table(items, f"Roadmap - {area_filter}")
-        else:
-            all_items = []
-            for area_id in discover_areas(root):
-                area_items = collect_items_from(roadmap_area_items_dir(root, area_id), area_id)
-                all_items.extend(area_items)
-            all_items.sort(key=lambda x: x["order"])
-            if not all_items:
-                print("No roadmap items found. Use 'roadmap capture' to create items.")
-                return 0
-            print(f"## Roadmap (global, {len(all_items)} items)\n")
-            print_table(all_items)
+    if not has_area_layout(root):
+        print("No roadmap found. Use 'roadmap init' to create the roadmap structure.")
         return 0
 
-    if has_flat_layout(root):
-        print("WARNING: flat legacy layout detected (.ai/roadmap/items/).")
-        print("Consider migrating to area-based layout (.ai/roadmap/areas/<area-id>/items/).\n")
-        rdir = resolve_roadmap_dir(root).path
-        items = collect_items_from(rdir / "items", None)
-        print_table(items)
-        return 0
+    area_filter = args.area
 
-    print("No roadmap found. Use 'roadmap init' to create the roadmap structure.")
+    if area_filter:
+        items = collect_items_from(roadmap_area_items_dir(root, area_filter), area_filter)
+        if not items:
+            print(f"Area '{area_filter}' not found or has no items.")
+            print(f"Available areas: {', '.join(discover_areas(root))}")
+            return 1
+        items = apply_status_filter(items, args.status, args.incomplete, args.done)
+        print_table(items, f"Roadmap - {area_filter}")
+    else:
+        all_items = []
+        for area_id in discover_areas(root):
+            area_items = collect_items_from(roadmap_area_items_dir(root, area_id), area_id)
+            all_items.extend(area_items)
+        all_items.sort(key=lambda x: x["order"])
+        if not all_items:
+            print("No roadmap items found. Use 'roadmap capture' to create items.")
+            return 0
+        all_items = apply_status_filter(all_items, args.status, args.incomplete, args.done)
+        print(f"## Roadmap (global, {len(all_items)} items)\n")
+        print_table(all_items)
     return 0
 
 
