@@ -68,6 +68,18 @@
       "area": "skill.sdlc-roadmap"
     },
     {
+      "id": "RM-EVAL-003",
+      "status": "ready",
+      "title": "隐藏目录发现与 Roadmap Preflight 加固",
+      "stage": "v2",
+      "priority": "p0",
+      "order": 30,
+      "depends_on": [],
+      "openspec_change": null,
+      "patches": [],
+      "area": "workflow.ai-evalops"
+    },
+    {
       "id": "RM-SDLC-004",
       "status": "planned",
       "title": "Backlog / GitHub Issues Integration",
@@ -80,6 +92,34 @@
       "openspec_change": null,
       "patches": [],
       "area": "skill.sdlc-roadmap"
+    },
+    {
+      "id": "RM-EVAL-004",
+      "status": "planned",
+      "title": "Promptfoo Eval 加速：并发 + 增量运行",
+      "stage": "v2",
+      "priority": "p0",
+      "order": 40,
+      "depends_on": [
+        "RM-EVAL-003"
+      ],
+      "openspec_change": null,
+      "patches": [],
+      "area": "workflow.ai-evalops"
+    },
+    {
+      "id": "RM-EVAL-005",
+      "status": "planned",
+      "title": "Session Eval 触发器接入 sdlc-orchestrator",
+      "stage": "v2",
+      "priority": "p1",
+      "order": 50,
+      "depends_on": [
+        "RM-EVAL-004"
+      ],
+      "openspec_change": null,
+      "patches": [],
+      "area": "workflow.ai-evalops"
     }
   ]
 }
