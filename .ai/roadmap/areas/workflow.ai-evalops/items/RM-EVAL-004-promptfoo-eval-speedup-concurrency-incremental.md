@@ -1,7 +1,7 @@
 ---
 id: RM-EVAL-004
 title: "Promptfoo Eval 加速：并发 + 增量运行"
-status: planned
+status: idea
 stage: v2
 priority: p0
 order: 40
@@ -11,7 +11,6 @@ openspec_change: null
 created_at: 2026-06-16
 started_at: null
 completed_at: null
-patches: []
 ---
 
 # Goal

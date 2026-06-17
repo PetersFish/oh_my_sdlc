@@ -10,7 +10,6 @@ openspec_change: standardize-ai-evalops-target-workspaces
 created_at: 2026-06-13
 started_at: null
 completed_at: 2026-06-14
-patches: []
 ---
 
 # Goal

@@ -11,7 +11,6 @@ openspec_change: sdlc-roadmap-revision-workflow
 created_at: 2026-06-09
 started_at: 2026-06-17
 completed_at: null
-patches: []
 ---
 
 # Goal

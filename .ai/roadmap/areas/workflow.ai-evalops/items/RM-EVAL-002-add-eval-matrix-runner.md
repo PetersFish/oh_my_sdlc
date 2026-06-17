@@ -11,7 +11,6 @@ openspec_change: add-eval-matrix-runner
 created_at: 2026-06-13
 started_at: 2026-06-14
 completed_at: 2026-06-14
-patches: []
 ---
 
 # Goal

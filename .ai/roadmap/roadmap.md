@@ -19,5 +19,5 @@ Only active (not done) items are shown:
 Done items: RM-SDLC-001 (MVP), RM-EVAL-001, RM-EVAL-002.
 
 RM-SDLC-002 is active as OpenSpec change `sdlc-roadmap-revision-workflow`.
-Run `roadmap promote RM-EVAL-003` to promote the EvalOps skill creation integration item.
+Run `roadmap review RM-EVAL-003` to review the EvalOps skill creation integration item.
 Run `roadmap capture` to create roadmap items in a specific area.

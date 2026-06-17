@@ -1,7 +1,7 @@
 ---
 id: RM-SDLC-004
 title: Backlog / GitHub Issues Integration
-status: planned
+status: idea
 stage: v4
 priority: p3
 order: 40
@@ -11,7 +11,6 @@ openspec_change: null
 created_at: 2026-06-09
 started_at: null
 completed_at: null
-patches: []
 ---
 
 # Goal

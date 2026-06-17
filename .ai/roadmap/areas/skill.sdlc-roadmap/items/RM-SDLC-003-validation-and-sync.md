@@ -1,7 +1,7 @@
 ---
 id: RM-SDLC-003
 title: Validation & Sync
-status: planned
+status: idea
 stage: v3
 priority: p2
 order: 30
@@ -11,7 +11,6 @@ openspec_change: null
 created_at: 2026-06-09
 started_at: null
 completed_at: null
-patches: []
 ---
 
 # Goal

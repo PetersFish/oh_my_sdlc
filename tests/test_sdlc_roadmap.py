@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -26,11 +27,37 @@ def _read_frontmatter(path: Path) -> dict:
         return {}
     raw = text[3:end].strip()
     result = {}
+    in_folded = False
+    folded_key = None
+    folded_lines = []
     for line in raw.split("\n"):
-        line = line.strip()
-        if ":" in line:
-            key, _, value = line.partition(":")
-            result[key.strip()] = value.strip()
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+
+        if in_folded:
+            if re.match(r"^\w+:\s", stripped):
+                result[folded_key] = " ".join(folded_lines)
+                in_folded = False
+                folded_key = None
+                folded_lines = []
+            else:
+                folded_lines.append(stripped)
+                continue
+
+        if ":" in stripped:
+            key, _, value = stripped.partition(":")
+            key = key.strip()
+            value = value.strip()
+            if value in (">-", ">", "|-", "|"):
+                in_folded = True
+                folded_key = key
+                folded_lines = []
+            else:
+                result[key] = value
+
+    if in_folded and folded_key:
+        result[folded_key] = " ".join(folded_lines)
     return result
 
 
@@ -51,7 +78,6 @@ def _setup_area_roadmap(roadmap_dir: Path) -> Path:
     area_dir = roadmap_dir / "areas" / area_id
     (area_dir / "items").mkdir(parents=True)
     (area_dir / "revisions").mkdir(parents=True)
-    (area_dir / "patches").mkdir(parents=True)
 
     (roadmap_dir / "manifest.json").write_text(json.dumps({
         "version": 1,
@@ -64,7 +90,7 @@ def _setup_area_roadmap(roadmap_dir: Path) -> Path:
             "owner_path": "skills/test",
             "id_prefix": "RM-TST"
         }],
-        "global_view": {"include_statuses": ["ready", "active", "planned"], "sort": ["priority", "order"]}
+        "global_view": {"include_statuses": ["ready", "active", "idea"], "sort": ["priority", "order"]}
     }))
 
     (area_dir / "manifest.json").write_text(json.dumps({
@@ -86,7 +112,7 @@ def _make_area_item(items_dir: Path, item_id: str, **overrides) -> Path:
     frontmatter = {
         "id": item_id,
         "title": f"Test {item_id}",
-        "status": "planned",
+        "status": "idea",
         "stage": "v1",
         "priority": "p0",
         "order": 10,
@@ -95,7 +121,6 @@ def _make_area_item(items_dir: Path, item_id: str, **overrides) -> Path:
         "created_at": "2026-06-09",
         "started_at": None,
         "completed_at": None,
-        "patches": [],
     }
     frontmatter.update(overrides)
 
@@ -153,10 +178,10 @@ class TestRoadmapSkillFrontmatter(unittest.TestCase):
     def test_skill_md_describes_state_machine(self) -> None:
         content = (ROADMAP_SKILL / "SKILL.md").read_text(encoding="utf-8")
         self.assertIn("idea", content.lower())
-        self.assertIn("planned", content.lower())
         self.assertIn("ready", content.lower())
         self.assertIn("active", content.lower())
         self.assertIn("done", content.lower())
+        self.assertIn("cancelled", content.lower())
 
     def test_skill_md_describes_boundary_rules(self) -> None:
         content = (ROADMAP_SKILL / "SKILL.md").read_text(encoding="utf-8")
@@ -168,6 +193,7 @@ class TestRoadmapSkillFrontmatter(unittest.TestCase):
         self.assertIn("validate.py", content)
         self.assertIn("rebuild_index.py", content)
         self.assertIn("list.py", content)
+        self.assertIn("sync.py", content)
 
     def test_skill_md_mandates_list_py_for_status_queries(self) -> None:
         content = (ROADMAP_SKILL / "SKILL.md").read_text(encoding="utf-8")
@@ -179,6 +205,58 @@ class TestRoadmapSkillFrontmatter(unittest.TestCase):
         )
         self.assertIn("no roadmap found", content_lower)
         self.assertNotIn(".roadmap/", content)
+
+    def test_skill_md_documents_review_workflow(self) -> None:
+        content = (ROADMAP_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        content_lower = content.lower()
+        self.assertIn("roadmap review", content_lower)
+        self.assertIn("following checklist", content_lower)
+        self.assertIn("review passes", content_lower)
+        self.assertIn("review does not pass", content_lower)
+        self.assertIn("status: ready", content_lower)
+        self.assertIn("openspec_change:", content_lower)
+
+    def test_skill_md_documents_revision_commands(self) -> None:
+        content = (ROADMAP_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        content_lower = content.lower()
+        self.assertIn("roadmap revise", content_lower)
+        self.assertIn("snapshot-before-edit", content_lower)
+        self.assertIn("roadmap insert", content_lower)
+        self.assertIn("roadmap reorder", content_lower)
+        self.assertIn("roadmap cancel", content_lower)
+        self.assertIn("roadmap replan", content_lower)
+
+    def test_skill_md_documents_apply_start_transition(self) -> None:
+        content = (ROADMAP_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        content_lower = content.lower()
+        self.assertIn("apply-start", content_lower)
+        self.assertIn("ready", content_lower)
+        self.assertIn("active", content_lower)
+
+    def test_skill_md_documents_orchestrator_boundary(self) -> None:
+        content = (ROADMAP_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        content_lower = content.lower()
+        self.assertIn("sdlc-orchestrator", content_lower)
+        self.assertIn("post-archive gate", content_lower)
+
+    def test_skill_md_documents_revision_history_model(self) -> None:
+        content = (ROADMAP_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        content_lower = content.lower()
+        self.assertIn("changelog", content_lower)
+        self.assertIn("snapshot", content_lower)
+        self.assertIn("batch revision", content_lower)
+
+    def test_skill_md_documents_minimal_status_model(self) -> None:
+        content = (ROADMAP_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        content_lower = content.lower()
+        self.assertIn("core flow", content_lower)
+        self.assertIn("cancellation", content_lower)
+
+    def test_skill_md_documents_sync_py_as_diagnostic(self) -> None:
+        content = (ROADMAP_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("sync.py", content)
+        content_lower = content.lower()
+        self.assertIn("diagnostic", content_lower)
 
 
 class TestTemplates(unittest.TestCase):
@@ -209,7 +287,7 @@ class TestTemplates(unittest.TestCase):
 
     def test_item_template_has_required_frontmatter_fields(self) -> None:
         content = (ROADMAP_SKILL / "templates" / "item.md").read_text(encoding="utf-8")
-        for field in ["id:", "title:", "status:", "stage:", "priority:", "order:", "depends_on:", "openspec_change:", "patches:"]:
+        for field in ["id:", "title:", "status:", "stage:", "priority:", "order:", "depends_on:", "openspec_change:"]:
             self.assertIn(field, content, f"item template missing field: {field}")
 
     def test_decisions_template_exists(self) -> None:
@@ -251,7 +329,7 @@ class TestValidateScript(unittest.TestCase):
         self.assertIn("mismatch", result.stdout)
 
     def test_valid_no_errors(self) -> None:
-        _make_area_item(self.items_dir, "RM-TST-001", status="planned", order=10)
+        _make_area_item(self.items_dir, "RM-TST-001", status="ready", order=10)
         _make_area_item(self.items_dir, "RM-TST-002", status="done", order=20, depends_on=["RM-TST-001"])
         subprocess.run(
             [sys.executable, str(SCRIPTS_DIR / "rebuild_index.py")],
@@ -267,12 +345,11 @@ class TestValidateScript(unittest.TestCase):
         content = """---
 id: RM-TST-001
 title: Test Item
-status: planned
+status: idea
 stage: v1
 priority: p0
 depends_on: []
 openspec_change: null
-patches: []
 ---
 # Goal
 Missing order field."""
@@ -288,7 +365,7 @@ Missing order field."""
         self.assertIn("missing", result.stdout.lower())
 
     def test_item_id_must_match_area_prefix(self) -> None:
-        _make_area_item(self.items_dir, "RM-WRONG-001", status="planned", order=10)
+        _make_area_item(self.items_dir, "RM-WRONG-001", status="idea", order=10)
         result = _run_script("validate.py", self.tmpdir)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("prefix", result.stdout)
@@ -305,7 +382,7 @@ class TestRebuildIndexScript(unittest.TestCase):
         shutil.rmtree(self.tmpdir)
 
     def test_generate_from_area_items(self) -> None:
-        _make_area_item(self.items_dir, "RM-TST-001", status="planned", order=10)
+        _make_area_item(self.items_dir, "RM-TST-001", status="ready", order=10)
         _make_area_item(self.items_dir, "RM-TST-002", status="done", order=20)
         result = _run_script("rebuild_index.py", self.tmpdir)
         self.assertEqual(result.returncode, 0)
@@ -350,13 +427,13 @@ class TestListScript(unittest.TestCase):
 
     def test_list_output(self) -> None:
         _make_area_item(self.items_dir, "RM-TST-001", status="ready", order=10)
-        _make_area_item(self.items_dir, "RM-TST-002", status="planned", order=20)
+        _make_area_item(self.items_dir, "RM-TST-002", status="idea", order=20)
         result = _run_script("list.py", self.tmpdir)
         self.assertEqual(result.returncode, 0)
         self.assertIn("RM-TST-001", result.stdout)
         self.assertIn("RM-TST-002", result.stdout)
         self.assertIn("ready", result.stdout)
-        self.assertIn("planned", result.stdout)
+        self.assertIn("idea", result.stdout)
         pos1 = result.stdout.index("RM-TST-001")
         pos2 = result.stdout.index("RM-TST-002")
         self.assertLess(pos1, pos2)
@@ -381,7 +458,7 @@ class TestListScript(unittest.TestCase):
 
     def test_incomplete_filter_excludes_done(self) -> None:
         _make_area_item(self.items_dir, "RM-TST-001", status="done", order=10)
-        _make_area_item(self.items_dir, "RM-TST-002", status="planned", order=20)
+        _make_area_item(self.items_dir, "RM-TST-002", status="idea", order=20)
         _make_area_item(self.items_dir, "RM-TST-003", status="ready", order=30)
         result = _run_script("list.py", self.tmpdir, args=["--incomplete"])
         self.assertEqual(result.returncode, 0)
@@ -389,31 +466,29 @@ class TestListScript(unittest.TestCase):
         self.assertIn("RM-TST-003", result.stdout)
         self.assertNotIn("RM-TST-001", result.stdout)
 
-    def test_incomplete_filter_excludes_cancelled_and_superseded(self) -> None:
+    def test_incomplete_filter_excludes_cancelled(self) -> None:
         _make_area_item(self.items_dir, "RM-TST-001", status="done", order=10)
         _make_area_item(self.items_dir, "RM-TST-002", status="cancelled", order=20)
-        _make_area_item(self.items_dir, "RM-TST-003", status="superseded", order=30)
-        _make_area_item(self.items_dir, "RM-TST-004", status="planned", order=40)
+        _make_area_item(self.items_dir, "RM-TST-003", status="idea", order=30)
         result = _run_script("list.py", self.tmpdir, args=["--incomplete"])
         self.assertEqual(result.returncode, 0)
         self.assertNotIn("RM-TST-001", result.stdout)
         self.assertNotIn("RM-TST-002", result.stdout)
-        self.assertNotIn("RM-TST-003", result.stdout)
-        self.assertIn("RM-TST-004", result.stdout)
+        self.assertIn("RM-TST-003", result.stdout)
 
     def test_done_filter_only_shows_done(self) -> None:
         _make_area_item(self.items_dir, "RM-TST-001", status="done", order=10)
-        _make_area_item(self.items_dir, "RM-TST-002", status="planned", order=20)
+        _make_area_item(self.items_dir, "RM-TST-002", status="idea", order=20)
         result = _run_script("list.py", self.tmpdir, args=["--done"])
         self.assertEqual(result.returncode, 0)
         self.assertIn("RM-TST-001", result.stdout)
         self.assertNotIn("RM-TST-002", result.stdout)
 
     def test_status_filter_exact_match(self) -> None:
-        _make_area_item(self.items_dir, "RM-TST-001", status="planned", order=10)
+        _make_area_item(self.items_dir, "RM-TST-001", status="idea", order=10)
         _make_area_item(self.items_dir, "RM-TST-002", status="ready", order=20)
         _make_area_item(self.items_dir, "RM-TST-003", status="done", order=30)
-        result = _run_script("list.py", self.tmpdir, args=["--status", "planned,ready"])
+        result = _run_script("list.py", self.tmpdir, args=["--status", "idea,ready"])
         self.assertEqual(result.returncode, 0)
         self.assertIn("RM-TST-001", result.stdout)
         self.assertIn("RM-TST-002", result.stdout)
@@ -423,9 +498,9 @@ class TestListScript(unittest.TestCase):
         legacy_dir = Path(self.tmpdir) / ".roadmap"
         (legacy_dir / "items").mkdir(parents=True)
         (legacy_dir / "items" / "RM-LEGACY-001-test.md").write_text(
-            "---\nid: RM-LEGACY-001\ntitle: Legacy Item\nstatus: planned\n"
+            "---\nid: RM-LEGACY-001\ntitle: Legacy Item\nstatus: idea\n"
             "stage: v1\npriority: p0\norder: 10\ndepends_on: []\n"
-            "openspec_change: null\npatches: []\n---\n# Goal\nLegacy.\n",
+            "openspec_change: null\n---\n# Goal\nLegacy.\n",
         )
         shutil.rmtree(self.roadmap_dir)
         result = _run_script("list.py", self.tmpdir)
@@ -435,11 +510,70 @@ class TestListScript(unittest.TestCase):
 
     def test_default_list_shows_done_and_incomplete(self) -> None:
         _make_area_item(self.items_dir, "RM-TST-001", status="done", order=10)
-        _make_area_item(self.items_dir, "RM-TST-002", status="planned", order=20)
+        _make_area_item(self.items_dir, "RM-TST-002", status="idea", order=20)
         result = _run_script("list.py", self.tmpdir)
         self.assertEqual(result.returncode, 0)
         self.assertIn("RM-TST-001", result.stdout)
         self.assertIn("RM-TST-002", result.stdout)
+
+
+class TestSyncScript(unittest.TestCase):
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.roadmap_dir = Path(self.tmpdir) / ".ai" / "roadmap"
+        self.roadmap_dir.mkdir(parents=True)
+        self.items_dir = _setup_area_roadmap(self.roadmap_dir)
+
+    def tearDown(self):
+        shutil.rmtree(self.tmpdir)
+
+    def test_archive_date_prefix_match_detected(self) -> None:
+        _make_area_item(
+            self.items_dir, "RM-TST-001",
+            status="active",
+            openspec_change="test-change",
+        )
+        archive_dir = (
+            Path(self.tmpdir) / "openspec" / "changes" / "archive"
+            / "2026-06-15-test-change"
+        )
+        archive_dir.mkdir(parents=True)
+        (archive_dir / ".openspec.yaml").write_text("status: archived\n")
+        result = _run_script("sync.py", self.tmpdir)
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("archived", result.stdout)
+        self.assertIn("RM-TST-001", result.stdout)
+
+    def test_no_items_no_mismatches(self) -> None:
+        result = _run_script("sync.py", self.tmpdir)
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("No roadmap items", result.stdout)
+
+    def test_item_without_openspec_change_no_mismatch(self) -> None:
+        _make_area_item(
+            self.items_dir, "RM-TST-001",
+            status="active",
+            openspec_change=None,
+        )
+        result = _run_script("sync.py", self.tmpdir)
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("No lifecycle mismatches", result.stdout)
+
+    def test_exact_archive_dir_name_match(self) -> None:
+        _make_area_item(
+            self.items_dir, "RM-TST-001",
+            status="active",
+            openspec_change="exact-name",
+        )
+        archive_dir = (
+            Path(self.tmpdir) / "openspec" / "changes" / "archive" / "exact-name"
+        )
+        archive_dir.mkdir(parents=True)
+        (archive_dir / ".openspec.yaml").write_text("status: archived\n")
+        result = _run_script("sync.py", self.tmpdir)
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("archived", result.stdout)
+        self.assertIn("RM-TST-001", result.stdout)
 
 
 class TestDistribution(unittest.TestCase):

@@ -20,7 +20,7 @@
     }
   ],
   "global_view": {
-    "include_statuses": ["active", "ready", "planned"],
+    "include_statuses": ["active", "ready", "idea"],
     "sort": ["priority", "order"]
   }
 }

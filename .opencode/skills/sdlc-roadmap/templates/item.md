@@ -1,7 +1,7 @@
 ---
 id: RM-PREFIX-XXX
 title: "<item-title>"
-status: planned
+status: idea
 stage: mvp
 priority: p0
 order: 10
@@ -10,7 +10,6 @@ openspec_change: null
 created_at: YYYY-MM-DD
 started_at: null
 completed_at: null
-patches: []
 ---
 
 # Goal
@@ -37,8 +36,12 @@ patches: []
 
 # Promotion Notes
 
-<context for when this item gets promoted to an OpenSpec change: suggested change-id, key constraints, design references>
+<context for when this item gets reviewed and promoted to an OpenSpec change: suggested change-id, key constraints, design references>
 
 # Completion Notes
 
 <filled when the item is marked done: what was accomplished, deferred items, lessons learned>
+
+# Design Reference
+
+<optional pointer to design docs>

@@ -28,9 +28,9 @@ from sdlc_runtime_paths import (  # noqa: E402
     roadmap_manifest_path,
 )
 
-VALID_STATUSES = {"idea", "planned", "ready", "active", "done", "deferred", "cancelled", "superseded"}
+VALID_STATUSES = {"idea", "ready", "active", "done", "cancelled"}
 VALID_PRIORITIES = {"p0", "p1", "p2", "p3"}
-REQUIRED_FM_FIELDS = {"id", "title", "status", "stage", "priority", "order", "depends_on", "openspec_change", "patches"}
+REQUIRED_FM_FIELDS = {"id", "title", "status", "stage", "priority", "order", "depends_on", "openspec_change"}
 REQUIRED_ROOT_MANIFEST_KEYS = {"version", "areas"}
 REQUIRED_AREA_MANIFEST_KEYS = {"id", "kind", "title", "owner_path"}
 REQUIRED_ITEM_KEYS_PER_AREA = {"id_prefix"}
@@ -127,6 +127,18 @@ def validate_area_layout(root: Path, roadmap_dir: Path, errors: list[str]):
 
     if "version" in manifest and not isinstance(manifest["version"], int):
         errors.append("root manifest.json: 'version' must be an integer")
+
+    global_view = manifest.get("global_view", {})
+    if isinstance(global_view, dict):
+        include_statuses = global_view.get("include_statuses", [])
+        if isinstance(include_statuses, list):
+            for s in include_statuses:
+                if s not in VALID_STATUSES:
+                    errors.append(
+                        f"root manifest.json: global_view.include_statuses "
+                        f"contains invalid status '{s}' "
+                        f"(valid: {sorted(VALID_STATUSES)})"
+                    )
 
     area_ids_from_disk = set(discover_areas(root))
     if "areas" in manifest and isinstance(manifest["areas"], list):

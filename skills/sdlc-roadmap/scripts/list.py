@@ -29,7 +29,7 @@ from sdlc_runtime_paths import (  # noqa: E402
     roadmap_area_items_dir,
 )
 
-COMPLETED_STATUSES = {"done", "cancelled", "superseded"}
+COMPLETED_STATUSES = {"done", "cancelled"}
 
 
 def parse_frontmatter(content: str) -> dict:

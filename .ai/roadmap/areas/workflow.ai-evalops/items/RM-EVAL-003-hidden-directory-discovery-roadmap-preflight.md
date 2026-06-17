@@ -10,7 +10,6 @@ openspec_change: null
 created_at: 2026-06-16
 started_at: null
 completed_at: null
-patches: []
 ---
 
 # Goal

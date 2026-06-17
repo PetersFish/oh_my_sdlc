@@ -10,7 +10,6 @@ openspec_change: add-sdlc-roadmap-skill
 created_at: 2026-06-09
 started_at: 2026-06-09
 completed_at: 2026-06-14
-patches: []
 ---
 
 # Goal

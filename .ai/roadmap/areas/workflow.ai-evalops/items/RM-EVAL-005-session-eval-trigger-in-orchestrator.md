@@ -1,7 +1,7 @@
 ---
 id: RM-EVAL-005
 title: "Session Eval 触发器接入 sdlc-orchestrator"
-status: planned
+status: idea
 stage: v2
 priority: p1
 order: 50
@@ -11,7 +11,6 @@ openspec_change: null
 created_at: 2026-06-16
 started_at: null
 completed_at: null
-patches: []
 ---
 
 # Goal
