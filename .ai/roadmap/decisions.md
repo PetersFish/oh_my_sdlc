@@ -75,3 +75,19 @@ Skill 名称为 `sdlc-roadmap`（而非 `roadmap-manager`）。目录：`skills/
 ### Rationale
 
 与现有 `sdlc-*` 技能族（sdlc-project-bootstrap, sdlc-openspec-init, sdlc-repository-memory-*）保持命名一致，触发边界更清晰，属于 SDLC 工作流编排层。
+
+---
+
+## Decision: V2 收敛为 Roadmap Revision Workflow，不做 Patch Log
+
+Date: 2026-06-17
+
+### Decision
+
+RM-SDLC-002 不再引入 patch capture/done/escalate 或独立 `patches/` 记录模型。V2 收敛为 roadmap revision workflow：`review`、`revise`、`insert`、`reorder`、`cancel`、`replan`，并通过 `revisions/changelog.md` 和必要的 snapshots 保留追溯信息。
+
+状态模型收敛为 `idea | ready | active | done | cancelled`。`planned`、`deferred`、`superseded` 暂不作为 V2 workflow 状态。
+
+### Rationale
+
+用户目标是修正 roadmap 定义和实现顺序，而不是管理轻量 patch 工作项。独立 patch 模型会把 roadmap 扩展成小任务系统，增加校验、同步和状态复杂度。revision workflow 更贴合“直接修改 roadmap 文件，但保留日志和必要历史版本”的需求。

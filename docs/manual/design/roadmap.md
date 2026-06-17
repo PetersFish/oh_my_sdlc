@@ -1642,24 +1642,26 @@ GitHub Issues 同步
 
 ---
 
-### V2：Replan & Patch
+### V2：Roadmap Revision Workflow
 
 目标：
 
 ```text
-解决中途调整和小优化追踪问题。
+解决 roadmap 评审、修正、插入、重排、取消和整体重规划问题。
 ```
 
 能力：
 
 ```text
-- replan
-- defer
+- review
+- revise
+- insert
+- reorder
 - cancel
-- supersede
-- patch.capture
-- patch.done
-- patch.escalate
+- replan
+- orchestrator post-archive gate 路由到 roadmap done
+- review 通过后创建 OpenSpec artifacts 并标记 ready
+- apply 开始后标记 active
 ```
 
 ---
@@ -1679,7 +1681,7 @@ GitHub Issues 同步
 - roadmap.md 重建
 - item 状态一致性检查
 - OpenSpec change 状态同步
-- patch 关联检查
+- revision/changelog 结构检查
 ```
 
 ---
@@ -1698,7 +1700,7 @@ GitHub Issues 同步
 - Backlog.md task 映射
 - GitHub issue 映射
 - roadmap item → issue
-- patch → issue comment
+- revision/changelog → issue comment
 - OpenSpec change → PR / issue link
 ```
 

@@ -27,15 +27,15 @@
     },
     {
       "id": "RM-SDLC-002",
-      "status": "planned",
-      "title": "Replan & Patch",
+      "status": "active",
+      "title": "Roadmap Revision Workflow",
       "stage": "v2",
       "priority": "p1",
       "order": 20,
       "depends_on": [
         "RM-SDLC-001"
       ],
-      "openspec_change": null,
+      "openspec_change": "sdlc-roadmap-revision-workflow",
       "patches": [],
       "area": "skill.sdlc-roadmap"
     },
