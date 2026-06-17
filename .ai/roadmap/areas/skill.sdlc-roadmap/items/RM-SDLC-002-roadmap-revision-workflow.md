@@ -1,7 +1,7 @@
 ---
 id: RM-SDLC-002
 title: Roadmap Revision Workflow
-status: active
+status: done
 stage: v2
 priority: p1
 order: 20
@@ -10,7 +10,7 @@ depends_on:
 openspec_change: sdlc-roadmap-revision-workflow
 created_at: 2026-06-09
 started_at: 2026-06-17
-completed_at: null
+completed_at: 2026-06-17
 ---
 
 # Goal
