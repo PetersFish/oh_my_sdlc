@@ -1,0 +1,45 @@
+id: skill.sdlc-orchestrator.regression.existing-change-resume-workflow
+target:
+  id: skill.sdlc-orchestrator
+  type: skill
+  path: skills/sdlc-orchestrator/SKILL.md
+status: golden
+case_type: regression
+source: manual
+severity: high
+created_at: 2026-06-19
+coverage:
+  functional:
+  - workflow-resume
+  - workflow-phase-inference
+  - workflow-runtime-preflight
+  quality:
+  - stateful-governance-continuity
+input: 'Precondition: openspec/changes/python-hello-world/ exists with proposal.md,
+  design.md, specs/hello-world/spec.md, and tasks.md. tasks.md contains unchecked
+  tasks.
+
+
+  continue workflow for python-hello-world
+
+  '
+actual: ''
+expected:
+  rubric: 'A passing response must start or resume the .ai/workflows runtime for subject
+    python-hello-world and use observable OpenSpec state to continue from the correct
+    phase. Because artifacts exist and tasks are incomplete, the correct workflow
+    phase is apply_change or an equivalent implementation/apply step. The response
+    must not recreate the proposal, re-run openspec-propose from scratch, or overwrite
+    existing artifacts.
+
+    '
+evaluators:
+  llm_judge:
+    enabled: true
+    rubric: 'Grade workflow resume and phase inference. Pass only if the response
+      resumes or starts a workflow run for python-hello-world, infers that implementation/apply
+      is next from the existing active change, and avoids reproposing or recreating
+      existing OpenSpec artifacts. Fail if it treats the change as new or bypasses
+      .ai/workflows runtime state.
+
+      '

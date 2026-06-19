@@ -11,14 +11,32 @@ coverage:
     - execution-path-choice-ux
     - explicit-opt-out-handling
     - boundary-preservation
+    - workflow-runtime-preflight
+    - workflow-run-creation
+    - workflow-resume
+    - workflow-phase-inference
+    - openspec-worker-gating
+    - multilingual-workflow-intent
+    - informational-boundary
+    - upstream-skill-boundary-preservation
+    - openspec-intent-without-explicit-workflow
   quality:
     - instruction-following-fidelity
     - multi-turn-governance-continuity
+    - workflow-side-effect-discipline
+    - stateful-governance-continuity
   edge_cases:
     - user-says-execute-plan-after-propose-route
     - plan-mode-final-response-drift
     - text-fallback-when-question-tool-unavailable
     - ambiguous-verify-vs-test-routing
+    - explicit-start-workflow-with-openspec
+    - chinese-start-workflow-request
+    - openspec-without-workflow-keyword
+    - existing-change-resume
+    - informational-workflow-question
+    - explicit-workflow-opt-out
+    - upstream-openspec-skill-not-modifiable
   output_constraints:
     - spec-driven-routes-must-not-default-to-direct-execution
     - plan-mode-handoff-must-match-selected-route
@@ -30,8 +48,14 @@ risk_focus:
     - ambiguous execute-plan request bypasses OpenSpec without explicit opt-out
     - plan-mode final message contradicts selected route
     - silently running pytest when user may have meant Promptfoo golden eval
+    - start workflow request does not create or resume .ai/workflows run
+    - openspec worker invoked before workflow.py start/readiness
+    - existing change is reproposed instead of resumed
+    - informational question mutates workflow state
+    - assistant recommends hacking upstream openspec skills
+    - openspec intent without explicit workflow keyword bypasses runtime
 
 review:
   status: reviewed
   reviewed_by_user: true
-  last_reviewed_at: 2026-06-10T00:00:00Z
+  last_reviewed_at: 2026-06-19T00:00:00Z

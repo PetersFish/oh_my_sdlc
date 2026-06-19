@@ -7,7 +7,14 @@ The assistant is acting as the `skill.sdlc-orchestrator`.
 # Source: skills/sdlc-orchestrator/SKILL.md
 ---
 name: sdlc-orchestrator
-description: Thin SDLC orchestration layer that classifies task complexity, selects the right workflow path, and coordinates Roadmap, OpenSpec, EvalOps, Superpowers, and Memory gates without replacing them. Triggers include uncertain task scope, "how should I do this", multi-step SDLC work, or any new development task. Produces a route decision before delegating to downstream skills. Do NOT use for tasks already inside an active OpenSpec change or for single-step information queries.
+description: >-
+  Thin SDLC orchestration layer that classifies task complexity, selects the right workflow path,
+  and coordinates Roadmap, OpenSpec, EvalOps, Superpowers, and Memory gates without replacing them.
+  Triggers include uncertain task scope, "how should I do this", multi-step SDLC work,
+  any new development task, "start workflow", "use openspec", "continue workflow",
+  OpenSpec lifecycle requests, and explicit workflow initialization.
+  Produces a route decision and starts the workflow runtime before delegating to downstream skills.
+  Do NOT use for tasks already inside an active OpenSpec change or for single-step information queries.
 license: MIT
 ---
 
@@ -30,8 +37,74 @@ Pre-OpenSpec decision layer. Classifies every development task into a workflow p
 
 - Tasks already inside an active OpenSpec change (continue with the current flow).
 - Pure informational or Q&A questions.
-- Tasks where the user explicitly chooses the workflow.
 - The orchestrator SHALL NOT implement, test, debug, or create artifacts. It classifies and delegates.
+
+## Runtime Preflight Requirement
+
+When the user explicitly or implicitly starts an SDLC workflow (including saying
+"start workflow", "use openspec", "continue workflow", "开启 sdlc workflow",
+or any request that enters the OpenSpec lifecycle):
+
+1. The orchestrator SHALL derive a kebab-case change-id from the user's request.
+2. The orchestrator SHALL start or resume the workflow runtime:
+   `python3 .ai/workflows/scripts/workflow.py --root . start --workflow sdlc-main --subject-type openspec_change --subject-id <change-id>`
+3. The orchestrator SHALL then run readiness:
+   `python3 .ai/workflows/scripts/workflow.py --root . readiness`
+4. Only after the runtime run exists and readiness is confirmed may the orchestrator dispatch
+   the OpenSpec worker (e.g., `openspec-propose`, `openspec-new-change`).
+
+This preflight is NOT optional. Invoking `openspec-propose` or `openspec-new-change`
+without first creating or resuming the `.ai/workflows` run and checking readiness
+violates the SDLC governance contract. Even if the user did not literally say
+"start workflow", requesting OpenSpec IS a stateful SDLC run that MUST be tracked.
+
+## SDLC Workflow Runtime
+
+For stateful SDLC runs (OpenSpec change lifecycle, roadmap promotion, post-archive actions), the orchestrator SHALL use the deterministic workflow runtime at `.ai/workflows/scripts/workflow.py` to manage run state, phase readiness, evidence, hooks, and guarded transitions.
+
+### Starting and Resuming Runs
+
+- To start a new SDLC workflow run: `workflow.py start --workflow sdlc-main --subject-type openspec_change --subject-id <change-id>`
+- To resume a matching active run: `workflow.py resume`
+- If a conflicting active run exists, `workflow.py start` reports the conflict; the orchestrator SHALL NOT overwrite it.
+
+### Before Worker Dispatch
+
+Before invoking any phase worker skill, the orchestrator SHALL call `workflow.py readiness` and check `phase_readiness.ready`. If `ready` is `false`, the orchestrator SHALL NOT invoke the worker and SHALL instead resolve missing inputs (via `workflow.py resolve`) or ask the user for required decisions.
+
+### After Worker Completion
+
+When a worker skill (e.g., `openspec-propose`, `openspec-apply-change`, `openspec-archive-change`) completes:
+
+1. Call `workflow.py record-evidence` to store worker-produced evidence.
+2. Call `workflow.py complete-phase --exit-criteria-satisfied <criteria>` to verify exit criteria and register post-phase hooks.
+3. Call `workflow.py advance` to perform the guarded phase transition (only if the current phase is complete, not blocked, and hooks are resolved).
+
+For hook completion (e.g., `memory_sync`, `roadmap_done_if_relevant`):
+
+1. Invoke the responsible worker (e.g., `sdlc-repository-memory-sync`, `sdlc-roadmap done`).
+2. Call `workflow.py complete-hook --hook <hook-name>` to verify hook evidence and clear it from `pending_hooks`.
+
+### Handling Blocked States
+
+When `workflow.py` reports status `blocked`, the orchestrator SHALL:
+
+1. Explain the block reason and `block.type` to the user.
+2. Present the `next_allowed` actions from the block.
+3. Do NOT force-advance or force-complete while blocked.
+
+### Lifecycle Completion
+
+The orchestrator SHALL NOT claim SDLC lifecycle completion before `workflow.py` confirms the run can reach `done`. Completion requires:
+- `workflow.py done` succeeds.
+- `pending_hooks` is empty.
+- Required gates (TDD, EvalOps) are resolved.
+
+### Transition Rules
+
+- All workflow state mutations go through `workflow.py`, NOT by directly editing `.ai/workflows/runs/current.json`.
+- `workflow.py advance` is a guarded transition; it blocks if the current phase is not complete, if hooks are pending, or if required gates are unresolved.
+- `workflow.py done` enforces `pending_hooks` emptiness, `current_phase == "done"`, and gate resolution. It writes history to `.ai/workflows/runs/history/<run_id>.json`.
 
 ## Route Classification
 
@@ -76,29 +149,32 @@ Small, low-risk changes. No OpenSpec artifacts.
 
 ### spec-driven-propose-flow
 
-Medium formal changes that benefit from OpenSpec artifacts but do not need step-by-step human review during planning. Route decisions are binding: the immediate next action SHALL be `openspec-propose`. Direct execution is not presented as the default for this route.
+Medium formal changes that benefit from OpenSpec artifacts but do not need step-by-step human review during planning. Route decisions are binding. Direct execution is not presented as the default for this route.
 
 **Example:** feature addition with clear scope, single-module behavior change, improvement with well-understood acceptance criteria.
 
 **Action:**
 
-1. Route to `openspec-propose` to generate all artifacts in one step. This is the bound next action — do not offer direct execution unless the user explicitly opts out.
-2. After generation, output a **review-focus summary** for the user.
-3. Delegate implementation to `openspec-apply-change` when the user is ready.
+1. **Runtime preflight (REQUIRED first):** Derive a kebab-case change-id, then start or resume the workflow runtime and check readiness (see Runtime Preflight Requirement).
+2. After runtime preflight passes, route to `openspec-propose` to generate all artifacts in one step. This is the bound worker action — do not offer direct execution unless the user explicitly opts out.
+3. After `openspec-propose` completes, call `workflow.py record-evidence`, `workflow.py complete-phase --exit-criteria-satisfied openspec_artifacts_done`, and `workflow.py advance`.
+4. Output a **review-focus summary** for the user.
+5. Delegate implementation to `openspec-apply-change` when the user is ready.
 
 ### spec-driven-incremental-flow
 
-Very complex formal changes that need iterative human review during planning. Route decisions are binding: the immediate next action SHALL be `openspec-new-change`. Direct execution is not presented as the default for this route.
+Very complex formal changes that need iterative human review during planning. Route decisions are binding. Direct execution is not presented as the default for this route.
 
 **Example:** ambiguous scope, high-risk architecture, cross-module changes, schema/data model changes, roadmap item promotion, or scope that may shift during design.
 
 **Action:**
 
-1. Route to `openspec-new-change` to create the change. This is the bound next action — do not offer direct execution unless the user explicitly opts out.
-2. For each subsequent artifact, route to `openspec-continue-change`.
-3. After each artifact is created, output a **review-focus summary** for the user.
-4. Delegate implementation to `openspec-apply-change`.
-5. After verification, delegate to `openspec-archive-change`.
+1. **Runtime preflight (REQUIRED first):** Derive a kebab-case change-id, then start or resume the workflow runtime and check readiness (see Runtime Preflight Requirement).
+2. After runtime preflight passes, route to `openspec-new-change` to create the change. This is the bound worker action — do not offer direct execution unless the user explicitly opts out.
+3. For each subsequent artifact, route to `openspec-continue-change`.
+4. After each artifact is created, output a **review-focus summary** for the user.
+5. Delegate implementation to `openspec-apply-change`.
+6. After verification, delegate to `openspec-archive-change`.
 
 ### roadmap-first
 
@@ -157,7 +233,7 @@ After a durable change completes.
 
 **Action:** Prompt for or route to `sdlc-repository-memory-sync` when the change introduces lasting architecture decisions, conventions, pitfalls, module behavior, or operational knowledge.
 
-For OpenSpec-verified changes, use `sdlc-openspec-memory-sync` as the pre-archive gate.
+For OpenSpec changes tracked by the SDLC workflow runtime, memory sync is a mandatory post-archive hook resolved through `workflow.py complete-hook --hook memory_sync`. Use `sdlc-openspec-memory-sync` or `sdlc-repository-memory-sync` as the worker, then complete the hook via the runtime.
 
 ## Route Decision Output
 
@@ -351,15 +427,16 @@ Consider: `sdlc-openspec-memory-sync` for durable facts, or `sdlc-repository-mem
 
 ### Post-Archive Roadmap Sync
 
-After `openspec-archive-change` completes and the change is moved to `openspec/changes/archive/`, the orchestrator SHALL check whether the archived change is linked to a roadmap item:
+The workflow runtime manages post-archive hooks through `workflow.py`. After `archive_change` completes and the workflow advances to `post_archive_actions`:
 
-1. Read `.ai/roadmap/areas/*/items/*.md` frontmatter fields.
-2. Find any item whose `openspec_change` matches the archived change id.
-3. If exactly one match is found: route to `sdlc-roadmap done <item-id>` to mark the roadmap item as done.
-4. If multiple matches are found: ask the user which item to mark done, then route to `sdlc-roadmap done <selected-id>`.
-5. If no match is found: report "No linked roadmap item found for this change" and continue.
+1. `pending_hooks` will contain `memory_sync` and `roadmap_done_if_relevant`.
+2. For `roadmap_done_if_relevant`, the orchestrator reads the linked roadmap item state from `workflow.py` evidence (`roadmap_link`).
+3. If exactly one linked item is `active`: route to `sdlc-roadmap done <item-id>` to perform the mutation, then call `workflow.py complete-hook --hook roadmap_done_if_relevant`.
+4. If the linked item is already `done`: call `workflow.py complete-hook --hook roadmap_done_if_relevant` (completes idempotently).
+5. If no linked item: call `workflow.py complete-hook --hook roadmap_done_if_relevant` (completes with `no_linked_item` evidence).
+6. If multiple linked items or mismatched state: the workflow blocks; the orchestrator SHALL present the block reason and candidates to the user.
 
-**This is a binding post-archive gate.** Do not skip it when the archived change has a roadmap link. The roadmap item's `status` SHALL transition to `done` and `completed_at` SHALL be set before the orchestrator considers the full lifecycle complete.
+**Do NOT skip the roadmap hook when the archived change has a roadmap link.** The workflow runtime prevents `done` while `roadmap_done_if_relevant` is pending.
 
 ## Boundary Rules
 
@@ -370,10 +447,18 @@ After `openspec-archive-change` completes and the change is moved to `openspec/c
 | Decides workflow path | Executes formal change governance |
 | Classifies complexity | Manages artifact lifecycle |
 | Coordinates gates | Provides proposal/design/specs/tasks |
+| Owns workflow lifecycle and runtime state | Pure worker, not lifecycle owner |
 
 **Rule:** The orchestrator does not create, modify, or archive OpenSpec artifacts.
 It routes to `openspec-propose`, `openspec-new-change`, `openspec-continue-change`,
 `openspec-apply-change`, `openspec-verify-change`, and `openspec-archive-change` as needed.
+
+**Upstream boundary rule:** OpenSpec skills (`openspec-propose`, `openspec-apply-change`,
+`openspec-archive-change`, etc.) are open-source upstream workers. They are NOT workflow
+lifecycle owners. When the workflow runtime does not trigger, or when remediation is needed,
+the fix must stay within `sdlc-orchestrator` instructions, local `workflow.py` preflight
+enforcement, repository-owned wrapper/guard code, or EvalOps regression coverage.
+Do NOT recommend modifying upstream `openspec-*` skill files or the OpenSpec npm package.
 
 ### Orchestrator vs Superpowers
 
@@ -435,7 +520,8 @@ Route: spec-driven-propose-flow
 Reason: single-module behavior change, score = 2, needs acceptance criteria
 Required gates: TDD (code-bearing behavior change)
 Expected artifacts: proposal, design, specs, tasks (via openspec-propose)
-Next action: invoke openspec-propose
+Next action: start workflow run for change-id "add-dry-run-mode" with workflow.py start,
+  then check readiness, then invoke openspec-propose
 ```
 
 ### Example 3: Very complex architecture change
@@ -447,7 +533,8 @@ Route: spec-driven-incremental-flow
 Reason: cross-module, data model change, architecture decision, score = 6
 Required gates: TDD
 Expected artifacts: proposal, design, specs, tasks (via incremental flow)
-Next action: invoke openspec-new-change
+Next action: start workflow run for change-id "multi-project-memory-index" with workflow.py start,
+  then check readiness, then invoke openspec-new-change
 ```
 
 ### Example 4: Roadmap item promotion
