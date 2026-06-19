@@ -1,0 +1,153 @@
+version: 1
+id: sdlc-main
+
+phases:
+  input:
+    required_inputs: []
+    context_loaders: []
+    allowed_workers:
+      - sdlc-orchestrator
+    exit_criteria:
+      - primary_subject_recorded
+    post_hooks: []
+    next: load_memory
+
+  load_memory:
+    required_inputs: []
+    context_loaders: []
+    allowed_workers:
+      - sdlc-repository-memory-load
+    exit_criteria:
+      - memory_context_loaded_or_not_initialized
+    post_hooks: []
+    next: brainstorm
+
+  brainstorm:
+    required_inputs: []
+    context_loaders: []
+    allowed_workers:
+      - brainstorming
+    exit_criteria:
+      - intent_ready_for_classification
+    post_hooks: []
+    next: decide_intent
+
+  decide_intent:
+    required_inputs: []
+    context_loaders: []
+    allowed_workers:
+      - sdlc-orchestrator
+    exit_criteria:
+      - workflow_branch_selected
+    post_hooks: []
+    branches:
+      create_roadmap: create_roadmap
+      create_change: create_change
+
+  create_roadmap:
+    required_inputs: []
+    context_loaders: []
+    allowed_workers:
+      - sdlc-roadmap
+    exit_criteria:
+      - roadmap_item_created
+    post_hooks: []
+    next: review_roadmap
+
+  review_roadmap:
+    required_inputs: []
+    context_loaders: []
+    allowed_workers:
+      - sdlc-roadmap
+    exit_criteria:
+      - review_decision_recorded
+    post_hooks: []
+    next: review_decision
+
+  review_decision:
+    required_inputs:
+      - context.review_decision
+    context_loaders: []
+    allowed_workers:
+      - sdlc-orchestrator
+    exit_criteria:
+      - review_passed_or_failed
+    post_hooks: []
+    branches:
+      review_passed: create_change
+      review_failed: review_roadmap
+
+  create_change:
+    required_inputs:
+      - context.change_id
+    context_loaders:
+      - openspec_change_status
+      - roadmap_linked_item
+    allowed_workers:
+      - openspec-propose
+      - openspec-new-change
+      - openspec-continue-change
+    exit_criteria:
+      - openspec_artifacts_done
+    post_hooks:
+      - roadmap_status_ready_if_linked
+    next: apply_change
+
+  apply_change:
+    required_inputs:
+      - context.change_id
+    context_loaders:
+      - openspec_change_status
+      - roadmap_item_status
+    allowed_workers:
+      - openspec-apply-change
+      - sdlc-evalops
+      - requesting-code-review
+      - receiving-code-review
+    exit_criteria:
+      - tasks_complete
+      - tdd_passed
+      - eval_passed_or_human_decision_recorded
+    post_hooks:
+      - roadmap_apply_start_if_ready
+    next: archive_change
+
+  archive_change:
+    required_inputs:
+      - context.change_id
+    context_loaders:
+      - openspec_archive_path
+    allowed_workers:
+      - openspec-archive-change
+    exit_criteria:
+      - archive_path_exists
+    post_hooks:
+      - memory_sync
+      - roadmap_done_if_relevant
+    next: post_archive_actions
+
+  post_archive_actions:
+    required_inputs: []
+    context_loaders:
+      - openspec_archive_path
+      - roadmap_linked_item
+      - roadmap_item_status
+    allowed_workers:
+      - sdlc-orchestrator
+      - sdlc-repository-memory-sync
+      - sdlc-openspec-memory-sync
+      - sdlc-roadmap
+    exit_criteria:
+      - pending_hooks_empty
+    post_hooks: []
+    next: done
+
+  done:
+    required_inputs: []
+    context_loaders: []
+    allowed_workers:
+      - sdlc-orchestrator
+    exit_criteria:
+      - run_status_done
+    post_hooks: []
+    terminal: true

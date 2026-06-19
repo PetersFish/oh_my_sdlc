@@ -409,14 +409,16 @@ When apply or implementation begins for a `ready` item, transition it to `active
 
 ## Orchestrator Post-Archive Boundary
 
-The `sdlc-orchestrator` owns the post-archive gate that triggers roadmap completion:
+The `sdlc-orchestrator` and the SDLC workflow runtime (`workflow.py`) own the post-archive gate that triggers roadmap completion. `sdlc-roadmap` only owns the safe mutation (the `done` capability) after being invoked.
 
-1. When OpenSpec archive succeeds, the orchestrator checks if any roadmap item has `openspec_change` matching the archived change and `status: active`.
-2. If exactly one match is found, the orchestrator routes to `sdlc-roadmap done <item-id>`.
-3. If no match is found, the orchestrator reports a sync mismatch and does not guess an item.
-4. If a matching item exists but is not `active`, the orchestrator reports a sync mismatch and does not overwrite the status.
+The workflow runtime coordinates post-archive hooks:
+- `roadmap_done_if_relevant`: registered in `pending_hooks` after `archive_change` completes. The orchestrator uses `workflow.py` to detect active linked items, route to `sdlc-roadmap done <item-id>` for the mutation, then call `workflow.py complete-hook --hook roadmap_done_if_relevant`.
+- `roadmap_status_ready_if_linked`: registered after `create_change` completes. The orchestrator routes to the roadmap worker to set the linked item to `ready` when applicable.
+- `roadmap_apply_start_if_ready`: registered when `apply_change` starts. The orchestrator routes to the roadmap worker to set the linked item to `active` and `started_at`.
 
-`sdlc-roadmap` only owns the safe mutation after being invoked by the orchestrator. It does not watch archives or initiate state transitions.
+Roadmap item files (`.ai/roadmap/areas/*/items/*.md`) remain the domain source of truth. The workflow runtime reads item state through loaders and records evidence; it does NOT edit roadmap item files directly.
+
+`sdlc-roadmap` only executes mutations when invoked by the orchestrator or directly by the user. It does not watch archives, initiate state transitions, or coordinate hook resolution.
 
 ## Revision History Model
 

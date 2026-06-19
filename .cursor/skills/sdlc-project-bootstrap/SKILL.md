@@ -81,7 +81,21 @@ Check whether `.ai/memory/manifest.json` exists at the project root.
 - Report the result from `sdlc-repository-memory-init`.
 - Do NOT auto-run `sdlc-repository-memory-sync`. Only suggest it as a next step.
 
-### Step 4: Summary
+### Step 4: Initialize SDLC Workflow Runtime
+
+Check whether `.ai/workflows/scripts/workflow.py` exists at the project root.
+
+**If workflow.py does not exist:**
+- Create `.ai/workflows/definitions/`, `.ai/workflows/runs/`, `.ai/workflows/runs/history/`, and `.ai/workflows/scripts/` directory layout.
+- Copy `templates/workflow/workflow.py` to `.ai/workflows/scripts/workflow.py` and `templates/workflow/sdlc-main.yaml` to `.ai/workflows/definitions/sdlc-main.yaml`.
+- Report: "SDLC Workflow Runtime: initialized with sdlc-main workflow".
+
+**If workflow.py exists:**
+- Report "SDLC Workflow Runtime: already initialized, no changes needed".
+
+The workflow runtime is a project SDLC foundation asset alongside `.ai/roadmap/` and `.ai/memory/`. It is not OpenCode configuration and lives under `.ai/workflows/`, not `.opencode/`.
+
+### Step 5: Summary
 
 After all steps complete, output a summary:
 
@@ -93,6 +107,7 @@ OpenSpec: [initialized | already present]
   AI tools: [selected]
   Default schema: [selected]
 Repository Memory: [initialized | already present]
+SDLC Workflow Runtime: [initialized | already present]
 
 Suggested next steps:
   1. Create your first change: openspec new change <name>
@@ -111,6 +126,7 @@ OpenSpec: [would initialize via openspec init | already present]
   AI tools: [would prompt for selection | already selected]
   Default schema: [would prompt for selection | already selected]
 Repository Memory: [would initialize via sdlc-repository-memory-init | already present]
+SDLC Workflow Runtime: [would initialize with sdlc-main workflow | already present]
 ```
 
 ## Guardrails

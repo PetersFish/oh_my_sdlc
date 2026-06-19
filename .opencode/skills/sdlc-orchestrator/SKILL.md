@@ -26,6 +26,54 @@ Pre-OpenSpec decision layer. Classifies every development task into a workflow p
 - Tasks where the user explicitly chooses the workflow.
 - The orchestrator SHALL NOT implement, test, debug, or create artifacts. It classifies and delegates.
 
+## SDLC Workflow Runtime
+
+For stateful SDLC runs (OpenSpec change lifecycle, roadmap promotion, post-archive actions), the orchestrator SHALL use the deterministic workflow runtime at `.ai/workflows/scripts/workflow.py` to manage run state, phase readiness, evidence, hooks, and guarded transitions.
+
+### Starting and Resuming Runs
+
+- To start a new SDLC workflow run: `workflow.py start --workflow sdlc-main --subject-type openspec_change --subject-id <change-id>`
+- To resume a matching active run: `workflow.py resume`
+- If a conflicting active run exists, `workflow.py start` reports the conflict; the orchestrator SHALL NOT overwrite it.
+
+### Before Worker Dispatch
+
+Before invoking any phase worker skill, the orchestrator SHALL call `workflow.py readiness` and check `phase_readiness.ready`. If `ready` is `false`, the orchestrator SHALL NOT invoke the worker and SHALL instead resolve missing inputs (via `workflow.py resolve`) or ask the user for required decisions.
+
+### After Worker Completion
+
+When a worker skill (e.g., `openspec-propose`, `openspec-apply-change`, `openspec-archive-change`) completes:
+
+1. Call `workflow.py record-evidence` to store worker-produced evidence.
+2. Call `workflow.py complete-phase --exit-criteria-satisfied <criteria>` to verify exit criteria and register post-phase hooks.
+3. Call `workflow.py advance` to perform the guarded phase transition (only if the current phase is complete, not blocked, and hooks are resolved).
+
+For hook completion (e.g., `memory_sync`, `roadmap_done_if_relevant`):
+
+1. Invoke the responsible worker (e.g., `sdlc-repository-memory-sync`, `sdlc-roadmap done`).
+2. Call `workflow.py complete-hook --hook <hook-name>` to verify hook evidence and clear it from `pending_hooks`.
+
+### Handling Blocked States
+
+When `workflow.py` reports status `blocked`, the orchestrator SHALL:
+
+1. Explain the block reason and `block.type` to the user.
+2. Present the `next_allowed` actions from the block.
+3. Do NOT force-advance or force-complete while blocked.
+
+### Lifecycle Completion
+
+The orchestrator SHALL NOT claim SDLC lifecycle completion before `workflow.py` confirms the run can reach `done`. Completion requires:
+- `workflow.py done` succeeds.
+- `pending_hooks` is empty.
+- Required gates (TDD, EvalOps) are resolved.
+
+### Transition Rules
+
+- All workflow state mutations go through `workflow.py`, NOT by directly editing `.ai/workflows/runs/current.json`.
+- `workflow.py advance` is a guarded transition; it blocks if the current phase is not complete, if hooks are pending, or if required gates are unresolved.
+- `workflow.py done` enforces `pending_hooks` emptiness, `current_phase == "done"`, and gate resolution. It writes history to `.ai/workflows/runs/history/<run_id>.json`.
+
 ## Route Classification
 
 Before choosing a path, estimate the task complexity:
@@ -150,7 +198,7 @@ After a durable change completes.
 
 **Action:** Prompt for or route to `sdlc-repository-memory-sync` when the change introduces lasting architecture decisions, conventions, pitfalls, module behavior, or operational knowledge.
 
-For OpenSpec-verified changes, use `sdlc-openspec-memory-sync` as the pre-archive gate.
+For OpenSpec changes tracked by the SDLC workflow runtime, memory sync is a mandatory post-archive hook resolved through `workflow.py complete-hook --hook memory_sync`. Use `sdlc-openspec-memory-sync` or `sdlc-repository-memory-sync` as the worker, then complete the hook via the runtime.
 
 ## Route Decision Output
 
@@ -344,15 +392,16 @@ Consider: `sdlc-openspec-memory-sync` for durable facts, or `sdlc-repository-mem
 
 ### Post-Archive Roadmap Sync
 
-After `openspec-archive-change` completes and the change is moved to `openspec/changes/archive/`, the orchestrator SHALL check whether the archived change is linked to a roadmap item:
+The workflow runtime manages post-archive hooks through `workflow.py`. After `archive_change` completes and the workflow advances to `post_archive_actions`:
 
-1. Read `.ai/roadmap/areas/*/items/*.md` frontmatter fields.
-2. Find any item whose `openspec_change` matches the archived change id.
-3. If exactly one match is found: route to `sdlc-roadmap done <item-id>` to mark the roadmap item as done.
-4. If multiple matches are found: ask the user which item to mark done, then route to `sdlc-roadmap done <selected-id>`.
-5. If no match is found: report "No linked roadmap item found for this change" and continue.
+1. `pending_hooks` will contain `memory_sync` and `roadmap_done_if_relevant`.
+2. For `roadmap_done_if_relevant`, the orchestrator reads the linked roadmap item state from `workflow.py` evidence (`roadmap_link`).
+3. If exactly one linked item is `active`: route to `sdlc-roadmap done <item-id>` to perform the mutation, then call `workflow.py complete-hook --hook roadmap_done_if_relevant`.
+4. If the linked item is already `done`: call `workflow.py complete-hook --hook roadmap_done_if_relevant` (completes idempotently).
+5. If no linked item: call `workflow.py complete-hook --hook roadmap_done_if_relevant` (completes with `no_linked_item` evidence).
+6. If multiple linked items or mismatched state: the workflow blocks; the orchestrator SHALL present the block reason and candidates to the user.
 
-**This is a binding post-archive gate.** Do not skip it when the archived change has a roadmap link. The roadmap item's `status` SHALL transition to `done` and `completed_at` SHALL be set before the orchestrator considers the full lifecycle complete.
+**Do NOT skip the roadmap hook when the archived change has a roadmap link.** The workflow runtime prevents `done` while `roadmap_done_if_relevant` is pending.
 
 ## Boundary Rules
 
