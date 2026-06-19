@@ -20,19 +20,11 @@ Start a new change using the experimental artifact-driven approach.
    Use the **AskUserQuestion tool** (open-ended, no preset options) to ask:
    > "What change do you want to work on? Describe what you want to build or fix."
 
-    From their description, derive a kebab-case name (e.g., "add user authentication" → `add-user-auth`).
+   From their description, derive a kebab-case name (e.g., "add user authentication" → `add-user-auth`).
 
-    **IMPORTANT**: Do NOT proceed without understanding what the user wants to build.
+   **IMPORTANT**: Do NOT proceed without understanding what the user wants to build.
 
-2. **Run the discovery gate**
-
-   Before writing proposal content for a `sdd-plus-superpowers` change, check whether the user has already provided enough scope, motivation, constraints, direction, and capability impact.
-
-   - If context is insufficient, ask focused clarifying questions or use interactive brainstorming/exploration.
-   - If context is sufficient, proceed without extra probing and preserve the decision context in proposal/design artifacts.
-   - Do not create `brainstorm.md`; brainstorming is an interaction gate, not a durable artifact.
-
-3. **Determine the workflow schema**
+2. **Determine the workflow schema**
 
    Use the default schema (omit `--schema`) unless the user explicitly requests a different workflow.
 
@@ -42,20 +34,20 @@ Start a new change using the experimental artifact-driven approach.
 
    **Otherwise**: Omit `--schema` to use the default.
 
-4. **Create the change directory**
+3. **Create the change directory**
    ```bash
    openspec new change "<name>"
    ```
    Add `--schema <name>` only if the user requested a specific workflow.
    This creates a scaffolded change at `openspec/changes/<name>/` with the selected schema.
 
-5. **Show the artifact status**
+4. **Show the artifact status**
    ```bash
    openspec status --change "<name>"
    ```
    This shows which artifacts need to be created and which are ready (dependencies satisfied).
 
-6. **Get instructions for the first artifact**
+5. **Get instructions for the first artifact**
    The first artifact depends on the schema (e.g., `proposal` for spec-driven).
    Check the status output to find the first artifact with status "ready".
    ```bash
@@ -63,7 +55,7 @@ Start a new change using the experimental artifact-driven approach.
    ```
    This outputs the template and context for creating the first artifact.
 
-7. **STOP and wait for user direction**
+6. **STOP and wait for user direction**
 
 **Output**
 
