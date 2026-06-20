@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "id": "workflow.sdlc-orchestrator",
+  "kind": "workflow",
+  "title": "SDLC Orchestrator Workflow",
+  "owner_path": "skills/sdlc-orchestrator",
+  "id_prefix": "RM-ORCH"
+}

@@ -17,6 +17,14 @@
       "path": "areas/workflow.ai-evalops",
       "owner_path": ".ai/evals",
       "id_prefix": "RM-EVAL"
+    },
+    {
+      "id": "workflow.sdlc-orchestrator",
+      "kind": "workflow",
+      "title": "SDLC Orchestrator Workflow",
+      "path": "areas/workflow.sdlc-orchestrator",
+      "owner_path": "skills/sdlc-orchestrator",
+      "id_prefix": "RM-ORCH"
     }
   ],
   "global_view": {

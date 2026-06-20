@@ -24,6 +24,17 @@
       "area": "workflow.ai-evalops"
     },
     {
+      "id": "RM-ORCH-001",
+      "status": "idea",
+      "title": "OpenCode Governance Validation",
+      "stage": "mvp",
+      "priority": "p0",
+      "order": 10,
+      "depends_on": [],
+      "openspec_change": null,
+      "area": "workflow.sdlc-orchestrator"
+    },
+    {
       "id": "RM-SDLC-002",
       "status": "done",
       "title": "Roadmap Revision Workflow",
@@ -48,6 +59,19 @@
       ],
       "openspec_change": "add-eval-matrix-runner",
       "area": "workflow.ai-evalops"
+    },
+    {
+      "id": "RM-ORCH-002",
+      "status": "idea",
+      "title": "Cross-Platform Hook Adaptation",
+      "stage": "v2",
+      "priority": "p1",
+      "order": 20,
+      "depends_on": [
+        "RM-ORCH-001"
+      ],
+      "openspec_change": null,
+      "area": "workflow.sdlc-orchestrator"
     },
     {
       "id": "RM-SDLC-003",
