@@ -29,13 +29,13 @@ sdlc-roadmap skill 必须提供模板文件供项目初始化使用。
 #### Scenario: 模板文件存在
 - **WHEN** 检查 `skills/sdlc-roadmap/templates/`
 - **THEN** 存在 `roadmap.md` 模板
-- **THEN** 存在 `item.md` 模板（含 frontmatter: id, title, status, stage, priority, order, depends_on, openspec_change, patches）
+- **THEN** 存在 `item.md` 模板（含 frontmatter: id, title, status, stage, priority, order, depends_on, openspec_change）
 - **THEN** 存在 `decisions.md` 模板
 
 #### Scenario: item 模板 frontmatter 字段完整
 - **WHEN** 读取 `skills/sdlc-roadmap/templates/item.md`
-- **THEN** frontmatter 包含：id, title, status, stage, priority, order, depends_on, openspec_change, created_at, started_at, completed_at, patches
-- **THEN** 模板包含 body 节：Goal, Scope, Acceptance Criteria, Promotion Notes, Completion Notes
+- **THEN** frontmatter 包含：id, title, status, stage, priority, order, depends_on, openspec_change, created_at, started_at, completed_at
+- **THEN** 模板包含 body 节：Goal, Problem Context, Scope, Design Notes (含 Key Decisions/Tradeoffs/Initial Approach/Open Questions), Acceptance Criteria, Promotion Notes, Completion Notes, Design Reference
 
 ### Requirement: 校验脚本 validate.py
 
@@ -67,7 +67,7 @@ sdlc-roadmap skill 必须提供模板文件供项目初始化使用。
 #### Scenario: 从 item 文件生成 index
 - **WHEN** 运行 `rebuild_index.py`
 - **THEN** 扫描 `.roadmap/items/*.md`
-- **THEN** 输出 `index.json` 包含所有 item 的 id/status/title/stage/priority/order/depends_on/openspec_change/patches
+- **THEN** 输出 `index.json` 包含所有 item 的 id/status/title/stage/priority/order/depends_on/openspec_change
 - **THEN** items 按 order 升序排列
 
 #### Scenario: 处理空 items 目录
@@ -99,6 +99,7 @@ open code 执行 `roadmap capture` 时应从对话上下文提取路线图规划
 #### Scenario: 从对话捕获 roadmap items
 - **WHEN** 用户说"把上面讨论的 MVP、V2、V3 规划整理进 roadmap"且 `.roadmap/` 已初始化
 - **THEN** 识别阶段性规划（MVP、V2、V3 等）
+- **THEN** 从对话中提炼 Problem Context（问题域、痛点）和 Design Notes（关键决策、取舍、初步方案、未决问题），不保存逐字聊天记录
 - **THEN** 为每个阶段创建 `.roadmap/items/RM-XXX-*.md`
 - **THEN** 更新 `roadmap.md`
 - **THEN** 输出创建摘要

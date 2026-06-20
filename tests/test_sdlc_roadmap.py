@@ -143,7 +143,9 @@ def _make_area_item(items_dir: Path, item_id: str, **overrides) -> Path:
             lines.append(f"{k}: {v}")
     lines.append("---")
     lines.append(f"\n# Goal\n\nTest goal for {item_id}.\n")
+    lines.append("# Problem Context\n\nTest problem context.\n")
     lines.append("# Scope\n\n## In\n\n- Test scope\n\n## Out\n\n- Excluded\n")
+    lines.append("# Design Notes\n\n## Key Decisions\n\n- Test decision.\n\n## Tradeoffs\n\n- Test tradeoff.\n\n## Initial Approach\n\n- Test approach.\n\n## Open Questions\n\n- Test question.\n")
     lines.append("# Acceptance Criteria\n\n- Test AC\n")
     lines.append("# Promotion Notes\n\nTest promotion notes.\n")
     lines.append("# Completion Notes\n\nNone yet.\n")
@@ -289,6 +291,21 @@ class TestTemplates(unittest.TestCase):
         content = (ROADMAP_SKILL / "templates" / "item.md").read_text(encoding="utf-8")
         for field in ["id:", "title:", "status:", "stage:", "priority:", "order:", "depends_on:", "openspec_change:"]:
             self.assertIn(field, content, f"item template missing field: {field}")
+
+    def test_item_template_has_design_sections(self) -> None:
+        content = (ROADMAP_SKILL / "templates" / "item.md").read_text(encoding="utf-8")
+        self.assertIn("Problem Context", content,
+                       "item template missing Problem Context section")
+        self.assertIn("Design Notes", content,
+                       "item template missing Design Notes section")
+        self.assertIn("Key Decisions", content,
+                       "item template missing Key Decisions sub-section")
+        self.assertIn("Tradeoffs", content,
+                       "item template missing Tradeoffs sub-section")
+        self.assertIn("Initial Approach", content,
+                       "item template missing Initial Approach sub-section")
+        self.assertIn("Open Questions", content,
+                       "item template missing Open Questions sub-section")
 
     def test_decisions_template_exists(self) -> None:
         self.assertTrue(
