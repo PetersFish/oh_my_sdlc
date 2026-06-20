@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import yaml
+from support.frontmatter import read_frontmatter
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -22,21 +22,12 @@ def _frontmatter_lines(path: Path) -> list[str]:
     return lines[1:end]
 
 
-def _read_frontmatter(path: Path) -> dict[str, str]:
-    frontmatter = _frontmatter_lines(path)
-    if not frontmatter:
-        return {}
-    parsed = yaml.safe_load("\n".join(frontmatter))
-    assert isinstance(parsed, dict)
-    return parsed
-
-
 class TestMetaSkillEvaluatorFrontmatter:
     def test_skill_md_exists(self):
         assert SKILL_MD.is_file(), "skills/meta-skill-evaluator/SKILL.md must exist"
 
     def test_frontmatter_name_and_description(self):
-        fm = _read_frontmatter(SKILL_MD)
+        fm = read_frontmatter(SKILL_MD)
         assert fm.get("name") == "meta-skill-evaluator"
         desc = fm.get("description", "")
         assert len(desc) > 80
@@ -49,7 +40,7 @@ class TestMetaSkillEvaluatorFrontmatter:
         assert "description: >-" in frontmatter
 
     def test_frontmatter_is_valid_yaml(self):
-        fm = _read_frontmatter(SKILL_MD)
+        fm = read_frontmatter(SKILL_MD)
         assert fm["name"] == "meta-skill-evaluator"
         assert isinstance(fm["description"], str)
 

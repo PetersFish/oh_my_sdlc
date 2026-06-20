@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -12,53 +11,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from support.frontmatter import read_frontmatter
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ROADMAP_SKILL = REPO_ROOT / "skills" / "sdlc-roadmap"
 OPENCODE_SKILL = REPO_ROOT / ".opencode" / "skills" / "sdlc-roadmap"
 SCRIPTS_DIR = ROADMAP_SKILL / "scripts"
-
-
-def _read_frontmatter(path: Path) -> dict:
-    text = path.read_text(encoding="utf-8")
-    if not text.startswith("---"):
-        return {}
-    end = text.find("---", 3)
-    if end == -1:
-        return {}
-    raw = text[3:end].strip()
-    result = {}
-    in_folded = False
-    folded_key = None
-    folded_lines = []
-    for line in raw.split("\n"):
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-
-        if in_folded:
-            if re.match(r"^\w+:\s", stripped):
-                result[folded_key] = " ".join(folded_lines)
-                in_folded = False
-                folded_key = None
-                folded_lines = []
-            else:
-                folded_lines.append(stripped)
-                continue
-
-        if ":" in stripped:
-            key, _, value = stripped.partition(":")
-            key = key.strip()
-            value = value.strip()
-            if value in (">-", ">", "|-", "|"):
-                in_folded = True
-                folded_key = key
-                folded_lines = []
-            else:
-                result[key] = value
-
-    if in_folded and folded_key:
-        result[folded_key] = " ".join(folded_lines)
-    return result
 
 
 def _run_script(script: str, cwd: str, check: bool = False, args: list[str] | None = None) -> subprocess.CompletedProcess:
@@ -163,13 +121,13 @@ class TestRoadmapSkillFrontmatter(unittest.TestCase):
         )
 
     def test_skill_md_has_valid_frontmatter(self) -> None:
-        fm = _read_frontmatter(ROADMAP_SKILL / "SKILL.md")
+        fm = read_frontmatter(ROADMAP_SKILL / "SKILL.md")
         self.assertEqual(fm.get("name"), "sdlc-roadmap")
         self.assertIn("description", fm)
         self.assertGreater(len(fm["description"]), 20, "description too short")
 
     def test_skill_md_description_contains_keywords(self) -> None:
-        fm = _read_frontmatter(ROADMAP_SKILL / "SKILL.md")
+        fm = read_frontmatter(ROADMAP_SKILL / "SKILL.md")
         desc = fm["description"].lower()
         self.assertIn("roadmap", desc)
         self.assertTrue(

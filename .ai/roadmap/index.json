@@ -25,13 +25,13 @@
     },
     {
       "id": "RM-ORCH-001",
-      "status": "idea",
+      "status": "ready",
       "title": "OpenCode Governance Validation",
       "stage": "mvp",
       "priority": "p0",
       "order": 10,
       "depends_on": [],
-      "openspec_change": null,
+      "openspec_change": "opencode-governance-validation",
       "area": "workflow.sdlc-orchestrator"
     },
     {

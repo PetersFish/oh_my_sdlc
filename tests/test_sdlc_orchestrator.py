@@ -4,25 +4,10 @@ import json
 import yaml
 from pathlib import Path
 
+from support.frontmatter import read_frontmatter
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ORCHESTRATOR_SKILL = REPO_ROOT / "skills" / "sdlc-orchestrator"
-
-
-def _read_frontmatter(path: Path) -> dict:
-    text = path.read_text(encoding="utf-8")
-    if not text.startswith("---"):
-        return {}
-    end = text.find("---", 3)
-    if end == -1:
-        return {}
-    raw = text[3:end].strip()
-    result = {}
-    for line in raw.split("\n"):
-        line = line.strip()
-        if ":" in line:
-            key, _, value = line.partition(":")
-            result[key.strip()] = value.strip()
-    return result
 
 
 class TestOrchestratorSkillFrontmatter:
@@ -33,7 +18,7 @@ class TestOrchestratorSkillFrontmatter:
             "sdlc-orchestrator/SKILL.md must exist"
 
     def test_skill_md_has_valid_frontmatter(self):
-        fm = _read_frontmatter(ORCHESTRATOR_SKILL / "SKILL.md")
+        fm = read_frontmatter(ORCHESTRATOR_SKILL / "SKILL.md")
         assert fm.get("name") == "sdlc-orchestrator", \
             f"Expected name=sdlc-orchestrator, got {fm.get('name')}"
         assert "description" in fm, "description must exist in frontmatter"
@@ -48,6 +33,21 @@ class TestOrchestratorSkillFrontmatter:
         lower = content.lower()
         for path in paths:
             assert path.lower() in lower, f"SKILL.md must mention routing path: {path}"
+
+    def test_no_local_read_frontmatter_in_test_files(self):
+        import re
+        tests_dir = Path(__file__).resolve().parent
+        violations = []
+        def_stmt = re.compile(r"^\s*def _read_frontmatter\(", re.MULTILINE)
+        for py_file in tests_dir.glob("test_*.py"):
+            content = py_file.read_text(encoding="utf-8")
+            if def_stmt.search(content):
+                violations.append(py_file.name)
+        assert not violations, (
+            "Test files must not define local _read_frontmatter(). "
+            "Use tests/support/frontmatter.py::read_frontmatter instead. "
+            f"Files with violations: {violations}"
+        )
 
 
 class TestOrchestratorRouteBinding:

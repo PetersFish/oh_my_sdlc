@@ -2,22 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import yaml
+from support.frontmatter import read_frontmatter
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 EVALOPS_SKILL = REPO_ROOT / "skills" / "sdlc-evalops"
-
-
-def _read_frontmatter(path: Path) -> dict:
-    text = path.read_text(encoding="utf-8")
-    if not text.startswith("---"):
-        return {}
-    end = text.find("\n---", 3)
-    if end == -1:
-        return {}
-    frontmatter = text[3:end].strip()
-    data = yaml.safe_load(frontmatter)
-    return data if isinstance(data, dict) else {}
 
 
 class TestEvalopsSkillFrontmatter:
@@ -28,7 +16,7 @@ class TestEvalopsSkillFrontmatter:
             "sdlc-evalops/SKILL.md must exist"
 
     def test_skill_md_has_valid_frontmatter(self):
-        fm = _read_frontmatter(EVALOPS_SKILL / "SKILL.md")
+        fm = read_frontmatter(EVALOPS_SKILL / "SKILL.md")
         assert fm.get("name") == "sdlc-evalops", \
             f"Expected name=sdlc-evalops, got {fm.get('name')}"
         assert "description" in fm, "description must exist in frontmatter"
@@ -40,18 +28,18 @@ class TestEvalopsSkillFrontmatter:
             "description must reference eval targets"
 
     def test_description_starts_with_use_when(self):
-        fm = _read_frontmatter(EVALOPS_SKILL / "SKILL.md")
+        fm = read_frontmatter(EVALOPS_SKILL / "SKILL.md")
         desc = fm["description"]
         assert desc.startswith("Use when"), \
             f"description must start with 'Use when', got: {desc[:80]}"
 
     def test_description_is_not_too_long(self):
-        fm = _read_frontmatter(EVALOPS_SKILL / "SKILL.md")
+        fm = read_frontmatter(EVALOPS_SKILL / "SKILL.md")
         assert len(fm["description"]) < 800, \
             f"description too long: {len(fm['description'])} chars (max 800)"
 
     def test_description_has_trigger_keywords(self):
-        fm = _read_frontmatter(EVALOPS_SKILL / "SKILL.md")
+        fm = read_frontmatter(EVALOPS_SKILL / "SKILL.md")
         desc = fm["description"].lower()
         assert "eval" in desc, "description must reference eval"
         assert "skill" in desc or "agent" in desc or "target" in desc, \

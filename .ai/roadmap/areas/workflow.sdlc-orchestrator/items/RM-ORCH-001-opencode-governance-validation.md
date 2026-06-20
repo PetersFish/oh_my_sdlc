@@ -1,12 +1,12 @@
 ---
 id: RM-ORCH-001
 title: "OpenCode Governance Validation"
-status: idea
+status: ready
 stage: mvp
 priority: p0
 order: 10
 depends_on: []
-openspec_change: null
+openspec_change: "opencode-governance-validation"
 created_at: 2026-06-20
 started_at: null
 completed_at: null

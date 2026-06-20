@@ -150,9 +150,14 @@ Medium formal changes that benefit from OpenSpec artifacts but do not need step-
 
 1. **Runtime preflight (REQUIRED first):** Derive a kebab-case change-id, then start or resume the workflow runtime and check readiness (see Runtime Preflight Requirement).
 2. After runtime preflight passes, route to `openspec-propose` to generate all artifacts in one step. This is the bound worker action — do not offer direct execution unless the user explicitly opts out.
-3. After `openspec-propose` completes, call `workflow.py record-evidence`, `workflow.py complete-phase --exit-criteria-satisfied openspec_artifacts_done`, and `workflow.py advance`.
-4. Output a **review-focus summary** for the user.
-5. Delegate implementation to `openspec-apply-change` when the user is ready.
+3. **EvalOps artifact completeness check (for EvalOps-gated changes only):** After `openspec-propose` generates `tasks.md`, verify that eval case creation and golden eval execution are handled correctly:
+   - **If the change does not involve semantic verification (not EvalOps-gated):** skip this check.
+   - **If this change created eval cases:** `tasks.md` MUST include a golden eval execution and evidence reporting step. Case creation and case execution are paired — one without the other is incomplete.
+   - **If this change did NOT create eval cases but golden cases already exist for the target:** `tasks.md` MUST still include a golden eval execution step using the existing golden cases.
+   - **If this change did NOT create eval cases AND no golden cases exist:** block. Report "no golden cases available for critical coverage dimensions" and route back to EvalOps for case creation before advancing the workflow.
+4. After `openspec-propose` completes and the EvalOps check passes, call `workflow.py record-evidence`, `workflow.py complete-phase --exit-criteria-satisfied openspec_artifacts_done`, and `workflow.py advance`.
+5. Output a **review-focus summary** for the user.
+6. Delegate implementation to `openspec-apply-change` when the user is ready.
 
 ### spec-driven-incremental-flow
 
@@ -184,6 +189,7 @@ When an AI behavior target is being created or modified. New AI skill developmen
 The orchestrator tracks EvalOps state across the full lifecycle for EvalOps-gated changes:
 
 ```
+--- Build Phase: create eval assets ---
 No coverage
   → coverage reviewed (gate: user confirms coverage.yaml review)
   → cases in inbox (gate: sdlc-evalops define-coverage + generate-cases)
@@ -191,8 +197,10 @@ Cases in inbox
   → cases accepted (gate: mandatory triage via sdlc-evalops)
 Cases accepted
   → cases golden (gate: user confirms golden promotion)
+--- Build / Run Boundary: pre-implementation gate ---
 Coverage + golden cases
   → implementation (gate: pre-implementation eval assets ready)
+--- Run Phase: execute and report ---
 Implementation
   → pytest pass (gate: TDD verification)
 Pytest pass
@@ -202,6 +210,8 @@ Golden eval run
 Golden eval run
   → golden eval fail → failure analysis (gate: user-confirmed fix plan)
 ```
+
+Build Phase and Run Phase are distinct gate categories. Build Phase creates eval assets (coverage, cases, golden promotion); Run Phase executes and reports them (pytest, Promptfoo golden eval). Creating cases without running them does NOT satisfy the EvalOps gate — both categories must be satisfied independently.
 
 Each transition requires either:
 - **Human confirmation** (human gates: coverage acceptance, golden promotion, fix plan approval).
@@ -366,6 +376,14 @@ Please focus on:
 - `design.md > Decisions`: technical tradeoffs match expectations
 - `specs/* > Requirements`: SHALL/MUST clauses are not too broad or too narrow
 - `tasks.md > Verification`: tasks can confirm completion
+```
+
+**EvalOps-gated variation:** For changes that involve semantic verification, the review-focus summary MUST additionally call out:
+```markdown
+- `tasks.md > EvalOps`: verify eval case creation and golden eval execution are paired:
+  - If cases were created, a corresponding golden eval execution task exists
+  - If golden cases already exist, a golden eval execution task exists
+  - If no golden cases exist, the change is blocked until cases are created
 ```
 
 ### Incremental Flow Summary

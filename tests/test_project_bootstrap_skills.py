@@ -6,27 +6,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from support.frontmatter import read_frontmatter
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BOOTSTRAP_SKILL = REPO_ROOT / "skills" / "sdlc-project-bootstrap"
 OPENSPEC_INIT_SKILL = REPO_ROOT / "skills" / "sdlc-openspec-init"
-
-
-def _read_frontmatter(path: Path) -> dict:
-    """Read YAML frontmatter from a SKILL.md file and return as dict."""
-    text = path.read_text(encoding="utf-8")
-    if not text.startswith("---"):
-        return {}
-    end = text.find("---", 3)
-    if end == -1:
-        return {}
-    raw = text[3:end].strip()
-    result = {}
-    for line in raw.split("\n"):
-        line = line.strip()
-        if ":" in line:
-            key, _, value = line.partition(":")
-            result[key.strip()] = value.strip()
-    return result
 
 
 class TestSdlcOpenspecInitSkill(unittest.TestCase):
@@ -39,7 +23,7 @@ class TestSdlcOpenspecInitSkill(unittest.TestCase):
         )
 
     def test_skill_md_has_valid_frontmatter(self) -> None:
-        fm = _read_frontmatter(OPENSPEC_INIT_SKILL / "SKILL.md")
+        fm = read_frontmatter(OPENSPEC_INIT_SKILL / "SKILL.md")
         self.assertEqual(fm.get("name"), "sdlc-openspec-init")
         self.assertIn("description", fm)
         self.assertGreater(len(fm["description"]), 20, "description too short")
@@ -142,7 +126,7 @@ class TestSdlcProjectBootstrapSkill(unittest.TestCase):
         )
 
     def test_skill_md_has_valid_frontmatter(self) -> None:
-        fm = _read_frontmatter(BOOTSTRAP_SKILL / "SKILL.md")
+        fm = read_frontmatter(BOOTSTRAP_SKILL / "SKILL.md")
         self.assertEqual(fm.get("name"), "sdlc-project-bootstrap")
         self.assertIn("description", fm)
         self.assertGreater(len(fm["description"]), 20, "description too short")
@@ -437,7 +421,7 @@ class TestSdlcOrchestratorSkill(unittest.TestCase):
         )
 
     def test_skill_md_has_valid_frontmatter(self) -> None:
-        fm = _read_frontmatter(ORCHESTRATOR_SKILL / "SKILL.md")
+        fm = read_frontmatter(ORCHESTRATOR_SKILL / "SKILL.md")
         self.assertEqual(fm.get("name"), "sdlc-orchestrator")
         self.assertIn("description", fm)
         self.assertGreater(len(fm["description"]), 20, "description too short")
