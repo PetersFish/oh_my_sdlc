@@ -11,3 +11,7 @@ Every roadmap mutation appends to this file.
 | 2026-06-20T14:09:54Z | revise | RM-ORCH-002 | Resolve cross-platform adapter design questions | Recorded Cursor conditional support model, explicit per-platform command selection, and Cursor support verification matrix. | snapshots/RM-ORCH-002-20260620T140954Z.md | - |
 | 2026-06-20T14:18:39Z | revise | RM-ORCH-002 | Capture Cursor validation results | Recorded Cursor 3.8.11 on macOS Tahoe 26.5.1 as first target, remediation-driving stop-hook feedback, and `python3` as Windows-native command choice. | snapshots/RM-ORCH-002-20260620T141839Z.md | - |
 | 2026-06-20T22:24:00Z | review | RM-ORCH-001 | Roadmap review passed; promote to OpenSpec | Created OpenSpec artifacts and marked item ready for apply. | - | opencode-governance-validation |
+| 2026-06-21T19:30:00Z | insert | RM-ORCH-003 | Capture governance UX improvement | Added roadmap item for auto-dispatching governance remediation to LLM assistant. | - | - |
+| 2026-06-21T19:30:00Z | insert | RM-ORCH-004 | Capture workflow state cleanup | Added roadmap item for clearing current.json on workflow run done. | - | - |
+| 2026-06-21T20:00:00Z | insert | RM-ORCH-005 | Capture workflow governance gap | Added roadmap item requiring workflow run before all Roadmap and OpenSpec stateful mutations. | - | - |
+| 2026-06-21T20:00:00Z | reorder | RM-ORCH-004, RM-ORCH-003 | Update priority and dependency sequence | RM-ORCH-004 order 30 (first), RM-ORCH-005 order 40 (second), RM-ORCH-003 order 50 (third). RM-ORCH-003 now depends on RM-ORCH-005. | - | - |

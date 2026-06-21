@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "run_id": "2026-06-21-add-sdlc-workflow-engine",
+  "workflow": "sdlc-main",
+  "status": "done",
+  "current_phase": "done",
+  "primary_subject": {
+    "type": "openspec_change",
+    "id": "add-sdlc-workflow-engine"
+  },
+  "context": {
+    "change_id": "add-sdlc-workflow-engine"
+  },
+  "phase_readiness": {
+    "phase": "done",
+    "ready": true,
+    "missing_required_inputs": []
+  },
+  "pending_hooks": [],
+  "completed_hooks": [
+    "roadmap_done_if_relevant",
+    "memory_sync"
+  ],
+  "completed_phases": [
+    "post_archive_actions"
+  ],
+  "gates": {},
+  "evidence": {
+    "archive_path": "openspec/changes/archive/2026-06-21-add-sdlc-workflow-engine",
+    "roadmap_link": {
+      "count": 0,
+      "items": []
+    },
+    "roadmap_hook_resolution": "no_linked_item",
+    "memory_sync_resolution": "synced",
+    "memory_sync_reason": "Specs synced during archive; memory already updated"
+  },
+  "block": null,
+  "updated_at": "2026-06-21T19:26:21.251704"
+}

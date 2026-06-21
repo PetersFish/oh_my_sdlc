@@ -1,15 +1,15 @@
 ---
 id: RM-ORCH-001
 title: "OpenCode Governance Validation"
-status: ready
+status: done
 stage: mvp
 priority: p0
 order: 10
 depends_on: []
 openspec_change: "opencode-governance-validation"
 created_at: 2026-06-20
-started_at: null
-completed_at: null
+started_at: 2026-06-20
+completed_at: 2026-06-21
 ---
 
 # Goal
@@ -103,7 +103,7 @@ Promote this item to OpenSpec when ready to implement Phase 1. The OpenSpec shou
 
 # Completion Notes
 
-Not started.
+Implemented Phase 1 governance diagnostics in workflow.py and OpenCode plugin. Archived under `openspec/changes/archive/2026-06-21-opencode-governance-validation/`.
 
 # Design Reference
 

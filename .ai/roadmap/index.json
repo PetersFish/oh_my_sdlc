@@ -25,7 +25,7 @@
     },
     {
       "id": "RM-ORCH-001",
-      "status": "ready",
+      "status": "done",
       "title": "OpenCode Governance Validation",
       "stage": "mvp",
       "priority": "p0",
@@ -98,6 +98,19 @@
       "area": "workflow.ai-evalops"
     },
     {
+      "id": "RM-ORCH-004",
+      "status": "idea",
+      "title": "Clear Current Run On Done",
+      "stage": "v2",
+      "priority": "p0",
+      "order": 30,
+      "depends_on": [
+        "RM-ORCH-001"
+      ],
+      "openspec_change": null,
+      "area": "workflow.sdlc-orchestrator"
+    },
+    {
       "id": "RM-SDLC-004",
       "status": "idea",
       "title": "Backlog / GitHub Issues Integration",
@@ -124,6 +137,20 @@
       "area": "workflow.ai-evalops"
     },
     {
+      "id": "RM-ORCH-005",
+      "status": "idea",
+      "title": "Workflow Run Required For Roadmap And OpenSpec Actions",
+      "stage": "v2",
+      "priority": "p0",
+      "order": 40,
+      "depends_on": [
+        "RM-ORCH-001",
+        "RM-ORCH-004"
+      ],
+      "openspec_change": null,
+      "area": "workflow.sdlc-orchestrator"
+    },
+    {
       "id": "RM-EVAL-005",
       "status": "idea",
       "title": "Session Eval 触发器接入 sdlc-orchestrator",
@@ -135,6 +162,20 @@
       ],
       "openspec_change": null,
       "area": "workflow.ai-evalops"
+    },
+    {
+      "id": "RM-ORCH-003",
+      "status": "idea",
+      "title": "Governance Remediation Auto-Dispatch",
+      "stage": "v2",
+      "priority": "p1",
+      "order": 50,
+      "depends_on": [
+        "RM-ORCH-001",
+        "RM-ORCH-005"
+      ],
+      "openspec_change": null,
+      "area": "workflow.sdlc-orchestrator"
     }
   ]
 }
