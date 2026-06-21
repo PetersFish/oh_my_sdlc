@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-06-14T03:39:51.028666Z",
+  "generated_at": "2026-06-21T10:45:43.117131Z",
   "entries": [
     {
       "id": "skills/integration-notion-sync",
@@ -365,6 +365,23 @@
       "spec_paths": []
     },
     {
+      "id": "init-command-core-pattern",
+      "type": "decisions",
+      "path": "decisions/init-command-core-pattern.md",
+      "title": "Init Functions as Command Core + Skill Shell",
+      "summary": "Mechanical init steps extracted into deterministic Python scripts; skills become interactive wrappers that call commands. Backstopped by verify-foundations.",
+      "tags": [
+        "init",
+        "bootstrap",
+        "reliability",
+        "skill-design"
+      ],
+      "updated_at": "2026-06-21T16:00:00Z",
+      "confidence": "high",
+      "status": "synced",
+      "parent_id": "root"
+    },
+    {
       "id": "decisions/schema-simplification",
       "type": "decisions",
       "path": "decisions/schema-simplification.md",
@@ -379,6 +396,23 @@
       "updated_at": "2026-06-10T04:00:00Z",
       "confidence": "high",
       "status": "synced"
+    },
+    {
+      "id": "skill-canonical-distribution",
+      "type": "decisions",
+      "path": "decisions/skill-canonical-distribution.md",
+      "title": "Canonical-First Skill Updates with Multi-CLI Distribution",
+      "summary": "Skills under skills/ are canonical source of truth. Changes must be made there first, then distributed to project-level and user-level CLI targets.",
+      "tags": [
+        "skills",
+        "distribution",
+        "canonical",
+        "governance"
+      ],
+      "updated_at": "2026-06-21T16:00:00Z",
+      "confidence": "high",
+      "status": "synced",
+      "parent_id": "root"
     },
     {
       "id": "decisions/target-grader-model-separation",
@@ -397,6 +431,24 @@
       "updated_at": "2026-06-13T17:00:00Z",
       "confidence": "high",
       "status": "synced"
+    },
+    {
+      "id": "template-sync-and-distribution",
+      "type": "decisions",
+      "path": "decisions/template-sync-and-distribution.md",
+      "title": "Template Sync + Canonical Distribution Workflow",
+      "summary": "Live .ai/workflows/ files sync to canonical skills/ templates; git hook enforces consistency; distributed copies derived from canonical.",
+      "tags": [
+        "workflow",
+        "sync",
+        "templates",
+        "distribution",
+        "git-hooks"
+      ],
+      "updated_at": "2026-06-21T16:00:00Z",
+      "confidence": "high",
+      "status": "synced",
+      "parent_id": "root"
     },
     {
       "id": "pitfalls/accept-encoding-identity-required",
@@ -437,6 +489,24 @@
       "status": "synced"
     },
     {
+      "id": "pitfalls/evalops-expected-rubric-vs-evaluator-rubric",
+      "type": "pitfalls",
+      "path": "pitfalls/evalops-expected-rubric-vs-evaluator-rubric.md",
+      "title": "EvalOps golden case expected.rubric is the Promptfoo assertion value \u2014 evaluators.llm_judge.rubric is ignored by export",
+      "summary": ">-",
+      "tags": [
+        "promptfoo",
+        "evals",
+        "evalops",
+        "rubric",
+        "export",
+        "llm-rubric"
+      ],
+      "updated_at": "2026-06-16T11:00:00Z",
+      "confidence": "high",
+      "status": "synced"
+    },
+    {
       "id": "pitfalls/exact-contains-assertions-brittle",
       "type": "pitfalls",
       "path": "pitfalls/exact-contains-assertions-brittle.md",
@@ -454,6 +524,23 @@
       "status": "synced"
     },
     {
+      "id": "live-template-drift",
+      "type": "pitfalls",
+      "path": "pitfalls/live-template-drift.md",
+      "title": "Live .ai/workflows/ Files Drift from Skill Templates",
+      "summary": "Editing only .ai/workflows/scripts/workflow.py without syncing to sdlc-project-bootstrap/templates/ causes new bootstrapped projects to get stale template files. Pre-commit hook now enforces sync.",
+      "tags": [
+        "templates",
+        "drift",
+        "sync",
+        "workflow"
+      ],
+      "updated_at": "2026-06-21T16:00:00Z",
+      "confidence": "high",
+      "status": "synced",
+      "parent_id": "root"
+    },
+    {
       "id": "pitfalls/reasoning-model-max-tokens-truncation",
       "type": "pitfalls",
       "path": "pitfalls/reasoning-model-max-tokens-truncation.md",
@@ -469,6 +556,23 @@
       "updated_at": "2026-06-13T08:50:00Z",
       "confidence": "high",
       "status": "synced"
+    },
+    {
+      "id": "skill-copies-drift",
+      "type": "pitfalls",
+      "path": "pitfalls/skill-copies-drift.md",
+      "title": "Distributed Skill Copies Drift from Canonical",
+      "summary": "Editing `.opencode/skills/<name>/SKILL.md` without syncing to `skills/<name>/SKILL.md` (canonical) or other distributed copies breaks canonical-distributed symmetry and causes test failures.",
+      "tags": [
+        "skills",
+        "distribution",
+        "drift",
+        "tests"
+      ],
+      "updated_at": "2026-06-21T16:00:00Z",
+      "confidence": "high",
+      "status": "synced",
+      "parent_id": "root"
     },
     {
       "id": "pitfalls/stale-global-skill-copies-break-openspec-init",
@@ -524,6 +628,24 @@
       ],
       "test_paths": "",
       "spec_paths": ""
+    },
+    {
+      "id": "20260621-workflow-runtime-enhancements",
+      "type": "evolution",
+      "path": "evolution/20260621-workflow-runtime-enhancements.md",
+      "title": "2026-06-21 \u2014 Workflow Runtime Enhancements",
+      "summary": "Added verify-foundations command, --json flag, sync_templates.py (canonical protection), init_foundations.py (command-backed init), git pre-commit hook, and multi-CLI distribution enforcement.",
+      "tags": [
+        "workflow",
+        "sync",
+        "init",
+        "distributions",
+        "hooks"
+      ],
+      "updated_at": "2026-06-21T16:00:00Z",
+      "confidence": "high",
+      "status": "synced",
+      "parent_id": "root"
     }
   ],
   "excluded_paths": [

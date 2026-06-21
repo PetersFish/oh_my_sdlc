@@ -5,14 +5,14 @@
   "git": {
     "available": true,
     "has_commits": true,
-    "head": "8fe4bbd08cb572add7155c1da21820a78f870e8d",
-    "last_synced_commit": "8fe4bbd08cb572add7155c1da21820a78f870e8d",
+    "head": "78d5ba3b808ead92860d79f6e3c2019782285046",
+    "last_synced_commit": "78d5ba3b808ead92860d79f6e3c2019782285046",
     "worktree_state": "dirty"
   },
   "pending_snapshots": [],
   "last_sync": {
-    "timestamp": "2026-06-14T03:37:05.367185Z",
-    "commit": "8fe4bbd08cb572add7155c1da21820a78f870e8d",
-    "snapshot_id": "20260614-070000"
+    "timestamp": "2026-06-21T10:44:58.241508Z",
+    "commit": "78d5ba3b808ead92860d79f6e3c2019782285046",
+    "snapshot_id": "20260621-170000"
   }
 }
