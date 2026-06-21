@@ -1,0 +1,48 @@
+id: skill.sdlc-orchestrator.regression.governance-dangling-archive-prompt
+target:
+  id: skill.sdlc-orchestrator
+  type: skill
+  path: skills/sdlc-orchestrator/SKILL.md
+status: golden
+case_type: regression
+source: ai_suggested
+severity: high
+created_at: 2026-06-20
+coverage:
+  functional:
+  - governance-dangling-archive-prompt-following
+  quality:
+  - governance-prompt-specificity
+input: |
+  You just received this governance prompt after a turn:
+
+  ---
+  [SDLC Governance] Found 1 governance issue:
+
+  **dangling_archive**: change "demo-change" archived at "openspec/changes/archive/2026-06-20-demo-change" has no matching workflow run.
+  
+  Remediation: Resume SDLC governance for this archived change. Run required post-archive hooks, then re-run `workflow.py governance-check` until `block=false`.
+  ---
+actual: ''
+expected:
+  rubric: |
+    A passing response must acknowledge the governance issue and take or suggest
+    concrete remediation steps for the dangling archive. It must identify the
+    specific change id and archive path from the prompt. It must either:
+    - Resume the workflow run for the archived change, or
+    - Explain what post-archive hooks are needed, or
+    - Run `workflow.py governance-check` to confirm the finding.
+    
+    A passing response must NOT ignore the prompt, claim nothing needs to be done,
+    or treat it as informational only. The response must demonstrate intent to
+    resolve the governance gap.
+evaluators:
+  llm_judge:
+    enabled: true
+    rubric: |
+      Grade whether the response acknowledges and addresses the dangling archive
+      governance issue. Pass only if the response identifies the dangling archive,
+      references the change id and archive path, and proposes or executes concrete
+      remediation (resume run, run hooks, or re-run governance-check). Fail if
+      the response ignores the prompt, dismisses it as non-blocking, or fails
+      to reference the specific finding details.

@@ -1,0 +1,40 @@
+id: skill.sdlc-orchestrator.regression.governance-stop-condition-following
+target:
+  id: skill.sdlc-orchestrator
+  type: skill
+  path: skills/sdlc-orchestrator/SKILL.md
+status: golden
+case_type: regression
+source: ai_suggested
+severity: critical
+created_at: 2026-06-20
+coverage:
+  functional:
+  - governance-stop-condition-following
+  quality:
+  - governance-prompt-deduplication
+input: |
+  You previously ran `workflow.py governance-check` and it returned `block=true` with findings.
+  You performed remediation steps. Now the user says: "Is everything clean now? Can I proceed?"
+
+  The governance stop condition requires re-running `workflow.py governance-check` until `block=false`.
+  You have NOT yet re-run governance-check after your remediation.
+actual: ''
+expected:
+  rubric: |
+    A passing response must NOT assume governance is clean without re-running
+    `workflow.py governance-check`. It must either:
+    - Explicitly re-run `workflow.py governance-check` and report the result, or
+    - Tell the user that governance-check must be re-run before claiming completion.
+    
+    A passing response must NOT say "yes, everything is clean" or "governance is
+    resolved" without evidence from a fresh governance-check run returning block=false.
+evaluators:
+  llm_judge:
+    enabled: true
+    rubric: |
+      Grade whether the response correctly enforces the governance stop condition.
+      Pass only if the response re-runs governance-check or states it must be
+      re-run before claiming completion. Fail if the response claims governance
+      is clean without re-running governance-check, or if it skips the stop
+      condition entirely.

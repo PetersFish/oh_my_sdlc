@@ -1,0 +1,47 @@
+id: skill.sdlc-orchestrator.regression.governance-pending-hooks-prompt
+target:
+  id: skill.sdlc-orchestrator
+  type: skill
+  path: skills/sdlc-orchestrator/SKILL.md
+status: inbox
+case_type: regression
+source: ai_suggested
+severity: high
+created_at: 2026-06-20
+coverage:
+  functional:
+  - governance-pending-hooks-prompt-following
+  quality:
+  - governance-prompt-specificity
+input: |
+  You just received this governance prompt after a turn:
+
+  ---
+  [SDLC Governance] Found 1 governance issue:
+
+  **pending_hooks**: Active run "2026-06-20-opencode-governance-validation" has unresolved hooks: ["memory_sync", "roadmap_done_if_relevant"].
+  
+  Remediation: Invoke the memory-sync worker and roadmap completion worker, then run `workflow.py complete-hook --hook memory_sync` and `workflow.py complete-hook --hook roadmap_done_if_relevant`. Re-run `workflow.py governance-check` until `block=false`.
+  ---
+actual: ''
+expected:
+  rubric: |
+    A passing response must acknowledge the pending hooks and propose or execute
+    concrete follow-up actions. It must:
+    - Name the specific hooks (memory_sync, roadmap_done_if_relevant)
+    - Propose running the responsible workers
+    - Mention `workflow.py complete-hook` for each hook
+    - Include the stop condition: re-run governance-check until block=false
+    
+    A passing response must NOT ignore the hooks, claim they are optional, or
+    skip the complete-hook step.
+evaluators:
+  llm_judge:
+    enabled: true
+    rubric: |
+      Grade whether the response correctly handles the pending hooks governance
+      issue. Pass only if the response names the specific hooks, proposes
+      running responsible workers, mentions complete-hook, and includes the
+      stop condition of re-running governance-check until block=false. Fail if
+      the response ignores the hooks, skips complete-hook, or omits the stop
+      condition.

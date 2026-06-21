@@ -840,5 +840,228 @@ class TestCompletePhase(FixtureBase):
         self.assertIn("roadmap_done_if_relevant", data.get("pending_hooks", []))
 
 
+class TestGovernanceCheck(FixtureBase):
+    """Tests for read-only governance-check command."""
+
+    def _run_gc(self):
+        rc, out, err = run_workflow(self.tmp, "governance-check")
+        self.assertEqual(rc, 0, f"governance-check failed: {err}")
+        data = json.loads(out)
+        self.assertIn("block", data)
+        self.assertIn("findings", data)
+        return data
+
+    def _make_active_run(self, change_id, pending_hooks=None):
+        runs_dir = os.path.join(self.tmp, ".ai", "workflows", "runs")
+        os.makedirs(runs_dir, exist_ok=True)
+        state = {
+            "version": 1,
+            "run_id": f"2026-06-20-{change_id}",
+            "workflow": "sdlc-main",
+            "status": "running",
+            "current_phase": "input",
+            "primary_subject": {
+                "type": "openspec_change",
+                "id": change_id,
+            },
+            "context": {"change_id": change_id},
+            "phase_readiness": {"phase": "input", "ready": True, "missing_required_inputs": []},
+            "pending_hooks": pending_hooks or [],
+            "completed_hooks": [],
+            "completed_phases": [],
+            "gates": {},
+            "evidence": {},
+            "block": None,
+            "updated_at": "2026-06-20T00:00:00",
+        }
+        with open(os.path.join(runs_dir, "current.json"), "w") as f:
+            json.dump(state, f)
+
+    def _make_done_history_run(self, change_id):
+        hist_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "history")
+        os.makedirs(hist_dir, exist_ok=True)
+        state = {
+            "version": 1,
+            "run_id": f"2026-06-20-{change_id}",
+            "workflow": "sdlc-main",
+            "status": "done",
+            "current_phase": "done",
+            "primary_subject": {
+                "type": "openspec_change",
+                "id": change_id,
+            },
+            "context": {"change_id": change_id},
+            "phase_readiness": {"phase": "done", "ready": True, "missing_required_inputs": []},
+            "pending_hooks": [],
+            "completed_hooks": [],
+            "completed_phases": [],
+            "gates": {},
+            "evidence": {},
+            "block": None,
+            "updated_at": "2026-06-20T00:00:00",
+        }
+        with open(os.path.join(hist_dir, f"{state['run_id']}.json"), "w") as f:
+            json.dump(state, f)
+
+    # 3.2: clean state returns block=false
+    def test_clean_state_returns_block_false(self):
+        data = self._run_gc()
+        self.assertFalse(data["block"])
+        self.assertEqual(data["findings"], [])
+
+    # 3.3: dangling archive
+    def test_dangling_archive_returns_block_true(self):
+        self._make_openspec_archive("demo-change", "2026-06-20")
+        data = self._run_gc()
+        self.assertTrue(data["block"])
+        self.assertEqual(len(data["findings"]), 1)
+        f = data["findings"][0]
+        self.assertEqual(f["type"], "dangling_archive")
+        self.assertEqual(f["change_id"], "demo-change")
+        self.assertIn("2026-06-20-demo-change", f["archive_path"])
+        self.assertTrue(f["message"])
+        self.assertTrue(f["remediation"])
+        self.assertTrue(f["hash"])
+        self.assertEqual(len(f["hash"]), 12)
+
+    # 3.4: archived change with matching active run not dangling
+    def test_archived_with_active_run_not_dangling(self):
+        self._make_openspec_archive("demo-change", "2026-06-20")
+        self._make_active_run("demo-change")
+        data = self._run_gc()
+        self.assertFalse(data["block"])
+        self.assertEqual(data["findings"], [])
+
+    # 3.5: archived change with matching done history run not dangling
+    def test_archived_with_done_history_not_dangling(self):
+        self._make_openspec_archive("demo-change", "2026-06-20")
+        self._make_done_history_run("demo-change")
+        data = self._run_gc()
+        self.assertFalse(data["block"])
+        self.assertEqual(data["findings"], [])
+
+    # 3.6: pending hooks return block=true
+    def test_pending_hooks_returns_block_true(self):
+        self._make_active_run("demo-change", pending_hooks=["memory_sync", "roadmap_done_if_relevant"])
+        data = self._run_gc()
+        self.assertTrue(data["block"])
+        self.assertEqual(len(data["findings"]), 1)
+        f = data["findings"][0]
+        self.assertEqual(f["type"], "pending_hooks")
+        self.assertEqual(f["run_id"], "2026-06-20-demo-change")
+        self.assertEqual(f["change_id"], "demo-change")
+        self.assertIn("memory_sync", f["pending_hook_names"])
+        self.assertIn("roadmap_done_if_relevant", f["pending_hook_names"])
+        self.assertTrue(f["message"])
+        self.assertTrue(f["remediation"])
+        self.assertTrue(f["hash"])
+
+    # 3.7: combined diagnostics
+    def test_combined_findings_return_both(self):
+        self._make_openspec_archive("other-change", "2026-06-20")
+        self._make_active_run("demo-change", pending_hooks=["memory_sync"])
+        data = self._run_gc()
+        self.assertTrue(data["block"])
+        types = {f["type"] for f in data["findings"]}
+        self.assertIn("dangling_archive", types)
+        self.assertIn("pending_hooks", types)
+        self.assertEqual(len(data["findings"]), 2)
+
+    # 3.8: write boundaries
+    def test_governance_check_write_boundaries(self):
+        self._make_openspec_archive("write-test", "2026-06-20")
+        self._make_active_run("write-test", pending_hooks=["memory_sync"])
+
+        archive_dir = os.path.join(self.tmp, "openspec", "changes", "archive", "2026-06-20-write-test")
+        runs_dir = os.path.join(self.tmp, ".ai", "workflows", "runs")
+        roadmap_dir = os.path.join(self.tmp, ".ai", "roadmap")
+        os.makedirs(roadmap_dir, exist_ok=True)
+
+        before_archive = os.path.getmtime(archive_dir)
+        before_runs = os.path.getmtime(runs_dir)
+
+        data = self._run_gc()
+
+        after_archive = os.path.getmtime(archive_dir)
+        after_runs = os.path.getmtime(runs_dir)
+
+        self.assertEqual(before_archive, after_archive, "archive directory must not be modified")
+        self.assertEqual(before_runs, after_runs, "runs directory must not be modified")
+        self.assertTrue(data["block"])
+
+    # hash stability
+    def test_finding_hash_is_stable(self):
+        self._make_openspec_archive("hash-test", "2026-06-20")
+        data1 = self._run_gc()
+        data2 = self._run_gc()
+        self.assertEqual(
+            data1["findings"][0]["hash"],
+            data2["findings"][0]["hash"],
+            "hash must be stable across repeated checks",
+        )
+
+    # duplicate archives for same change_id produce different hashes
+    def test_duplicate_archive_different_dates_produce_different_hashes(self):
+        self._make_openspec_archive("dup-test", "2026-06-20")
+        self._make_openspec_archive("dup-test", "2026-06-21")
+        data = self._run_gc()
+        self.assertEqual(len(data["findings"]), 2)
+        self.assertNotEqual(
+            data["findings"][0]["hash"],
+            data["findings"][1]["hash"],
+        )
+
+    # pending hooks with no change_id still works
+    def test_pending_hooks_without_change_id(self):
+        runs_dir = os.path.join(self.tmp, ".ai", "workflows", "runs")
+        os.makedirs(runs_dir, exist_ok=True)
+        state = {
+            "version": 1,
+            "run_id": "2026-06-20-unknown",
+            "workflow": "sdlc-main",
+            "status": "running",
+            "current_phase": "input",
+            "primary_subject": {"type": "other", "id": "unknown"},
+            "context": {},
+            "phase_readiness": {"phase": "input", "ready": True, "missing_required_inputs": []},
+            "pending_hooks": ["memory_sync"],
+            "completed_hooks": [],
+            "completed_phases": [],
+            "gates": {},
+            "evidence": {},
+            "block": None,
+            "updated_at": "2026-06-20T00:00:00",
+        }
+        with open(os.path.join(runs_dir, "current.json"), "w") as f:
+            json.dump(state, f)
+        data = self._run_gc()
+        self.assertTrue(data["block"])
+        f = data["findings"][0]
+        self.assertIsNone(f["change_id"])
+
+    # Prompt contract: remediation text must contain runtime follow-up commands
+    def test_pending_hooks_remediation_includes_complete_hook_and_stop_condition(self):
+        self._make_active_run(
+            "contract-test", pending_hooks=["memory_sync", "roadmap_done_if_relevant"]
+        )
+        data = self._run_gc()
+        f = data["findings"][0]
+        remediation = f["remediation"]
+        self.assertIn("complete-hook", remediation,
+                      "remediation must mention workflow.py complete-hook")
+        self.assertIn("governance-check", remediation,
+                      "remediation must mention re-running governance-check")
+        self.assertIn("block=false", remediation,
+                      "remediation must include stop condition block=false")
+
+    # Prompt contract: dangling archive remediation also includes stop condition
+    def test_dangling_archive_remediation_includes_governance_check_stop_condition(self):
+        self._make_openspec_archive("contract-dangle", "2026-06-20")
+        data = self._run_gc()
+        f = data["findings"][0]
+        self.assertIn("governance-check", f["remediation"])
+        self.assertIn("block=false", f["remediation"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

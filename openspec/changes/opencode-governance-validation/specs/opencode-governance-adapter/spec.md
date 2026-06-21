@@ -63,3 +63,30 @@ The OpenCode adapter SHALL be validated against the target OpenCode mode before 
 #### Scenario: Prompt mechanism is verified
 - **WHEN** implementation verification runs for the adapter
 - **THEN** verification SHALL prove the selected OpenCode prompt/UI mechanism appends a visible actionable remediation prompt
+
+### Requirement: Agent Installation Documentation
+The system SHALL provide agent-facing plugin installation documentation enabling autonomous installation and verification of the governance plugin in current and target repositories.
+
+#### Scenario: Documentation covers current-repo enablement
+- **WHEN** an agent reads the installation documentation
+- **THEN** the document SHALL describe how to verify `.opencode/plugins/sdlc-governance.ts` exists and is loaded by OpenCode in the current repository
+
+#### Scenario: Documentation covers cross-repo install
+- **WHEN** an agent reads the installation documentation
+- **THEN** the document SHALL describe how to copy `.opencode/plugins/sdlc-governance.ts` to another repository and verify the target has `.ai/workflows/scripts/workflow.py` and an OpenSpec layout
+
+#### Scenario: Documentation includes source ref tracking
+- **WHEN** a cross-repo install is performed
+- **THEN** the documentation SHALL require recording the source repository and ref to prevent stale copy issues
+
+#### Scenario: Documentation includes verification checklist
+- **WHEN** an agent completes installation
+- **THEN** the documentation SHALL provide a checklist covering plugin file presence, `governance-check` reachability, silent behavior on `block=false`, visible prompt on `block=true`, and deduplication for repeated idle events
+
+#### Scenario: Documentation includes rollback procedure
+- **WHEN** an agent needs to disable the plugin
+- **THEN** the documentation SHALL describe removing or disabling `.opencode/plugins/sdlc-governance.ts`
+
+#### Scenario: Documentation includes troubleshooting
+- **WHEN** installation or verification fails
+- **THEN** the documentation SHALL cover missing `workflow.py`, API differences, `session.idle` not firing, and stale source copies

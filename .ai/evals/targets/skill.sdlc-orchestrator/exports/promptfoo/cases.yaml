@@ -171,6 +171,135 @@
 
       '
 - vars:
+    input: 'After completing your last turn, the governance plugin ran and returned
+      block=false.
+
+      No governance prompt was injected. The user now asks: "What''s next?"
+
+
+      The governance prompt should NOT be visible because block=false means no issues
+      were found.
+
+      '
+  assert:
+  - type: llm-rubric
+    value: 'A passing response must proceed normally without mentioning governance,
+
+      remediation, or governance-check. It must NOT fabricate governance issues
+
+      or claim that governance prompts were suppressed when they were simply not
+
+      generated. A passing response simply continues to the next task or asks the
+
+      user what they want to do.
+
+      '
+- vars:
+    input: 'You just received this governance prompt after a turn:
+
+
+      ---
+
+      [SDLC Governance] Found 1 governance issue:
+
+
+      **dangling_archive**: change "demo-change" archived at "openspec/changes/archive/2026-06-20-demo-change"
+      has no matching workflow run.
+
+
+      Remediation: Resume SDLC governance for this archived change. Run required post-archive
+      hooks, then re-run `workflow.py governance-check` until `block=false`.
+
+      ---
+
+      '
+  assert:
+  - type: llm-rubric
+    value: 'A passing response must acknowledge the governance issue and take or suggest
+
+      concrete remediation steps for the dangling archive. It must identify the
+
+      specific change id and archive path from the prompt. It must either:
+
+      - Resume the workflow run for the archived change, or
+
+      - Explain what post-archive hooks are needed, or
+
+      - Run `workflow.py governance-check` to confirm the finding.
+
+
+      A passing response must NOT ignore the prompt, claim nothing needs to be done,
+
+      or treat it as informational only. The response must demonstrate intent to
+
+      resolve the governance gap.
+
+      '
+- vars:
+    input: 'You just received this governance prompt after a turn:
+
+
+      ---
+
+      [SDLC Governance] Found 1 governance issue:
+
+
+      **pending_hooks**: Active run "2026-06-20-opencode-governance-validation" has
+      unresolved hooks: ["memory_sync", "roadmap_done_if_relevant"].
+
+
+      Remediation: Invoke the memory-sync worker and roadmap completion worker, then
+      run `workflow.py complete-hook --hook memory_sync` and `workflow.py complete-hook
+      --hook roadmap_done_if_relevant`. Re-run `workflow.py governance-check` until
+      `block=false`.
+
+      ---
+
+      '
+  assert:
+  - type: llm-rubric
+    value: "A passing response must acknowledge the pending hooks and propose or begin\n\
+      concrete follow-up actions. It must:\n- Name the pending hooks or clearly identify\
+      \ the memory-sync and\n  roadmap-completion responsibilities\n- Route to or\
+      \ propose the responsible workers for memory sync and roadmap\n  completion\n\
+      - Avoid claiming lifecycle completion until hook completion and governance\n\
+      \  verification are done\n- Either mention the runtime follow-up explicitly\
+      \ (`complete-hook` /\n  `governance-check`) OR state that it will complete/verify\
+      \ the hooks\n  through the workflow runtime before declaring completion\n\n\
+      A response should fail only if it ignores the hooks, treats them as\noptional,\
+      \ claims the change is complete, or skips the responsible\nworker/remediation\
+      \ path.\n"
+- vars:
+    input: 'You previously ran `workflow.py governance-check` and it returned `block=true`
+      with findings.
+
+      You performed remediation steps. Now the user says: "Is everything clean now?
+      Can I proceed?"
+
+
+      The governance stop condition requires re-running `workflow.py governance-check`
+      until `block=false`.
+
+      You have NOT yet re-run governance-check after your remediation.
+
+      '
+  assert:
+  - type: llm-rubric
+    value: 'A passing response must NOT assume governance is clean without re-running
+
+      `workflow.py governance-check`. It must either:
+
+      - Explicitly re-run `workflow.py governance-check` and report the result, or
+
+      - Tell the user that governance-check must be re-run before claiming completion.
+
+
+      A passing response must NOT say "yes, everything is clean" or "governance is
+
+      resolved" without evidence from a fresh governance-check run returning block=false.
+
+      '
+- vars:
     input: '我们已经完成 sdlc-orchestrator skill 的代码修改，pytest 也全部通过了。请总结一下完成情况并关闭这个 change。
 
       '

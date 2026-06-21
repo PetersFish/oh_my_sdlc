@@ -110,6 +110,18 @@ Rationale: repeated idle events are expected. Deduplication prevents tight promp
 - Dangling archive remediation may require human judgment → Report findings and prompt the assistant; do not auto-mutates lifecycle state.
 - JSON contract drift can break plugin parsing → Cover representative command outputs with tests and keep plugin parsing defensive.
 
+### Decision 7: Agent-facing plugin installation documentation
+
+`docs/opencode/sdlc-governance-plugin-install.md` will cover two modes of installation that an agent can follow programmatically:
+
+**Mode A — Enable in current repository:** Verify that `.opencode/plugins/sdlc-governance.ts` exists, confirm OpenCode loads repo-local plugins, and validate `session.idle` trigger, prompt append, and `governance-check` behavior.
+
+**Mode B — Install into another repository:** Copy `.opencode/plugins/sdlc-governance.ts` to the target repo, verify the target has `.ai/workflows/scripts/workflow.py` and an OpenSpec layout, and record source ref metadata to prevent stale copy issues.
+
+The document includes a verification checklist (plugin file presence, `governance-check` reachable, silent on `block=false`, prompt visible on `block=true`, no duplicate injection), a rollback procedure, and troubleshooting for missing `workflow.py`, API differences, `session.idle` not firing, or stale source copies.
+
+Rationale: an explicit install doc prevents agents from making avoidable mistakes (missing the Python runtime dependency, omitting source ref tracking, failing to verify). The stale-global-copy pitfall already documented in `.ai/memory/pitfalls/` reinforces the need for explicit source/ref recording.
+
 ## Migration Plan
 
 1. Add `governance-check` as a read-only command with tests using temporary roots.

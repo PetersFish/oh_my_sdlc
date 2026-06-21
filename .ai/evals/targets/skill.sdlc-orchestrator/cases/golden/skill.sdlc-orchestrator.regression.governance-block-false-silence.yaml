@@ -1,0 +1,35 @@
+id: skill.sdlc-orchestrator.regression.governance-block-false-silence
+target:
+  id: skill.sdlc-orchestrator
+  type: skill
+  path: skills/sdlc-orchestrator/SKILL.md
+status: golden
+case_type: regression
+source: ai_suggested
+severity: medium
+created_at: 2026-06-20
+coverage:
+  functional:
+  - governance-block-false-silence
+input: |
+  After completing your last turn, the governance plugin ran and returned block=false.
+  No governance prompt was injected. The user now asks: "What's next?"
+
+  The governance prompt should NOT be visible because block=false means no issues were found.
+actual: ''
+expected:
+  rubric: |
+    A passing response must proceed normally without mentioning governance,
+    remediation, or governance-check. It must NOT fabricate governance issues
+    or claim that governance prompts were suppressed when they were simply not
+    generated. A passing response simply continues to the next task or asks the
+    user what they want to do.
+evaluators:
+  llm_judge:
+    enabled: true
+    rubric: |
+      Grade whether the response correctly stays silent about governance when
+      block=false. Pass only if the response does not mention governance,
+      remediation, or governance-check, and proceeds with normal task handling.
+      Fail if the response fabricates governance issues, claims prompts were
+      suppressed, or unnecessarily runs governance-check again.

@@ -2,11 +2,13 @@
 """SDLC workflow runtime -- deterministic, non-interactive state machine.
 
 Commands: status, start, resume, readiness, resolve, record-evidence,
-complete-phase, complete-hook, advance, block, done, validate.
+complete-phase, complete-hook, advance, block, done, validate,
+governance-check.
 """
 
 import argparse
 import datetime
+import hashlib
 import json
 import os
 import sys
@@ -49,6 +51,13 @@ def _ensure_dir(path):
 
 def _resolve_path(root, rel):
     return os.path.normpath(os.path.join(root, rel)) if root else rel
+
+
+def _finding_hash(finding_type, **fields):
+    canonical = finding_type + "|" + "|".join(
+        f"{k}={v}" for k, v in sorted(fields.items()) if v is not None
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:12]
 
 
 # ---------------------------------------------------------------------------
@@ -875,6 +884,106 @@ def cmd_done(root, args):
     print(json.dumps(state, indent=2))
 
 
+def cmd_governance_check(root, args):
+    """Read-only governance diagnostics: dangling archives and pending hooks."""
+    findings = []
+    archive_dir = _resolve_path(root, "openspec/changes/archive")
+    active_state = load_run_state(root)
+    history_dir = _resolve_path(root, ".ai/workflows/runs/history")
+
+    governed_change_ids = set()
+
+    if active_state:
+        ps = active_state.get("primary_subject", {})
+        if ps.get("type") == "openspec_change" and ps.get("id"):
+            governed_change_ids.add(ps["id"])
+
+    if os.path.isdir(history_dir):
+        for fname in _list_dirs(history_dir):
+            if not fname.endswith(".json"):
+                continue
+            hpath = os.path.join(history_dir, fname)
+            try:
+                with open(hpath, "r") as f:
+                    hist = json.load(f)
+            except Exception:
+                continue
+            if hist.get("status") in ("done",):
+                ps = hist.get("primary_subject", {})
+                if ps.get("type") == "openspec_change" and ps.get("id"):
+                    governed_change_ids.add(ps["id"])
+
+    if os.path.isdir(archive_dir):
+        for entry in _list_dirs(archive_dir):
+            e_path = os.path.join(archive_dir, entry)
+            if not os.path.isdir(e_path):
+                continue
+            parts = entry.split("-")
+            if len(parts) < 4:
+                continue
+            change_id = "-".join(parts[3:])
+            if change_id in governed_change_ids:
+                continue
+            rel_path = os.path.relpath(e_path, root)
+            message = (
+                f"Archived OpenSpec change \"{change_id}\" has no "
+                f"matching workflow run."
+            )
+            remediation = (
+                f"Resume SDLC governance for archived change \"{change_id}\" "
+                f"(archive path: {rel_path}). Run required post-archive hooks, "
+                f"then re-run \"workflow.py governance-check\" until block=false."
+            )
+            fh = _finding_hash(
+                "dangling_archive", change_id=change_id, archive_path=rel_path
+            )
+            findings.append({
+                "type": "dangling_archive",
+                "change_id": change_id,
+                "archive_path": rel_path,
+                "message": message,
+                "remediation": remediation,
+                "hash": fh,
+            })
+
+    if active_state:
+        pending = active_state.get("pending_hooks", [])
+        if pending:
+            run_id = active_state.get("run_id", "")
+            ctx = active_state.get("context", {})
+            change_id = ctx.get("change_id", "")
+            hook_list = ", ".join(pending)
+            message = (
+                f"Active run \"{run_id}\" has {len(pending)} unresolved "
+                f"hook(s): {pending}."
+            )
+            remediation = (
+                f"Active run \"{run_id}\" has unresolved hooks: [{hook_list}]. "
+                f"Invoke the responsible workers for each hook, then run "
+                f"\"workflow.py complete-hook --hook <hook-name>\" for each. "
+                f"Re-run \"workflow.py governance-check\" until block=false."
+            )
+            fh = _finding_hash(
+                "pending_hooks",
+                run_id=run_id,
+                change_id=change_id or None,
+                pending_hook_names=",".join(sorted(pending)),
+            )
+            findings.append({
+                "type": "pending_hooks",
+                "run_id": run_id,
+                "change_id": change_id or None,
+                "pending_hook_names": pending,
+                "message": message,
+                "remediation": remediation,
+                "hash": fh,
+            })
+
+    block = len(findings) > 0
+    output = {"block": block, "findings": findings}
+    print(json.dumps(output, indent=2))
+
+
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
@@ -1000,6 +1109,7 @@ COMMANDS = {
     "block",
     "done",
     "validate",
+    "governance-check",
 }
 
 
@@ -1055,6 +1165,8 @@ def main():
         cmd_block(root, args)
     elif args.command == "done":
         cmd_done(root, args)
+    elif args.command == "governance-check":
+        cmd_governance_check(root, args)
 
 
 if __name__ == "__main__":

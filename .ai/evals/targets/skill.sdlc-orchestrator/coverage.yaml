@@ -20,11 +20,17 @@ coverage:
     - informational-boundary
     - upstream-skill-boundary-preservation
     - openspec-intent-without-explicit-workflow
+    - governance-dangling-archive-prompt-following
+    - governance-pending-hooks-prompt-following
+    - governance-stop-condition-following
+    - governance-block-false-silence
   quality:
     - instruction-following-fidelity
     - multi-turn-governance-continuity
     - workflow-side-effect-discipline
     - stateful-governance-continuity
+    - governance-prompt-deduplication
+    - governance-prompt-specificity
   edge_cases:
     - user-says-execute-plan-after-propose-route
     - plan-mode-final-response-drift
@@ -37,6 +43,9 @@ coverage:
     - informational-workflow-question
     - explicit-workflow-opt-out
     - upstream-openspec-skill-not-modifiable
+    - governance-clean-state-no-prompt
+    - governance-duplicate-finding-suppressed
+    - governance-missing-workflow-py-target
   output_constraints:
     - spec-driven-routes-must-not-default-to-direct-execution
     - plan-mode-handoff-must-match-selected-route
@@ -54,6 +63,9 @@ risk_focus:
     - informational question mutates workflow state
     - assistant recommends hacking upstream openspec skills
     - openspec intent without explicit workflow keyword bypasses runtime
+    - governance dangling archive prompt ignored by assistant
+    - governance pending hooks prompt ignored by assistant
+    - assistant claims governance complete without re-running governance-check
 
 review:
   status: reviewed

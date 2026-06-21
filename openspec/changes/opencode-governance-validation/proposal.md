@@ -13,6 +13,7 @@ OpenSpec archive and workflow hook completion can still be bypassed when actions
 - Have the plugin append finding-specific remediation prompts through an OpenCode prompt/UI mechanism such as `tui.prompt.append`.
 - Deduplicate repeated prompt injection by a stable finding hash so idle checks do not create tight prompt loops.
 - Defer `file.watcher.updated` triggering until idle-only behavior is proven stable.
+- Include agent-facing plugin installation documentation (`docs/opencode/sdlc-governance-plugin-install.md`) covering current-repo enablement, cross-repo install, verification checklist, rollback, and stale copy protection.
 
 ## Capabilities
 
@@ -28,4 +29,5 @@ OpenSpec archive and workflow hook completion can still be bypassed when actions
 - Adds tests around workflow/OpenSpec archive fixtures and active run `pending_hooks` state.
 - Adds `.opencode/plugins/sdlc-governance.ts` for OpenCode-specific idle integration.
 - May add or update local OpenCode plugin configuration only as needed for plugin loading.
+- Adds `docs/opencode/sdlc-governance-plugin-install.md` as agent-facing installation documentation.
 - Does not alter upstream `openspec-*` skills, Roadmap lifecycle commands, Memory sync behavior, or workflow state mutation ownership.

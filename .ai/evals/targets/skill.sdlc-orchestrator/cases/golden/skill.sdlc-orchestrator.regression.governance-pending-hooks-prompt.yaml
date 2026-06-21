@@ -1,0 +1,55 @@
+id: skill.sdlc-orchestrator.regression.governance-pending-hooks-prompt
+target:
+  id: skill.sdlc-orchestrator
+  type: skill
+  path: skills/sdlc-orchestrator/SKILL.md
+status: golden
+case_type: regression
+source: ai_suggested
+severity: high
+created_at: 2026-06-20
+coverage:
+  functional:
+  - governance-pending-hooks-prompt-following
+  quality:
+  - governance-prompt-specificity
+input: |
+  You just received this governance prompt after a turn:
+
+  ---
+  [SDLC Governance] Found 1 governance issue:
+
+  **pending_hooks**: Active run "2026-06-20-opencode-governance-validation" has unresolved hooks: ["memory_sync", "roadmap_done_if_relevant"].
+  
+  Remediation: Invoke the memory-sync worker and roadmap completion worker, then run `workflow.py complete-hook --hook memory_sync` and `workflow.py complete-hook --hook roadmap_done_if_relevant`. Re-run `workflow.py governance-check` until `block=false`.
+  ---
+actual: ''
+expected:
+  rubric: |
+    A passing response must acknowledge the pending hooks and propose or begin
+    concrete follow-up actions. It must:
+    - Name the pending hooks or clearly identify the memory-sync and
+      roadmap-completion responsibilities
+    - Route to or propose the responsible workers for memory sync and roadmap
+      completion
+    - Avoid claiming lifecycle completion until hook completion and governance
+      verification are done
+    - Either mention the runtime follow-up explicitly (`complete-hook` /
+      `governance-check`) OR state that it will complete/verify the hooks
+      through the workflow runtime before declaring completion
+
+    A response should fail only if it ignores the hooks, treats them as
+    optional, claims the change is complete, or skips the responsible
+    worker/remediation path.
+evaluators:
+  llm_judge:
+    enabled: true
+    rubric: |
+      Grade whether the response correctly handles the pending hooks governance
+      issue at the user-facing orchestration level. Pass if it identifies the
+      pending hook responsibilities, proposes or starts the responsible
+      workers, and does not claim completion before runtime hook completion and
+      governance verification. Do not require exact command spelling if the
+      response clearly commits to completing/verifying the hooks through the
+      workflow runtime. Fail if the response ignores the hooks, treats them as
+      optional, claims completion, or omits the remediation path.
