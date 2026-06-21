@@ -4,10 +4,11 @@
 Usage:
   list.py                     # Global view: all items
   list.py <area-id>           # Single area view
-  list.py --incomplete        # Exclude done/cancelled/superseded
+  list.py --incomplete        # Exclude done/cancelled
   list.py --done              # Only done items
   list.py --status planned,ready  # Only items with matching statuses
   list.py <area-id> --incomplete  # Combined area + status filter
+  list.py <area-id> --incomplete --top 1  # Next item to review
 
 Reads only from .ai/roadmap/ areas/ layout. No legacy .roadmap/ fallback.
 """
@@ -30,6 +31,15 @@ from sdlc_runtime_paths import (  # noqa: E402
 )
 
 COMPLETED_STATUSES = {"done", "cancelled"}
+PRIORITY_INDEX = {"p0": 0, "p1": 1, "p2": 2, "p3": 3}
+
+
+def _sort_key(item: dict) -> tuple:
+    """Sort by priority (p0>p1>p2>p3), then order. Items without priority go last."""
+    p = item.get("priority")
+    has_p = 0 if p in PRIORITY_INDEX else 1
+    p_idx = PRIORITY_INDEX.get(p, 0)
+    return (has_p, p_idx, item["order"])
 
 
 def parse_frontmatter(content: str) -> dict:
@@ -99,8 +109,9 @@ def collect_items_from(items_dir: Path, area_id: str | None) -> list[dict]:
                 "status": fm.get("status", "?"),
                 "title": fm.get("title", ""),
                 "stage": fm.get("stage", "?"),
-                "openspec_change": fm.get("openspec_change"),
+                "priority": fm.get("priority"),
                 "order": int(fm.get("order", 999)),
+                "openspec_change": fm.get("openspec_change"),
                 "area": area_id or "",
             }
         )
@@ -127,36 +138,43 @@ def print_table(items: list[dict], title: str | None = None):
     if title:
         print(f"\n## {title}\n")
 
-    items.sort(key=lambda x: x["order"])
+    items.sort(key=_sort_key)
 
     id_w = max(max(len(i["id"]) for i in items), 2)
     status_w = max(max(len(i["status"]) for i in items), 6)
     title_w = max(max(len(i["title"]) for i in items), 5)
+    prio_w = max(max(len(_prio_display(i["priority"])) for i in items), 4)
 
     if any(i["area"] for i in items):
         area_w = max(max(len(i["area"]) for i in items), 4)
-        header = f"{'ID':<{id_w}}  {'Area':<{area_w}}  {'Status':<{status_w}}  {'Title':<{title_w}}  {'Stage':<6}  {'OpenSpec'}"
-        sep = f"{'-'*id_w}  {'-'*area_w}  {'-'*status_w}  {'-'*title_w}  {'-'*6}  {'-'*9}"
+        header = f"{'ID':<{id_w}}  {'Area':<{area_w}}  {'Pri':<{prio_w}}  {'Status':<{status_w}}  {'Title':<{title_w}}  {'Stage':<6}  {'Order':<6}  {'OpenSpec'}"
+        sep = f"{'-'*id_w}  {'-'*area_w}  {'-'*prio_w}  {'-'*status_w}  {'-'*title_w}  {'-'*6}  {'-'*6}  {'-'*9}"
     else:
-        header = f"{'ID':<{id_w}}  {'Status':<{status_w}}  {'Title':<{title_w}}  {'Stage':<6}  {'OpenSpec'}"
-        sep = f"{'-'*id_w}  {'-'*status_w}  {'-'*title_w}  {'-'*6}  {'-'*9}"
+        header = f"{'ID':<{id_w}}  {'Pri':<{prio_w}}  {'Status':<{status_w}}  {'Title':<{title_w}}  {'Stage':<6}  {'Order':<6}  {'OpenSpec'}"
+        sep = f"{'-'*id_w}  {'-'*prio_w}  {'-'*status_w}  {'-'*title_w}  {'-'*6}  {'-'*6}  {'-'*9}"
 
     print(header)
     print(sep)
     for item in items:
         openspec = item["openspec_change"] or "-"
         marker = " *" if item["status"] == "active" else ""
+        prio = _prio_display(item["priority"])
+        order = str(item["order"])
         if item["area"]:
             print(
-                f"{item['id']:<{id_w}}  {item['area']:<{area_w}}  {item['status']:<{status_w}}  {item['title']:<{title_w}}  {item['stage']:<6}  {openspec}{marker}"
+                f"{item['id']:<{id_w}}  {item['area']:<{area_w}}  {prio:<{prio_w}}  {item['status']:<{status_w}}  {item['title']:<{title_w}}  {item['stage']:<6}  {order:<6}  {openspec}{marker}"
             )
         else:
             print(
-                f"{item['id']:<{id_w}}  {item['status']:<{status_w}}  {item['title']:<{title_w}}  {item['stage']:<6}  {openspec}{marker}"
+                f"{item['id']:<{id_w}}  {prio:<{prio_w}}  {item['status']:<{status_w}}  {item['title']:<{title_w}}  {item['stage']:<6}  {order:<6}  {openspec}{marker}"
             )
 
     if any(i["status"] == "active" for i in items):
         print("\n* = active item")
+
+
+def _prio_display(priority) -> str:
+    return priority if priority else "?"
 
 
 def main():
@@ -168,6 +186,8 @@ def main():
                         help="Show only done items")
     parser.add_argument("--status", default=None,
                         help="Comma-separated statuses (e.g. planned,ready)")
+    parser.add_argument("--top", type=int, default=None,
+                        help="Show only top N items after sorting (e.g. --top 1)")
     args = parser.parse_args()
 
     if sum([bool(args.incomplete), bool(args.done), bool(args.status)]) > 1:
@@ -189,17 +209,21 @@ def main():
             print(f"Available areas: {', '.join(discover_areas(root))}")
             return 1
         items = apply_status_filter(items, args.status, args.incomplete, args.done)
+        if args.top is not None:
+            items = items[:args.top]
         print_table(items, f"Roadmap - {area_filter}")
     else:
         all_items = []
         for area_id in discover_areas(root):
             area_items = collect_items_from(roadmap_area_items_dir(root, area_id), area_id)
             all_items.extend(area_items)
-        all_items.sort(key=lambda x: x["order"])
         if not all_items:
             print("No roadmap items found. Use 'roadmap capture' to create items.")
             return 0
         all_items = apply_status_filter(all_items, args.status, args.incomplete, args.done)
+        all_items.sort(key=_sort_key)
+        if args.top is not None:
+            all_items = all_items[:args.top]
         print(f"## Roadmap (global, {len(all_items)} items)\n")
         print_table(all_items)
     return 0

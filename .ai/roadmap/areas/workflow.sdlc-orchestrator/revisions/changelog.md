@@ -15,3 +15,4 @@ Every roadmap mutation appends to this file.
 | 2026-06-21T19:30:00Z | insert | RM-ORCH-004 | Capture workflow state cleanup | Added roadmap item for clearing current.json on workflow run done. | - | - |
 | 2026-06-21T20:00:00Z | insert | RM-ORCH-005 | Capture workflow governance gap | Added roadmap item requiring workflow run before all Roadmap and OpenSpec stateful mutations. | - | - |
 | 2026-06-21T20:00:00Z | reorder | RM-ORCH-004, RM-ORCH-003 | Update priority and dependency sequence | RM-ORCH-004 order 30 (first), RM-ORCH-005 order 40 (second), RM-ORCH-003 order 50 (third). RM-ORCH-003 now depends on RM-ORCH-005. | - | - |
+| 2026-06-22T00:00:00Z | reorder | RM-ORCH-002 | Deprioritize cross-platform support | Changed priority from p1 to p3. Cross-platform adaptation is deferred until core workflow governance (RM-ORCH-004, RM-ORCH-005) and auto-dispatch (RM-ORCH-003) are complete. | - | - |

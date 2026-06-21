@@ -3,7 +3,7 @@ id: RM-ORCH-002
 title: "Cross-Platform Hook Adaptation"
 status: idea
 stage: v2
-priority: p1
+priority: p3
 order: 20
 depends_on:
   - RM-ORCH-001

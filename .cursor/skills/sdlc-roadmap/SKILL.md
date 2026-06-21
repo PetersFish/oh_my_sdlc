@@ -112,11 +112,19 @@ Item IDs are scoped within their area using the area's `id_prefix`. Cross-area d
 ### Roadmap Item Body Sections
 
 - `# Goal` — What this phase aims to achieve.
+- `# Problem Context` — Why this item exists: problem domain, user pain points, or architectural gap it addresses.
 - `# Scope` — `## In` and `## Out` lists.
+- `# Design Notes` — Design-level summary from prior discussions, structured as:
+  - `## Key Decisions` — Architecture or approach decisions.
+  - `## Tradeoffs` — Tradeoffs considered and rationale.
+  - `## Initial Approach` — Agreed solution direction, enough to reconstruct context for future review.
+  - `## Open Questions` — Unresolved questions.
 - `# Acceptance Criteria` — Verifiable completion conditions.
 - `# Promotion Notes` — Context for when this item gets promoted to OpenSpec.
 - `# Completion Notes` — What was learned, follow-up items (filled on done).
-- `# Design Reference` — Optional pointer to design docs.
+- `# Design Reference` — Optional pointer to external design docs or ADRs.
+
+**Rule:** Design Notes hold a design summary, not verbatim chat logs. When the design is too heavy for an inline summary, use `Design Reference` to point to an external design document, OpenSpec design, research doc, or ADR.
 
 ## State Machine
 
@@ -182,16 +190,21 @@ Extract MVP/V2/V3/Later planning from conversation context and generate roadmap 
 1. Read current conversation context for phased planning.
 2. Identify which area the items belong to. If unclear, ask the user or use `default_area` from root manifest.
 3. Identify each phase (MVP, V2, V3, Later) with goal, scope, and acceptance criteria.
-4. For each phase, create `.ai/roadmap/areas/<area-id>/items/RM-PREFIX-XX-slug.md` with frontmatter populated:
+4. For each phase, extract design context from the conversation:
+   - **Problem Context**: the problem domain, pain points, or architectural gap.
+   - **Design Notes**: key decisions, tradeoffs, initial approach, and open questions.
+   - Extract design-level facts only — do NOT copy verbatim chat logs. The goal is to preserve the design summary for future review, not to archive the conversation.
+5. For each phase, create `.ai/roadmap/areas/<area-id>/items/RM-PREFIX-XX-slug.md` with frontmatter populated:
    - `status`: `idea` for all captured items.
    - `stage`: match the phase label.
    - `order`: assign increments of 10 (10, 20, 30...) to allow insertion.
    - `id`: use the area's `id_prefix` (e.g., `RM-SDLC-001`).
    - Create frontmatter with all required fields.
-5. Update the area `roadmap.md` overview table.
-6. Append a changelog entry to `revisions/changelog.md` for each captured item.
-7. Run `rebuild_index.py` to regenerate global `index.json`.
-8. Output summary: "Created: RM-PREFIX-001 <title>, RM-PREFIX-002 <title>, ..."
+   - Populate `# Problem Context` and `# Design Notes` from step 4.
+6. Update the area `roadmap.md` overview table.
+7. Append a changelog entry to `revisions/changelog.md` for each captured item.
+8. Run `rebuild_index.py` to regenerate global `index.json`.
+9. Output summary: "Created: RM-PREFIX-001 <title>, RM-PREFIX-002 <title>, ..."
 
 **Rules:**
 - Assign IDs sequentially within the area: RM-PREFIX-001, RM-PREFIX-002, ...
@@ -213,22 +226,27 @@ Show the current roadmap as a structured summary.
    - `--incomplete`: exclude done, cancelled (returns ready/active/idea).
    - `--done`: show only done items.
    - `--status ready,active`: exact status match.
+   - `--top N`: show only top N items after priority+order sorting (e.g., `--top 1 --incomplete` finds the next item to review).
    - `python3 skills/sdlc-roadmap/scripts/list.py <area-id>`: single area view, can combine with flags.
 2. Report the results to the user. Do not supplement from other sources.
 3. If the script outputs "No roadmap found", say "No roadmap found. Use 'roadmap init' to create the roadmap structure."
+
+The table shows Priority (p0/p1/p2/p3 or ? if unset) and Order columns. Items are sorted by priority first (p0 > p1 > p2 > p3), then by order. Items without a priority are sorted to the end by order.
 
 ### roadmap review
 
 Guide review of roadmap ideas before they become ready OpenSpec-backed work. Combines `roadmap review RM-xxx` (specific) and `roadmap review` (prompt for selection).
 
-**Trigger:** User says "review RM-xxx", "review roadmap", "roadmap review", or equivalent.
+**Trigger:** User says "review RM-xxx", "review roadmap", "roadmap review", "review <area-id> next roadmap item", "review <area-id> highest priority roadmap item", "review next <area-id>", or equivalent.
 
 **Workflow for specified item (`roadmap review RM-xxx`):**
 1. Read the item file for RM-xxx.
 2. Verify the item status is `idea`. If not `idea`, report current status and ask whether to proceed.
 3. Guide review across the following checklist:
    - **Goal**: Is the goal clear and achievable in one phase?
+   - **Problem Context**: Does it adequately describe why this item exists? Can a future reviewer reconstruct the design motivation from it?
    - **Scope**: Are In/Out boundaries well-defined? Anything missing or over-scoped?
+   - **Design Notes**: Are key decisions, tradeoffs, initial approach, and open questions captured? Is there enough context to resume design discussions without repeating prior work?
    - **Acceptance Criteria**: Are they verifiable and complete?
    - **Dependencies**: Are `depends_on` items identified and correct?
    - **Priority**: Is `p0`/`p1`/`p2`/`p3` appropriate?
@@ -249,9 +267,15 @@ Guide review of roadmap ideas before they become ready OpenSpec-backed work. Com
 2. Ask the user to choose one.
 3. Proceed with the specified review workflow above.
 
+**Workflow for next/highest priority review (`review <area-id> next/highest priority`):**
+1. Run `python3 skills/sdlc-roadmap/scripts/list.py <area-id> --incomplete --top 1`.
+2. If the script returns an item, read its file and proceed with the specified review workflow above.
+3. If no items returned: "No incomplete items in area '<area-id>'."
+4. If no area specified, run `list.py --incomplete --top 1` for the global next item.
+
 **Rules:**
 - Only `idea` items can be reviewed. `ready` items already have complete OpenSpec artifacts.
-- Review-passed artifact creation uses `openspec-propose` or `openspec-new-change` with the item's Goal, Scope, Acceptance Criteria, and Promotion Notes as input.
+- Review-passed artifact creation uses `openspec-propose` or `openspec-new-change` with the item's Goal, Problem Context, Scope, Design Notes, Acceptance Criteria, and Promotion Notes as input.
 - Do NOT create OpenSpec artifacts manually; route through OpenSpec skills.
 
 ### roadmap revise RM-xxx
@@ -263,7 +287,7 @@ Revise a roadmap item's content with traceable history.
 **Workflow:**
 1. Read the item file for RM-xxx.
 2. Save a full snapshot of the current item to `revisions/snapshots/RM-xxx-<timestamp>.md` before any changes.
-3. Apply the requested content changes (Goal, Scope, Acceptance Criteria, Promotion Notes, Design Reference).
+3. Apply the requested content changes (Goal, Problem Context, Scope, Design Notes, Acceptance Criteria, Promotion Notes, Design Reference).
 4. Append a changelog entry to `revisions/changelog.md` with: timestamp, action (`revise`), item id, reason, change summary, snapshot path.
 5. Handle status-sensitive cases:
    - **`ready` item revised on core semantics**: Ask whether to keep `ready` or return to `idea` for re-review.
@@ -274,6 +298,7 @@ Revise a roadmap item's content with traceable history.
 - Snapshot-before-edit is mandatory for `revise`. The snapshot is the full item content before changes.
 - Changelog entry is mandatory.
 - Revise does not change status (except per the ready/active warnings above).
+- Revising Goal, Problem Context, Scope, or Design Notes on a `ready` item is a semantic change and must prompt for status resolution.
 
 ### roadmap insert
 
@@ -484,9 +509,11 @@ Snapshots are stored under `revisions/snapshots/` as `RM-xxx-<timestamp>.md`.
 | Content | Destination |
 |---------|-------------|
 | Product phase goal (MVP contract review) | Roadmap item |
+| Problem domain and architecture justification | Roadmap item `Problem Context` + `Design Notes` |
 | Formal change spec for that phase | OpenSpec change |
 | Implementation of the change | Superpowers execution |
 | Architecture decision made during build | Memory sync (`.ai/memory/`) |
+| Heavy design document or ADR | External doc, linked from `Design Reference` |
 | Roadmap item content correction | `roadmap revise` with snapshot |
 | Roadmap reordered after learning | `roadmap reorder` |
 | Area-level replan after major discovery | `roadmap replan` |

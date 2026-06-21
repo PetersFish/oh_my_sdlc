@@ -16,6 +16,10 @@ completed_at: null
 
 <Brief statement of what this phase aims to achieve>
 
+# Problem Context
+
+<Why this item exists: problem domain, user pain points, or architectural gap it addresses>
+
 # Scope
 
 ## In
@@ -27,6 +31,24 @@ completed_at: null
 
 - <excluded 1>
 - <excluded 2>
+
+# Design Notes
+
+## Key Decisions
+
+- <key architecture or approach decisions from design discussions>
+
+## Tradeoffs
+
+- <tradeoffs considered and why this path was chosen>
+
+## Initial Approach
+
+- <summary of the agreed solution direction, enough to reconstruct context for future review>
+
+## Open Questions
+
+- <unresolved questions that need further thought or data>
 
 # Acceptance Criteria
 

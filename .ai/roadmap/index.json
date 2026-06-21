@@ -65,7 +65,7 @@
       "status": "idea",
       "title": "Cross-Platform Hook Adaptation",
       "stage": "v2",
-      "priority": "p1",
+      "priority": "p3",
       "order": 20,
       "depends_on": [
         "RM-ORCH-001"

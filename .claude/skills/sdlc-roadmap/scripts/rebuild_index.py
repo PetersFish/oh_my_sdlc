@@ -99,7 +99,7 @@ def collect_items_from(items_dir: Path, area_id: str) -> list[dict]:
                 "status": fm.get("status", "idea"),
                 "title": fm.get("title", ""),
                 "stage": fm.get("stage", ""),
-                "priority": fm.get("priority", "p2"),
+                "priority": fm.get("priority"),
                 "order": order,
                 "depends_on": fm.get("depends_on", []) or [],
                 "openspec_change": fm.get("openspec_change"),
