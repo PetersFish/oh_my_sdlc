@@ -81,3 +81,59 @@ Do not use unquoted plain scalar descriptions for long natural-language text. `:
 If `.ai/memory/index.json` exists and the task involves planning, editing, reviewing, or continuing work in this repository, load relevant repository memory first using `sdlc-repository-memory-load`.
 
 Do not load `.ai/memory/sync-history/`, `.ai/memory/sessions/`, `.ai/memory/snapshots/`, `.ai/memory/tmp/`, `.ai/memory/cache/`, or `.ai/memory/review-queue.json` by default.
+
+## Workflow Template Sync
+
+When modifying files under `.ai/workflows/scripts/workflow.py` or `.ai/workflows/definitions/sdlc-main.yaml`, the corresponding templates in `sdlc-project-bootstrap/templates/workflow/` MUST be synced before commit. The pre-commit hook enforces this.
+
+**Install the hook (one-time per clone):**
+
+```bash
+git config core.hooksPath .githooks
+```
+
+**Sync command:**
+
+```bash
+python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py --root .
+```
+
+**Check for drift (read-only):**
+
+```bash
+python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py --root . --check
+```
+
+**Check distributed copies (read-only):**
+
+```bash
+python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py --root . --check-distributed
+```
+
+**Distribute canonical to all project-level copies:**
+
+```bash
+python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py --root . --distribute
+```
+
+## Skill Updates Discipline
+
+Skills under `skills/<name>/` are canonical. Distributed copies live in `.opencode/skills/`, `.claude/skills/`, and `.cursor/skills/` (project-level), plus user-level directories managed by `meta-skill-lifecycle-governance`.
+
+**Rules:**
+- Modifications to skill content (SKILL.md, scripts/, templates/, schemas/) MUST be made in canonical `skills/<name>/` first.
+- After canonical changes, re-distribute to all AI CLI targets:
+  - **Project-level**: `.opencode/skills/`, `.claude/skills/`, `.cursor/skills/`
+  - **User-level**: invoke `meta-skill-lifecycle-governance` with the DISTRIBUTE action (handles OS-specific paths)
+- Do NOT edit distributed copies directly — they are derived from canonical.
+- For `sdlc-project-bootstrap/templates/workflow/`, the pre-commit hook enforces consistency: live ↔ canonical ↔ all project-level distributed copies.
+
+**Distribution command (per skill, project-level):**
+```bash
+python3 skills/meta-skill-lifecycle-governance/scripts/install_skill.py \
+  --source-repo . --skill-name <skill> --source-ref HEAD \
+  --target .opencode/skills/<skill> --status stable
+# Repeat for .claude/skills/<skill> and .cursor/skills/<skill>
+```
+
+**For user-level distribution**, invoke `meta-skill-lifecycle-governance` (covers OS-specific paths).

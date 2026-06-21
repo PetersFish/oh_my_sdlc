@@ -33,7 +33,7 @@ Behavioral constraints for agents modifying `.ai/workflows/scripts/workflow.py`.
 
 - Every new policy or command behavior MUST have a corresponding test in `test_workflow.py`.
 - Tests use temporary directory fixtures (never mutate real `.ai/` or `openspec/` data).
-- Run the full test suite before committing: `python3 .ai/workflows/scripts/test_workflow.py`.
+- Run the full test suite before committing: `python3 -m pytest tests/test_workflow.py -v`.
 - Each test MUST assert on the specific `status`, `reason`, and `next_action` fields of the preflight decision.
 
 ## 6. Code Style

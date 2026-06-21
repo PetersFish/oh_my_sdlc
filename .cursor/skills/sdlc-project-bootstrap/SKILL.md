@@ -86,8 +86,11 @@ Check whether `.ai/memory/manifest.json` exists at the project root.
 Check whether `.ai/workflows/scripts/workflow.py` exists at the project root.
 
 **If workflow.py does not exist:**
-- Create `.ai/workflows/definitions/`, `.ai/workflows/runs/`, `.ai/workflows/runs/history/`, and `.ai/workflows/scripts/` directory layout.
-- Copy `templates/workflow/workflow.py` to `.ai/workflows/scripts/workflow.py` and `templates/workflow/sdlc-main.yaml` to `.ai/workflows/definitions/sdlc-main.yaml`.
+- Run the deterministic init script:
+  ```bash
+  python3 .opencode/skills/sdlc-project-bootstrap/scripts/init_foundations.py --root <root>
+  ```
+  This creates `.ai/workflows/{definitions,runs,runs/history,scripts}/` directories and copies `workflow.py` and `sdlc-main.yaml` from skill templates. It is idempotent — safe to run multiple times.
 - Report: "SDLC Workflow Runtime: initialized with sdlc-main workflow".
 
 **If workflow.py exists:**

@@ -1,0 +1,58 @@
+#!/bin/sh
+# Pre-commit hook: enforces two consistency rules for .ai/workflows/ files.
+#
+# Rule 1: live .ai/workflows/ files must match canonical skill templates.
+# Rule 2: canonical skill templates must match project-level distributed copies.
+#
+# Install: git config core.hooksPath .githooks
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SYNC_TOOL="$REPO_ROOT/skills/sdlc-project-bootstrap/scripts/sync_templates.py"
+
+if [ ! -f "$SYNC_TOOL" ]; then
+    echo "ERROR: sync_templates.py not found at $SYNC_TOOL" >&2
+    exit 1
+fi
+
+BLOCKED=0
+
+# Rule 1: live == canonical
+python3 "$SYNC_TOOL" --root "$REPO_ROOT" --check
+RET=$?
+if [ $RET -ne 0 ]; then
+    echo ""
+    echo "============================================"
+    echo "  COMMIT BLOCKED: Template drift detected"
+    echo "============================================"
+    echo ""
+    echo "Live .ai/workflows/ files differ from canonical skill templates."
+    echo "Run the following to sync live -> canonical, then re-commit:"
+    echo ""
+    echo "  python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py --root ."
+    echo ""
+    BLOCKED=1
+fi
+
+# Rule 2: canonical == project-level distributed copies
+python3 "$SYNC_TOOL" --root "$REPO_ROOT" --check-distributed
+RET=$?
+if [ $RET -ne 0 ]; then
+    echo ""
+    echo "============================================"
+    echo "  COMMIT BLOCKED: Distributed drift detected"
+    echo "============================================"
+    echo ""
+    echo "Canonical skill templates differ from one or more distributed copies"
+    echo "(.opencode/, .claude/, .cursor/). Run the following to re-distribute:"
+    echo ""
+    echo "  python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py --root . --distribute"
+    echo ""
+    BLOCKED=1
+fi
+
+if [ $BLOCKED -ne 0 ]; then
+    exit 1
+fi
+
+exit 0

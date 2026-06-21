@@ -1529,6 +1529,32 @@ def _check_exit_criteria(state, phase_def, supplied):
 # CLI
 # ---------------------------------------------------------------------------
 
+FOUNDATIONS = {
+    "workflow_py": ".ai/workflows/scripts/workflow.py",
+    "workflow_yaml": ".ai/workflows/definitions/sdlc-main.yaml",
+    "workflow_runs": ".ai/workflows/runs",
+    "agents_md": "AGENTS.md",
+    "openspec_config": "openspec/config.yaml",
+    "memory_manifest": ".ai/memory/manifest.json",
+}
+
+
+def cmd_verify_foundations(root, args):
+    report = {}
+    for key, relpath in FOUNDATIONS.items():
+        report[key] = os.path.exists(os.path.join(root, relpath))
+
+    all_present = all(report.values())
+    if args.json:
+        print(json.dumps({"foundations": report, "all_present": all_present}, indent=2))
+    else:
+        for key, present in report.items():
+            status = "PRESENT" if present else "MISSING"
+            print(f"{status}: {key} ({FOUNDATIONS[key]})")
+    if not all_present:
+        sys.exit(1)
+
+
 COMMANDS = {
     "status",
     "start",
@@ -1545,6 +1571,7 @@ COMMANDS = {
     "governance-check",
     "preflight",
     "ensure-run",
+    "verify-foundations",
 }
 
 
@@ -1573,6 +1600,7 @@ def main():
     parser.add_argument("--message", default=None, help="block/status message")
     parser.add_argument("--next-allowed", default=None, help="comma-separated next allowed actions")
     parser.add_argument("--action", default=None, help="governed action for preflight/ensure-run")
+    parser.add_argument("--json", action="store_true", help="output as JSON")
 
     args = parser.parse_args()
     root = args.root or os.getcwd()
@@ -1607,6 +1635,8 @@ def main():
         cmd_preflight(root, args)
     elif args.command == "ensure-run":
         cmd_ensure_run(root, args)
+    elif args.command == "verify-foundations":
+        cmd_verify_foundations(root, args)
 
 
 if __name__ == "__main__":

@@ -66,6 +66,27 @@ requesting OpenSpec IS a stateful SDLC run that MUST be tracked.
 
 For stateful SDLC runs (OpenSpec change lifecycle, roadmap promotion, post-archive actions), the orchestrator SHALL use the deterministic workflow runtime at `.ai/workflows/scripts/workflow.py` to manage run state, phase readiness, evidence, hooks, and guarded transitions.
 
+### Foundation Verification
+
+**Bootstrap edge case:** If `.ai/workflows/scripts/workflow.py` itself is missing, `verify-foundations` cannot run. In this case, route directly to `sdlc-project-bootstrap` Step 4 to install foundations before attempting verification.
+
+Before starting any workflow run, the orchestrator SHALL verify that the project foundations are in place:
+
+```bash
+python3 .ai/workflows/scripts/workflow.py --root . verify-foundations
+```
+
+If foundations are missing, the orchestrator SHALL route to the appropriate init path:
+
+| Missing foundation | Route to |
+|---|---|
+| `workflow_py`, `workflow_yaml`, `workflow_runs` | `sdlc-project-bootstrap` → Step 4 (`scripts/init_foundations.py`) |
+| `agents_md` | `sdlc-project-bootstrap` → Step 1 |
+| `openspec_config` | `sdlc-openspec-init` |
+| `memory_manifest` | `sdlc-repository-memory-init` |
+
+Do NOT proceed to start a workflow run until `verify-foundations` exits 0. This command is read-only and does not modify any files.
+
 ### Starting and Resuming Runs
 
 - To start a new SDLC workflow run: `workflow.py start --workflow sdlc-main --subject-type openspec_change --subject-id <change-id>`

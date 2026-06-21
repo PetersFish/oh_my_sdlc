@@ -46,17 +46,28 @@ When the user explicitly or implicitly starts an SDLC workflow (including saying
 or any request that enters the OpenSpec lifecycle):
 
 1. The orchestrator SHALL derive a kebab-case change-id from the user's request.
-2. The orchestrator SHALL start or resume the workflow runtime:
-   `python3 .ai/workflows/scripts/workflow.py --root . start --workflow sdlc-main --subject-type openspec_change --subject-id <change-id>`
-3. The orchestrator SHALL then run readiness:
-   `python3 .ai/workflows/scripts/workflow.py --root . readiness`
-4. Only after the runtime run exists and readiness is confirmed may the orchestrator dispatch
+2. The orchestrator SHALL run the blocking gate for the relevant governed action:
+   `python3 .ai/workflows/scripts/workflow.py --root . preflight --action <governed-action> --subject-type openspec_change --subject-id <change-id>`
+   Governed actions: `openspec_create`, `openspec_continue`, `openspec_apply`, `openspec_archive`.
+3. If preflight blocks (`allowed: false`), the orchestrator SHALL follow the `next_action.command`
+   in the decision to create/resume/advance the run, then re-run preflight until `allowed: true`.
+4. Only after preflight passes may the orchestrator dispatch
    the OpenSpec worker (e.g., `openspec-propose`, `openspec-new-change`).
 
 This preflight is NOT optional. Invoking `openspec-propose` or `openspec-new-change`
-without first creating or resuming the `.ai/workflows` run and checking readiness
-violates the SDLC governance contract. Even if the user did not literally say
-"start workflow", requesting OpenSpec IS a stateful SDLC run that MUST be tracked.
+without first passing the blocking gate (`workflow.py preflight`) violates the SDLC
+governance contract. Even if the user did not literally say "start workflow",
+requesting OpenSpec IS a stateful SDLC run that MUST be tracked.
+
+**Governed action → preflight mapping:**
+
+| Lifecycle step | Governed action | Preflight command |
+|---|---|---|
+| Create change | `openspec_create` | `preflight --action openspec_create --subject-type openspec_change --subject-id <id>` |
+| Continue change | `openspec_continue` | `preflight --action openspec_continue --subject-type openspec_change --subject-id <id>` |
+| Apply change | `openspec_apply` | `preflight --action openspec_apply --subject-type openspec_change --subject-id <id>` |
+| Archive change | `openspec_archive` | `preflight --action openspec_archive --subject-type openspec_change --subject-id <id>` |
+| Direct task | `superpowers_direct` | (no preflight needed) |
 
 ## SDLC Workflow Runtime
 
@@ -155,7 +166,7 @@ Medium formal changes that benefit from OpenSpec artifacts but do not need step-
 
 **Action:**
 
-1. **Runtime preflight (REQUIRED first):** Derive a kebab-case change-id, then start or resume the workflow runtime and check readiness (see Runtime Preflight Requirement).
+1. **Runtime preflight (REQUIRED first):** Derive a kebab-case change-id, then run `workflow.py preflight --action openspec_create --subject-type openspec_change --subject-id <change-id>`. If blocked, follow the `next_action.command` in the decision (typically `start` or `advance`) and re-run preflight until `allowed: true`.
 2. After runtime preflight passes, route to `openspec-propose` to generate all artifacts in one step. This is the bound worker action — do not offer direct execution unless the user explicitly opts out.
 3. **EvalOps artifact completeness check (for EvalOps-gated changes only):** After `openspec-propose` generates `tasks.md`, verify that eval case creation and golden eval execution are handled correctly:
    - **If the change does not involve semantic verification (not EvalOps-gated):** skip this check.
@@ -174,7 +185,7 @@ Very complex formal changes that need iterative human review during planning. Ro
 
 **Action:**
 
-1. **Runtime preflight (REQUIRED first):** Derive a kebab-case change-id, then start or resume the workflow runtime and check readiness (see Runtime Preflight Requirement).
+1. **Runtime preflight (REQUIRED first):** Derive a kebab-case change-id, then run `workflow.py preflight --action openspec_create --subject-type openspec_change --subject-id <change-id>`. If blocked, follow the `next_action.command` in the decision (typically `start` or `advance`) and re-run preflight until `allowed: true`.
 2. After runtime preflight passes, route to `openspec-new-change` to create the change. This is the bound worker action — do not offer direct execution unless the user explicitly opts out.
 3. For each subsequent artifact, route to `openspec-continue-change`.
 4. After each artifact is created, output a **review-focus summary** for the user.
