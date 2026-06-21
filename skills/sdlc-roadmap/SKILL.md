@@ -226,15 +226,18 @@ Show the current roadmap as a structured summary.
    - `--incomplete`: exclude done, cancelled (returns ready/active/idea).
    - `--done`: show only done items.
    - `--status ready,active`: exact status match.
+   - `--top N`: show only top N items after priority+order sorting (e.g., `--top 1 --incomplete` finds the next item to review).
    - `python3 skills/sdlc-roadmap/scripts/list.py <area-id>`: single area view, can combine with flags.
 2. Report the results to the user. Do not supplement from other sources.
 3. If the script outputs "No roadmap found", say "No roadmap found. Use 'roadmap init' to create the roadmap structure."
+
+The table shows Priority (p0/p1/p2/p3 or ? if unset) and Order columns. Items are sorted by priority first (p0 > p1 > p2 > p3), then by order. Items without a priority are sorted to the end by order.
 
 ### roadmap review
 
 Guide review of roadmap ideas before they become ready OpenSpec-backed work. Combines `roadmap review RM-xxx` (specific) and `roadmap review` (prompt for selection).
 
-**Trigger:** User says "review RM-xxx", "review roadmap", "roadmap review", or equivalent.
+**Trigger:** User says "review RM-xxx", "review roadmap", "roadmap review", "review <area-id> next roadmap item", "review <area-id> highest priority roadmap item", "review next <area-id>", or equivalent.
 
 **Workflow for specified item (`roadmap review RM-xxx`):**
 1. Read the item file for RM-xxx.
@@ -263,6 +266,12 @@ Guide review of roadmap ideas before they become ready OpenSpec-backed work. Com
 1. List all `idea` items using `list.py --status idea`.
 2. Ask the user to choose one.
 3. Proceed with the specified review workflow above.
+
+**Workflow for next/highest priority review (`review <area-id> next/highest priority`):**
+1. Run `python3 skills/sdlc-roadmap/scripts/list.py <area-id> --incomplete --top 1`.
+2. If the script returns an item, read its file and proceed with the specified review workflow above.
+3. If no items returned: "No incomplete items in area '<area-id>'."
+4. If no area specified, run `list.py --incomplete --top 1` for the global next item.
 
 **Rules:**
 - Only `idea` items can be reviewed. `ready` items already have complete OpenSpec artifacts.

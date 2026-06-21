@@ -491,6 +491,70 @@ class TestListScript(unittest.TestCase):
         self.assertIn("RM-TST-001", result.stdout)
         self.assertIn("RM-TST-002", result.stdout)
 
+    def test_list_includes_pri_and_order_columns(self) -> None:
+        _make_area_item(self.items_dir, "RM-TST-001", priority="p0", order=10)
+        result = _run_script("list.py", self.tmpdir)
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("Pri", result.stdout)
+        self.assertIn("Order", result.stdout)
+        self.assertIn("p0", result.stdout)
+        self.assertIn("10", result.stdout)
+
+    def test_list_priority_missing_shows_question(self) -> None:
+        _make_area_item(self.items_dir, "RM-TST-001", order=5, priority=None)
+        result = _run_script("list.py", self.tmpdir)
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("?", result.stdout)
+
+    def test_list_sorted_by_priority_then_order(self) -> None:
+        _make_area_item(self.items_dir, "RM-TST-003", priority="p2", order=1)
+        _make_area_item(self.items_dir, "RM-TST-001", priority="p0", order=50)
+        _make_area_item(self.items_dir, "RM-TST-002", priority="p0", order=5)
+        _make_area_item(self.items_dir, "RM-TST-004", order=1, priority=None)
+        result = _run_script("list.py", self.tmpdir)
+        self.assertEqual(result.returncode, 0)
+        # RM-TST-002 (p0,5) before RM-TST-001 (p0,50) before RM-TST-003 (p2,1) before RM-TST-004 (None,1)
+        idx2 = result.stdout.index("RM-TST-002")
+        idx1 = result.stdout.index("RM-TST-001")
+        idx3 = result.stdout.index("RM-TST-003")
+        idx4 = result.stdout.index("RM-TST-004")
+        self.assertLess(idx2, idx1)
+        self.assertLess(idx1, idx3)
+        self.assertLess(idx3, idx4)
+
+    def test_list_top_n_limits_output(self) -> None:
+        _make_area_item(self.items_dir, "RM-TST-001", priority="p0", order=10)
+        _make_area_item(self.items_dir, "RM-TST-002", priority="p0", order=20)
+        _make_area_item(self.items_dir, "RM-TST-003", priority="p1", order=30)
+        result = _run_script("list.py", self.tmpdir, args=["--top", "2"])
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("RM-TST-001", result.stdout)
+        self.assertIn("RM-TST-002", result.stdout)
+        self.assertNotIn("RM-TST-003", result.stdout)
+
+    def test_list_top_with_incomplete(self) -> None:
+        _make_area_item(self.items_dir, "RM-TST-001", priority="p0", status="done", order=10)
+        _make_area_item(self.items_dir, "RM-TST-002", priority="p1", status="idea", order=20)
+        _make_area_item(self.items_dir, "RM-TST-003", priority="p2", status="ready", order=30)
+        result = _run_script("list.py", self.tmpdir, args=["--incomplete", "--top", "1"])
+        self.assertEqual(result.returncode, 0)
+        self.assertNotIn("RM-TST-001", result.stdout)  # done excluded
+        self.assertIn("RM-TST-002", result.stdout)      # top incomplete
+        self.assertNotIn("RM-TST-003", result.stdout)   # beyond top
+
+    def test_list_top_with_area_filter(self) -> None:
+        _make_area_item(self.items_dir, "RM-TST-001", priority="p0", order=10)
+        _make_area_item(self.items_dir, "RM-TST-002", priority="p1", order=20)
+        result = subprocess.run(
+            [sys.executable, str(SCRIPTS_DIR / "list.py"), "skill.test", "--top", "1"],
+            cwd=self.tmpdir,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("RM-TST-001", result.stdout)
+        self.assertNotIn("RM-TST-002", result.stdout)
+
 
 class TestSyncScript(unittest.TestCase):
     def setUp(self):
