@@ -1,9 +1,9 @@
 {
-  "skill": "sdlc-project-bootstrap",
+  "skill": "sdlc-orchestrator",
   "source_repo": ".",
   "source_ref": "5413dd4026c4a2a610cd6fd7ce6521e1d9ca5a2c",
   "status": "stable",
-  "target": ".opencode/skills/sdlc-project-bootstrap",
-  "installed_at": "2026-06-21T06:54:01.346334Z",
+  "target": ".claude/skills/sdlc-orchestrator",
+  "installed_at": "2026-06-21T06:53:22.757170Z",
   "backport_policy": "review-required"
 }

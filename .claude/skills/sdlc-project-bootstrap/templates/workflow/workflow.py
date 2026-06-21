@@ -2,11 +2,13 @@
 """SDLC workflow runtime -- deterministic, non-interactive state machine.
 
 Commands: status, start, resume, readiness, resolve, record-evidence,
-complete-phase, complete-hook, advance, block, done, validate.
+complete-phase, complete-hook, advance, block, done, validate,
+governance-check, preflight, ensure-run.
 """
 
 import argparse
 import datetime
+import hashlib
 import json
 import os
 import sys
@@ -49,6 +51,13 @@ def _ensure_dir(path):
 
 def _resolve_path(root, rel):
     return os.path.normpath(os.path.join(root, rel)) if root else rel
+
+
+def _finding_hash(finding_type, **fields):
+    canonical = finding_type + "|" + "|".join(
+        f"{k}={v}" for k, v in sorted(fields.items()) if v is not None
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:12]
 
 
 # ---------------------------------------------------------------------------
@@ -329,6 +338,430 @@ def loader_roadmap_item_status(root, item_id):
                 "completed_at": _read_frontmatter_field(fpath, "completed_at"),
             }
     return None
+
+
+# ---------------------------------------------------------------------------
+# Preflight: blocking gate policy registry (open for extension, closed for modification)
+# ---------------------------------------------------------------------------
+
+def _load_done_history_run_ids(root):
+    """Return set of (subject_type, subject_id) from done history runs."""
+    governed = set()
+    history_dir = _resolve_path(root, ".ai/workflows/runs/history")
+    if not os.path.isdir(history_dir):
+        return governed
+    for fname in _list_dirs(history_dir):
+        if not fname.endswith(".json"):
+            continue
+        hpath = os.path.join(history_dir, fname)
+        try:
+            with open(hpath, "r") as f:
+                hist = json.load(f)
+        except Exception:
+            continue
+        if hist.get("status") in ("done",):
+            ps = hist.get("primary_subject", {})
+            if ps.get("type") and ps.get("id"):
+                governed.add((ps["type"], ps["id"]))
+    return governed
+
+
+def _make_preflight_decision(allowed, status, reason="", next_action=None):
+    return {
+        "allowed": allowed,
+        "status": status,
+        "reason": reason,
+        "next_action": next_action,
+    }
+
+
+def _evaluate_subject_run_context(root, subject_type, subject_id):
+    """Return (active_state, done_subjects_set) for subject validation."""
+    active = load_run_state(root)
+    done_subjects = _load_done_history_run_ids(root)
+    return active, done_subjects
+
+
+# Policy registry: add new governed actions by registering a policy function.
+# A policy receives (root, action, subject_type, subject_id) and returns a dict
+# with keys: allowed, status, reason, next_action.
+# Policy metadata is stored per-action in POLICY_META (not on the function)
+# to avoid stacked-decorator overwrite bugs.
+POLICY_REGISTRY = {}
+POLICY_META = {}  # action -> {allowed_phases, repair_hooks, creates_run}
+
+# Backward-compat: ACTION_PHASE_MAP for quick lookups
+ACTION_PHASE_MAP = {}
+
+
+def register_policy(action, *, allowed_phases=None, repair_hooks=None, creates_run=False):
+    """Decorator to register a policy function for a governed action.
+
+    Args:
+        action: Governed action name.
+        allowed_phases: Set of phase names this action is valid for (None = no restriction).
+        repair_hooks: List of hook names to set pending when ensure-run creates a run.
+        creates_run: Whether ensure-run is allowed to create a run for this action.
+    """
+    def decorator(fn):
+        POLICY_REGISTRY[action] = fn
+        POLICY_META[action] = {
+            "allowed_phases": allowed_phases,
+            "repair_hooks": repair_hooks or [],
+            "creates_run": creates_run,
+        }
+        if allowed_phases is not None:
+            ACTION_PHASE_MAP[action] = allowed_phases
+        return fn
+    return decorator
+
+
+def _validate_action_phase(action, active_state):
+    """Check that the active run's current_phase is valid for the action.
+    Returns (is_valid, allowed_phases_set_or_None)."""
+    allowed = ACTION_PHASE_MAP.get(action)
+    if allowed is None:
+        return True, None
+    if not active_state:
+        return True, None  # no-phase restriction only applies when a run exists
+    current = active_state.get("current_phase", "")
+    return current in allowed, allowed
+
+
+def _start_command(subject_type, subject_id):
+    """Return a next_action dict for workflow start."""
+    return {
+        "command": (
+            f"python3 .ai/workflows/scripts/workflow.py --root . start"
+            f" --subject-type {subject_type} --subject-id {subject_id}"
+        ),
+        "description": (
+            f"Create a new workflow run for '{subject_id}'"
+            f" then re-run preflight"
+        ),
+    }
+
+
+def _ensure_command(subject_type, subject_id):
+    """Return a next_action dict for workflow ensure-run."""
+    return {
+        "command": (
+            f"python3 .ai/workflows/scripts/workflow.py --root . ensure-run"
+            f" --action dangling_archive_repair"
+            f" --subject-type {subject_type} --subject-id {subject_id}"
+        ),
+        "description": (
+            f"Restore SDLC governance for archived change '{subject_id}'."
+            f" Creates a post_archive_actions run with post-archive hooks."
+            f" After hooks are resolved, complete-phase and advance to done."
+        ),
+    }
+
+
+# --- Policies ---
+
+@register_policy("superpowers_direct")
+def _policy_no_workflow(root, action, subject_type, subject_id):
+    return _make_preflight_decision(True, "not_required")
+
+
+@register_policy(
+    "openspec_create", allowed_phases={"create_change", "input"},
+)
+@register_policy(
+    "openspec_continue", allowed_phases={"create_change", "apply_change"},
+)
+@register_policy(
+    "openspec_apply", allowed_phases={"apply_change"},
+)
+@register_policy(
+    "openspec_archive", allowed_phases={"archive_change"},
+)
+def _policy_openspec_change(root, action, subject_type, subject_id):
+    """Require matching active run or done history for openspec lifecycle actions.
+    Also validates the run's current phase against the action via ACTION_PHASE_MAP."""
+    if not subject_type or not subject_id:
+        return _make_preflight_decision(False, "error", "missing_subject")
+    active, done_subjects = _evaluate_subject_run_context(root, subject_type, subject_id)
+
+    # Done history exists => lifecycle already completed
+    if (subject_type, subject_id) in done_subjects:
+        return _make_preflight_decision(True, "ok", "done_history_exists")
+
+    # No active run => block, require start
+    if not active:
+        return _make_preflight_decision(
+            False, "blocked", "missing_active_run",
+            next_action=_start_command(subject_type, subject_id),
+        )
+
+    # Active run exists - check subject match
+    active_ps = active.get("primary_subject", {})
+    active_status = active.get("status", "")
+    if (
+        active_ps.get("type") == subject_type
+        and active_ps.get("id") == subject_id
+        and active_status in ("running", "blocked")
+    ):
+        # Phase validation
+        phase_ok, allowed_phases = _validate_action_phase(action, active)
+        if not phase_ok:
+            current = active["current_phase"]
+            return _make_preflight_decision(
+                False, "blocked", "wrong_phase",
+                next_action={
+                    "command": "python3 .ai/workflows/scripts/workflow.py --root . advance",
+                    "description": (
+                        f"Run is in phase '{current}', but action '{action}'"
+                        f" requires one of: {sorted(allowed_phases)}."
+                        f" Advance the run to the correct phase first."
+                    ),
+                },
+            )
+        return _make_preflight_decision(True, "ok", "active_run_exists")
+
+    # Different active run => conflict
+    return _make_preflight_decision(
+        False, "blocked", "conflict_active_run",
+        next_action={
+            "command": "python3 .ai/workflows/scripts/workflow.py --root . status",
+            "description": (
+                f"Active run for '{active_ps.get('id')}' exists."
+                f" Complete or cancel it before starting '{subject_id}'."
+            ),
+        },
+    )
+
+
+@register_policy(
+    "post_archive_actions", allowed_phases={"post_archive_actions"},
+)
+@register_policy(
+    "dangling_archive_repair",
+    allowed_phases={"post_archive_actions"},
+    repair_hooks=["memory_sync", "roadmap_done_if_relevant"],
+    creates_run=True,
+)
+def _policy_archived_change(root, action, subject_type, subject_id):
+    """Archived changes must have an active run or done history."""
+    if not subject_type or not subject_id:
+        return _make_preflight_decision(False, "error", "missing_subject")
+    active, done_subjects = _evaluate_subject_run_context(root, subject_type, subject_id)
+
+    if (subject_type, subject_id) in done_subjects:
+        return _make_preflight_decision(True, "ok", "done_history_exists")
+
+    if not active:
+        return _make_preflight_decision(
+            False, "blocked", "missing_active_run",
+            next_action=_ensure_command(subject_type, subject_id),
+        )
+
+    active_ps = active.get("primary_subject", {})
+    active_status = active.get("status", "")
+    if (
+        active_ps.get("type") == subject_type
+        and active_ps.get("id") == subject_id
+        and active_status in ("running", "blocked")
+    ):
+        phase_ok, allowed_phases = _validate_action_phase(action, active)
+        if not phase_ok:
+            current = active["current_phase"]
+            return _make_preflight_decision(
+                False, "blocked", "wrong_phase",
+                next_action={
+                    "command": "python3 .ai/workflows/scripts/workflow.py --root . advance",
+                    "description": (
+                        f"Run is in phase '{current}', but action '{action}'"
+                        f" requires one of: {sorted(allowed_phases)}."
+                        f" Advance the run to the correct phase first."
+                    ),
+                },
+            )
+        return _make_preflight_decision(True, "ok", "active_run_exists")
+
+    return _make_preflight_decision(
+        False, "blocked", "conflict_active_run",
+        next_action={
+            "command": "python3 .ai/workflows/scripts/workflow.py --root . status",
+            "description": (
+                f"Active run for '{active_ps.get('id')}' exists."
+                f" Complete or cancel it before repairing '{subject_id}'."
+            ),
+        },
+    )
+
+
+# --- Preflight Commands ---
+
+def cmd_preflight(root, args):
+    """Read-only blocking gate: check if a governed action can proceed.
+    Dispatches to the policy registry -- NEVER contains action-specific if/else."""
+    action = getattr(args, "action", "")
+    subject_type = args.subject_type
+    subject_id = args.subject_id
+
+    policy = POLICY_REGISTRY.get(action)
+    if not policy:
+        decision = _make_preflight_decision(False, "error", "unknown_action")
+        print(json.dumps(decision, indent=2))
+        sys.exit(1)
+
+    decision = policy(root, action, subject_type, subject_id)
+    print(json.dumps(decision, indent=2))
+    if not decision["allowed"]:
+        sys.exit(1)
+
+
+def _create_workflow_run(root, subject_type, subject_id, pending_hooks):
+    """Create a workflow run and return a preflight decision.
+    Uses existing _infer_phase and _run_loaders for consistent behavior."""
+    workflow_id = "sdlc-main"
+    run_id = _make_run_id(subject_type, subject_id)
+    phase = _infer_phase(root, subject_type, subject_id)
+
+    state = {
+        "version": 1,
+        "run_id": run_id,
+        "workflow": workflow_id,
+        "status": "running",
+        "current_phase": phase,
+        "primary_subject": {"type": subject_type, "id": subject_id},
+        "context": {"change_id": subject_id} if subject_type == "openspec_change" else {},
+        "phase_readiness": {"phase": phase, "ready": False, "missing_required_inputs": []},
+        "pending_hooks": list(pending_hooks),
+        "completed_hooks": [],
+        "completed_phases": [],
+        "gates": {},
+        "evidence": {},
+        "block": None,
+        "updated_at": "",
+    }
+    wf = load_workflow(root, workflow_id)
+    if wf:
+        _run_loaders(root, state, wf)
+
+    save_run_state(root, state)
+    decision = _make_preflight_decision(
+        True, "run_created", "active_run_created_for_governed_action",
+        next_action={
+            "command": (
+                f"python3 .ai/workflows/scripts/workflow.py --root . resolve"
+            ),
+            "description": (
+                f"Run created at phase '{phase}' for '{subject_id}'."
+                f" Resolve to load context, complete hooks,"
+                f" complete-phase --exit-criteria-satisfied pending_hooks_empty,"
+                f" then advance to done."
+            ),
+        },
+    )
+    decision["run_id"] = run_id
+    decision["current_phase"] = state["current_phase"]
+    decision["pending_hooks"] = list(pending_hooks)
+    return decision
+
+
+def cmd_ensure_run(root, args):
+    """Writable blocking gate: ensure a governed action has a run.
+    Delegates to policy metadata via POLICY_META -- NEVER
+    contains action-specific if/else."""
+    action = getattr(args, "action", "")
+    subject_type = args.subject_type
+    subject_id = args.subject_id
+
+    policy = POLICY_REGISTRY.get(action)
+    if not policy:
+        decision = _make_preflight_decision(False, "error", "unknown_action")
+        print(json.dumps(decision, indent=2))
+        sys.exit(1)
+
+    meta = POLICY_META.get(action, {})
+
+    # Non-governed actions (e.g., superpowers_direct) pass through
+    if not meta.get("creates_run"):
+        decision = policy(root, action, subject_type, subject_id)
+        print(json.dumps(decision, indent=2))
+        if not decision["allowed"]:
+            sys.exit(1)
+        return
+
+    # Governed actions with creates_run=True
+    active, done_subjects = _evaluate_subject_run_context(
+        root, subject_type, subject_id
+    )
+
+    if (subject_type, subject_id) in done_subjects:
+        decision = _make_preflight_decision(True, "ok", "done_history_exists")
+        print(json.dumps(decision, indent=2))
+        return
+
+    if not active:
+        # Policy must have creates_run=True to reach here
+        if not subject_type or not subject_id:
+            decision = _make_preflight_decision(
+                False, "blocked", "missing_active_run",
+                next_action=_start_command(subject_type, subject_id),
+            )
+            print(json.dumps(decision, indent=2))
+            sys.exit(1)
+
+        # Verify subject is archived before creating a repair run
+        status = loader_openspec_change_status(root, subject_id)
+        if status.get("classification") != "archived":
+            decision = _make_preflight_decision(
+                False, "error", "subject_not_archived",
+                next_action=_start_command(subject_type, subject_id),
+            )
+            print(json.dumps(decision, indent=2))
+            sys.exit(1)
+
+        hooks = meta.get("repair_hooks", [])
+        decision = _create_workflow_run(root, subject_type, subject_id, hooks)
+        print(json.dumps(decision, indent=2))
+        return
+
+    # Active run exists - check for match
+    active_ps = active.get("primary_subject", {})
+    active_status = active.get("status", "")
+    if (
+        active_ps.get("type") == subject_type
+        and active_ps.get("id") == subject_id
+        and active_status in ("running", "blocked")
+    ):
+        phase_ok, allowed_phases = _validate_action_phase(action, active)
+        if not phase_ok:
+            current = active["current_phase"]
+            decision = _make_preflight_decision(
+                False, "blocked", "wrong_phase",
+                next_action={
+                    "command": "python3 .ai/workflows/scripts/workflow.py --root . advance",
+                    "description": (
+                        f"Run is in phase '{current}', but action '{action}'"
+                        f" requires one of: {sorted(allowed_phases or [])}."
+                        f" Advance the run to the correct phase first."
+                    ),
+                },
+            )
+            print(json.dumps(decision, indent=2))
+            sys.exit(1)
+        decision = _make_preflight_decision(True, "ok", "active_run_exists")
+        print(json.dumps(decision, indent=2))
+        return
+
+    # Conflict
+    decision = _make_preflight_decision(
+        False, "blocked", "conflict_active_run",
+        next_action={
+            "command": "python3 .ai/workflows/scripts/workflow.py --root . status",
+            "description": (
+                f"Active run for '{active_ps.get('id')}' exists."
+                f" Complete or cancel it first."
+            ),
+        },
+    )
+    print(json.dumps(decision, indent=2))
+    sys.exit(1)
 
 
 # ---------------------------------------------------------------------------
@@ -875,6 +1308,115 @@ def cmd_done(root, args):
     print(json.dumps(state, indent=2))
 
 
+def cmd_governance_check(root, args):
+    """Read-only governance diagnostics: dangling archives and pending hooks."""
+    findings = []
+    archive_dir = _resolve_path(root, "openspec/changes/archive")
+    active_state = load_run_state(root)
+    history_dir = _resolve_path(root, ".ai/workflows/runs/history")
+
+    governed_change_ids = set()
+
+    if active_state:
+        ps = active_state.get("primary_subject", {})
+        if ps.get("type") == "openspec_change" and ps.get("id"):
+            governed_change_ids.add(ps["id"])
+
+    if os.path.isdir(history_dir):
+        for fname in _list_dirs(history_dir):
+            if not fname.endswith(".json"):
+                continue
+            hpath = os.path.join(history_dir, fname)
+            try:
+                with open(hpath, "r") as f:
+                    hist = json.load(f)
+            except Exception:
+                continue
+            if hist.get("status") in ("done",):
+                ps = hist.get("primary_subject", {})
+                if ps.get("type") == "openspec_change" and ps.get("id"):
+                    governed_change_ids.add(ps["id"])
+
+    if os.path.isdir(archive_dir):
+        for entry in _list_dirs(archive_dir):
+            e_path = os.path.join(archive_dir, entry)
+            if not os.path.isdir(e_path):
+                continue
+            parts = entry.split("-")
+            if len(parts) < 4:
+                continue
+            change_id = "-".join(parts[3:])
+            if change_id in governed_change_ids:
+                continue
+            rel_path = os.path.relpath(e_path, root)
+            message = (
+                f"Archived OpenSpec change \"{change_id}\" has no "
+                f"matching workflow run."
+            )
+            ensure_cmd = (
+                f"python3 .ai/workflows/scripts/workflow.py --root . ensure-run"
+                f" --action dangling_archive_repair"
+                f" --subject-type openspec_change"
+                f" --subject-id {change_id}"
+            )
+            remediation = (
+                f"Archived OpenSpec change \"{change_id}\" (archive path: {rel_path})"
+                f" has no matching workflow run. Run: {ensure_cmd}"
+                f" to create a post_archive_actions run. Then resolve,"
+                f" complete hooks, complete-phase --exit-criteria-satisfied"
+                f" pending_hooks_empty, advance to done, and re-run"
+                f" \"workflow.py governance-check\" until block=false."
+            )
+            fh = _finding_hash(
+                "dangling_archive", change_id=change_id, archive_path=rel_path
+            )
+            findings.append({
+                "type": "dangling_archive",
+                "change_id": change_id,
+                "archive_path": rel_path,
+                "message": message,
+                "remediation": remediation,
+                "hash": fh,
+            })
+
+    if active_state:
+        pending = active_state.get("pending_hooks", [])
+        if pending:
+            run_id = active_state.get("run_id", "")
+            ctx = active_state.get("context", {})
+            change_id = ctx.get("change_id", "")
+            hook_list = ", ".join(pending)
+            message = (
+                f"Active run \"{run_id}\" has {len(pending)} unresolved "
+                f"hook(s): {pending}."
+            )
+            remediation = (
+                f"Active run \"{run_id}\" has unresolved hooks: [{hook_list}]. "
+                f"Invoke the responsible workers for each hook, then run "
+                f"\"workflow.py complete-hook --hook <hook-name>\" for each. "
+                f"Re-run \"workflow.py governance-check\" until block=false."
+            )
+            fh = _finding_hash(
+                "pending_hooks",
+                run_id=run_id,
+                change_id=change_id or None,
+                pending_hook_names=",".join(sorted(pending)),
+            )
+            findings.append({
+                "type": "pending_hooks",
+                "run_id": run_id,
+                "change_id": change_id or None,
+                "pending_hook_names": pending,
+                "message": message,
+                "remediation": remediation,
+                "hash": fh,
+            })
+
+    block = len(findings) > 0
+    output = {"block": block, "findings": findings}
+    print(json.dumps(output, indent=2))
+
+
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
@@ -1000,6 +1542,9 @@ COMMANDS = {
     "block",
     "done",
     "validate",
+    "governance-check",
+    "preflight",
+    "ensure-run",
 }
 
 
@@ -1027,6 +1572,7 @@ def main():
     parser.add_argument("--block-type", default=None, help="block type")
     parser.add_argument("--message", default=None, help="block/status message")
     parser.add_argument("--next-allowed", default=None, help="comma-separated next allowed actions")
+    parser.add_argument("--action", default=None, help="governed action for preflight/ensure-run")
 
     args = parser.parse_args()
     root = args.root or os.getcwd()
@@ -1055,6 +1601,12 @@ def main():
         cmd_block(root, args)
     elif args.command == "done":
         cmd_done(root, args)
+    elif args.command == "governance-check":
+        cmd_governance_check(root, args)
+    elif args.command == "preflight":
+        cmd_preflight(root, args)
+    elif args.command == "ensure-run":
+        cmd_ensure_run(root, args)
 
 
 if __name__ == "__main__":

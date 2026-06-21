@@ -1054,13 +1054,415 @@ class TestGovernanceCheck(FixtureBase):
         self.assertIn("block=false", remediation,
                       "remediation must include stop condition block=false")
 
-    # Prompt contract: dangling archive remediation also includes stop condition
-    def test_dangling_archive_remediation_includes_governance_check_stop_condition(self):
+    # Prompt contract: dangling archive remediation includes ensure-run and stop condition
+    def test_dangling_archive_remediation_includes_ensure_run_and_stop_condition(self):
         self._make_openspec_archive("contract-dangle", "2026-06-20")
         data = self._run_gc()
         f = data["findings"][0]
+        self.assertIn("ensure-run", f["remediation"],
+                      "remediation must mention workflow.py ensure-run")
+        self.assertIn("complete-phase", f["remediation"],
+                      "remediation must include complete-phase step")
+        self.assertIn("pending_hooks_empty", f["remediation"],
+                      "remediation must reference pending_hooks_empty exit criteria")
         self.assertIn("governance-check", f["remediation"])
         self.assertIn("block=false", f["remediation"])
+
+
+class TestPreflightAndEnsureRun(FixtureBase):
+    """Tests for preflight and ensure-run commands."""
+
+    def _run_preflight(self, action, subject_type=None, subject_id=None):
+        kwargs = {"action": action}
+        if subject_type:
+            kwargs["subject_type"] = subject_type
+        if subject_id:
+            kwargs["subject_id"] = subject_id
+        rc, out, err = run_workflow(self.tmp, "preflight", **kwargs)
+        return rc, json.loads(out), err
+
+    def _run_ensure_run(self, action, subject_type=None, subject_id=None):
+        kwargs = {"action": action}
+        if subject_type:
+            kwargs["subject_type"] = subject_type
+        if subject_id:
+            kwargs["subject_id"] = subject_id
+        rc, out, err = run_workflow(self.tmp, "ensure-run", **kwargs)
+        return rc, json.loads(out), err
+
+    # --- no-workflow policy ---
+
+    def test_preflight_superpowers_direct_returns_not_required(self):
+        rc, data, _ = self._run_preflight("superpowers_direct")
+        self.assertEqual(rc, 0)
+        self.assertTrue(data["allowed"])
+        self.assertEqual(data["status"], "not_required")
+
+    # --- openspec action without active run ---
+
+    def test_preflight_openspec_create_without_active_run_blocks(self):
+        rc, data, _ = self._run_preflight(
+            "openspec_create",
+            subject_type="openspec_change",
+            subject_id="new-change",
+        )
+        self.assertEqual(rc, 1)
+        self.assertFalse(data["allowed"])
+        self.assertEqual(data["status"], "blocked")
+        self.assertEqual(data["reason"], "missing_active_run")
+        self.assertIsNotNone(data["next_action"])
+        self.assertIn("start", data["next_action"].get("command", ""))
+
+    def test_preflight_openspec_apply_without_active_run_blocks(self):
+        rc, data, _ = self._run_preflight(
+            "openspec_apply",
+            subject_type="openspec_change",
+            subject_id="apply-me",
+        )
+        self.assertEqual(rc, 1)
+        self.assertFalse(data["allowed"])
+        self.assertEqual(data["reason"], "missing_active_run")
+
+    def test_preflight_openspec_archive_without_active_run_blocks(self):
+        rc, data, _ = self._run_preflight(
+            "openspec_archive",
+            subject_type="openspec_change",
+            subject_id="archive-me",
+        )
+        self.assertEqual(rc, 1)
+        self.assertFalse(data["allowed"])
+        self.assertEqual(data["reason"], "missing_active_run")
+
+    # --- openspec action with matching active run ---
+
+    def test_preflight_openspec_create_with_matching_active_run_allows(self):
+        run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="my-change",
+        )
+        rc, data, _ = self._run_preflight(
+            "openspec_create",
+            subject_type="openspec_change",
+            subject_id="my-change",
+        )
+        self.assertEqual(rc, 0)
+        self.assertTrue(data["allowed"])
+        self.assertEqual(data["status"], "ok")
+
+    # --- openspec action with different active run ---
+
+    def test_preflight_openspec_create_with_different_active_run_blocks(self):
+        run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="existing-change",
+        )
+        rc, data, _ = self._run_preflight(
+            "openspec_create",
+            subject_type="openspec_change",
+            subject_id="new-change",
+        )
+        self.assertEqual(rc, 1)
+        self.assertFalse(data["allowed"])
+        self.assertEqual(data["reason"], "conflict_active_run")
+
+    # --- openspec action with done history ---
+
+    def test_preflight_openspec_create_with_done_history_allows(self):
+        hist_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "history")
+        os.makedirs(hist_dir, exist_ok=True)
+        state = {
+            "version": 1,
+            "run_id": "2026-06-20-hist-change",
+            "workflow": "sdlc-main",
+            "status": "done",
+            "current_phase": "done",
+            "primary_subject": {"type": "openspec_change", "id": "hist-change"},
+            "context": {"change_id": "hist-change"},
+            "phase_readiness": {"phase": "done", "ready": True, "missing_required_inputs": []},
+            "pending_hooks": [], "completed_hooks": [],
+            "completed_phases": [], "gates": {}, "evidence": {},
+            "block": None, "updated_at": "2026-06-20T00:00:00",
+        }
+        with open(os.path.join(hist_dir, "2026-06-20-hist-change.json"), "w") as f:
+            json.dump(state, f)
+        rc, data, _ = self._run_preflight(
+            "openspec_create",
+            subject_type="openspec_change",
+            subject_id="hist-change",
+        )
+        self.assertEqual(rc, 0)
+        self.assertTrue(data["allowed"])
+        self.assertEqual(data["status"], "ok")
+
+    # --- dangling archive repair (preflight read-only) ---
+
+    def test_preflight_dangling_archive_repair_without_run_blocks(self):
+        self._make_openspec_archive("orphan-arch", "2026-06-20")
+        rc, data, _ = self._run_preflight(
+            "dangling_archive_repair",
+            subject_type="openspec_change",
+            subject_id="orphan-arch",
+        )
+        self.assertEqual(rc, 1)
+        self.assertFalse(data["allowed"])
+        self.assertEqual(data["reason"], "missing_active_run")
+        self.assertIn("ensure-run", data["next_action"].get("command", ""))
+
+    def test_preflight_dangling_archive_repair_with_active_run_allows(self):
+        self._make_openspec_archive("has-run-arch", "2026-06-20")
+        run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="has-run-arch",
+        )
+        rc, data, _ = self._run_preflight(
+            "dangling_archive_repair",
+            subject_type="openspec_change",
+            subject_id="has-run-arch",
+        )
+        self.assertEqual(rc, 0)
+        self.assertTrue(data["allowed"])
+
+    def test_preflight_dangling_archive_repair_with_done_history_allows(self):
+        self._make_openspec_archive("done-arch", "2026-06-20")
+        hist_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "history")
+        os.makedirs(hist_dir, exist_ok=True)
+        state = {
+            "version": 1,
+            "run_id": "2026-06-20-done-arch",
+            "workflow": "sdlc-main",
+            "status": "done",
+            "current_phase": "done",
+            "primary_subject": {"type": "openspec_change", "id": "done-arch"},
+            "context": {"change_id": "done-arch"},
+            "phase_readiness": {"phase": "done", "ready": True, "missing_required_inputs": []},
+            "pending_hooks": [], "completed_hooks": [],
+            "completed_phases": [], "gates": {}, "evidence": {},
+            "block": None, "updated_at": "2026-06-20T00:00:00",
+        }
+        with open(os.path.join(hist_dir, "2026-06-20-done-arch.json"), "w") as f:
+            json.dump(state, f)
+        rc, data, _ = self._run_preflight(
+            "dangling_archive_repair",
+            subject_type="openspec_change",
+            subject_id="done-arch",
+        )
+        self.assertEqual(rc, 0)
+        self.assertTrue(data["allowed"])
+
+    # --- ensure-run creates active run for dangling archive ---
+
+    def test_ensure_run_creates_run_for_dangling_archive(self):
+        self._make_openspec_archive("orphan-ens", "2026-06-20")
+        rc, data, _ = self._run_ensure_run(
+            "dangling_archive_repair",
+            subject_type="openspec_change",
+            subject_id="orphan-ens",
+        )
+        self.assertEqual(rc, 0)
+        self.assertTrue(data["allowed"])
+        self.assertEqual(data["status"], "run_created")
+        self.assertIn("orphan-ens", data["run_id"])
+        # next_action must name the complete-phase step
+        desc = data.get("next_action", {}).get("description", "")
+        self.assertIn("complete-phase", desc,
+                      "next_action must include complete-phase step")
+        self.assertIn("pending_hooks_empty", desc,
+                      "next_action must reference pending_hooks_empty exit criteria")
+        # Verify current.json was created with post_archive_actions phase
+        current = self._read_current_state()
+        self.assertIsNotNone(current)
+        self.assertEqual(current["current_phase"], "post_archive_actions")
+        self.assertEqual(
+            current["primary_subject"],
+            {"type": "openspec_change", "id": "orphan-ens"},
+        )
+
+    # --- ensure-run skips when active run exists ---
+
+    def test_ensure_run_skips_when_active_run_exists(self):
+        self._make_openspec_archive("has-ens", "2026-06-20")
+        run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="has-ens",
+        )
+        rc, data, _ = self._run_ensure_run(
+            "dangling_archive_repair",
+            subject_type="openspec_change",
+            subject_id="has-ens",
+        )
+        self.assertEqual(rc, 0)
+        self.assertTrue(data["allowed"])
+        self.assertEqual(data["status"], "ok")
+
+    # --- ensure-run blocks on conflict ---
+
+    def test_ensure_run_blocks_on_conflict(self):
+        run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="other-change",
+        )
+        self._make_openspec_archive("block-me", "2026-06-20")
+        rc, data, _ = self._run_ensure_run(
+            "dangling_archive_repair",
+            subject_type="openspec_change",
+            subject_id="block-me",
+        )
+        self.assertEqual(rc, 1)
+        self.assertFalse(data["allowed"])
+        self.assertEqual(data["reason"], "conflict_active_run")
+
+    # --- ensure-run skips when done history exists ---
+
+    def test_ensure_run_skips_when_done_history_exists(self):
+        self._make_openspec_archive("done-ens", "2026-06-20")
+        hist_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "history")
+        os.makedirs(hist_dir, exist_ok=True)
+        state = {
+            "version": 1,
+            "run_id": "2026-06-20-done-ens",
+            "workflow": "sdlc-main",
+            "status": "done",
+            "current_phase": "done",
+            "primary_subject": {"type": "openspec_change", "id": "done-ens"},
+            "context": {"change_id": "done-ens"},
+            "phase_readiness": {"phase": "done", "ready": True, "missing_required_inputs": []},
+            "pending_hooks": [], "completed_hooks": [],
+            "completed_phases": [], "gates": {}, "evidence": {},
+            "block": None, "updated_at": "2026-06-20T00:00:00",
+        }
+        with open(os.path.join(hist_dir, "2026-06-20-done-ens.json"), "w") as f:
+            json.dump(state, f)
+        rc, data, _ = self._run_ensure_run(
+            "dangling_archive_repair",
+            subject_type="openspec_change",
+            subject_id="done-ens",
+        )
+        self.assertEqual(rc, 0)
+        self.assertTrue(data["allowed"])
+        self.assertEqual(data["status"], "ok")
+
+    # --- ensure-run dangling archive creates hooks ---
+
+    def test_ensure_run_dangling_archive_has_pending_hooks(self):
+        self._make_openspec_archive("hook-repair", "2026-06-20")
+        rc, data, _ = self._run_ensure_run(
+            "dangling_archive_repair",
+            subject_type="openspec_change",
+            subject_id="hook-repair",
+        )
+        self.assertEqual(rc, 0)
+        self.assertEqual(data["status"], "run_created")
+        current = self._read_current_state()
+        self.assertIsNotNone(current)
+        self.assertIn("memory_sync", current["pending_hooks"],
+                      "dangling repair must create memory_sync hook")
+        self.assertIn("roadmap_done_if_relevant", current["pending_hooks"],
+                      "dangling repair must create roadmap_done_if_relevant hook")
+        desc = data.get("next_action", {}).get("description", "")
+        self.assertIn("complete-phase", desc,
+                      "next_action must include complete-phase step")
+        self.assertIn("pending_hooks_empty", desc,
+                      "next_action must reference pending_hooks_empty exit criteria")
+
+    # --- ensure-run superpowers_direct returns not_required ---
+
+    def test_ensure_run_superpowers_direct_returns_not_required(self):
+        rc, data, _ = self._run_ensure_run("superpowers_direct")
+        self.assertEqual(rc, 0)
+        self.assertTrue(data["allowed"])
+        self.assertEqual(data["status"], "not_required")
+
+    # --- phase validation: preflight blocks when run phase doesn't match action ---
+
+    def test_preflight_openspec_apply_in_create_phase_blocks(self):
+        run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="phase-test",
+        )
+        # Run is in create_change phase (default for missing change)
+        rc, data, _ = self._run_preflight(
+            "openspec_apply",
+            subject_type="openspec_change",
+            subject_id="phase-test",
+        )
+        self.assertEqual(rc, 1)
+        self.assertFalse(data["allowed"])
+        self.assertEqual(data["reason"], "wrong_phase")
+
+    def test_preflight_openspec_archive_in_create_phase_blocks(self):
+        run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="phase-test2",
+        )
+        rc, data, _ = self._run_preflight(
+            "openspec_archive",
+            subject_type="openspec_change",
+            subject_id="phase-test2",
+        )
+        self.assertEqual(rc, 1)
+        self.assertFalse(data["allowed"])
+        self.assertEqual(data["reason"], "wrong_phase")
+
+    def test_preflight_openspec_create_in_create_phase_allows(self):
+        run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="phase-ok",
+        )
+        rc, data, _ = self._run_preflight(
+            "openspec_create",
+            subject_type="openspec_change",
+            subject_id="phase-ok",
+        )
+        self.assertEqual(rc, 0)
+        self.assertTrue(data["allowed"])
+        self.assertEqual(data["status"], "ok")
+
+    def test_preflight_openspec_apply_in_apply_phase_allows(self):
+        self._make_openspec_change("apply-ok")
+        run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="apply-ok",
+        )
+        rc, data, _ = self._run_preflight(
+            "openspec_apply",
+            subject_type="openspec_change",
+            subject_id="apply-ok",
+        )
+        self.assertEqual(rc, 0)
+        self.assertTrue(data["allowed"])
+
+    def test_preflight_openspec_archive_in_archive_phase_allows(self):
+        self._make_openspec_change("archive-ok")
+        self._make_task_file("archive-ok", completed=True)
+        run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="archive-ok",
+        )
+        rc, data, _ = self._run_preflight(
+            "openspec_archive",
+            subject_type="openspec_change",
+            subject_id="archive-ok",
+        )
+        self.assertEqual(rc, 0)
+        self.assertTrue(data["allowed"])
+
+    # --- unknown action ---
+
+    def test_preflight_unknown_action_returns_error(self):
+        rc, data, _ = self._run_preflight("bogus_action")
+        self.assertEqual(rc, 1)
+        self.assertFalse(data["allowed"])
+        self.assertEqual(data["reason"], "unknown_action")
 
 
 if __name__ == "__main__":
