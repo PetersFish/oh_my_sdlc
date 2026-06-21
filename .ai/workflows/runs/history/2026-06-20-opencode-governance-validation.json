@@ -2,8 +2,8 @@
   "version": 1,
   "run_id": "2026-06-20-opencode-governance-validation",
   "workflow": "sdlc-main",
-  "status": "running",
-  "current_phase": "apply_change",
+  "status": "done",
+  "current_phase": "done",
   "primary_subject": {
     "type": "openspec_change",
     "id": "opencode-governance-validation"
@@ -44,5 +44,5 @@
     }
   },
   "block": null,
-  "updated_at": "2026-06-20T22:28:50.459433"
+  "updated_at": "2026-06-20T23:00:00"
 }

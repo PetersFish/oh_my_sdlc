@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "run_id": "2026-06-19-hello-world",
+  "workflow": "sdlc-main",
+  "status": "done",
+  "current_phase": "done",
+  "primary_subject": {
+    "type": "openspec_change",
+    "id": "hello-world"
+  },
+  "context": {
+    "change_id": "hello-world"
+  },
+  "phase_readiness": {
+    "phase": "done",
+    "ready": true,
+    "missing_required_inputs": []
+  },
+  "pending_hooks": [],
+  "completed_hooks": [
+    "retroactive_governance"
+  ],
+  "completed_phases": [
+    "create_change",
+    "apply_change",
+    "archive_change"
+  ],
+  "gates": {},
+  "evidence": {
+    "retroactive": true,
+    "note": "Archived before workflow system existed"
+  },
+  "block": null,
+  "updated_at": "2026-06-19T00:00:00"
+}
