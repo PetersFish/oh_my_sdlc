@@ -209,6 +209,7 @@ def main():
             print(f"Available areas: {', '.join(discover_areas(root))}")
             return 1
         items = apply_status_filter(items, args.status, args.incomplete, args.done)
+        items.sort(key=_sort_key)
         if args.top is not None:
             items = items[:args.top]
         print_table(items, f"Roadmap - {area_filter}")

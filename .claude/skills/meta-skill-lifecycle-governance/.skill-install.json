@@ -3,7 +3,7 @@
   "source_repo": ".",
   "source_ref": "HEAD",
   "status": "stable",
-  "target": ".opencode/skills/meta-skill-lifecycle-governance",
-  "installed_at": "2026-06-22T04:47:44.245815Z",
+  "target": ".claude/skills/meta-skill-lifecycle-governance",
+  "installed_at": "2026-06-22T04:47:44.297030Z",
   "backport_policy": "review-required"
 }

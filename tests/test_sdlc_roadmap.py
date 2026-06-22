@@ -555,6 +555,21 @@ class TestListScript(unittest.TestCase):
         self.assertIn("RM-TST-001", result.stdout)
         self.assertNotIn("RM-TST-002", result.stdout)
 
+    def test_list_area_incomplete_top_sorts_before_truncation(self) -> None:
+        _make_area_item(self.items_dir, "RM-TST-001", priority="p0", status="done", order=10)
+        _make_area_item(self.items_dir, "RM-TST-002", priority="p3", status="idea", order=20)
+        _make_area_item(self.items_dir, "RM-TST-003", priority="p0", status="ready", order=30)
+        result = subprocess.run(
+            [sys.executable, str(SCRIPTS_DIR / "list.py"), "skill.test", "--incomplete", "--top", "1"],
+            cwd=self.tmpdir,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertNotIn("RM-TST-001", result.stdout)
+        self.assertNotIn("RM-TST-002", result.stdout)
+        self.assertIn("RM-TST-003", result.stdout)
+
 
 class TestSyncScript(unittest.TestCase):
     def setUp(self):

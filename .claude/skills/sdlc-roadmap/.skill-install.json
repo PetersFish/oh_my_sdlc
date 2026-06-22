@@ -4,6 +4,6 @@
   "source_ref": "HEAD",
   "status": "stable",
   "target": ".claude/skills/sdlc-roadmap",
-  "installed_at": "2026-06-21T16:42:59.422943Z",
+  "installed_at": "2026-06-22T04:46:07.927463Z",
   "backport_policy": "review-required"
 }

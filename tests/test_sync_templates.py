@@ -261,5 +261,71 @@ class TestSyncTemplatesDistributed(unittest.TestCase):
         self.assertEqual(content, "# canonical workflow\n")
 
 
+CHECK_SKILL_DIST = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "..", "skills", "meta-skill-lifecycle-governance", "scripts",
+    "check_skill_distribution.py",
+)
+
+
+def run_skill_check(root, *extra_args):
+    args = [sys.executable, CHECK_SKILL_DIST, "--root", root] + list(extra_args)
+    result = subprocess.run(args, capture_output=True, text=True)
+    return result.returncode, result.stdout.strip(), result.stderr.strip()
+
+
+class TestCheckSkillDistribution(unittest.TestCase):
+    """Tests for check_skill_distribution.py — full-tree skill copy drift detection."""
+
+    SKILL = "test-skill"
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        # Canonical skill: SKILL.md + scripts/
+        skill_dir = os.path.join(self.tmp, "skills", self.SKILL)
+        os.makedirs(os.path.join(skill_dir, "scripts"))
+        write_file(self.tmp, f"skills/{self.SKILL}/SKILL.md", "# skill content\n")
+        write_file(self.tmp, f"skills/{self.SKILL}/scripts/do.py", "# do script\n")
+
+        # Matching distributed copies
+        for dist in [".opencode", ".claude", ".cursor"]:
+            d = os.path.join(self.tmp, dist, "skills", self.SKILL)
+            os.makedirs(os.path.join(d, "scripts"))
+            write_file(self.tmp, f"{dist}/skills/{self.SKILL}/SKILL.md", "# skill content\n")
+            write_file(self.tmp, f"{dist}/skills/{self.SKILL}/scripts/do.py", "# do script\n")
+            # Distribution install metadata (should be ignored by check)
+            write_file(self.tmp, f"{dist}/skills/{self.SKILL}/.skill-install.json",
+                       '{"source_ref":"HEAD"}\n')
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp)
+
+    def test_all_match_exits_zero(self):
+        rc, stdout, _ = run_skill_check(self.tmp)
+        self.assertEqual(rc, 0, f"identical copies should exit 0, got stdout={stdout!r}")
+
+    def test_drift_in_script_detected(self):
+        write_file(self.tmp, "skills/test-skill/scripts/do.py", "# modified script\n")
+        rc, stdout, _ = run_skill_check(self.tmp)
+        self.assertNotEqual(rc, 0, f"script drift should exit non-zero, got stdout={stdout!r}")
+        self.assertIn("do.py", stdout)
+
+    def test_file_only_in_canonical_detected(self):
+        write_file(self.tmp, "skills/test-skill/scripts/new.py", "# new file\n")
+        rc, stdout, _ = run_skill_check(self.tmp)
+        self.assertNotEqual(rc, 0, f"extra canonical file should exit non-zero, got stdout={stdout!r}")
+        self.assertIn("new.py", stdout)
+
+    def test_skills_filter_skips_unrelated_drift(self):
+        write_file(self.tmp, "skills/test-skill/scripts/do.py", "# modified script\n")
+        write_file(self.tmp, "skills/other-skill/SKILL.md", "# other\n")
+        os.makedirs(os.path.join(self.tmp, ".opencode", "skills", "other-skill"))
+        write_file(self.tmp, ".opencode/skills/other-skill/SKILL.md", "# different\n")
+        rc, stdout, _ = run_skill_check(self.tmp, "--skills", "test-skill")
+        self.assertNotEqual(rc, 0, f"should detect test-skill drift")
+        self.assertIn("do.py", stdout)
+        self.assertNotIn("other-skill", stdout, "unrelated skill should be skipped")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
