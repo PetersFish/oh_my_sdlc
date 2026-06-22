@@ -74,6 +74,19 @@
       "area": "workflow.sdlc-orchestrator"
     },
     {
+      "id": "RM-ORCH-006",
+      "status": "idea",
+      "title": "Multi-Run Concurrent Support",
+      "stage": "v2",
+      "priority": "p0",
+      "order": 25,
+      "depends_on": [
+        "RM-ORCH-001"
+      ],
+      "openspec_change": null,
+      "area": "workflow.sdlc-orchestrator"
+    },
+    {
       "id": "RM-SDLC-003",
       "status": "idea",
       "title": "Validation & Sync",
@@ -100,12 +113,12 @@
     {
       "id": "RM-ORCH-004",
       "status": "idea",
-      "title": "Clear Current Run On Done",
+      "title": "Verify Done Run Cleanup From Active Directory",
       "stage": "v2",
-      "priority": "p0",
-      "order": 30,
+      "priority": "p1",
+      "order": 35,
       "depends_on": [
-        "RM-ORCH-001"
+        "RM-ORCH-006"
       ],
       "openspec_change": null,
       "area": "workflow.sdlc-orchestrator"
@@ -145,7 +158,20 @@
       "order": 40,
       "depends_on": [
         "RM-ORCH-001",
-        "RM-ORCH-004"
+        "RM-ORCH-006"
+      ],
+      "openspec_change": null,
+      "area": "workflow.sdlc-orchestrator"
+    },
+    {
+      "id": "RM-ORCH-007",
+      "status": "idea",
+      "title": "Workflow Wrapper Abstraction",
+      "stage": "v2",
+      "priority": "p1",
+      "order": 45,
+      "depends_on": [
+        "RM-ORCH-005"
       ],
       "openspec_change": null,
       "area": "workflow.sdlc-orchestrator"
