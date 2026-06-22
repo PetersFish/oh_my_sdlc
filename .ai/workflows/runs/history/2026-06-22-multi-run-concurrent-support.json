@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "run_id": "2026-06-22-multi-run-concurrent-support",
+  "workflow": "sdlc-main",
+  "status": "done",
+  "current_phase": "done",
+  "primary_subject": {
+    "type": "openspec_change",
+    "id": "multi-run-concurrent-support"
+  },
+  "context": {
+    "change_id": "multi-run-concurrent-support",
+    "roadmap_item_id": "RM-ORCH-006"
+  },
+  "phase_readiness": {
+    "phase": "done",
+    "ready": true,
+    "missing_required_inputs": []
+  },
+  "pending_hooks": [],
+  "completed_hooks": [
+    "roadmap_status_ready_if_linked",
+    "roadmap_apply_start_if_ready",
+    "memory_sync",
+    "roadmap_done_if_relevant"
+  ],
+  "completed_phases": [
+    "create_change",
+    "apply_change",
+    "archive_change",
+    "post_archive_actions"
+  ],
+  "gates": {},
+  "evidence": {
+    "openspec_status": {
+      "classification": "active",
+      "source": "active"
+    },
+    "roadmap_link": {
+      "count": 1,
+      "items": [
+        {
+          "item_id": "RM-ORCH-006",
+          "status": "done",
+          "completed_at": "2026-06-22",
+          "file": ".ai/roadmap/areas/workflow.sdlc-orchestrator/items/RM-ORCH-006-multi-run-concurrent-support.md",
+          "area": "workflow.sdlc-orchestrator"
+        }
+      ]
+    },
+    "proposal": {
+      "path": "openspec/changes/multi-run-concurrent-support/proposal.md"
+    },
+    "archive_path": "openspec/changes/archive/2026-06-22-multi-run-concurrent-support",
+    "memory_sync_resolution": "not_needed",
+    "memory_sync_reason": "repository memory not initialized; state correction only",
+    "roadmap_hook_resolution": "idempotent_done"
+  },
+  "block": null,
+  "updated_at": "2026-06-22T19:59:32.778255"
+}
