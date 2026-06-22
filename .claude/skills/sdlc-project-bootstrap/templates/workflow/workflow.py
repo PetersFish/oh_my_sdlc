@@ -72,12 +72,74 @@ RUN_STATE_KEYS = {
 }
 
 
-def load_run_state(root):
-    path = _resolve_path(root, ".ai/workflows/runs/current.json")
+def _read_pointer(root):
+    pointer_path = _resolve_path(root, ".ai/workflows/runs/current.json")
+    if not os.path.exists(pointer_path):
+        return None
+    with open(pointer_path, "r") as f:
+        return json.load(f)
+
+
+def _set_pointer(root, run_id):
+    pointer_path = _resolve_path(root, ".ai/workflows/runs/current.json")
+    _ensure_dir(os.path.dirname(pointer_path))
+    with open(pointer_path, "w") as f:
+        json.dump({"run_id": run_id}, f)
+
+
+def _clear_pointer(root):
+    pointer_path = _resolve_path(root, ".ai/workflows/runs/current.json")
+    _ensure_dir(os.path.dirname(pointer_path))
+    with open(pointer_path, "w") as f:
+        json.dump({}, f)
+
+
+def _active_path(root, run_id):
+    return _resolve_path(root, f".ai/workflows/runs/active/{run_id}.json")
+
+
+def load_run_state(root, run_id=None):
+    if run_id is not None:
+        path = _active_path(root, run_id)
+        if not os.path.exists(path):
+            return None
+        with open(path, "r") as f:
+            return json.load(f)
+    pointer = _read_pointer(root)
+    if not pointer or not pointer.get("run_id"):
+        return None
+    path = _active_path(root, pointer["run_id"])
     if not os.path.exists(path):
         return None
     with open(path, "r") as f:
         return json.load(f)
+
+
+def _list_active_runs(root):
+    active_dir = _resolve_path(root, ".ai/workflows/runs/active")
+    if not os.path.isdir(active_dir):
+        return []
+    results = []
+    for fname in _list_dirs(active_dir):
+        if not fname.endswith(".json"):
+            continue
+        active_path_file = os.path.join(active_dir, fname)
+        try:
+            with open(active_path_file, "r") as f:
+                state = json.load(f)
+            results.append((state.get("run_id", fname.replace(".json", "")), state))
+        except Exception:
+            continue
+    return results
+
+
+def _find_active_run_by_subject(root, subject_type, subject_id):
+    for run_id, state in _list_active_runs(root):
+        ps = state.get("primary_subject", {})
+        if ps.get("type") == subject_type and ps.get("id") == subject_id:
+            if state.get("status") in ("running", "blocked"):
+                return state
+    return None
 
 
 def _json_default(obj):
@@ -87,11 +149,13 @@ def _json_default(obj):
 
 
 def save_run_state(root, state):
-    path = _resolve_path(root, ".ai/workflows/runs/current.json")
+    run_id = state["run_id"]
+    path = _active_path(root, run_id)
     _ensure_dir(os.path.dirname(path))
     state["updated_at"] = _ts()
     with open(path, "w") as f:
         json.dump(state, f, indent=2, default=_json_default)
+    _set_pointer(root, run_id)
 
 
 def validate_run_state(state):
@@ -329,14 +393,19 @@ def loader_roadmap_item_status(root, item_id):
     areas_dir = _resolve_path(root, ".ai/roadmap/areas")
     for area in _list_dirs(areas_dir):
         items_dir = os.path.join(areas_dir, area, "items")
-        fname_md = f"{item_id}.md"
-        fpath = os.path.join(items_dir, fname_md)
-        if os.path.exists(fpath):
-            return {
-                "item_id": item_id,
-                "status": _read_frontmatter_field(fpath, "status"),
-                "completed_at": _read_frontmatter_field(fpath, "completed_at"),
-            }
+        if not os.path.isdir(items_dir):
+            continue
+        for fname in _list_dirs(items_dir):
+            if not fname.endswith(".md"):
+                continue
+            fpath = os.path.join(items_dir, fname)
+            fm_id = _read_frontmatter_field(fpath, "id")
+            if fm_id == item_id:
+                return {
+                    "item_id": item_id,
+                    "status": _read_frontmatter_field(fpath, "status"),
+                    "completed_at": _read_frontmatter_field(fpath, "completed_at"),
+                }
     return None
 
 
@@ -376,10 +445,20 @@ def _make_preflight_decision(allowed, status, reason="", next_action=None):
 
 
 def _evaluate_subject_run_context(root, subject_type, subject_id):
-    """Return (active_state, done_subjects_set) for subject validation."""
+    """Return (active_state_matching_subject, done_subjects_set). Sets pointer to matching run if found."""
     active = load_run_state(root)
+    if active:
+        ps = active.get("primary_subject", {})
+        if ps.get("type") == subject_type and ps.get("id") == subject_id:
+            done_subjects = _load_done_history_run_ids(root)
+            return active, done_subjects
+
+    matching = _find_active_run_by_subject(root, subject_type, subject_id)
+    if matching:
+        _set_pointer(root, matching["run_id"])
+
     done_subjects = _load_done_history_run_ids(root)
-    return active, done_subjects
+    return matching, done_subjects
 
 
 # Policy registry: add new governed actions by registering a policy function.
@@ -769,12 +848,59 @@ def cmd_ensure_run(root, args):
 # ---------------------------------------------------------------------------
 
 
+def _status_summaries(active_runs):
+    summaries = []
+    for run_id, state in active_runs:
+        summaries.append({
+            "run_id": run_id,
+            "current_phase": state.get("current_phase"),
+            "status": state.get("status"),
+            "primary_subject": state.get("primary_subject"),
+            "updated_at": state.get("updated_at"),
+        })
+    return summaries
+
+
 def cmd_status(root, args):
-    state = load_run_state(root)
-    if not state:
-        print(json.dumps({"status": "no_active_run"}, indent=2))
+    subject_type = args.subject_type
+    subject_id = args.subject_id
+
+    if subject_type and subject_id:
+        state = _find_active_run_by_subject(root, subject_type, subject_id)
+        if not state:
+            print(json.dumps({"status": "no_active_run"}, indent=2))
+            return
+        print(json.dumps(state, indent=2))
         return
-    print(json.dumps(state, indent=2))
+
+    pointer = _read_pointer(root)
+    if pointer and pointer.get("run_id"):
+        state = load_run_state(root)
+        if state:
+            print(json.dumps(state, indent=2))
+            return
+        active_runs = _list_active_runs(root)
+        summaries = _status_summaries(active_runs)
+        print(
+            json.dumps(
+                {
+                    "status": "stale_pointer",
+                    "pointer_run_id": pointer["run_id"],
+                    "message": "pointed run file not found in active/",
+                    "runs": summaries,
+                },
+                indent=2,
+            )
+        )
+        return
+
+    active_runs = _list_active_runs(root)
+    if not active_runs:
+        print(json.dumps({"status": "no_active_run"}))
+        return
+
+    summaries = _status_summaries(active_runs)
+    print(json.dumps({"status": "active_runs", "runs": summaries}, indent=2))
 
 
 def cmd_validate(root, args):
@@ -797,43 +923,26 @@ def cmd_validate(root, args):
 
 
 def cmd_start(root, args):
-    existing = load_run_state(root)
     workflow_id = args.workflow or "sdlc-main"
     subject_type = args.subject_type or "openspec_change"
     subject_id = args.subject_id
     run_id = _make_run_id(subject_type, subject_id)
 
-    if existing and existing.get("status") in ("running", "blocked"):
-        existing_subject = existing.get("primary_subject", {})
-        if (
-            existing_subject.get("type") == subject_type
-            and existing_subject.get("id") == subject_id
-        ):
-            print(
-                json.dumps(
-                    {
-                        "action": "resume",
-                        "run_id": existing["run_id"],
-                        "current_phase": existing["current_phase"],
-                        "message": "matching active run exists, use resume",
-                    },
-                    indent=2,
-                )
+    # Check ALL active runs for same-subject duplicate
+    duplicate = _find_active_run_by_subject(root, subject_type, subject_id)
+    if duplicate:
+        print(
+            json.dumps(
+                {
+                    "action": "conflict",
+                    "message": "active run already exists for this subject",
+                    "existing_run_id": duplicate["run_id"],
+                    "existing_subject": duplicate.get("primary_subject", {}),
+                },
+                indent=2,
             )
-            return
-        else:
-            print(
-                json.dumps(
-                    {
-                        "action": "conflict",
-                        "message": "different active run exists",
-                        "existing_run_id": existing["run_id"],
-                        "existing_subject": existing_subject,
-                    },
-                    indent=2,
-                )
-            )
-            sys.exit(1)
+        )
+        sys.exit(1)
 
     phase = _infer_phase(root, subject_type, subject_id)
 
@@ -864,33 +973,44 @@ def cmd_start(root, args):
 
 
 def cmd_resume(root, args):
-    state = load_run_state(root)
-    if not state:
-        print(json.dumps({"error": "no active run to resume"}, indent=2))
-        sys.exit(1)
-
     subject_type = args.subject_type
     subject_id = args.subject_id
 
-    existing_subject = state.get("primary_subject", {})
-    if subject_type and subject_id:
-        if (
-            existing_subject.get("type") != subject_type
-            or existing_subject.get("id") != subject_id
-        ):
-            print(
-                json.dumps(
-                    {
-                        "action": "conflict",
-                        "message": "active run has different subject",
-                        "run_id": state["run_id"],
-                        "existing_subject": existing_subject,
-                        "requested_subject": {"type": subject_type, "id": subject_id},
-                    },
-                    indent=2,
-                )
+    if not subject_type or not subject_id:
+        active_runs = _list_active_runs(root)
+        summaries = []
+        for run_id, state in active_runs:
+            summaries.append({
+                "run_id": run_id,
+                "current_phase": state.get("current_phase"),
+                "status": state.get("status"),
+                "primary_subject": state.get("primary_subject"),
+                "updated_at": state.get("updated_at"),
+            })
+        print(
+            json.dumps(
+                {
+                    "error": "subject-type and subject-id required for resume with concurrent runs",
+                    "active_runs": summaries,
+                },
+                indent=2,
             )
-            sys.exit(1)
+        )
+        sys.exit(1)
+
+    state = _find_active_run_by_subject(root, subject_type, subject_id)
+    if not state:
+        print(
+            json.dumps(
+                {
+                    "error": f"no active run found for {subject_type}/{subject_id}",
+                },
+                indent=2,
+            )
+        )
+        sys.exit(1)
+
+    _set_pointer(root, state["run_id"])
 
     status = state.get("status")
     if status == "done":
@@ -902,7 +1022,7 @@ def cmd_resume(root, args):
 
     wf = load_workflow(root, state.get("workflow", "sdlc-main"))
     if wf:
-        phase = _infer_phase(root, existing_subject.get("type"), existing_subject.get("id"))
+        phase = _infer_phase(root, subject_type, subject_id)
         state["current_phase"] = phase
         _run_loaders(root, state, wf)
         _calc_readiness(state, wf)
@@ -1218,6 +1338,15 @@ def cmd_advance(root, args):
         with open(history_path, "w") as f:
             json.dump(state, f, indent=2)
 
+        run_id = state["run_id"]
+        active_path = _active_path(root, run_id)
+        if os.path.exists(active_path):
+            os.remove(active_path)
+        _clear_pointer(root)
+
+        print(json.dumps(state, indent=2))
+        return
+
     save_run_state(root, state)
     print(json.dumps(state, indent=2))
 
@@ -1304,7 +1433,12 @@ def cmd_done(root, args):
     with open(history_path, "w") as f:
         json.dump(state, f, indent=2)
 
-    save_run_state(root, state)
+    run_id = state["run_id"]
+    active_path = _active_path(root, run_id)
+    if os.path.exists(active_path):
+        os.remove(active_path)
+    _clear_pointer(root)
+
     print(json.dumps(state, indent=2))
 
 
@@ -1312,12 +1446,12 @@ def cmd_governance_check(root, args):
     """Read-only governance diagnostics: dangling archives and pending hooks."""
     findings = []
     archive_dir = _resolve_path(root, "openspec/changes/archive")
-    active_state = load_run_state(root)
     history_dir = _resolve_path(root, ".ai/workflows/runs/history")
 
     governed_change_ids = set()
 
-    if active_state:
+    active_runs = _list_active_runs(root)
+    for run_id, active_state in active_runs:
         ps = active_state.get("primary_subject", {})
         if ps.get("type") == "openspec_change" and ps.get("id"):
             governed_change_ids.add(ps["id"])
@@ -1379,38 +1513,38 @@ def cmd_governance_check(root, args):
                 "hash": fh,
             })
 
-    if active_state:
+    for run_id, active_state in active_runs:
         pending = active_state.get("pending_hooks", [])
-        if pending:
-            run_id = active_state.get("run_id", "")
-            ctx = active_state.get("context", {})
-            change_id = ctx.get("change_id", "")
-            hook_list = ", ".join(pending)
-            message = (
-                f"Active run \"{run_id}\" has {len(pending)} unresolved "
-                f"hook(s): {pending}."
-            )
-            remediation = (
-                f"Active run \"{run_id}\" has unresolved hooks: [{hook_list}]. "
-                f"Invoke the responsible workers for each hook, then run "
-                f"\"workflow.py complete-hook --hook <hook-name>\" for each. "
-                f"Re-run \"workflow.py governance-check\" until block=false."
-            )
-            fh = _finding_hash(
-                "pending_hooks",
-                run_id=run_id,
-                change_id=change_id or None,
-                pending_hook_names=",".join(sorted(pending)),
-            )
-            findings.append({
-                "type": "pending_hooks",
-                "run_id": run_id,
-                "change_id": change_id or None,
-                "pending_hook_names": pending,
-                "message": message,
-                "remediation": remediation,
-                "hash": fh,
-            })
+        if not pending:
+            continue
+        ctx = active_state.get("context", {})
+        change_id = ctx.get("change_id", "")
+        hook_list = ", ".join(pending)
+        message = (
+            f"Active run \"{run_id}\" has {len(pending)} unresolved "
+            f"hook(s): {pending}."
+        )
+        remediation = (
+            f"Active run \"{run_id}\" has unresolved hooks: [{hook_list}]. "
+            f"Invoke the responsible workers for each hook, then run "
+            f"\"workflow.py complete-hook --hook <hook-name>\" for each. "
+            f"Re-run \"workflow.py governance-check\" until block=false."
+        )
+        fh = _finding_hash(
+            "pending_hooks",
+            run_id=run_id,
+            change_id=change_id or None,
+            pending_hook_names=",".join(sorted(pending)),
+        )
+        findings.append({
+            "type": "pending_hooks",
+            "run_id": run_id,
+            "change_id": change_id or None,
+            "pending_hook_names": pending,
+            "message": message,
+            "remediation": remediation,
+            "hash": fh,
+        })
 
     block = len(findings) > 0
     output = {"block": block, "findings": findings}

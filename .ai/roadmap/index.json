@@ -75,7 +75,7 @@
     },
     {
       "id": "RM-ORCH-006",
-      "status": "idea",
+      "status": "done",
       "title": "Multi-Run Concurrent Support",
       "stage": "v2",
       "priority": "p0",
@@ -83,7 +83,7 @@
       "depends_on": [
         "RM-ORCH-001"
       ],
-      "openspec_change": null,
+      "openspec_change": "multi-run-concurrent-support",
       "area": "workflow.sdlc-orchestrator"
     },
     {

@@ -1,16 +1,16 @@
 ---
 id: RM-ORCH-006
 title: "Multi-Run Concurrent Support"
-status: idea
+status: done
 stage: v2
 priority: p0
 order: 25
 depends_on:
   - RM-ORCH-001
-openspec_change: null
+openspec_change: multi-run-concurrent-support
 created_at: 2026-06-22
-started_at: null
-completed_at: null
+started_at: 2026-06-22
+completed_at: 2026-06-22
 ---
 
 # Goal
@@ -112,7 +112,10 @@ The fix: move run state to `active/<run_id>.json` while keeping `current.json` a
 
 # Completion Notes
 
-Not started.
+- Full implementation: active/ directory, pointer file, concurrent run support, 85 tests + 11 subtests passing.
+- Code review found 3 post-implementation issues, all fixed before archive.
+- Known gap: OpenCode plugin does not automatically trigger workflow post-archive hooks; manual state correction required for this run.
+- Follow-up: automatic archive→roadmap/workflow lifecycle bridge needed.
 
 # Design Reference
 

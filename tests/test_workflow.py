@@ -83,7 +83,7 @@ class FixtureBase(unittest.TestCase):
         with open(os.path.join(tasks_dir, "tasks.md"), "w") as f:
             f.write(content)
 
-    def _make_roadmap_item(self, item_id, status, openspec_change=None, area="area1", completed_at=None):
+    def _make_roadmap_item(self, item_id, status, openspec_change=None, area="area1", completed_at=None, slug=None):
         items_dir = os.path.join(
             self.tmp, ".ai", "roadmap", "areas", area, "items"
         )
@@ -94,12 +94,29 @@ class FixtureBase(unittest.TestCase):
         if completed_at:
             fm += f"completed_at: {completed_at}\n"
         content = f"---\n{fm}---\n# {item_id}\n"
-        fpath = os.path.join(items_dir, f"{item_id}.md")
+        fname = f"{item_id}-{slug}.md" if slug else f"{item_id}.md"
+        fpath = os.path.join(items_dir, fname)
         with open(fpath, "w") as f:
             f.write(content)
 
     def _read_current_state(self):
-        return load_json(self.tmp, ".ai/workflows/runs/current.json")
+        pointer = load_json(self.tmp, ".ai/workflows/runs/current.json")
+        if not pointer or not pointer.get("run_id"):
+            return None
+        return load_json(self.tmp, f".ai/workflows/runs/active/{pointer['run_id']}.json")
+
+    def _write_current_state(self, state):
+        run_id = state["run_id"]
+        active_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "active")
+        os.makedirs(active_dir, exist_ok=True)
+        with open(os.path.join(active_dir, f"{run_id}.json"), "w") as f:
+            json.dump(state, f)
+        pointer_path = os.path.join(self.tmp, ".ai", "workflows", "runs", "current.json")
+        with open(pointer_path, "w") as f:
+            json.dump({"run_id": run_id}, f)
+
+    def _read_active_file(self, run_id):
+        return load_json(self.tmp, f".ai/workflows/runs/active/{run_id}.json")
 
     def _read_history(self, run_id):
         return load_json(self.tmp, f".ai/workflows/runs/history/{run_id}.json")
@@ -127,7 +144,7 @@ class TestStartAndStatus(FixtureBase):
             {"type": "openspec_change", "id": "demo-change"},
         )
 
-    def test_start_existing_run_same_subject_suggests_resume(self):
+    def test_start_existing_run_same_subject_reports_conflict(self):
         run_workflow(
             self.tmp, "start",
             subject_type="openspec_change",
@@ -138,11 +155,11 @@ class TestStartAndStatus(FixtureBase):
             subject_type="openspec_change",
             subject_id="demo-change",
         )
-        self.assertEqual(rc, 0)
+        self.assertNotEqual(rc, 0)
         data = json.loads(out)
-        self.assertEqual(data["action"], "resume")
+        self.assertEqual(data["action"], "conflict")
 
-    def test_start_existing_run_different_subject_conflict(self):
+    def test_start_existing_run_different_subject_allows_concurrent(self):
         run_workflow(
             self.tmp, "start",
             subject_type="openspec_change",
@@ -153,9 +170,10 @@ class TestStartAndStatus(FixtureBase):
             subject_type="openspec_change",
             subject_id="demo-change-2",
         )
-        self.assertNotEqual(rc, 0)
+        self.assertEqual(rc, 0)
         data = json.loads(out)
-        self.assertEqual(data["action"], "conflict")
+        self.assertEqual(data["status"], "running")
+        self.assertIn("demo-change-2", data["run_id"])
 
 
 class TestPhaseInference(FixtureBase):
@@ -232,10 +250,7 @@ class TestReadinessAndResolve(FixtureBase):
         state = self._read_current_state()
         state["current_phase"] = "create_change"
         state["context"] = {}
-        with open(
-            os.path.join(self.tmp, ".ai/workflows/runs/current.json"), "w"
-        ) as f:
-            json.dump(state, f)
+        self._write_current_state(state)
 
         rc, out, _ = run_workflow(self.tmp, "readiness")
         self.assertEqual(rc, 0)
@@ -331,10 +346,7 @@ class TestBranchPhase(FixtureBase):
         state = self._read_current_state()
         state["current_phase"] = "decide_intent"
         state["completed_phases"] = ["decide_intent"]
-        with open(
-            os.path.join(self.tmp, ".ai/workflows/runs/current.json"), "w"
-        ) as f:
-            json.dump(state, f)
+        self._write_current_state(state)
 
         rc, out, _ = run_workflow(self.tmp, "advance", branch="bogus")
         self.assertNotEqual(rc, 0)
@@ -359,10 +371,30 @@ class TestPostArchiveHooks(FixtureBase):
     def _add_hook(self, hook_name):
         state = self._read_current_state()
         state.setdefault("pending_hooks", []).append(hook_name)
-        with open(
-            os.path.join(self.tmp, ".ai/workflows/runs/current.json"), "w"
-        ) as f:
-            json.dump(state, f)
+        self._write_current_state(state)
+
+    def test_roadmap_done_hook_with_slug_filename(self):
+        """roadmap_done_if_relevant hook resolves 'done' when item file has slug suffix."""
+        self._start_archived_workflow("slug-test", [
+            {"item_id": "RM-SLUG-001", "status": "active", "openspec_change": "slug-test"},
+        ])
+        items_dir = os.path.join(
+            self.tmp, ".ai", "roadmap", "areas", "area1", "items"
+        )
+        os.remove(os.path.join(items_dir, "RM-SLUG-001.md"))
+        self._make_roadmap_item(
+            "RM-SLUG-001", "done", slug="my-feature-slug",
+            openspec_change="slug-test", completed_at="2026-06-22",
+        )
+        self._add_hook("roadmap_done_if_relevant")
+
+        rc, out, _ = run_workflow(
+            self.tmp, "complete-hook",
+            hook="roadmap_done_if_relevant",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["evidence"]["roadmap_hook_resolution"], "done")
 
     def test_archived_active_roadmap_blocks_done(self):
         self._start_archived_workflow("arch-block", [
@@ -378,10 +410,7 @@ class TestPostArchiveHooks(FixtureBase):
         state["pending_hooks"] = ["roadmap_done_if_relevant"]
         state["status"] = "running"
         state["block"] = None
-        with open(
-            os.path.join(self.tmp, ".ai/workflows/runs/current.json"), "w"
-        ) as f:
-            json.dump(state, f)
+        self._write_current_state(state)
 
         rc, out, _ = run_workflow(self.tmp, "done")
         data = json.loads(out)
@@ -420,10 +449,7 @@ class TestPostArchiveHooks(FixtureBase):
         ]
         state["status"] = "running"
         state["block"] = None
-        with open(
-            os.path.join(self.tmp, ".ai/workflows/runs/current.json"), "w"
-        ) as f:
-            json.dump(state, f)
+        self._write_current_state(state)
 
         rc, out3, _ = run_workflow(self.tmp, "done")
         self.assertEqual(rc, 0)
@@ -487,11 +513,14 @@ class TestPostArchiveHooks(FixtureBase):
                         subject_id=f"arch-{status}",
                     )
                     # Register hook manually
-                    state_path = os.path.join(tmp, ".ai/workflows/runs/current.json")
-                    with open(state_path, "r") as f:
+                    pointer_path = os.path.join(tmp, ".ai/workflows/runs/current.json")
+                    with open(pointer_path, "r") as f:
+                        pointer = json.load(f)
+                    active_path = os.path.join(tmp, ".ai/workflows/runs/active", f"{pointer['run_id']}.json")
+                    with open(active_path, "r") as f:
                         s = json.load(f)
                     s.setdefault("pending_hooks", []).append("roadmap_done_if_relevant")
-                    with open(state_path, "w") as f:
+                    with open(active_path, "w") as f:
                         json.dump(s, f)
 
                     rc, out, _ = run_workflow(
@@ -515,10 +544,7 @@ class TestMemorySyncHook(FixtureBase):
         )
         state = self._read_current_state()
         state["pending_hooks"] = ["memory_sync"]
-        with open(
-            os.path.join(self.tmp, ".ai/workflows/runs/current.json"), "w"
-        ) as f:
-            json.dump(state, f)
+        self._write_current_state(state)
 
     def test_memory_sync_deferred_without_reason_fails(self):
         self._setup_archived_with_memory_hook("mem-no-reason")
@@ -572,12 +598,16 @@ class TestResume(FixtureBase):
             subject_type="openspec_change",
             subject_id="resume-test",
         )
-        rc, out, _ = run_workflow(self.tmp, "resume")
+        rc, out, _ = run_workflow(
+            self.tmp, "resume",
+            subject_type="openspec_change",
+            subject_id="resume-test",
+        )
         self.assertEqual(rc, 0)
         data = json.loads(out)
         self.assertIn("resume-test", data["run_id"])
 
-    def test_resume_different_subject_conflict(self):
+    def test_resume_different_subject_not_found(self):
         run_workflow(
             self.tmp, "start",
             subject_type="openspec_change",
@@ -590,7 +620,19 @@ class TestResume(FixtureBase):
         )
         self.assertNotEqual(rc, 0)
         data = json.loads(out)
-        self.assertEqual(data["action"], "conflict")
+        self.assertIn("no active run found", data["error"])
+
+    def test_resume_without_subject_args_lists_runs(self):
+        run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="resume-nosub",
+        )
+        rc, out, _ = run_workflow(self.tmp, "resume")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertIn("active_runs", data)
+        self.assertEqual(len(data["active_runs"]), 1)
 
 
 class TestDone(FixtureBase):
@@ -618,21 +660,22 @@ class TestDone(FixtureBase):
             "post_archive_actions",
         ]
         state["status"] = "running"
-        with open(
-            os.path.join(self.tmp, ".ai/workflows/runs/current.json"), "w"
-        ) as f:
-            json.dump(state, f)
+        self._write_current_state(state)
 
-    def test_done_preserves_current_json(self):
+    def test_done_clears_active_and_pointer(self):
         self._prepare_done_state()
+        state = self._read_current_state()
+        run_id = state["run_id"]
         rc, out, _ = run_workflow(self.tmp, "done")
         self.assertEqual(rc, 0)
         data = json.loads(out)
         self.assertEqual(data["status"], "done")
-        # current.json should still be there with status done
-        current = self._read_current_state()
-        self.assertIsNotNone(current)
-        self.assertEqual(current["status"], "done")
+        # Active file should be removed
+        active_path = os.path.join(self.tmp, ".ai", "workflows", "runs", "active", f"{run_id}.json")
+        self.assertFalse(os.path.exists(active_path))
+        # Pointer should be cleared
+        pointer = self._read_current_state()
+        self.assertIsNone(pointer)
 
     def test_done_writes_history(self):
         self._prepare_done_state()
@@ -655,10 +698,7 @@ class TestDone(FixtureBase):
         state["current_phase"] = "done"
         state["pending_hooks"] = ["memory_sync"]
         state["status"] = "running"
-        with open(
-            os.path.join(self.tmp, ".ai/workflows/runs/current.json"), "w"
-        ) as f:
-            json.dump(state, f)
+        self._write_current_state(state)
         rc, out, _ = run_workflow(self.tmp, "done")
         self.assertNotEqual(rc, 0)
         data = json.loads(out)
@@ -760,10 +800,7 @@ class TestGateLedger(FixtureBase):
         ]
         state["gates"] = {"evalops": {"status": "required"}}
         state["status"] = "running"
-        with open(
-            os.path.join(self.tmp, ".ai/workflows/runs/current.json"), "w"
-        ) as f:
-            json.dump(state, f)
+        self._write_current_state(state)
 
         rc, out, _ = run_workflow(self.tmp, "done")
         self.assertNotEqual(rc, 0)
@@ -792,10 +829,7 @@ class TestGateLedger(FixtureBase):
         ]
         state["gates"] = {"evalops": {"status": "passed"}}
         state["status"] = "running"
-        with open(
-            os.path.join(self.tmp, ".ai/workflows/runs/current.json"), "w"
-        ) as f:
-            json.dump(state, f)
+        self._write_current_state(state)
 
         rc, out, _ = run_workflow(self.tmp, "done")
         self.assertEqual(rc, 0)
@@ -826,10 +860,7 @@ class TestCompletePhase(FixtureBase):
         state = self._read_current_state()
         state["current_phase"] = "archive_change"
         state["evidence"]["archive_path"] = "openspec/changes/archive/2026-06-18-cp-test"
-        with open(
-            os.path.join(self.tmp, ".ai/workflows/runs/current.json"), "w"
-        ) as f:
-            json.dump(state, f)
+        self._write_current_state(state)
 
         rc, out, _ = run_workflow(
             self.tmp, "complete-phase",
@@ -856,9 +887,10 @@ class TestGovernanceCheck(FixtureBase):
     def _make_active_run(self, change_id, pending_hooks=None):
         runs_dir = os.path.join(self.tmp, ".ai", "workflows", "runs")
         os.makedirs(runs_dir, exist_ok=True)
+        run_id = f"2026-06-20-{change_id}"
         state = {
             "version": 1,
-            "run_id": f"2026-06-20-{change_id}",
+            "run_id": run_id,
             "workflow": "sdlc-main",
             "status": "running",
             "current_phase": "input",
@@ -876,8 +908,13 @@ class TestGovernanceCheck(FixtureBase):
             "block": None,
             "updated_at": "2026-06-20T00:00:00",
         }
-        with open(os.path.join(runs_dir, "current.json"), "w") as f:
+        active_dir = os.path.join(runs_dir, "active")
+        os.makedirs(active_dir, exist_ok=True)
+        with open(os.path.join(active_dir, f"{run_id}.json"), "w") as f:
             json.dump(state, f)
+        pointer_path = os.path.join(runs_dir, "current.json")
+        with open(pointer_path, "w") as f:
+            json.dump({"run_id": run_id}, f)
 
     def _make_done_history_run(self, change_id):
         hist_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "history")
@@ -1017,9 +1054,10 @@ class TestGovernanceCheck(FixtureBase):
     def test_pending_hooks_without_change_id(self):
         runs_dir = os.path.join(self.tmp, ".ai", "workflows", "runs")
         os.makedirs(runs_dir, exist_ok=True)
+        run_id = "2026-06-20-unknown"
         state = {
             "version": 1,
-            "run_id": "2026-06-20-unknown",
+            "run_id": run_id,
             "workflow": "sdlc-main",
             "status": "running",
             "current_phase": "input",
@@ -1034,8 +1072,12 @@ class TestGovernanceCheck(FixtureBase):
             "block": None,
             "updated_at": "2026-06-20T00:00:00",
         }
-        with open(os.path.join(runs_dir, "current.json"), "w") as f:
+        active_dir = os.path.join(runs_dir, "active")
+        os.makedirs(active_dir, exist_ok=True)
+        with open(os.path.join(active_dir, f"{run_id}.json"), "w") as f:
             json.dump(state, f)
+        with open(os.path.join(runs_dir, "current.json"), "w") as f:
+            json.dump({"run_id": run_id}, f)
         data = self._run_gc()
         self.assertTrue(data["block"])
         f = data["findings"][0]
@@ -1167,7 +1209,7 @@ class TestPreflightAndEnsureRun(FixtureBase):
         )
         self.assertEqual(rc, 1)
         self.assertFalse(data["allowed"])
-        self.assertEqual(data["reason"], "conflict_active_run")
+        self.assertEqual(data["reason"], "missing_active_run")
 
     # --- openspec action with done history ---
 
@@ -1300,9 +1342,9 @@ class TestPreflightAndEnsureRun(FixtureBase):
         self.assertTrue(data["allowed"])
         self.assertEqual(data["status"], "ok")
 
-    # --- ensure-run blocks on conflict ---
+    # --- ensure-run allows concurrent run for different subject ---
 
-    def test_ensure_run_blocks_on_conflict(self):
+    def test_ensure_run_allows_concurrent_for_different_subject(self):
         run_workflow(
             self.tmp, "start",
             subject_type="openspec_change",
@@ -1314,9 +1356,9 @@ class TestPreflightAndEnsureRun(FixtureBase):
             subject_type="openspec_change",
             subject_id="block-me",
         )
-        self.assertEqual(rc, 1)
-        self.assertFalse(data["allowed"])
-        self.assertEqual(data["reason"], "conflict_active_run")
+        self.assertEqual(rc, 0)
+        self.assertTrue(data["allowed"])
+        self.assertEqual(data["status"], "run_created")
 
     # --- ensure-run skips when done history exists ---
 
@@ -1521,6 +1563,262 @@ class TestVerifyFoundations(FixtureBase):
         missing = {k for k, v in data["foundations"].items() if not v}
         self.assertIn("workflow_yaml", present)     # FixtureBase sets up definitions/
         self.assertIn("agents_md", missing)         # Not created
+
+
+class TestConcurrentRuns(FixtureBase):
+    """Tests for multi-run concurrent support."""
+
+    # 4.1 Two independent starts with different subject_id
+    def test_two_independent_starts_create_separate_active_files(self):
+        rc1, out1, _ = run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="change-a",
+        )
+        self.assertEqual(rc1, 0)
+        data1 = json.loads(out1)
+        run_id_a = data1["run_id"]
+
+        rc2, out2, _ = run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="change-b",
+        )
+        self.assertEqual(rc2, 0)
+        data2 = json.loads(out2)
+        run_id_b = data2["run_id"]
+
+        self.assertNotEqual(run_id_a, run_id_b)
+        self.assertIsNotNone(self._read_active_file(run_id_a))
+        self.assertIsNotNone(self._read_active_file(run_id_b))
+        # Pointer should point to the last started run
+        pointer = load_json(self.tmp, ".ai/workflows/runs/current.json")
+        self.assertEqual(pointer["run_id"], run_id_b)
+
+    # 4.2 Duplicate subject_id start reports conflict
+    def test_start_duplicate_subject_reports_conflict(self):
+        rc1, _, _ = run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="dup-change",
+        )
+        self.assertEqual(rc1, 0)
+
+        rc2, out2, _ = run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="dup-change",
+        )
+        self.assertNotEqual(rc2, 0)
+        data = json.loads(out2)
+        self.assertEqual(data["action"], "conflict")
+
+    # 4.3 Resume with subject args finds correct run and sets pointer
+    def test_resume_with_subject_args_finds_correct_run(self):
+        run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="change-a",
+        )
+        run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="change-b",
+        )
+        # Pointer now points to change-b
+        rc, out, _ = run_workflow(
+            self.tmp, "resume",
+            subject_type="openspec_change",
+            subject_id="change-a",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertIn("change-a", data["run_id"])
+        # Pointer should now point to change-a
+        pointer = load_json(self.tmp, ".ai/workflows/runs/current.json")
+        self.assertIn("change-a", pointer["run_id"])
+
+    # 4.4 Status without subject lists all active runs
+    def test_status_without_subject_lists_all_active_runs(self):
+        run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="change-x",
+        )
+        run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="change-y",
+        )
+        # Clear pointer to test listing
+        pointer_path = os.path.join(self.tmp, ".ai", "workflows", "runs", "current.json")
+        with open(pointer_path, "w") as f:
+            json.dump({}, f)
+
+        rc, out, _ = run_workflow(self.tmp, "status")
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "active_runs")
+        self.assertEqual(len(data["runs"]), 2)
+        run_ids = {r["run_id"] for r in data["runs"]}
+        self.assertEqual(len(run_ids), 2)
+
+    # 4.5 Done writes history, removes from active/, clears pointer
+    def test_done_removes_active_and_clears_pointer(self):
+        self._make_openspec_archive("done-concurrent", "2026-06-20")
+        rc, out, _ = run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="done-concurrent",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        run_id = data["run_id"]
+
+        # Complete hooks and set up for done
+        run_workflow(self.tmp, "complete-hook", hook="roadmap_done_if_relevant")
+        run_workflow(
+            self.tmp, "complete-hook",
+            hook="memory_sync", resolution="synced",
+        )
+        state = self._read_current_state()
+        state["current_phase"] = "done"
+        state["completed_phases"] = [
+            "input", "load_memory", "brainstorm", "decide_intent",
+            "create_change", "apply_change", "archive_change",
+            "post_archive_actions",
+        ]
+        state["status"] = "running"
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(self.tmp, "done")
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "done")
+
+        # Active file should be removed
+        active_path = os.path.join(self.tmp, ".ai", "workflows", "runs", "active", f"{run_id}.json")
+        self.assertFalse(os.path.exists(active_path))
+
+        # Pointer should be cleared
+        pointer = load_json(self.tmp, ".ai/workflows/runs/current.json")
+        self.assertFalse(pointer.get("run_id"))
+
+        # History should be written
+        history = self._read_history(run_id)
+        self.assertIsNotNone(history)
+        self.assertEqual(history["status"], "done")
+
+    # 4.6 Governance-check detects pending_hooks from ANY active run
+    def test_governance_check_scans_all_active_runs(self):
+        self._make_openspec_archive("gc-multi-a", "2026-06-20")
+        self._make_openspec_archive("gc-multi-b", "2026-06-20")
+        run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="gc-multi-a",
+        )
+        run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="gc-multi-b",
+        )
+        # Add pending hook to the first run only
+        active_runs = self._list_active_runs_support()
+        for run_id, state in active_runs:
+            if "gc-multi-a" in run_id:
+                state["pending_hooks"] = ["memory_sync"]
+                active_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "active")
+                with open(os.path.join(active_dir, f"{run_id}.json"), "w") as f:
+                    json.dump(state, f)
+
+        rc, out, _ = run_workflow(self.tmp, "governance-check")
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertTrue(data["block"])
+        pending = [f for f in data["findings"] if f["type"] == "pending_hooks"]
+        self.assertGreaterEqual(len(pending), 1)
+
+    # 4.7 Preflight searches active/ by subject and sets pointer
+    def test_preflight_sets_pointer_by_subject(self):
+        run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="preflight-a",
+        )
+        run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="preflight-b",
+        )
+        # Pointer points to preflight-b. Preflight for preflight-a should switch pointer.
+        rc, out, _ = run_workflow(
+            self.tmp, "preflight",
+            action="openspec_create",
+            subject_type="openspec_change",
+            subject_id="preflight-a",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertTrue(data["allowed"])
+        pointer = load_json(self.tmp, ".ai/workflows/runs/current.json")
+        self.assertIn("preflight-a", pointer["run_id"])
+
+    # 4.8 Stale pointer reports single JSON with summaries
+    def test_status_stale_pointer_outputs_single_json(self):
+        # Create a stale pointer (pointing to a missing run)
+        pointer_path = os.path.join(self.tmp, ".ai", "workflows", "runs", "current.json")
+        os.makedirs(os.path.dirname(pointer_path), exist_ok=True)
+        with open(pointer_path, "w") as f:
+            json.dump({"run_id": "2026-06-22-missing-run"}, f)
+
+        # No active runs
+        rc, out, _ = run_workflow(self.tmp, "status")
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "stale_pointer")
+        self.assertEqual(data["pointer_run_id"], "2026-06-22-missing-run")
+        self.assertIn("runs", data)
+        self.assertEqual(data["runs"], [])
+
+    def test_status_stale_pointer_with_active_runs_lists_summaries(self):
+        # Create a stale pointer
+        pointer_path = os.path.join(self.tmp, ".ai", "workflows", "runs", "current.json")
+        os.makedirs(os.path.dirname(pointer_path), exist_ok=True)
+        with open(pointer_path, "w") as f:
+            json.dump({"run_id": "2026-06-22-missing-run"}, f)
+
+        # Create an active run via start (creates active/<run_id>.json + updates pointer)
+        run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="stale-other",
+        )
+
+        # Overwrite pointer back to stale
+        with open(pointer_path, "w") as f:
+            json.dump({"run_id": "2026-06-22-missing-run"}, f)
+
+        rc, out, _ = run_workflow(self.tmp, "status")
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "stale_pointer")
+        self.assertEqual(data["pointer_run_id"], "2026-06-22-missing-run")
+        self.assertGreaterEqual(len(data["runs"]), 1)
+        self.assertIn("stale-other", data["runs"][0]["run_id"])
+
+    def _list_active_runs_support(self):
+        active_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "active")
+        if not os.path.isdir(active_dir):
+            return []
+        results = []
+        for fname in sorted(os.listdir(active_dir)):
+            if not fname.endswith(".json"):
+                continue
+            with open(os.path.join(active_dir, fname), "r") as f:
+                state = json.load(f)
+            results.append((state.get("run_id", fname.replace(".json", "")), state))
+        return results
 
 
 if __name__ == "__main__":
