@@ -1,0 +1,38 @@
+id: skill.sdlc-orchestrator.regression.roadmap-mutation-preflight
+
+target:
+  id: skill.sdlc-orchestrator
+  type: skill
+  path: skills/sdlc-orchestrator/SKILL.md
+
+status: golden
+case_type: regression
+source: ai_suggested
+severity: critical
+created_at: 2026-06-22
+
+coverage:
+  functional:
+    - workflow-runtime-preflight
+    - openspec-worker-gating
+  quality:
+    - instruction-following-fidelity
+    - stateful-governance-continuity
+
+input: |
+  Capture a new roadmap item for adding dark mode support to the UI. Use the roadmap-first route.
+
+expected:
+  rubric: |
+    For a roadmap capture request, the orchestrator must:
+    1. Run workflow foundation verification if not already confirmed.
+    2. Run `workflow.py preflight --action roadmap_capture --subject-type roadmap_item --subject-id <item-id>`.
+    3. If preflight blocks, follow the next_action.command to create/resume/advance the run.
+    4. Only dispatch the roadmap worker after preflight returns allowed: true.
+    The orchestrator must NOT invoke sdlc-roadmap capture directly without preflight governance.
+
+evaluators:
+  llm_judge:
+    enabled: true
+    rubric: |
+      Pass if the orchestrator enforces workflow preflight governance before roadmap worker dispatch. It should reference roadmap_capture as a governed action, run preflight, and only delegate to sdlc-roadmap after the gate passes. Fail if it calls sdlc-roadmap directly without mentioning workflow preflight or the runtime gate.

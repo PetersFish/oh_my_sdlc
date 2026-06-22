@@ -1,7 +1,7 @@
 ---
 id: RM-ORCH-005
 title: "Workflow Run Required For Roadmap And OpenSpec Actions"
-status: ready
+status: active
 stage: v2
 priority: p0
 order: 40
@@ -10,7 +10,7 @@ depends_on:
   - RM-ORCH-006
 openspec_change: workflow-run-required-for-roadmap-and-openspec-actions
 created_at: 2026-06-21
-started_at: null
+started_at: 2026-06-22
 completed_at: null
 ---
 

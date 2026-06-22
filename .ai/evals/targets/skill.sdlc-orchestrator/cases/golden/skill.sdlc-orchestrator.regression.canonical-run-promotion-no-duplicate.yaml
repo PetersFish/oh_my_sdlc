@@ -1,0 +1,40 @@
+id: skill.sdlc-orchestrator.regression.canonical-run-promotion-no-duplicate
+
+target:
+  id: skill.sdlc-orchestrator
+  type: skill
+  path: skills/sdlc-orchestrator/SKILL.md
+
+status: golden
+case_type: regression
+source: ai_suggested
+severity: critical
+created_at: 2026-06-22
+
+coverage:
+  functional:
+    - workflow-runtime-preflight
+    - openspec-worker-gating
+  quality:
+    - instruction-following-fidelity
+    - stateful-governance-continuity
+    - workflow-side-effect-discipline
+
+input: |
+  Promote roadmap item RM-ORCH-005 to an OpenSpec change. The item is already review-passed and a workflow run exists for RM-ORCH-005.
+
+expected:
+  rubric: |
+    For roadmap item promotion to an OpenSpec change, the orchestrator must:
+    1. Write the change_id into the existing roadmap_item run's context.change_id.
+    2. Advance the canonical roadmap item run to create_change phase.
+    3. When openspec_create preflight runs, it must find the linked roadmap_item run via context.change_id or frontmatter openspec_change match.
+    4. The orchestrator must NOT call `workflow.py start --subject-type openspec_change` because the roadmap_item run is the canonical run.
+    5. Direct OpenSpec changes (without linked roadmap item) still create openspec_change runs as before.
+    The orchestrator must NOT create a second workflow run for a promoted roadmap item.
+
+evaluators:
+  llm_judge:
+    enabled: true
+    rubric: |
+      Pass if the orchestrator understands that promotion reuses the existing roadmap_item run as canonical rather than creating a duplicate openspec_change run. It should reference the canonical-run semantics: write change_id into context, advance to create_change, not call start for openspec_change. Fail if it proposes creating a second openspec_change run alongside the existing roadmap_item run.

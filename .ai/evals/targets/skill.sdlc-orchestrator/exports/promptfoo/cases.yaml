@@ -93,6 +93,32 @@
 
       '
 - vars:
+    input: 'Promote roadmap item RM-ORCH-005 to an OpenSpec change. The item is already
+      review-passed and a workflow run exists for RM-ORCH-005.
+
+      '
+  assert:
+  - type: llm-rubric
+    value: 'For roadmap item promotion to an OpenSpec change, the orchestrator must:
+
+      1. Write the change_id into the existing roadmap_item run''s context.change_id.
+
+      2. Advance the canonical roadmap item run to create_change phase.
+
+      3. When openspec_create preflight runs, it must find the linked roadmap_item
+      run via context.change_id or frontmatter openspec_change match.
+
+      4. The orchestrator must NOT call `workflow.py start --subject-type openspec_change`
+      because the roadmap_item run is the canonical run.
+
+      5. Direct OpenSpec changes (without linked roadmap item) still create openspec_change
+      runs as before.
+
+      The orchestrator must NOT create a second workflow run for a promoted roadmap
+      item.
+
+      '
+- vars:
     input: '帮我开启一个 sdlc workflow，用 openspec 做一个 python hello world
 
       '
@@ -364,6 +390,79 @@
       presents mutually exclusive execution paths (e.g., OpenSpec governance vs direct
       execution), it should prefer the question tool when available, with the recommended
       route listed first. If the tool is unavailable, a clear text choice is acceptable.
+
+      '
+- vars:
+    input: 'Capture a new roadmap item for adding dark mode support to the UI. Use
+      the roadmap-first route.
+
+      '
+  assert:
+  - type: llm-rubric
+    value: 'For a roadmap capture request, the orchestrator must:
+
+      1. Run workflow foundation verification if not already confirmed.
+
+      2. Run `workflow.py preflight --action roadmap_capture --subject-type roadmap_item
+      --subject-id <item-id>`.
+
+      3. If preflight blocks, follow the next_action.command to create/resume/advance
+      the run.
+
+      4. Only dispatch the roadmap worker after preflight returns allowed: true.
+
+      The orchestrator must NOT invoke sdlc-roadmap capture directly without preflight
+      governance.
+
+      '
+- vars:
+    input: 'Revise roadmap item RM-ORCH-005 to update its acceptance criteria.
+
+      '
+  assert:
+  - type: llm-rubric
+    value: 'The orchestrator must enforce workflow preflight governance for all stateful
+      roadmap mutations, not just OpenSpec actions. For a roadmap revise request:
+
+      1. The orchestrator must run `workflow.py preflight --action roadmap_revise
+      --subject-type roadmap_item --subject-id RM-ORCH-005`.
+
+      2. If preflight blocks, the orchestrator must follow the next_action.command.
+
+      3. Only after preflight passes must the orchestrator dispatch sdlc-roadmap to
+      perform the revise mutation.
+
+      4. After the roadmap worker completes, the orchestrator must record evidence
+      and advance the run.
+
+      The orchestrator must NOT invoke sdlc-roadmap directly without the preflight
+      gate.
+
+      '
+- vars:
+    input: 'Replan the workflow.sdlc-orchestrator area. The old items RM-ORCH-old-1
+      and RM-ORCH-old-2 should be cancelled and replaced with new items.
+
+      '
+  assert:
+  - type: llm-rubric
+    value: 'For a roadmap replan request, the orchestrator must:
+
+      1. Preflight roadmap_replan before dispatching the roadmap worker.
+
+      2. After the roadmap worker completes replan, receive structured evidence with
+      cancelled_item_ids and created_item_ids.
+
+      3. Loop over cancelled old item IDs and call `workflow.py cancel-run --subject-type
+      roadmap_item --subject-id <id> --reason replanned`.
+
+      4. Loop over created new item IDs and call `workflow.py start --subject-type
+      roadmap_item --subject-id <id>`.
+
+      5. Report per-item success/failure.
+
+      The orchestrator must NOT create a bulk replan API call and must use single-subject
+      runtime primitives in a loop.
 
       '
 - vars:

@@ -521,6 +521,41 @@ def _start_command(subject_type, subject_id):
     }
 
 
+def _find_linked_roadmap_run(root, change_id):
+    """Scan active roadmap_item runs for a context.change_id or
+    frontmatter openspec_change matching a given change_id."""
+    for _run_id, state in _list_active_runs(root):
+        ps = state.get("primary_subject", {})
+        if ps.get("type") != "roadmap_item":
+            continue
+        ctx = state.get("context", {})
+        if ctx.get("change_id") == change_id:
+            return state
+        roadmap_item_id = ctx.get("roadmap_item_id") or ps.get("id")
+        if roadmap_item_id:
+            linked_change = _read_roadmap_item_openspec_change(root, roadmap_item_id)
+            if linked_change == change_id:
+                return state
+    return None
+
+
+def _read_roadmap_item_openspec_change(root, item_id):
+    """Read openspec_change frontmatter field from a roadmap item file."""
+    areas_dir = _resolve_path(root, ".ai/roadmap/areas")
+    for area in _list_dirs(areas_dir):
+        items_dir = os.path.join(areas_dir, area, "items")
+        if not os.path.isdir(items_dir):
+            continue
+        for fname in _list_dirs(items_dir):
+            if not fname.endswith(".md"):
+                continue
+            fpath = os.path.join(items_dir, fname)
+            fm_id = _read_frontmatter_field(fpath, "id")
+            if fm_id == item_id:
+                return _read_frontmatter_field(fpath, "openspec_change")
+    return None
+
+
 def _ensure_command(subject_type, subject_id):
     """Return a next_action dict for workflow ensure-run."""
     return {
@@ -566,6 +601,30 @@ def _policy_openspec_change(root, action, subject_type, subject_id):
     # Done history exists => lifecycle already completed
     if (subject_type, subject_id) in done_subjects:
         return _make_preflight_decision(True, "ok", "done_history_exists")
+
+    # No active run => check for canonical linked roadmap_item run (promotion)
+    if not active and action == "openspec_create":
+        linked = _find_linked_roadmap_run(root, subject_id)
+        if linked:
+            _set_pointer(root, linked["run_id"])
+            phase_ok, allowed_phases = _validate_action_phase(action, linked)
+            if not phase_ok:
+                current = linked["current_phase"]
+                return _make_preflight_decision(
+                    False, "blocked", "wrong_phase",
+                    next_action={
+                        "command": "python3 .ai/workflows/scripts/workflow.py --root . advance",
+                        "description": (
+                            f"Linked roadmap item run is in phase '{current}',"
+                            f" but action '{action}' requires one of:"
+                            f" {sorted(allowed_phases)}."
+                            f" Advance the run to the correct phase first."
+                        ),
+                    },
+                )
+            return _make_preflight_decision(
+                True, "ok", "linked_roadmap_run_exists",
+            )
 
     # No active run => block, require start
     if not active:
@@ -666,6 +725,66 @@ def _policy_archived_change(root, action, subject_type, subject_id):
             "description": (
                 f"Active run for '{active_ps.get('id')}' exists."
                 f" Complete or cancel it before repairing '{subject_id}'."
+            ),
+        },
+    )
+
+
+# --- Roadmap Actions ---
+
+@register_policy("roadmap_capture", allowed_phases={"create_roadmap"})
+@register_policy("roadmap_insert", allowed_phases={"create_roadmap"})
+@register_policy("roadmap_review", allowed_phases={"review_roadmap"})
+@register_policy("roadmap_revise")
+@register_policy("roadmap_cancel")
+@register_policy("roadmap_reorder")
+@register_policy("roadmap_replan")
+@register_policy("roadmap_done")
+def _policy_roadmap(root, action, subject_type, subject_id):
+    """Require matching active run or done history for stateful roadmap mutations."""
+    if not subject_type or not subject_id:
+        return _make_preflight_decision(False, "error", "missing_subject")
+    active, done_subjects = _evaluate_subject_run_context(root, subject_type, subject_id)
+
+    if (subject_type, subject_id) in done_subjects:
+        return _make_preflight_decision(True, "ok", "done_history_exists")
+
+    if not active:
+        return _make_preflight_decision(
+            False, "blocked", "missing_active_run",
+            next_action=_start_command(subject_type, subject_id),
+        )
+
+    active_ps = active.get("primary_subject", {})
+    active_status = active.get("status", "")
+    if (
+        active_ps.get("type") == subject_type
+        and active_ps.get("id") == subject_id
+        and active_status in ("running", "blocked")
+    ):
+        phase_ok, allowed_phases = _validate_action_phase(action, active)
+        if not phase_ok:
+            current = active["current_phase"]
+            return _make_preflight_decision(
+                False, "blocked", "wrong_phase",
+                next_action={
+                    "command": "python3 .ai/workflows/scripts/workflow.py --root . advance",
+                    "description": (
+                        f"Run is in phase '{current}', but action '{action}'"
+                        f" requires one of: {sorted(allowed_phases)}."
+                        f" Advance the run to the correct phase first."
+                    ),
+                },
+            )
+        return _make_preflight_decision(True, "ok", "active_run_exists")
+
+    return _make_preflight_decision(
+        False, "blocked", "conflict_active_run",
+        next_action={
+            "command": "python3 .ai/workflows/scripts/workflow.py --root . status",
+            "description": (
+                f"Active run for '{active_ps.get('id')}' exists."
+                f" Complete or cancel it before starting '{subject_id}'."
             ),
         },
     )
@@ -943,6 +1062,26 @@ def cmd_start(root, args):
             )
         )
         sys.exit(1)
+
+    # Prevent duplicate openspec_change run when a linked roadmap_item run exists
+    if subject_type == "openspec_change":
+        linked = _find_linked_roadmap_run(root, subject_id)
+        if linked:
+            print(
+                json.dumps(
+                    {
+                        "action": "conflict",
+                        "message": (
+                            "A linked roadmap_item run already exists for this change."
+                            " The roadmap_item run is the canonical run."
+                        ),
+                        "existing_run_id": linked["run_id"],
+                        "existing_subject": linked.get("primary_subject", {}),
+                    },
+                    indent=2,
+                )
+            )
+            sys.exit(1)
 
     phase = _infer_phase(root, subject_type, subject_id)
 
@@ -1224,6 +1363,33 @@ def cmd_complete_hook(root, args):
     print(json.dumps(state, indent=2))
 
 
+def cmd_cancel_run(root, args):
+    """Remove an active run without writing history. Used for replanned roadmap items."""
+    subject_type = args.subject_type or "roadmap_item"
+    subject_id = args.subject_id
+    reason = args.reason or "cancelled"
+
+    if not subject_id:
+        print(json.dumps({"error": "subject-id required for cancel-run"}))
+        sys.exit(1)
+
+    active = _find_active_run_by_subject(root, subject_type, subject_id)
+    if not active:
+        print(json.dumps({"status": "not_found", "message": f"no active run for {subject_type}/{subject_id}"}))
+        return
+
+    run_id = active["run_id"]
+    pointer = _read_pointer(root)
+    if pointer and pointer.get("run_id") == run_id:
+        _clear_pointer(root)
+
+    active_path = _active_path(root, run_id)
+    if os.path.exists(active_path):
+        os.remove(active_path)
+
+    print(json.dumps({"status": "cancelled", "run_id": run_id, "reason": reason}))
+
+
 def cmd_advance(root, args):
     state = load_run_state(root)
     if not state:
@@ -1443,18 +1609,22 @@ def cmd_done(root, args):
 
 
 def cmd_governance_check(root, args):
-    """Read-only governance diagnostics: dangling archives and pending hooks."""
+    """Read-only governance diagnostics: dangling archives, pending hooks,
+    duplicate promotion runs, and ungoverned roadmap items."""
     findings = []
     archive_dir = _resolve_path(root, "openspec/changes/archive")
     history_dir = _resolve_path(root, ".ai/workflows/runs/history")
 
     governed_change_ids = set()
+    governed_roadmap_ids = set()
 
     active_runs = _list_active_runs(root)
     for run_id, active_state in active_runs:
         ps = active_state.get("primary_subject", {})
         if ps.get("type") == "openspec_change" and ps.get("id"):
             governed_change_ids.add(ps["id"])
+        if ps.get("type") == "roadmap_item" and ps.get("id"):
+            governed_roadmap_ids.add(ps["id"])
 
     if os.path.isdir(history_dir):
         for fname in _list_dirs(history_dir):
@@ -1470,6 +1640,8 @@ def cmd_governance_check(root, args):
                 ps = hist.get("primary_subject", {})
                 if ps.get("type") == "openspec_change" and ps.get("id"):
                     governed_change_ids.add(ps["id"])
+                if ps.get("type") == "roadmap_item" and ps.get("id"):
+                    governed_roadmap_ids.add(ps["id"])
 
     if os.path.isdir(archive_dir):
         for entry in _list_dirs(archive_dir):
@@ -1512,6 +1684,182 @@ def cmd_governance_check(root, args):
                 "remediation": remediation,
                 "hash": fh,
             })
+
+    # Detect duplicate promotion runs: roadmap_item + openspec_change for same change
+    roadmap_change_ids = {}
+    openspec_run_ids = set()
+    for run_id, active_state in active_runs:
+        ps = active_state.get("primary_subject", {})
+        ctx = active_state.get("context", {})
+        if ps.get("type") == "roadmap_item":
+            cid = ctx.get("change_id")
+            if cid:
+                roadmap_change_ids[cid] = run_id
+        elif ps.get("type") == "openspec_change":
+            openspec_run_ids.add(run_id)
+    for run_id, active_state in active_runs:
+        ps = active_state.get("primary_subject", {})
+        if ps.get("type") != "openspec_change":
+            continue
+        oc_change_id = ps.get("id")
+        if oc_change_id and oc_change_id in roadmap_change_ids:
+            canonical_run_id = roadmap_change_ids[oc_change_id]
+            message = (
+                f"Duplicate runs for change \"{oc_change_id}\":"
+                f" openspec_change run \"{run_id}\" and"
+                f" roadmap_item run \"{canonical_run_id}\"."
+                f" The roadmap_item run is canonical."
+            )
+            remediation = (
+                f"Cancel the openspec_change run \"{run_id}\" with:"
+                f" python3 .ai/workflows/scripts/workflow.py --root . cancel-run"
+                f" --subject-type openspec_change --subject-id {oc_change_id}"
+                f" --reason \"duplicate of canonical roadmap_item run {canonical_run_id}\"."
+                f" Re-run \"workflow.py governance-check\" until block=false."
+            )
+            fh = _finding_hash(
+                "duplicate_promotion_runs",
+                change_id=oc_change_id,
+                canonical_run_id=canonical_run_id,
+                duplicate_run_id=run_id,
+            )
+            findings.append({
+                "type": "duplicate_promotion_runs",
+                "change_id": oc_change_id,
+                "canonical_run_id": canonical_run_id,
+                "duplicate_run_id": run_id,
+                "message": message,
+                "remediation": remediation,
+                "hash": fh,
+            })
+
+    # Detect ungoverned active roadmap items without matching active run or done history
+    areas_dir = _resolve_path(root, ".ai/roadmap/areas")
+    if os.path.isdir(areas_dir):
+        for area in _list_dirs(areas_dir):
+            items_dir = os.path.join(areas_dir, area, "items")
+            if not os.path.isdir(items_dir):
+                continue
+            for fname in _list_dirs(items_dir):
+                if not fname.endswith(".md"):
+                    continue
+                fpath = os.path.join(items_dir, fname)
+                fm_id = _read_frontmatter_field(fpath, "id")
+                fm_status = _read_frontmatter_field(fpath, "status")
+                if not fm_id or not fm_status:
+                    continue
+                if fm_status in ("done", "cancelled", "idea"):
+                    continue
+                if fm_id in governed_roadmap_ids:
+                    continue
+                has_active = bool(_find_active_run_by_subject(root, "roadmap_item", fm_id))
+                if has_active:
+                    governed_roadmap_ids.add(fm_id)
+                    continue
+                rel_path = os.path.relpath(fpath, root)
+                message = (
+                    f"Roadmap item \"{fm_id}\" (status: {fm_status}) has no"
+                    f" matching active run or done history."
+                )
+                ensure_cmd = (
+                    f"python3 .ai/workflows/scripts/workflow.py --root . ensure-run"
+                    f" --action roadmap_insert"
+                    f" --subject-type roadmap_item"
+                    f" --subject-id {fm_id}"
+                )
+                remediation = (
+                    f"Roadmap item \"{fm_id}\" ({rel_path}, status: {fm_status})"
+                    f" is ungoverned. Run: {ensure_cmd}"
+                    f" to create a run, resolve, complete hooks, advance, and re-run"
+                    f" \"workflow.py governance-check\" until block=false."
+                )
+                fh = _finding_hash(
+                    "ungoverned_roadmap_item",
+                    item_id=fm_id,
+                    status=fm_status,
+                    file_path=rel_path,
+                )
+                findings.append({
+                    "type": "ungoverned_roadmap_item",
+                    "item_id": fm_id,
+                    "status": fm_status,
+                    "file_path": rel_path,
+                    "message": message,
+                    "remediation": remediation,
+                    "hash": fh,
+                })
+
+    # Detect archived OpenSpec changes linked from roadmap items without
+    # matching workflow evidence (4.2)
+    governed_roadmap_change_ids = set()
+    for run_id, active_state in active_runs:
+        ps = active_state.get("primary_subject", {})
+        ctx = active_state.get("context", {})
+        if ps.get("type") == "roadmap_item":
+            cid = ctx.get("change_id")
+            if cid:
+                governed_roadmap_change_ids.add(cid)
+    if os.path.isdir(history_dir):
+        for fname in _list_dirs(history_dir):
+            if not fname.endswith(".json"):
+                continue
+            hpath = os.path.join(history_dir, fname)
+            try:
+                with open(hpath, "r") as f:
+                    hist = json.load(f)
+            except Exception:
+                continue
+            if hist.get("status") in ("done",):
+                ps = hist.get("primary_subject", {})
+                ctx = hist.get("context", {})
+                if ps.get("type") == "roadmap_item":
+                    cid = ctx.get("change_id")
+                    if cid:
+                        governed_roadmap_change_ids.add(cid)
+    if os.path.isdir(areas_dir):
+        for area in _list_dirs(areas_dir):
+            items_dir = os.path.join(areas_dir, area, "items")
+            if not os.path.isdir(items_dir):
+                continue
+            for fname in _list_dirs(items_dir):
+                if not fname.endswith(".md"):
+                    continue
+                fpath = os.path.join(items_dir, fname)
+                linked_change = _read_frontmatter_field(fpath, "openspec_change")
+                if not linked_change or linked_change == "None":
+                    continue
+                fm_id = _read_frontmatter_field(fpath, "id")
+                fm_status = _read_frontmatter_field(fpath, "status")
+                if linked_change in governed_change_ids:
+                    continue
+                if linked_change in governed_roadmap_change_ids:
+                    continue
+                rel_path = os.path.relpath(fpath, root)
+                message = (
+                    f"Roadmap item \"{fm_id}\" (status: {fm_status}) links to"
+                    f" OpenSpec change \"{linked_change}\" without matching"
+                    f" workflow evidence."
+                )
+                remediation = (
+                    f"Roadmap item \"{fm_id}\" ({rel_path}) links to"
+                    f" \"{linked_change}\" without workflow evidence."
+                    f" If the change is active, ensure a run exists for it."
+                    f" Re-run \"workflow.py governance-check\" until block=false."
+                )
+                fh = _finding_hash(
+                    "archived_linked_item_no_evidence",
+                    item_id=fm_id or "",
+                    change_id=linked_change,
+                )
+                findings.append({
+                    "type": "archived_linked_item_no_evidence",
+                    "item_id": fm_id,
+                    "change_id": linked_change,
+                    "file_path": rel_path,
+                    "message": message,
+                    "remediation": remediation,
+                    "hash": fh,
+                })
 
     for run_id, active_state in active_runs:
         pending = active_state.get("pending_hooks", [])
@@ -1557,6 +1905,13 @@ def cmd_governance_check(root, args):
 
 
 def _infer_phase(root, subject_type, subject_id):
+    if subject_type == "roadmap_item":
+        item_status = loader_roadmap_item_status(root, subject_id)
+        if item_status:
+            status = item_status.get("status", "")
+            if status == "review":
+                return "review_roadmap"
+        return "create_roadmap"
     if subject_type != "openspec_change":
         return "input"
     status = loader_openspec_change_status(root, subject_id)
@@ -1701,6 +2056,7 @@ COMMANDS = {
     "advance",
     "block",
     "done",
+    "cancel-run",
     "validate",
     "governance-check",
     "preflight",
@@ -1763,6 +2119,8 @@ def main():
         cmd_block(root, args)
     elif args.command == "done":
         cmd_done(root, args)
+    elif args.command == "cancel-run":
+        cmd_cancel_run(root, args)
     elif args.command == "governance-check":
         cmd_governance_check(root, args)
     elif args.command == "preflight":

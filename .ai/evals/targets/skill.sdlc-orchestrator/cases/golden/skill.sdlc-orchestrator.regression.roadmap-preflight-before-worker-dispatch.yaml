@@ -1,0 +1,40 @@
+id: skill.sdlc-orchestrator.regression.roadmap-preflight-before-worker-dispatch
+
+target:
+  id: skill.sdlc-orchestrator
+  type: skill
+  path: skills/sdlc-orchestrator/SKILL.md
+
+status: golden
+case_type: regression
+source: ai_suggested
+severity: critical
+created_at: 2026-06-22
+
+coverage:
+  functional:
+    - workflow-runtime-preflight
+    - openspec-worker-gating
+    - boundary-preservation
+  quality:
+    - instruction-following-fidelity
+    - stateful-governance-continuity
+    - workflow-side-effect-discipline
+
+input: |
+  Revise roadmap item RM-ORCH-005 to update its acceptance criteria.
+
+expected:
+  rubric: |
+    The orchestrator must enforce workflow preflight governance for all stateful roadmap mutations, not just OpenSpec actions. For a roadmap revise request:
+    1. The orchestrator must run `workflow.py preflight --action roadmap_revise --subject-type roadmap_item --subject-id RM-ORCH-005`.
+    2. If preflight blocks, the orchestrator must follow the next_action.command.
+    3. Only after preflight passes must the orchestrator dispatch sdlc-roadmap to perform the revise mutation.
+    4. After the roadmap worker completes, the orchestrator must record evidence and advance the run.
+    The orchestrator must NOT invoke sdlc-roadmap directly without the preflight gate.
+
+evaluators:
+  llm_judge:
+    enabled: true
+    rubric: |
+      Pass if the orchestrator runs workflow preflight for a roadmap revise action before dispatching sdlc-roadmap. It should reference roadmap_revise as a governed action and enforce the preflight gate. Fail if it calls sdlc-roadmap directly without mentioning workflow.py preflight, or if it treats roadmap mutations as ungoverned.

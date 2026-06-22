@@ -1508,6 +1508,371 @@ class TestPreflightAndEnsureRun(FixtureBase):
         self.assertFalse(data["allowed"])
         self.assertEqual(data["reason"], "unknown_action")
 
+    # --- roadmap governed actions ---
+
+    def test_preflight_roadmap_capture_recognized(self):
+        rc, data, _ = self._run_preflight(
+            "roadmap_capture",
+            subject_type="roadmap_item",
+            subject_id="RM-TEST-001",
+        )
+        self.assertEqual(rc, 1)
+        self.assertFalse(data["allowed"])
+        self.assertEqual(data["reason"], "missing_active_run")
+
+    def test_preflight_roadmap_insert_recognized(self):
+        rc, data, _ = self._run_preflight(
+            "roadmap_insert",
+            subject_type="roadmap_item",
+            subject_id="RM-TEST-002",
+        )
+        self.assertEqual(rc, 1)
+        self.assertFalse(data["allowed"])
+        self.assertEqual(data["reason"], "missing_active_run")
+
+    def test_preflight_roadmap_replan_recognized(self):
+        rc, data, _ = self._run_preflight(
+            "roadmap_replan",
+            subject_type="roadmap_item",
+            subject_id="RM-TEST-003",
+        )
+        self.assertEqual(rc, 1)
+        self.assertFalse(data["allowed"])
+        self.assertEqual(data["reason"], "missing_active_run")
+
+    def test_preflight_roadmap_review_wrong_phase_blocks(self):
+        self._make_roadmap_item("RM-REV-001", "idea")
+        run_workflow(
+            self.tmp, "start",
+            subject_type="roadmap_item",
+            subject_id="RM-REV-001",
+        )
+        # Run is in create_roadmap phase, review requires review_roadmap
+        rc, data, _ = self._run_preflight(
+            "roadmap_review",
+            subject_type="roadmap_item",
+            subject_id="RM-REV-001",
+        )
+        self.assertEqual(rc, 1)
+        self.assertFalse(data["allowed"])
+        self.assertEqual(data["reason"], "wrong_phase")
+
+    def test_preflight_roadmap_revise_without_run_blocks(self):
+        rc, data, _ = self._run_preflight(
+            "roadmap_revise",
+            subject_type="roadmap_item",
+            subject_id="RM-REV-002",
+        )
+        self.assertEqual(rc, 1)
+        self.assertFalse(data["allowed"])
+        self.assertEqual(data["reason"], "missing_active_run")
+
+    def test_preflight_roadmap_revise_with_run_allows(self):
+        self._make_roadmap_item("RM-REV-003", "idea")
+        run_workflow(
+            self.tmp, "start",
+            subject_type="roadmap_item",
+            subject_id="RM-REV-003",
+        )
+        rc, data, _ = self._run_preflight(
+            "roadmap_revise",
+            subject_type="roadmap_item",
+            subject_id="RM-REV-003",
+        )
+        self.assertEqual(rc, 0)
+        self.assertTrue(data["allowed"])
+
+    def test_preflight_roadmap_non_phase_mutating_does_not_advance(self):
+        """roadmap_revise has no allowed_phases, should not check phase."""
+        self._make_roadmap_item("RM-NP-001", "idea")
+        run_workflow(
+            self.tmp, "start",
+            subject_type="roadmap_item",
+            subject_id="RM-NP-001",
+        )
+        rc, data, _ = self._run_preflight(
+            "roadmap_cancel",
+            subject_type="roadmap_item",
+            subject_id="RM-NP-001",
+        )
+        self.assertEqual(rc, 0)
+        self.assertTrue(data["allowed"])
+        self.assertEqual(data["reason"], "active_run_exists")
+
+    def _list_active_runs_support(self):
+        active_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "active")
+        if not os.path.isdir(active_dir):
+            return []
+        results = []
+        for fname in sorted(os.listdir(active_dir)):
+            if not fname.endswith(".json"):
+                continue
+            with open(os.path.join(active_dir, fname), "r") as f:
+                state = json.load(f)
+            results.append((state.get("run_id", fname.replace(".json", "")), state))
+        return results
+
+    # --- canonical-run promotion: openspec_create finds linked roadmap_item run ---
+
+    def test_preflight_openspec_create_finds_linked_roadmap_run_by_context(self):
+        self._make_roadmap_item("RM-PROMO-001", "review", openspec_change="promo-change")
+        run_workflow(
+            self.tmp, "start",
+            subject_type="roadmap_item",
+            subject_id="RM-PROMO-001",
+        )
+        # Write change_id into the roadmap item run's context (simulating promotion)
+        active_runs = self._list_active_runs_support()
+        for _run_id, state in active_runs:
+            if "RM-PROMO-001" in _run_id:
+                state["context"]["change_id"] = "promo-change"
+                state["current_phase"] = "create_change"
+                active_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "active")
+                with open(os.path.join(active_dir, f"{_run_id}.json"), "w") as f:
+                    json.dump(state, f)
+                break
+        # Now preflight openspec_create for the promoted change
+        rc, data, _ = self._run_preflight(
+            "openspec_create",
+            subject_type="openspec_change",
+            subject_id="promo-change",
+        )
+        self.assertEqual(rc, 0)
+        self.assertTrue(data["allowed"])
+        self.assertEqual(data["reason"], "linked_roadmap_run_exists")
+
+    def test_preflight_openspec_create_finds_linked_roadmap_run_by_frontmatter(self):
+        self._make_roadmap_item("RM-PROMO-002", "idea", openspec_change="promo-change-2")
+        run_workflow(
+            self.tmp, "start",
+            subject_type="roadmap_item",
+            subject_id="RM-PROMO-002",
+        )
+        # Advance the run to create_change to match openspec_create allowed phases
+        active_runs = self._list_active_runs_support()
+        for _run_id, state in active_runs:
+            if "RM-PROMO-002" in _run_id:
+                state["current_phase"] = "create_change"
+                active_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "active")
+                with open(os.path.join(active_dir, f"{_run_id}.json"), "w") as f:
+                    json.dump(state, f)
+                break
+        # Preflight without context.change_id set (frontmatter-only link)
+        rc, data, _ = self._run_preflight(
+            "openspec_create",
+            subject_type="openspec_change",
+            subject_id="promo-change-2",
+        )
+        self.assertEqual(rc, 0)
+        self.assertTrue(data["allowed"])
+        self.assertEqual(data["reason"], "linked_roadmap_run_exists")
+
+    def test_preflight_openspec_create_direct_change_still_creates_run(self):
+        """Direct openspec change without linked roadmap_item run returns missing_active_run."""
+        rc, data, _ = self._run_preflight(
+            "openspec_create",
+            subject_type="openspec_change",
+            subject_id="direct-change",
+        )
+        self.assertEqual(rc, 1)
+        self.assertFalse(data["allowed"])
+        self.assertEqual(data["reason"], "missing_active_run")
+
+
+class TestCancelRun(FixtureBase):
+    """Tests for cancel-run runtime primitive."""
+
+    def test_cancel_run_removes_active_file(self):
+        run_workflow(
+            self.tmp, "start",
+            subject_type="roadmap_item",
+            subject_id="RM-CANCEL-001",
+        )
+        active_file = self._find_active_file("RM-CANCEL-001")
+        self.assertIsNotNone(active_file)
+
+        rc, out, _ = run_workflow(
+            self.tmp, "cancel-run",
+            subject_type="roadmap_item",
+            subject_id="RM-CANCEL-001",
+            reason="replanned",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "cancelled")
+        self.assertEqual(data["reason"], "replanned")
+
+        # File should be removed
+        self.assertFalse(os.path.exists(active_file))
+
+    def test_cancel_run_clears_pointer_when_pointed(self):
+        run_workflow(
+            self.tmp, "start",
+            subject_type="roadmap_item",
+            subject_id="RM-CANCEL-002",
+        )
+        # Verify pointer points to this run
+        pointer = load_json(self.tmp, ".ai/workflows/runs/current.json")
+        self.assertTrue(pointer.get("run_id"))
+
+        rc, out, _ = run_workflow(
+            self.tmp, "cancel-run",
+            subject_type="roadmap_item",
+            subject_id="RM-CANCEL-002",
+            reason="replanned",
+        )
+        self.assertEqual(rc, 0)
+        pointer = load_json(self.tmp, ".ai/workflows/runs/current.json")
+        self.assertFalse(pointer.get("run_id"))
+
+    def test_cancel_run_no_history_written(self):
+        run_workflow(
+            self.tmp, "start",
+            subject_type="roadmap_item",
+            subject_id="RM-CANCEL-003",
+        )
+        active_file = self._find_active_file("RM-CANCEL-003")
+        run_id = os.path.basename(active_file).replace(".json", "")
+
+        rc, out, _ = run_workflow(
+            self.tmp, "cancel-run",
+            subject_type="roadmap_item",
+            subject_id="RM-CANCEL-003",
+            reason="replanned",
+        )
+        self.assertEqual(rc, 0)
+
+        # No history file should be written
+        hist_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "history")
+        hist_file = os.path.join(hist_dir, f"{run_id}.json")
+        self.assertFalse(os.path.exists(hist_file))
+
+    def test_cancel_run_missing_run_reports_not_found(self):
+        rc, out, _ = run_workflow(
+            self.tmp, "cancel-run",
+            subject_type="roadmap_item",
+            subject_id="RM-NONEXIST",
+            reason="replanned",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "not_found")
+
+    def _find_active_file(self, subject_id):
+        active_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "active")
+        for fname in sorted(os.listdir(active_dir)):
+            fpath = os.path.join(active_dir, fname)
+            with open(fpath) as f:
+                state = json.load(f)
+            ps = state.get("primary_subject", {})
+            if ps.get("id") == subject_id:
+                return fpath
+        return None
+
+
+class TestGovernanceCheckExtended(FixtureBase):
+    """Tests for governance-check extensions: roadmap items and duplicate runs."""
+
+    def test_governance_check_ungoverned_roadmap_item(self):
+        """An active roadmap item without a matching run should be flagged."""
+        self._make_roadmap_item("RM-GOV-001", "ready")
+        rc, out, _ = run_workflow(self.tmp, "governance-check")
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        ungoverned = [f for f in data["findings"] if f["type"] == "ungoverned_roadmap_item"]
+        self.assertGreaterEqual(len(ungoverned), 1)
+        item_ids = [f["item_id"] for f in ungoverned]
+        self.assertIn("RM-GOV-001", item_ids)
+
+    def test_governance_check_ignores_done_roadmap_item(self):
+        """A done roadmap item should not be flagged as ungoverned."""
+        self._make_roadmap_item("RM-GOV-002", "done", completed_at="2026-06-22")
+        rc, out, _ = run_workflow(self.tmp, "governance-check")
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        ungoverned = [f for f in data["findings"] if f["type"] == "ungoverned_roadmap_item"
+                      and f["item_id"] == "RM-GOV-002"]
+        self.assertEqual(len(ungoverned), 0)
+
+    def test_governance_check_ignores_idea_roadmap_item(self):
+        """An idea roadmap item should not be flagged as ungoverned."""
+        self._make_roadmap_item("RM-GOV-003", "idea")
+        rc, out, _ = run_workflow(self.tmp, "governance-check")
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        ungoverned = [f for f in data["findings"] if f["type"] == "ungoverned_roadmap_item"
+                      and f["item_id"] == "RM-GOV-003"]
+        self.assertEqual(len(ungoverned), 0)
+
+    def test_governance_check_ignores_governed_roadmap_item(self):
+        """A roadmap item with matching active run should not be flagged."""
+        self._make_roadmap_item("RM-GOV-004", "ready")
+        run_workflow(
+            self.tmp, "start",
+            subject_type="roadmap_item",
+            subject_id="RM-GOV-004",
+        )
+        rc, out, _ = run_workflow(self.tmp, "governance-check")
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        ungoverned = [f for f in data["findings"] if f["type"] == "ungoverned_roadmap_item"
+                      and f["item_id"] == "RM-GOV-004"]
+        self.assertEqual(len(ungoverned), 0)
+
+    def test_governance_check_duplicate_promotion_runs(self):
+        """Both a roadmap_item and openspec_change run for the same change should be flagged."""
+        self._make_roadmap_item("RM-DUP-001", "review", openspec_change="dup-change")
+
+        # Manually create a roadmap_item run with change_id in context
+        rm_run_id = "2026-06-22-RM-DUP-001"
+        rm_state = {
+            "version": 1, "run_id": rm_run_id, "workflow": "sdlc-main",
+            "status": "running", "current_phase": "create_change",
+            "primary_subject": {"type": "roadmap_item", "id": "RM-DUP-001"},
+            "context": {"change_id": "dup-change", "roadmap_item_id": "RM-DUP-001"},
+            "phase_readiness": {"phase": "create_change", "ready": False, "missing_required_inputs": []},
+            "pending_hooks": [], "completed_hooks": [], "completed_phases": [],
+            "gates": {}, "evidence": {}, "block": None, "updated_at": "",
+        }
+        active_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "active")
+        os.makedirs(active_dir, exist_ok=True)
+        with open(os.path.join(active_dir, f"{rm_run_id}.json"), "w") as f:
+            json.dump(rm_state, f)
+
+        # Manually create an openspec_change run for the same change
+        oc_run_id = "2026-06-22-dup-change"
+        oc_state = {
+            "version": 1, "run_id": oc_run_id, "workflow": "sdlc-main",
+            "status": "running", "current_phase": "create_change",
+            "primary_subject": {"type": "openspec_change", "id": "dup-change"},
+            "context": {"change_id": "dup-change"},
+            "phase_readiness": {"phase": "create_change", "ready": False, "missing_required_inputs": []},
+            "pending_hooks": [], "completed_hooks": [], "completed_phases": [],
+            "gates": {}, "evidence": {}, "block": None, "updated_at": "",
+        }
+        with open(os.path.join(active_dir, f"{oc_run_id}.json"), "w") as f:
+            json.dump(oc_state, f)
+
+        rc, out, _ = run_workflow(self.tmp, "governance-check")
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        duplicate_findings = [f for f in data["findings"] if f["type"] == "duplicate_promotion_runs"]
+        self.assertGreaterEqual(len(duplicate_findings), 1)
+        self.assertIn("dup-change", duplicate_findings[0]["change_id"])
+
+    def _list_active_runs_support(self):
+        active_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "active")
+        if not os.path.isdir(active_dir):
+            return []
+        results = []
+        for fname in sorted(os.listdir(active_dir)):
+            if not fname.endswith(".json"):
+                continue
+            with open(os.path.join(active_dir, fname), "r") as f:
+                state = json.load(f)
+            results.append((state.get("run_id", fname.replace(".json", "")), state))
+        return results
+
 
 class TestVerifyFoundations(FixtureBase):
     """Tests for the verify-foundations read-only command."""

@@ -388,6 +388,15 @@ Replace unfinished roadmap plans for a whole area while preserving completed and
 4. Create new `idea` items for the replanned phases.
 5. Append a changelog entry summarizing the replan: timestamp, action (`replan`), area, archived/preserved/new counts, batch revision path.
 6. Update area `roadmap.md` and run `rebuild_index.py`.
+7. Output structured evidence for the orchestrator to reconcile workflow runs:
+
+```json
+{
+  "cancelled_item_ids": ["RM-xxx", "RM-yyy"],
+  "created_item_ids": ["RM-zzz"],
+  "batch_revision_path": "revisions/batch/RM-<area>-replan-<timestamp>.md"
+}
+```
 
 **Rules:**
 - Replan uses a batch revision file, not per-item snapshots.
@@ -444,6 +453,25 @@ The workflow runtime coordinates post-archive hooks:
 Roadmap item files (`.ai/roadmap/areas/*/items/*.md`) remain the domain source of truth. The workflow runtime reads item state through loaders and records evidence; it does NOT edit roadmap item files directly.
 
 `sdlc-roadmap` only executes mutations when invoked by the orchestrator or directly by the user. It does not watch archives, initiate state transitions, or coordinate hook resolution.
+
+## Workflow Governance Boundary
+
+Stateful roadmap mutations are governed by the SDLC workflow runtime via `sdlc-orchestrator`.
+The roadmap worker SHALL NOT own workflow lifecycle:
+
+- `sdlc-roadmap` SHALL NOT call `workflow.py start`, `workflow.py preflight`, `workflow.py advance`, or `workflow.py done`.
+- `sdlc-roadmap` SHALL perform only the roadmap domain mutation.
+- After completing a governed mutation, `sdlc-roadmap` SHALL provide structured mutation
+  evidence that the orchestrator can record in workflow runtime state (via `workflow.py record-evidence`).
+
+For `roadmap replan`, the evidence SHALL include:
+- `cancelled_item_ids`: list of old roadmap item IDs that were cancelled by the replan.
+- `created_item_ids`: list of new roadmap item IDs that were created by the replan.
+- `batch_revision_path`: path to the batch revision file recording the replan.
+
+For `roadmap done`, the evidence SHALL include:
+- `item_id`: the roadmap item marked done.
+- `completed_at`: the completion date.
 
 ## Revision History Model
 

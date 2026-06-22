@@ -62,6 +62,73 @@ requesting OpenSpec IS a stateful SDLC run that MUST be tracked.
 | Archive change | `openspec_archive` | `preflight --action openspec_archive --subject-type openspec_change --subject-id <id>` |
 | Direct task | `superpowers_direct` | (no preflight needed) |
 
+### Roadmap-First Runtime Governance
+
+Stateful roadmap mutations are governed by the workflow runtime. Before dispatching
+a roadmap worker, the orchestrator SHALL pass the runtime gate:
+
+1. The orchestrator SHALL run `verify-foundations` if not already confirmed in session.
+2. The orchestrator SHALL run the corresponding preflight:
+   `python3 .ai/workflows/scripts/workflow.py --root . preflight --action <roadmap-action> --subject-type roadmap_item --subject-id <item-id>`
+3. If preflight blocks, the orchestrator SHALL follow the `next_action.command` and re-run
+   preflight until `allowed: true`.
+4. After preflight passes, the orchestrator SHALL dispatch the roadmap worker.
+5. After the roadmap worker completes, the orchestrator SHALL record mutation evidence
+   via `workflow.py record-evidence`, complete the current phase if exit criteria are met,
+   complete relevant hooks, and advance the run under the guarded transition.
+
+Roadmap governed actions:
+
+| Action | Subject type | Preflight command |
+|---|---|---|
+| Capture | `roadmap_capture` | `preflight --action roadmap_capture --subject-type roadmap_item --subject-id <id>` |
+| Insert | `roadmap_insert` | `preflight --action roadmap_insert --subject-type roadmap_item --subject-id <id>` |
+| Review | `roadmap_review` | `preflight --action roadmap_review --subject-type roadmap_item --subject-id <id>` |
+| Revise | `roadmap_revise` | `preflight --action roadmap_revise --subject-type roadmap_item --subject-id <id>` |
+| Cancel | `roadmap_cancel` | `preflight --action roadmap_cancel --subject-type roadmap_item --subject-id <id>` |
+| Reorder | `roadmap_reorder` | `preflight --action roadmap_reorder --subject-type roadmap_item --subject-id <id>` |
+| Replan | `roadmap_replan` | `preflight --action roadmap_replan --subject-type roadmap_item --subject-id <id>` |
+| Done | `roadmap_done` | `preflight --action roadmap_done --subject-type roadmap_item --subject-id <id>` |
+| List | (read-only, ungoverned) | (none) |
+| Init | (bootstrap, ungoverned) | (none) |
+
+### Roadmap Replan Follow-Up Coordination
+
+`roadmap_replan` is a governed batch mutation. The orchestrator SHALL coordinate
+follow-up run handling using single-subject runtime primitives in a loop:
+
+1. Preflight `roadmap_replan` before dispatching the roadmap worker.
+2. The roadmap worker performs the replan and returns evidence: cancelled old item IDs,
+   created new item IDs, and the batch revision path.
+3. The orchestrator SHALL loop over each cancelled old item ID and call:
+   `python3 .ai/workflows/scripts/workflow.py --root . cancel-run --subject-type roadmap_item --subject-id <cancelled-id> --reason replanned`
+4. The orchestrator SHALL loop over each created new item ID and call:
+   `python3 .ai/workflows/scripts/workflow.py --root . start --subject-type roadmap_item --subject-id <new-id>`
+5. Report per-item success/failure and leave unresolved items visible.
+
+The orchestrator SHALL NOT use a bulk workflow command for replan. Replan uses single-subject
+runtime primitives in a loop.
+
+### Canonical-Run Promotion From Roadmap Item To OpenSpec Change
+
+When a roadmap item is promoted to an OpenSpec change, the existing `roadmap_item` run
+SHALL serve as the canonical run for the entire lifecycle:
+
+1. The roadmap item run starts at `create_roadmap` or `review_roadmap`.
+2. When promotion creates an OpenSpec change, the orchestrator SHALL write the `change_id`
+   into the existing roadmap item run's `context.change_id` and advance it to `create_change`.
+3. `openspec_create` preflight, when it does not find a direct `openspec_change` run,
+   SHALL scan for a matching `roadmap_item` run whose `context.change_id` or linked
+   roadmap item frontmatter matches the requested change id.
+4. If a linked roadmap item run is found, preflight returns `allowed: true` — no new
+   `openspec_change` run is created. The orchestrator SHALL NOT call `workflow.py start`
+   for an `openspec_change` subject.
+5. Direct OpenSpec changes (without a linked roadmap item) still create
+   `openspec_change/<change-id>` runs as before.
+
+The orchestrator SHALL NOT create a second workflow run for a promoted roadmap item.
+The roadmap item run is the canonical run.
+
 ## SDLC Workflow Runtime
 
 For stateful SDLC runs (OpenSpec change lifecycle, roadmap promotion, post-archive actions), the orchestrator SHALL use the deterministic workflow runtime at `.ai/workflows/scripts/workflow.py` to manage run state, phase readiness, evidence, hooks, and guarded transitions.
@@ -210,7 +277,7 @@ Very complex formal changes that need iterative human review during planning. Ro
 
 When the task involves long-term product planning.
 
-**Action:** Route to `sdlc-roadmap` for capture, promotion, or status before any OpenSpec change is created.
+**Action:** Route to `sdlc-roadmap` for capture, promotion, or status before any OpenSpec change is created. All stateful roadmap mutations (capture, insert, review, revise, cancel, reorder, replan, done) SHALL pass through runtime preflight governance before roadmap worker dispatch.
 
 ### evalops-gated
 
