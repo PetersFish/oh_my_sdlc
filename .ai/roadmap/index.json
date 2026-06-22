@@ -151,7 +151,7 @@
     },
     {
       "id": "RM-ORCH-005",
-      "status": "idea",
+      "status": "ready",
       "title": "Workflow Run Required For Roadmap And OpenSpec Actions",
       "stage": "v2",
       "priority": "p0",
@@ -160,7 +160,7 @@
         "RM-ORCH-001",
         "RM-ORCH-006"
       ],
-      "openspec_change": null,
+      "openspec_change": "workflow-run-required-for-roadmap-and-openspec-actions",
       "area": "workflow.sdlc-orchestrator"
     },
     {

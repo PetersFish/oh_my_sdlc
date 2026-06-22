@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "run_id": "2026-06-22-RM-ORCH-005",
+  "workflow": "sdlc-main",
+  "status": "running",
+  "current_phase": "apply_change",
+  "primary_subject": {
+    "type": "roadmap_item",
+    "id": "RM-ORCH-005"
+  },
+  "context": {
+    "change_id": "workflow-run-required-for-roadmap-and-openspec-actions",
+    "roadmap_item_id": "RM-ORCH-005"
+  },
+  "phase_readiness": {
+    "phase": "apply_change",
+    "ready": true,
+    "missing_required_inputs": []
+  },
+  "pending_hooks": [],
+  "completed_hooks": [
+    "roadmap_status_ready_if_linked"
+  ],
+  "completed_phases": [
+    "create_change"
+  ],
+  "gates": {},
+  "evidence": {
+    "openspec_status": {
+      "classification": "in-progress",
+      "source": "active"
+    },
+    "roadmap_link": {
+      "count": 1,
+      "items": [
+        {
+          "item_id": "RM-ORCH-005",
+          "status": "ready",
+          "completed_at": "None",
+          "file": ".ai/roadmap/areas/workflow.sdlc-orchestrator/items/RM-ORCH-005-workflow-run-required-for-roadmap-openspec-actions.md",
+          "area": "workflow.sdlc-orchestrator"
+        }
+      ]
+    },
+    "openspec_artifacts": {
+      "proposal": "openspec/changes/workflow-run-required-for-roadmap-and-openspec-actions/proposal.md",
+      "design": "openspec/changes/workflow-run-required-for-roadmap-and-openspec-actions/design.md",
+      "specs": [
+        "openspec/changes/workflow-run-required-for-roadmap-and-openspec-actions/specs/sdlc-orchestrator/spec.md",
+        "openspec/changes/workflow-run-required-for-roadmap-and-openspec-actions/specs/sdlc-roadmap/spec.md",
+        "openspec/changes/workflow-run-required-for-roadmap-and-openspec-actions/specs/sdlc-workflow-engine/spec.md"
+      ],
+      "tasks": "openspec/changes/workflow-run-required-for-roadmap-and-openspec-actions/tasks.md"
+    },
+    "roadmap_item_status": {
+      "item_id": "RM-ORCH-005",
+      "status": "ready",
+      "completed_at": "None"
+    }
+  },
+  "block": null,
+  "updated_at": "2026-06-22T21:27:23.746949"
+}
