@@ -5,9 +5,9 @@
   "source_ref": "HEAD",
   "status": "stable",
   "target": ".opencode/skills/sdlc-orchestrator",
-  "installed_at": "2026-06-23T13:13:25.308401Z",
+  "installed_at": "2026-06-23T15:51:24.690157Z",
   "backport_policy": "review-required",
-  "payload_hash": "1ed6bb6ea729cb8275d028948c5c014a7e19acc8f484526c828ae9f746693aed",
+  "payload_hash": "9ceb48df3cdfc5b5bf35144f58379e31d78b1c6e05d10b9fec6557b21779c206",
   "files": [
     "SKILL.md"
   ]

@@ -1,7 +1,7 @@
 ---
 id: RM-EVAL-005
 title: "Session Eval 触发器接入 sdlc-orchestrator"
-status: idea
+status: done
 stage: v2
 priority: p1
 order: 50
@@ -9,8 +9,8 @@ depends_on:
   - RM-EVAL-004
 openspec_change: null
 created_at: 2026-06-16
-started_at: null
-completed_at: null
+started_at: 2026-06-23
+completed_at: 2026-06-23
 ---
 
 # Goal
@@ -48,4 +48,19 @@ completed_at: null
 适合在 RM-EVAL-004（Promptfoo 加速）完成后再推进。加速能力先解决"跑 eval 太慢"的核心痛点，再补流程触发，避免触发更多慢 eval 造成体验变差。
 
 # Completion Notes
+
+Implemented 2026-06-23. Changes made to `skills/sdlc-orchestrator/SKILL.md` (canonical, synced to `.claude/`, `.opencode/`, `.cursor/` distributed copies):
+
+1. Updated EvalOps Lifecycle State Machine to include Session Eval capture paths (observed deviation → inbox, failure pattern → inbox).
+2. Added Session Eval Checkpoint Rules after existing Gate Rules (capture-before-fix priority, pre-verify capture prompt, post-eval-failure capture, skip policy, target identification for verify deviation).
+3. Added full `## Session Eval Checkpoints` section with three checkpoints:
+   - Checkpoint 1: Post-Implementation (user reports wrong output)
+   - Checkpoint 2: Pre-Verify (deviations observed during implementation)
+   - Checkpoint 3: Post-Eval-Failure (capture failure patterns before fix)
+4. Added Verify Deviation Target Identification: LLM analyzes context, lists candidate target-ids, user selects.
+5. Added Session Eval vs Promptfoo Eval comparison table.
+6. Updated Route Decision Output template to mention Session Eval checkpoints.
+7. Updated Example 5 (AI behavior target change) to include Session Eval checkpoint notes.
+
+No code/scripts changed. All 303 tests pass (187 evalops + 116 workflow).
 

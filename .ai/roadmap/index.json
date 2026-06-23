@@ -176,7 +176,7 @@
     },
     {
       "id": "RM-EVAL-005",
-      "status": "idea",
+      "status": "done",
       "title": "Session Eval 触发器接入 sdlc-orchestrator",
       "stage": "v2",
       "priority": "p1",
