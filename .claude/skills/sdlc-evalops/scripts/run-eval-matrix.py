@@ -39,6 +39,10 @@ from run_index import (
     get_changed_golden_files, find_last_full_run, find_latest_run,
     build_run_entry,
 )
+from case_selection import (
+    get_case_identity, collect_case_files, select_only_new,
+    select_only_failed,
+)
 
 def find_repo_root() -> Path:
     p = Path.cwd().resolve()
@@ -746,7 +750,7 @@ def main() -> None:
             if not changed_files:
                 log(f"No changed golden case files since last full run for {target_id}. Skipping.")
                 continue
-            selected_cases = [c for c in golden_cases if c.get("_file") in changed_files]
+            selected_cases = select_only_new(golden_cases, changed_files)
             if not selected_cases:
                 log(f"Changed files have no matching golden cases for {target_id}. Skipping.")
                 continue
@@ -768,7 +772,7 @@ def main() -> None:
             if not failed_ids:
                 log(f"No failed cases to retry for {target_id}. Skipping.")
                 continue
-            selected_cases = [c for c in golden_cases if c.get("id") in failed_ids]
+            selected_cases = select_only_failed(golden_cases, failed_ids)
             if not selected_cases:
                 log(f"Failed cases not found in golden dir for {target_id}. Skipping.")
                 continue
@@ -777,7 +781,6 @@ def main() -> None:
         model_results = []
 
         if parallel and len(model_entries) > 1:
-            # Parallel execution via ThreadPoolExecutor
             with concurrent.futures.ThreadPoolExecutor(max_workers=max_parallel_models) as executor:
                 future_to_model = {}
                 for model_entry in model_entries:
@@ -788,16 +791,50 @@ def main() -> None:
                     )
                     future_to_model[future] = model_entry
 
+                fail_fast_triggered = False
                 for future in concurrent.futures.as_completed(future_to_model):
-                    result = future.result()
+                    if fail_fast_triggered:
+                        try:
+                            future.result(timeout=0)
+                        except concurrent.futures.CancelledError:
+                            pass
+                        except Exception:
+                            pass
+                        continue
+                    try:
+                        result = future.result()
+                    except Exception as e:
+                        model_entry = future_to_model[future]
+                        result = {
+                            "model_name": model_safe_name(model_entry),
+                            "cfg_name": model_entry.get("name", "?"),
+                            "observed_provider": "?",
+                            "report_dir": str(target_reports_dir / model_safe_name(model_entry)),
+                            "parsed": {"total": 0, "passed": 0, "failed": 0, "errors": 1, "error": str(e)},
+                            "exit_code": -1,
+                            "failed": True,
+                        }
                     model_results.append(result)
                     if result.get("failed") and fail_fast:
-                        log("fail_fast enabled, cancelling remaining model runs.")
+                        fail_fast_triggered = True
+                        log("fail_fast enabled, cancelling remaining model futures.")
                         for f in future_to_model:
                             if not f.done():
                                 f.cancel()
+
+                for future in future_to_model:
+                    if future.cancelled():
+                        model_entry = future_to_model[future]
+                        model_results.append({
+                            "model_name": model_safe_name(model_entry),
+                            "cfg_name": model_entry.get("name", "?"),
+                            "observed_provider": "?",
+                            "report_dir": str(target_reports_dir / model_safe_name(model_entry)),
+                            "parsed": {"total": 0, "passed": 0, "failed": 0, "errors": 1, "error": "cancelled by fail_fast"},
+                            "exit_code": -1,
+                            "failed": True,
+                        })
         else:
-            # Sequential execution
             for model_entry in model_entries:
                 result = run_single_model(
                     model_entry, target_id, workspace,
@@ -807,28 +844,41 @@ def main() -> None:
                 model_results.append(result)
                 if result.get("failed") and fail_fast:
                     log("fail_fast enabled, stopping remaining model runs.")
-                    any_failure = True
                     break
 
-        # Calculate per-case status from all model results
+        # Calculate per-case status aggregation across all model results
         case_status = {}
         failed_case_ids = set()
-        case_files = {}
-        for mr in model_results:
-            parsed = mr.get("parsed", {})
-            for case_detail in parsed.get("cases", []):
-                # Use input preview as case key
-                inp = case_detail.get("input_preview", "")[:50]
-                status = "passed" if case_detail.get("passed") else "failed"
-                case_status[f"{mr['model_name']}:{inp}"] = status
-                if not case_detail.get("passed"):
-                    failed_case_ids.add(inp)
+        for case in selected_cases:
+            case_id = case.get("id", "?")
+            all_passed = True
+            for mr in model_results:
+                parsed = mr.get("parsed", {})
+                # Skip cancelled model runs that have no case results
+                err = parsed.get("error", "")
+                if err and err.endswith("cancelled by fail_fast"):
+                    continue
+                mr_cases = parsed.get("cases", [])
+                if not mr_cases:
+                    continue
+                try:
+                    case_idx = selected_cases.index(case)
+                except ValueError:
+                    continue
+                if case_idx < len(mr_cases):
+                    passed = mr_cases[case_idx].get("passed", False)
+                    if not passed:
+                        all_passed = False
+            case_status[case_id] = "passed" if all_passed else "failed"
+            if not all_passed:
+                failed_case_ids.add(case_id)
+
+        case_files = collect_case_files(selected_cases, golden_dir)
 
         write_aggregate_summary(target_reports_dir, target_id, matrix_run_id,
                                 model_results, run_mode=run_mode,
                                 failure_source=failure_source)
 
-        # Write run index entry
         git_baseline = get_git_baseline(REPO_ROOT)
         entry = build_run_entry(
             run_id=matrix_run_id, mode=run_mode, git_baseline=git_baseline,
