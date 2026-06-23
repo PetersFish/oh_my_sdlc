@@ -1,0 +1,41 @@
+id: <<target-id>>.<<case-type>>.<<short-name>>
+
+target:
+  id: <<target-id>>
+  type: <<target-type>>
+  path: <<target-source-path>>
+
+status: inbox
+case_type: failure
+source: manual
+severity: medium
+created_at: <<YYYY-MM-DD>>
+
+coverage:
+  functional: []
+  quality: []
+
+input: |
+  <<user-input>>
+
+actual: |
+  <<actual-output-if-applicable>>
+
+expected:
+  rubric: |
+    <<semantic-evaluation-rubric>>
+
+evaluators:
+  llm_judge:
+    enabled: true
+    rubric: |
+      <<llm-judge-rubric>>
+
+# Optional deterministic checks for exact literals/structure only:
+# expected:
+#   must_include: []
+#   must_not_include: []
+# evaluators:
+#   rule_based:
+#     contains: []
+#     not_contains: []

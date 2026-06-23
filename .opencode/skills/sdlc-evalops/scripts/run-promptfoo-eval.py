@@ -19,12 +19,20 @@ Reports land under .ai/evals/targets/<target-id>/reports/<run-id>/
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+
+import yaml
+from run_index import (
+    load_run_index, save_run_index, get_git_baseline,
+    get_changed_golden_files, find_last_full_run, find_latest_run,
+    build_run_entry,
+)
 
 def find_repo_root() -> Path:
     p = Path.cwd().resolve()
@@ -103,7 +111,25 @@ def resolve_target_workspace(target_id: str) -> Path:
     sys.exit(2)
 
 
-def run_promptfoo_eval(config_path: Path, output_path: Path) -> int:
+def load_model_matrix() -> dict:
+    mm_path = EVALS_ROOT / "model-matrix.yaml"
+    if mm_path.is_file():
+        return yaml.safe_load(mm_path.read_text("utf-8")) or {}
+    return {}
+
+
+def load_golden_cases(golden_dir: Path) -> list[dict]:
+    cases = []
+    if golden_dir.is_dir():
+        for case_file in sorted(golden_dir.glob("*.yaml")):
+            case = yaml.safe_load(case_file.read_text("utf-8")) or {}
+            case["_file"] = str(case_file.name)
+            cases.append(case)
+    return cases
+
+
+def run_promptfoo_eval(config_path: Path, output_path: Path,
+                       max_concurrency: int = 1) -> int:
     log(f"Running: promptfoo eval -c {config_path} -o {output_path}")
     env = os.environ.copy()
     result = subprocess.run(
@@ -111,7 +137,7 @@ def run_promptfoo_eval(config_path: Path, output_path: Path) -> int:
             "promptfoo", "eval",
             "-c", str(config_path),
             "-o", str(output_path),
-            "--max-concurrency", "1",
+            "--max-concurrency", str(max_concurrency),
             "--no-cache",
         ],
         capture_output=True,
@@ -177,7 +203,9 @@ def parse_promptfoo_output(output_path: Path) -> dict:
 
 
 def write_summary_md(reports_dir: Path, target_id: str, run_id: str,
-                     export_fresh: bool, parsed: dict) -> None:
+                     export_fresh: bool, parsed: dict, run_mode: str = "full",
+                     failure_source: str | None = None,
+                     max_concurrency: int = 1) -> None:
     total = parsed.get("total", 0)
     passed = parsed.get("passed", 0)
     failed = parsed.get("failed", 0)
@@ -189,6 +217,12 @@ def write_summary_md(reports_dir: Path, target_id: str, run_id: str,
         "",
         f"**Target:** {target_id}",
         f"**Run ID:** {run_id}",
+        f"**Run Mode:** {run_mode}",
+    ]
+    if failure_source:
+        lines.append(f"**Failure Source:** {failure_source}")
+    lines.extend([
+        "",
         f"**Export Freshness:** {'pass' if export_fresh else 'stale'}",
         f"**Timestamp:** {datetime.now(timezone.utc).isoformat()}",
         "",
@@ -205,11 +239,11 @@ def write_summary_md(reports_dir: Path, target_id: str, run_id: str,
         f"**Eval Command:** `OPENCODE_GO_API_KEY=<key> promptfoo eval -c "
         f".ai/evals/targets/{target_id}/exports/promptfoo/promptfooconfig.yaml "
         f"-o .ai/evals/targets/{target_id}/reports/{run_id}/promptfoo-output.json "
-        f"--max-concurrency 1 --no-cache`",
+        f"--max-concurrency {max_concurrency} --no-cache`",
         "",
         f"**Report Path:** `.ai/evals/targets/{target_id}/reports/{run_id}/`",
         "",
-    ]
+    ])
 
     if failures:
         lines.append("## Failures")
@@ -256,7 +290,17 @@ def main() -> None:
     parser.add_argument("target_id", help="Target ID (e.g., skill.sdlc-orchestrator)")
     parser.add_argument("--from-auth", action="store_true",
                         help="Read OPENCODE_GO_API_KEY from ~/.local/share/opencode/auth.json")
+    parser.add_argument("--only-new", action="store_true",
+                        help="Run only golden cases changed since last full run")
+    parser.add_argument("--only-failed", action="store_true",
+                        help="Run only previously failed cases")
+    parser.add_argument("--failed-from", choices=["latest", "full"],
+                        help="Failure source for --only-failed: latest run or last full run")
     args = parser.parse_args()
+
+    if args.only_failed and not args.failed_from:
+        error("--only-failed requires --failed-from latest|full")
+        sys.exit(2)
 
     api_key = resolve_api_key(from_auth=args.from_auth)
     if not api_key:
@@ -272,21 +316,81 @@ def main() -> None:
     target_id = args.target_id
     workspace = resolve_target_workspace(target_id)
 
+    model_matrix = load_model_matrix()
+    run_policy = model_matrix.get("run_policy", {})
+    max_concurrency = run_policy.get("max_concurrency", 1)
+
+    reports_base = workspace / "reports"
+    run_index_data = load_run_index(reports_base)
+    if run_index_data.get("target_id") != target_id:
+        run_index_data["target_id"] = target_id
+
+    run_mode = "full"
+    failure_source = None
+    selected_cases = None
+
+    if args.only_failed:
+        run_mode = "only-failed"
+        failure_source = args.failed_from
+        if not run_index_data.get("runs"):
+            error("No run index found. Run a full eval first.")
+            sys.exit(2)
+        if args.failed_from == "latest":
+            ref_run = find_latest_run(run_index_data["runs"])
+        else:
+            ref_run = find_last_full_run(run_index_data["runs"])
+        if not ref_run:
+            error("No qualifying run found in run index. Run a full eval first.")
+            sys.exit(2)
+        failed_ids = ref_run.get("failed_cases", [])
+        if not failed_ids:
+            log("No failed cases to retry. Exiting.")
+            sys.exit(0)
+        selected_cases = failed_ids
+        log(f"Only-failed ({failure_source}): {len(selected_cases)} failed case(s) to retry")
+
+    if args.only_new:
+        run_mode = "only-new"
+        run_index_data = load_run_index(reports_base)
+        if run_index_data.get("target_id") != target_id:
+            run_index_data["target_id"] = target_id
+        last_full = find_last_full_run(run_index_data.get("runs", []))
+        if not last_full:
+            error("No prior full run found in run index. Run a full eval first.")
+            sys.exit(2)
+        baseline = last_full.get("git_baseline")
+        if not baseline:
+            error("Last full run has no Git baseline. Run a full eval to record one.")
+            sys.exit(2)
+        t_manifest = yaml.safe_load((workspace / "manifest.yaml").read_text("utf-8")) or {}
+        golden_rel = t_manifest.get("canonical_case_directories", {}).get("golden", "cases/golden")
+        golden_dir = workspace / golden_rel
+        changed_files = get_changed_golden_files(REPO_ROOT, baseline, golden_dir)
+        if not changed_files:
+            log("No changed golden case files since last full run. Exiting.")
+            sys.exit(0)
+        all_cases = load_golden_cases(golden_dir)
+        selected_cases = [c for c in all_cases if c.get("_file") in changed_files]
+        if not selected_cases:
+            log("Changed files have no matching golden cases. Exiting.")
+            sys.exit(0)
+        log(f"Only-new: {len(selected_cases)} case(s) changed since baseline {baseline[:8]}")
+
     export_exit = run_export(target_id)
     export_fresh = export_exit == 0
-    if export_exit != 0 and export_exit != 5:  # 5 = stale exports
+    if export_exit != 0 and export_exit != 5:
         error("Export failed; aborting eval")
         sys.exit(export_exit)
 
     run_id = generate_run_id(target_id)
-    reports_dir = workspace / "reports" / run_id
+    reports_dir = reports_base / run_id
     reports_dir.mkdir(parents=True, exist_ok=True)
     log(f"Reports dir: {reports_dir}")
 
     config_path = workspace / "exports" / "promptfoo" / "promptfooconfig.yaml"
     output_path = reports_dir / "promptfoo-output.json"
 
-    eval_exit = run_promptfoo_eval(config_path, output_path)
+    eval_exit = run_promptfoo_eval(config_path, output_path, max_concurrency=max_concurrency)
     if eval_exit != 0:
         log(f"promptfoo eval exited with code {eval_exit}")
 
@@ -295,13 +399,39 @@ def main() -> None:
         error(f"Cannot parse results: {parsed['error']}")
         sys.exit(1)
 
-    write_summary_md(reports_dir, target_id, run_id, export_fresh, parsed)
+    write_summary_md(reports_dir, target_id, run_id, export_fresh, parsed,
+                     run_mode=run_mode, failure_source=failure_source,
+                     max_concurrency=max_concurrency)
     write_failures_yaml(reports_dir, parsed)
 
     passed = parsed.get("passed", 0)
     failed = parsed.get("failed", 0)
     errors = parsed.get("errors", 0)
     total = parsed.get("total", 0)
+
+    # Build run index entry
+    git_baseline = get_git_baseline(REPO_ROOT)
+    case_details = parsed.get("cases", [])
+    case_files = {}
+    case_status = {}
+    failed_case_ids = []
+    for idx, c in enumerate(case_details):
+        case_name = f"case-{idx}"
+        case_files[case_name] = ""
+        outcome = "passed" if c.get("passed") else "failed"
+        case_status[case_name] = outcome
+        if not c.get("passed"):
+            failed_case_ids.append(case_name)
+
+    entry = build_run_entry(
+        run_id=run_id, mode=run_mode, git_baseline=git_baseline,
+        case_files=case_files, case_status=case_status,
+        failed_cases=failed_case_ids,
+        report_path=str(reports_dir.relative_to(REPO_ROOT)),
+        failure_source=failure_source,
+    )
+    run_index_data.setdefault("runs", []).append(entry)
+    save_run_index(reports_base, run_index_data)
 
     log(f"\nResults: {passed}/{total} passed, {failed} failed, {errors} errors")
     print(f"Report: {reports_dir}")

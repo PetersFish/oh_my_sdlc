@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "run_id": "2026-06-23-RM-EVAL-004",
+  "workflow": "sdlc-main",
+  "status": "running",
+  "current_phase": "apply_change",
+  "primary_subject": {
+    "type": "roadmap_item",
+    "id": "RM-EVAL-004"
+  },
+  "context": {
+    "change_id": "evalops-concurrency-incremental-eval",
+    "roadmap_item_id": "RM-EVAL-004"
+  },
+  "phase_readiness": {
+    "phase": "apply_change",
+    "ready": true,
+    "missing_required_inputs": []
+  },
+  "pending_hooks": [],
+  "completed_hooks": [
+    "roadmap_status_ready_if_linked"
+  ],
+  "completed_phases": [
+    "create_change"
+  ],
+  "gates": {},
+  "evidence": {
+    "roadmap_item_path": ".ai/roadmap/areas/workflow.ai-evalops/items/RM-EVAL-004-promptfoo-eval-speedup-concurrency-incremental.md",
+    "openspec_status": {
+      "classification": "in-progress",
+      "source": "active"
+    },
+    "roadmap_link": {
+      "count": 1,
+      "items": [
+        {
+          "item_id": "RM-EVAL-004",
+          "status": "ready",
+          "completed_at": "None",
+          "file": ".ai/roadmap/areas/workflow.ai-evalops/items/RM-EVAL-004-promptfoo-eval-speedup-concurrency-incremental.md",
+          "area": "workflow.ai-evalops"
+        }
+      ]
+    },
+    "roadmap_item_status": {
+      "item_id": "RM-EVAL-004",
+      "status": "ready",
+      "completed_at": "None"
+    }
+  },
+  "block": null,
+  "updated_at": "2026-06-23T12:40:10.992564"
+}

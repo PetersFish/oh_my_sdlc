@@ -3,7 +3,7 @@
   "source_repo": ".",
   "source_ref": "HEAD",
   "status": "stable",
-  "target": ".cursor/skills/sdlc-evalops",
-  "installed_at": "2026-06-23T05:57:06.505862Z",
+  "target": ".claude/skills/sdlc-evalops",
+  "installed_at": "2026-06-23T05:57:06.469184Z",
   "backport_policy": "review-required"
 }

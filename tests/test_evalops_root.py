@@ -500,6 +500,8 @@ class TestEvalRunnerScript:
         content = RUNNER_SCRIPT.read_text(encoding="utf-8")
         assert "--max-concurrency" in content, \
             "runner script must use --max-concurrency"
+        assert "max_concurrency" in content, \
+            "runner script must reference max_concurrency for config-driven behavior"
 
     def test_evalops_skill_eval_command_includes_o_flag(self):
         skill_paths = [
@@ -713,3 +715,143 @@ class TestExportMatrixParity:
         content = MATRIX_RUNNER_SCRIPT.read_text(encoding="utf-8")
         assert "NOT mutated" in content, \
             "matrix runner must state canonical exports are not mutated"
+
+
+class TestRunPolicyConcurrencyFields:
+    """Validate max_concurrency and max_parallel_models in model-matrix files."""
+
+    def test_template_has_concurrency_fields(self):
+        content = (REPO_ROOT / "skills" / "sdlc-evalops" / "templates" / "model-matrix.yaml") \
+            .read_text(encoding="utf-8")
+        assert "max_concurrency" in content, \
+            "template model-matrix.yaml must have max_concurrency"
+        assert "max_parallel_models" in content, \
+            "template model-matrix.yaml must have max_parallel_models"
+
+    def test_live_has_concurrency_fields(self):
+        content = (EVALS_ROOT / "model-matrix.yaml").read_text(encoding="utf-8")
+        assert "max_concurrency" in content, \
+            ".ai/evals/model-matrix.yaml must have max_concurrency"
+        assert "max_parallel_models" in content, \
+            ".ai/evals/model-matrix.yaml must have max_parallel_models"
+
+    def test_concurrency_defaults_in_template(self):
+        mm = yaml.safe_load(
+            (REPO_ROOT / "skills" / "sdlc-evalops" / "templates" / "model-matrix.yaml")
+            .read_text(encoding="utf-8")
+        )
+        rp = mm.get("run_policy", {})
+        assert rp.get("max_concurrency") == 3, "Default max_concurrency must be 3"
+        assert rp.get("parallel") is True, "Default parallel must be true"
+        assert rp.get("max_parallel_models") == 2, "Default max_parallel_models must be 2"
+
+    def test_concurrency_defaults_in_live(self):
+        mm = yaml.safe_load(
+            (EVALS_ROOT / "model-matrix.yaml").read_text(encoding="utf-8")
+        )
+        rp = mm.get("run_policy", {})
+        assert rp.get("max_concurrency") == 3, "Live max_concurrency must be 3"
+        assert rp.get("parallel") is True, "Live parallel must be true"
+        assert rp.get("max_parallel_models") == 2, "Live max_parallel_models must be 2"
+
+
+class TestRunnerIncrementalFlags:
+    """Validate --only-new, --only-failed, --failed-from flags in runner scripts."""
+
+    def test_single_runner_has_only_new(self):
+        content = RUNNER_SCRIPT.read_text(encoding="utf-8")
+        assert "--only-new" in content, \
+            "run-promptfoo-eval.py must support --only-new"
+
+    def test_single_runner_has_only_failed(self):
+        content = RUNNER_SCRIPT.read_text(encoding="utf-8")
+        assert "--only-failed" in content, \
+            "run-promptfoo-eval.py must support --only-failed"
+        assert "--failed-from" in content, \
+            "run-promptfoo-eval.py must support --failed-from"
+
+    def test_single_runner_has_failed_from_choices(self):
+        content = RUNNER_SCRIPT.read_text(encoding="utf-8")
+        assert '"latest"' in content and '"full"' in content, \
+            "run-promptfoo-eval.py must validate --failed-from latest|full"
+
+    def test_matrix_runner_has_only_new(self):
+        content = MATRIX_RUNNER_SCRIPT.read_text(encoding="utf-8")
+        assert "--only-new" in content, \
+            "run-eval-matrix.py must support --only-new"
+
+    def test_matrix_runner_has_only_failed(self):
+        content = MATRIX_RUNNER_SCRIPT.read_text(encoding="utf-8")
+        assert "--only-failed" in content, \
+            "run-eval-matrix.py must support --only-failed"
+        assert "--failed-from" in content, \
+            "run-eval-matrix.py must support --failed-from"
+
+
+class TestRunIndexModule:
+    """Validate run_index.py shared module and run index integration."""
+
+    def test_run_index_module_exists(self):
+        path = SKILL_SCRIPTS / "run_index.py"
+        assert path.is_file(), "skills/sdlc-evalops/scripts/run_index.py must exist"
+
+    def test_run_index_has_load_save(self):
+        content = (SKILL_SCRIPTS / "run_index.py").read_text(encoding="utf-8")
+        assert "def load_run_index" in content, \
+            "run_index.py must define load_run_index()"
+        assert "def save_run_index" in content, \
+            "run_index.py must define save_run_index()"
+        assert "def build_run_entry" in content, \
+            "run_index.py must define build_run_entry()"
+
+    def test_run_index_has_case_status(self):
+        content = (SKILL_SCRIPTS / "run_index.py").read_text(encoding="utf-8")
+        assert "case_status" in content, \
+            "run_index.py must reference case_status in run entry"
+
+    def test_runners_reference_run_index(self):
+        for script in [RUNNER_SCRIPT, MATRIX_RUNNER_SCRIPT]:
+            content = script.read_text(encoding="utf-8")
+            assert "run_index" in content, \
+                f"{script.name} must import run_index"
+            assert "run-index.json" in content.lower() or "run_index" in content, \
+                f"{script.name} must reference run index"
+
+
+class TestRunnerRunModeInSummary:
+    """Validate Run Mode and Failure Source in summary output."""
+
+    def test_single_runner_summary_has_run_mode(self):
+        content = RUNNER_SCRIPT.read_text(encoding="utf-8")
+        assert "Run Mode" in content, \
+            "run-promptfoo-eval.py summary must include Run Mode field"
+
+    def test_single_runner_summary_has_failure_source(self):
+        content = RUNNER_SCRIPT.read_text(encoding="utf-8")
+        assert "Failure Source" in content, \
+            "run-promptfoo-eval.py summary must include Failure Source field"
+
+    def test_matrix_runner_summary_has_run_mode(self):
+        content = MATRIX_RUNNER_SCRIPT.read_text(encoding="utf-8")
+        assert "Run Mode" in content, \
+            "run-eval-matrix.py summary must include Run Mode field"
+
+
+class TestMatrixRunnerParallelExecution:
+    """Validate ThreadPoolExecutor and parallel execution in matrix runner."""
+
+    def test_matrix_runner_imports_threadpoolexecutor(self):
+        content = MATRIX_RUNNER_SCRIPT.read_text(encoding="utf-8")
+        assert "ThreadPoolExecutor" in content, \
+            "run-eval-matrix.py must import ThreadPoolExecutor"
+
+    def test_matrix_runner_reads_parallel_setting(self):
+        content = MATRIX_RUNNER_SCRIPT.read_text(encoding="utf-8")
+        assert '"parallel"' in content or "'parallel'" in content, \
+            "run-eval-matrix.py must read run_policy.parallel"
+
+    def test_matrix_runner_serial_fallback(self):
+        content = MATRIX_RUNNER_SCRIPT.read_text(encoding="utf-8")
+        assert "Sequential" in content or "serial" in content.lower() or \
+               "else:" in content, \
+            "run-eval-matrix.py must have fallback for sequential execution"

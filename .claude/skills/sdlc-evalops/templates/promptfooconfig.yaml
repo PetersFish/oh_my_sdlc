@@ -1,0 +1,29 @@
+description: "EvalOps export for <<target-id>>"
+
+prompts:
+  - "<<prompt-file-or-text>>"
+
+providers:
+  - id: openai:chat:<<model>>
+    label: "<<label>>"
+    config:
+      apiBaseUrl: "<<openai-compatible-base-url>>"
+      apiKeyEnvar: "<<api-key-env-var>>"
+      headers:
+        Accept-Encoding: identity
+      temperature: 0
+      max_tokens: 4096
+
+defaultTest:
+  options:
+    provider:
+      id: openai:chat:<<grader-model>>
+      config:
+        apiBaseUrl: "<<openai-compatible-base-url>>"
+        apiKeyEnvar: "<<api-key-env-var>>"
+        headers:
+          Accept-Encoding: identity
+        temperature: 0
+        max_tokens: 4096
+
+tests: "<<cases-file>>"

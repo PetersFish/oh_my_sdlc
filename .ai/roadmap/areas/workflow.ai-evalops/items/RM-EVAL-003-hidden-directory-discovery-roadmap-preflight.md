@@ -1,7 +1,7 @@
 ---
 id: RM-EVAL-003
 title: "隐藏目录发现与 Roadmap Preflight 加固"
-status: cancelled
+status: done
 stage: v2
 priority: p0
 order: 30

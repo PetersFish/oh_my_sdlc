@@ -1541,17 +1541,17 @@ class TestPreflightAndEnsureRun(FixtureBase):
         self.assertEqual(data["reason"], "missing_active_run")
 
     def test_preflight_roadmap_review_wrong_phase_blocks(self):
-        self._make_roadmap_item("RM-REV-001", "idea")
+        # Start a run for a non-existent item → create_roadmap phase
+        # create_roadmap does NOT allow roadmap_review
         run_workflow(
             self.tmp, "start",
             subject_type="roadmap_item",
-            subject_id="RM-REV-001",
+            subject_id="RM-NEW-001",
         )
-        # Run is in create_roadmap phase, review requires review_roadmap
         rc, data, _ = self._run_preflight(
             "roadmap_review",
             subject_type="roadmap_item",
-            subject_id="RM-REV-001",
+            subject_id="RM-NEW-001",
         )
         self.assertEqual(rc, 1)
         self.assertFalse(data["allowed"])
@@ -2184,6 +2184,125 @@ class TestConcurrentRuns(FixtureBase):
                 state = json.load(f)
             results.append((state.get("run_id", fname.replace(".json", "")), state))
         return results
+
+
+class TestRoadmapPhaseInference(FixtureBase):
+    """Tests for roadmap_item phase inference at start time."""
+
+    def test_start_idea_item_goes_to_review_roadmap(self):
+        self._make_roadmap_item("RM-PI-001", "idea")
+        rc, out, _ = run_workflow(
+            self.tmp, "start",
+            subject_type="roadmap_item",
+            subject_id="RM-PI-001",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["current_phase"], "review_roadmap")
+
+    def test_start_ready_item_with_change_goes_to_create_change(self):
+        self._make_roadmap_item("RM-PI-002", "ready", openspec_change="pi-change")
+        rc, out, _ = run_workflow(
+            self.tmp, "start",
+            subject_type="roadmap_item",
+            subject_id="RM-PI-002",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["current_phase"], "create_change")
+
+    def test_start_ready_item_without_change_goes_to_review_roadmap(self):
+        self._make_roadmap_item("RM-PI-003", "ready")
+        rc, out, _ = run_workflow(
+            self.tmp, "start",
+            subject_type="roadmap_item",
+            subject_id="RM-PI-003",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["current_phase"], "review_roadmap")
+
+    def test_start_active_item_goes_to_apply_change(self):
+        self._make_roadmap_item("RM-PI-004", "active")
+        rc, out, _ = run_workflow(
+            self.tmp, "start",
+            subject_type="roadmap_item",
+            subject_id="RM-PI-004",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["current_phase"], "apply_change")
+
+    def test_start_new_item_goes_to_create_roadmap(self):
+        # Item does not exist in the roadmap
+        rc, out, _ = run_workflow(
+            self.tmp, "start",
+            subject_type="roadmap_item",
+            subject_id="RM-PI-005",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["current_phase"], "create_roadmap")
+
+
+class TestResolveResolvedBlocks(FixtureBase):
+    """Tests for resolve command clearing resolvable blocks."""
+
+    def test_resolve_clears_missing_required_inputs_when_resolved(self):
+        # Create a run and manually set a missing_required_inputs block
+        run_workflow(
+            self.tmp, "start",
+            subject_type="roadmap_item",
+            subject_id="RM-RES-001",
+        )
+        state = self._read_current_state()
+        state["status"] = "blocked"
+        state["block"] = {
+            "type": "missing_required_inputs",
+            "message": "missing: context.review_decision",
+            "next_allowed": ["resolve", "block"],
+        }
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(self.tmp, "resolve")
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        # Should clear block and restore running since readiness is met
+        self.assertIsNone(data.get("block"))
+        self.assertEqual(data["status"], "running")
+
+
+class TestCompletePhaseClearsBlock(FixtureBase):
+    """Tests for complete-phase clearing exit_criteria_failed block on success."""
+
+    def test_complete_phase_clears_exit_criteria_failed_block(self):
+        # Create a run and set it to create_roadmap with exit_criteria_failed block
+        self._make_roadmap_item("RM-CPB-001", "idea")
+        run_workflow(
+            self.tmp, "start",
+            subject_type="roadmap_item",
+            subject_id="RM-CPB-001",
+        )
+        state = self._read_current_state()
+        # Force to create_roadmap (where roadmap_item_created is the exit criteria)
+        state["current_phase"] = "create_roadmap"
+        state["status"] = "blocked"
+        state["block"] = {
+            "type": "exit_criteria_failed",
+            "message": "exit criteria not satisfied",
+            "next_allowed": ["resolve", "block"],
+        }
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(
+            self.tmp, "complete-phase",
+            exit_criteria_satisfied="roadmap_item_created",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertIsNone(data.get("block"))
+        self.assertEqual(data["status"], "running")
+        self.assertIn("create_roadmap", data.get("completed_phases", []))
 
 
 if __name__ == "__main__":

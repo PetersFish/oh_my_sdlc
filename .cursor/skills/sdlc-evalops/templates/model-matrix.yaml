@@ -53,7 +53,9 @@ run_policy:
   fail_fast: false
   timeout_seconds: 300
   retry_count: 0
-  parallel: false
+  parallel: true
+  max_concurrency: 3
+  max_parallel_models: 2
 
 # --- Rules ---
 # - API keys MUST NOT be written into this file. Use apiKeyEnvar instead.

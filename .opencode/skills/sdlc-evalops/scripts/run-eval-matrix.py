@@ -23,6 +23,8 @@ Canonical exports/ under each target workspace are NOT mutated.
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
+import hashlib
 import json
 import os
 import subprocess
@@ -31,6 +33,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
+
+from run_index import (
+    load_run_index, save_run_index, get_git_baseline,
+    get_changed_golden_files, find_last_full_run, find_latest_run,
+    build_run_entry,
+)
 
 def find_repo_root() -> Path:
     p = Path.cwd().resolve()
@@ -272,7 +280,8 @@ def write_matrix_promptfoo_files(export_dir: Path, golden_cases: list[dict],
 
 
 def run_promptfoo_eval(config_path: Path, output_path: Path,
-                       timeout_seconds: int = 600) -> int:
+                       timeout_seconds: int = 600,
+                       max_concurrency: int = 1) -> int:
     log(f"Running: promptfoo eval -c {config_path} -o {output_path}")
     env = os.environ.copy()
     result = subprocess.run(
@@ -280,7 +289,7 @@ def run_promptfoo_eval(config_path: Path, output_path: Path,
             "promptfoo", "eval",
             "-c", str(config_path),
             "-o", str(output_path),
-            "--max-concurrency", "1",
+            "--max-concurrency", str(max_concurrency),
             "--no-cache",
         ],
         capture_output=True,
@@ -359,7 +368,8 @@ def parse_promptfoo_output(output_path: Path) -> dict:
 
 
 def write_model_summary(reports_dir: Path, target_id: str, model_entry: dict,
-                         model_name: str, parsed: dict) -> None:
+                         model_name: str, parsed: dict, run_mode: str = "full",
+                         failure_source: str | None = None) -> None:
     total = parsed.get("total", 0)
     passed = parsed.get("passed", 0)
     failed = parsed.get("failed", 0)
@@ -377,6 +387,11 @@ def write_model_summary(reports_dir: Path, target_id: str, model_entry: dict,
         f"# Matrix Model Run: {model_name}",
         "",
         f"**Target:** {target_id}",
+        f"**Run Mode:** {run_mode}",
+    ]
+    if failure_source:
+        lines.append(f"**Failure Source:** {failure_source}")
+    lines.extend([
         f"**Timestamp:** {datetime.now(timezone.utc).isoformat()}",
         "",
         "## Configured Model",
@@ -405,7 +420,7 @@ def write_model_summary(reports_dir: Path, target_id: str, model_entry: dict,
         f"| Errors | {errors} |",
         f"| Pass Rate | {parsed.get('pass_rate', '?')}% |",
         "",
-    ]
+    ])
 
     if failures:
         lines.append("## Failures")
@@ -446,20 +461,27 @@ def write_model_failures(reports_dir: Path, parsed: dict) -> None:
 
 def write_aggregate_summary(target_reports_dir: Path, target_id: str,
                               run_id: str,
-                              model_results: list[dict]) -> None:
+                              model_results: list[dict],
+                              run_mode: str = "full",
+                              failure_source: str | None = None) -> None:
     target_reports_dir.mkdir(parents=True, exist_ok=True)
     lines = [
         f"# Matrix Eval Run: {run_id}",
         "",
         f"**Target:** {target_id}",
         f"**Run ID:** {run_id}",
+        f"**Run Mode:** {run_mode}",
+    ]
+    if failure_source:
+        lines.append(f"**Failure Source:** {failure_source}")
+    lines.extend([
         f"**Timestamp:** {datetime.now(timezone.utc).isoformat()}",
         "",
         "## Results by Model",
         "",
         "| Model | Total | Passed | Failed | Errors | Pass Rate |",
         "|-------|-------|--------|--------|--------|-----------|",
-    ]
+    ])
 
     overall_total = 0
     overall_passed = 0
@@ -518,6 +540,77 @@ def resolve_api_key(from_auth: bool = False) -> str:
     return ""
 
 
+def run_single_model(model_entry: dict, target_id: str, workspace: Path,
+                     t_manifest: dict, golden_cases: list[dict],
+                     target_reports_dir: Path, run_policy: dict,
+                     run_mode: str = "full",
+                     failure_source: str | None = None) -> dict:
+    """Run eval for a single model entry. Returns a model_results dict."""
+    model_name = model_safe_name(model_entry)
+    promptfoo_block = model_entry.get("promptfoo")
+    grader_block = model_entry.get("grader")
+
+    if not promptfoo_block:
+        return {
+            "model_name": model_name,
+            "cfg_name": model_entry.get("name", "?"),
+            "observed_provider": "?",
+            "report_dir": str(target_reports_dir / model_name),
+            "parsed": {"total": 0, "passed": 0, "failed": 0, "errors": 1, "error": "no promptfoo config"},
+        }
+
+    model_export_dir = target_reports_dir / model_name / "promptfoo"
+    log(f"\n  Model: {model_name} ({promptfoo_block.get('id', '?')})")
+
+    write_matrix_promptfoo_files(
+        model_export_dir, golden_cases, t_manifest,
+        promptfoo_block, grader_block,
+    )
+
+    model_output_path = model_export_dir.parent / "promptfoo-output.json"
+
+    max_concurrency = run_policy.get("max_concurrency", 1)
+    timeout_seconds = run_policy.get("timeout_seconds", 300)
+    retry_count = run_policy.get("retry_count", 0)
+
+    exit_code = 1
+    for attempt in range(retry_count + 1):
+        if attempt > 0:
+            log(f"  Retry {attempt}/{retry_count}...")
+        exit_code = run_promptfoo_eval(
+            model_export_dir / "promptfooconfig.yaml",
+            model_output_path,
+            timeout_seconds=timeout_seconds,
+            max_concurrency=max_concurrency,
+        )
+        if exit_code == 0:
+            break
+
+    model_report_dir = model_export_dir.parent
+    parsed = parse_promptfoo_output(model_output_path)
+    write_model_summary(model_report_dir, target_id, model_entry, model_name, parsed,
+                        run_mode=run_mode, failure_source=failure_source)
+    write_model_failures(model_report_dir, parsed)
+
+    failed_count = parsed.get("failed", 0)
+    error_count = parsed.get("errors", 0)
+    status = "FAIL" if (exit_code != 0 or failed_count > 0 or error_count > 0) else "PASS"
+    log(
+        f"  {status}: {parsed.get('passed', 0)}/{parsed.get('total', 0)} passed, "
+        f"{failed_count} failed, {error_count} errors"
+    )
+
+    return {
+        "model_name": model_name,
+        "cfg_name": model_entry.get("name", "?"),
+        "observed_provider": parsed.get("observed_provider", "?"),
+        "report_dir": str(model_report_dir),
+        "parsed": parsed,
+        "exit_code": exit_code,
+        "failed": failed_count > 0 or error_count > 0 or exit_code != 0,
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Run EvalOps targets across the configured model matrix"
@@ -538,10 +631,20 @@ def main() -> None:
         "--dry-run", action="store_true",
         help="Generate configs and print plan without executing promptfoo eval"
     )
+    parser.add_argument("--only-new", action="store_true",
+                        help="Run only golden cases changed since last full run")
+    parser.add_argument("--only-failed", action="store_true",
+                        help="Run only previously failed cases")
+    parser.add_argument("--failed-from", choices=["latest", "full"],
+                        help="Failure source for --only-failed: latest run or last full run")
     args = parser.parse_args()
 
     if not args.target_id and not args.all:
         error("Specify a <target-id> or use --all to run all registered targets.")
+        sys.exit(2)
+
+    if args.only_failed and not args.failed_from:
+        error("--only-failed requires --failed-from latest|full")
         sys.exit(2)
 
     api_key = resolve_api_key(from_auth=args.from_auth)
@@ -562,8 +665,8 @@ def main() -> None:
     model_entries = resolve_model_entries(model_matrix)
     run_policy = model_matrix.get("run_policy", {})
     fail_fast = run_policy.get("fail_fast", False)
-    retry_count = run_policy.get("retry_count", 0)
-    timeout_seconds = run_policy.get("timeout_seconds", 300)
+    parallel = run_policy.get("parallel", False)
+    max_parallel_models = run_policy.get("max_parallel_models", 1)
 
     matrix_run_id = generate_matrix_run_id()
 
@@ -571,6 +674,16 @@ def main() -> None:
     log(f"Targets: {len(targets)}")
     log(f"Models: {len(model_entries)}")
     log(f"Fail Fast: {fail_fast}")
+    log(f"Parallel: {parallel} (max workers: {max_parallel_models})")
+
+    run_mode = "full"
+    failure_source = None
+
+    if args.only_failed:
+        run_mode = "only-failed"
+        failure_source = args.failed_from
+    elif args.only_new:
+        run_mode = "only-new"
 
     if args.dry_run:
         log("Dry-run mode: configs will be generated but no eval executed.")
@@ -608,80 +721,128 @@ def main() -> None:
             continue
 
         target_reports_dir = workspace / "reports" / matrix_run_id
+        reports_base = workspace / "reports"
         log(f"\nTarget: {target_id} ({len(golden_cases)} golden cases)")
         log(f"Reports: {target_reports_dir}")
 
+        # Run index: handle only-new / only-failed golden case filtering
+        run_index_data = load_run_index(reports_base)
+        if run_index_data.get("target_id") != target_id:
+            run_index_data["target_id"] = target_id
+
+        selected_cases = golden_cases
+        if args.only_new:
+            last_full = find_last_full_run(run_index_data.get("runs", []))
+            if not last_full:
+                error(f"No prior full run found in run index for {target_id}. Run a full eval first.")
+                any_failure = True
+                continue
+            baseline = last_full.get("git_baseline")
+            if not baseline:
+                error(f"Last full run has no Git baseline for {target_id}. Run a full eval to record one.")
+                any_failure = True
+                continue
+            changed_files = get_changed_golden_files(REPO_ROOT, baseline, golden_dir)
+            if not changed_files:
+                log(f"No changed golden case files since last full run for {target_id}. Skipping.")
+                continue
+            selected_cases = [c for c in golden_cases if c.get("_file") in changed_files]
+            if not selected_cases:
+                log(f"Changed files have no matching golden cases for {target_id}. Skipping.")
+                continue
+            log(f"Only-new: {len(selected_cases)} case(s) changed since baseline {baseline[:8]}")
+        elif args.only_failed:
+            if not run_index_data.get("runs"):
+                error(f"No run index found for {target_id}. Run a full eval first.")
+                any_failure = True
+                continue
+            if args.failed_from == "latest":
+                ref_run = find_latest_run(run_index_data["runs"])
+            else:
+                ref_run = find_last_full_run(run_index_data["runs"])
+            if not ref_run:
+                error(f"No qualifying run found in run index for {target_id}.")
+                any_failure = True
+                continue
+            failed_ids = ref_run.get("failed_cases", [])
+            if not failed_ids:
+                log(f"No failed cases to retry for {target_id}. Skipping.")
+                continue
+            selected_cases = [c for c in golden_cases if c.get("id") in failed_ids]
+            if not selected_cases:
+                log(f"Failed cases not found in golden dir for {target_id}. Skipping.")
+                continue
+            log(f"Only-failed ({failure_source}): {len(selected_cases)} failed case(s) to retry")
+
         model_results = []
 
-        for model_entry in model_entries:
-            model_name = model_safe_name(model_entry)
-            promptfoo_block = model_entry.get("promptfoo")
-            grader_block = model_entry.get("grader")
+        if parallel and len(model_entries) > 1:
+            # Parallel execution via ThreadPoolExecutor
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_parallel_models) as executor:
+                future_to_model = {}
+                for model_entry in model_entries:
+                    future = executor.submit(
+                        run_single_model, model_entry, target_id, workspace,
+                        t_manifest, selected_cases, target_reports_dir,
+                        run_policy, run_mode, failure_source,
+                    )
+                    future_to_model[future] = model_entry
 
-            if not promptfoo_block:
-                error(f"Model entry '{model_entry.get('name', '?')}' has no promptfoo config")
-                any_failure = True
-                if fail_fast:
-                    sys.exit(2)
-                model_results.append({
-                    "model_name": model_name,
-                    "cfg_name": model_entry.get("name", "?"),
-                    "observed_provider": "?",
-                    "report_dir": str(target_reports_dir / model_name),
-                    "parsed": {"total": 0, "passed": 0, "failed": 0, "errors": 1, "error": "no promptfoo config"},
-                })
-                continue
-
-            model_export_dir = target_reports_dir / model_name / "promptfoo"
-            log(f"\n  Model: {model_name} ({promptfoo_block.get('id', '?')})")
-
-            write_matrix_promptfoo_files(
-                model_export_dir, golden_cases, t_manifest,
-                promptfoo_block, grader_block,
-            )
-
-            model_output_path = model_export_dir.parent / "promptfoo-output.json"
-
-            exit_code = 1
-            for attempt in range(retry_count + 1):
-                if attempt > 0:
-                    log(f"  Retry {attempt}/{retry_count}...")
-                exit_code = run_promptfoo_eval(
-                    model_export_dir / "promptfooconfig.yaml",
-                    model_output_path,
-                    timeout_seconds=timeout_seconds,
+                for future in concurrent.futures.as_completed(future_to_model):
+                    result = future.result()
+                    model_results.append(result)
+                    if result.get("failed") and fail_fast:
+                        log("fail_fast enabled, cancelling remaining model runs.")
+                        for f in future_to_model:
+                            if not f.done():
+                                f.cancel()
+        else:
+            # Sequential execution
+            for model_entry in model_entries:
+                result = run_single_model(
+                    model_entry, target_id, workspace,
+                    t_manifest, selected_cases, target_reports_dir,
+                    run_policy, run_mode, failure_source,
                 )
-                if exit_code == 0:
-                    break
-
-            model_report_dir = model_export_dir.parent
-            parsed = parse_promptfoo_output(model_output_path)
-            write_model_summary(model_report_dir, target_id, model_entry, model_name, parsed)
-            write_model_failures(model_report_dir, parsed)
-
-            failed_count = parsed.get("failed", 0)
-            error_count = parsed.get("errors", 0)
-            status = "FAIL" if (exit_code != 0 or failed_count > 0 or error_count > 0) else "PASS"
-            log(
-                f"  {status}: {parsed.get('passed', 0)}/{parsed.get('total', 0)} passed, "
-                f"{failed_count} failed, {error_count} errors"
-            )
-
-            model_results.append({
-                "model_name": model_name,
-                "cfg_name": model_entry.get("name", "?"),
-                "observed_provider": parsed.get("observed_provider", "?"),
-                "report_dir": str(model_report_dir),
-                "parsed": parsed,
-            })
-
-            if exit_code != 0 or failed_count > 0 or error_count > 0:
-                any_failure = True
-                if fail_fast:
+                model_results.append(result)
+                if result.get("failed") and fail_fast:
                     log("fail_fast enabled, stopping remaining model runs.")
+                    any_failure = True
                     break
 
-        write_aggregate_summary(target_reports_dir, target_id, matrix_run_id, model_results)
+        # Calculate per-case status from all model results
+        case_status = {}
+        failed_case_ids = set()
+        case_files = {}
+        for mr in model_results:
+            parsed = mr.get("parsed", {})
+            for case_detail in parsed.get("cases", []):
+                # Use input preview as case key
+                inp = case_detail.get("input_preview", "")[:50]
+                status = "passed" if case_detail.get("passed") else "failed"
+                case_status[f"{mr['model_name']}:{inp}"] = status
+                if not case_detail.get("passed"):
+                    failed_case_ids.add(inp)
+
+        write_aggregate_summary(target_reports_dir, target_id, matrix_run_id,
+                                model_results, run_mode=run_mode,
+                                failure_source=failure_source)
+
+        # Write run index entry
+        git_baseline = get_git_baseline(REPO_ROOT)
+        entry = build_run_entry(
+            run_id=matrix_run_id, mode=run_mode, git_baseline=git_baseline,
+            case_files=case_files, case_status=case_status,
+            failed_cases=list(failed_case_ids),
+            report_path=str(target_reports_dir.relative_to(REPO_ROOT)),
+            failure_source=failure_source,
+        )
+        run_index_data.setdefault("runs", []).append(entry)
+        save_run_index(reports_base, run_index_data)
+
+        for mr in model_results:
+            if mr.get("failed"):
+                any_failure = True
 
     if any_failure:
         log("\nMatrix run completed with failures.")

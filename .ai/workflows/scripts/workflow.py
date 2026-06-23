@@ -904,15 +904,16 @@ def cmd_ensure_run(root, args):
             print(json.dumps(decision, indent=2))
             sys.exit(1)
 
-        # Verify subject is archived before creating a repair run
-        status = loader_openspec_change_status(root, subject_id)
-        if status.get("classification") != "archived":
-            decision = _make_preflight_decision(
-                False, "error", "subject_not_archived",
-                next_action=_start_command(subject_type, subject_id),
-            )
-            print(json.dumps(decision, indent=2))
-            sys.exit(1)
+        # For openspec_change subjects, verify subject is archived before creating a repair run
+        if subject_type == "openspec_change":
+            status = loader_openspec_change_status(root, subject_id)
+            if status.get("classification") != "archived":
+                decision = _make_preflight_decision(
+                    False, "error", "subject_not_archived",
+                    next_action=_start_command(subject_type, subject_id),
+                )
+                print(json.dumps(decision, indent=2))
+                sys.exit(1)
 
         hooks = meta.get("repair_hooks", [])
         decision = _create_workflow_run(root, subject_type, subject_id, hooks)
@@ -1194,6 +1195,25 @@ def cmd_resolve(root, args):
         print(json.dumps({"error": "workflow not found"}, indent=2))
         sys.exit(1)
     _run_loaders(root, state, wf)
+    _calc_readiness(state, wf)
+
+    # Attempt to clear resolvable blocks
+    block = state.get("block")
+    if block:
+        block_type = block.get("type", "")
+        if block_type == "missing_required_inputs":
+            if state["phase_readiness"].get("ready"):
+                state["block"] = None
+                state["status"] = "running"
+        elif block_type == "domain_state_mismatch":
+            # Re-evaluate: if loader updated evidence, domain may now match
+            # For now, clear if phase is complete (which implies domain resolved)
+            if is_phase_complete(state, state["current_phase"]):
+                state["block"] = None
+                state["status"] = "running"
+    else:
+        state["status"] = "running"
+
     save_run_state(root, state)
     print(json.dumps(state, indent=2))
 
@@ -1209,6 +1229,23 @@ def cmd_record_evidence(root, args):
         except (json.JSONDecodeError, TypeError):
             val = args.value
         state.setdefault("evidence", {})[args.key] = val
+    save_run_state(root, state)
+    print(json.dumps(state, indent=2))
+
+
+def cmd_record_context(root, args):
+    """Write a key into the run's context dict (e.g., change_id for roadmap promotion)."""
+    state = load_run_state(root)
+    if not state:
+        print(json.dumps({"error": "no active run"}, indent=2))
+        sys.exit(1)
+    if not args.key:
+        print(json.dumps({"error": "key required for record-context"}, indent=2))
+        sys.exit(1)
+    if args.value is None:
+        print(json.dumps({"error": "value required for record-context"}, indent=2))
+        sys.exit(1)
+    state.setdefault("context", {})[args.key] = args.value
     save_run_state(root, state)
     print(json.dumps(state, indent=2))
 
@@ -1240,6 +1277,11 @@ def cmd_complete_phase(root, args):
         save_run_state(root, state)
         print(json.dumps(state, indent=2))
         sys.exit(1)
+
+    # Clear any stale block and restore running status
+    if state.get("block"):
+        state["block"] = None
+    state["status"] = "running"
 
     completed = state.setdefault("completed_phases", [])
     if current not in completed:
@@ -1691,8 +1733,13 @@ def cmd_governance_check(root, args):
     for run_id, active_state in active_runs:
         ps = active_state.get("primary_subject", {})
         ctx = active_state.get("context", {})
+        ev = active_state.get("evidence", {})
         if ps.get("type") == "roadmap_item":
-            cid = ctx.get("change_id")
+            cid = ctx.get("change_id") or ev.get("change_id")
+            if not cid:
+                item_id = ps.get("id")
+                if item_id:
+                    cid = _read_roadmap_item_openspec_change(root, item_id)
             if cid:
                 roadmap_change_ids[cid] = run_id
         elif ps.get("type") == "openspec_change":
@@ -1761,16 +1808,15 @@ def cmd_governance_check(root, args):
                     f"Roadmap item \"{fm_id}\" (status: {fm_status}) has no"
                     f" matching active run or done history."
                 )
-                ensure_cmd = (
-                    f"python3 .ai/workflows/scripts/workflow.py --root . ensure-run"
-                    f" --action roadmap_insert"
+                start_cmd = (
+                    f"python3 .ai/workflows/scripts/workflow.py --root . start"
                     f" --subject-type roadmap_item"
                     f" --subject-id {fm_id}"
                 )
                 remediation = (
                     f"Roadmap item \"{fm_id}\" ({rel_path}, status: {fm_status})"
-                    f" is ungoverned. Run: {ensure_cmd}"
-                    f" to create a run, resolve, complete hooks, advance, and re-run"
+                    f" is ungoverned. Run: {start_cmd}"
+                    f" to create a run. Then complete-phase, advance, and re-run"
                     f" \"workflow.py governance-check\" until block=false."
                 )
                 fh = _finding_hash(
@@ -1789,14 +1835,19 @@ def cmd_governance_check(root, args):
                     "hash": fh,
                 })
 
-    # Detect archived OpenSpec changes linked from roadmap items without
-    # matching workflow evidence (4.2)
+    # Detect OpenSpec changes linked from roadmap items without
+    # matching workflow evidence
     governed_roadmap_change_ids = set()
     for run_id, active_state in active_runs:
         ps = active_state.get("primary_subject", {})
         ctx = active_state.get("context", {})
+        ev = active_state.get("evidence", {})
         if ps.get("type") == "roadmap_item":
-            cid = ctx.get("change_id")
+            cid = ctx.get("change_id") or ev.get("change_id")
+            if not cid:
+                item_id = ps.get("id")
+                if item_id:
+                    cid = _read_roadmap_item_openspec_change(root, item_id)
             if cid:
                 governed_roadmap_change_ids.add(cid)
     if os.path.isdir(history_dir):
@@ -1812,8 +1863,13 @@ def cmd_governance_check(root, args):
             if hist.get("status") in ("done",):
                 ps = hist.get("primary_subject", {})
                 ctx = hist.get("context", {})
+                ev = hist.get("evidence", {})
                 if ps.get("type") == "roadmap_item":
-                    cid = ctx.get("change_id")
+                    cid = ctx.get("change_id") or ev.get("change_id")
+                    if not cid:
+                        item_id = ps.get("id")
+                        if item_id:
+                            cid = _read_roadmap_item_openspec_change(root, item_id)
                     if cid:
                         governed_roadmap_change_ids.add(cid)
     if os.path.isdir(areas_dir):
@@ -1840,19 +1896,37 @@ def cmd_governance_check(root, args):
                     f" OpenSpec change \"{linked_change}\" without matching"
                     f" workflow evidence."
                 )
-                remediation = (
-                    f"Roadmap item \"{fm_id}\" ({rel_path}) links to"
-                    f" \"{linked_change}\" without workflow evidence."
-                    f" If the change is active, ensure a run exists for it."
-                    f" Re-run \"workflow.py governance-check\" until block=false."
-                )
+                # If there is an active roadmap_item run for this item, guide user to
+                # write context.change_id and advance to create_change.
+                linked_item_run = _find_active_run_by_subject(root, "roadmap_item", fm_id)
+                if linked_item_run:
+                    remediation = (
+                        f"Roadmap item \"{fm_id}\" ({rel_path}) links to"
+                        f" \"{linked_change}\" but its workflow run"
+                        f" \"{linked_item_run.get('run_id', '?')}\" (phase: {linked_item_run.get('current_phase', '?')})"
+                        f" has no context.change_id."
+                        f" Run: python3 .ai/workflows/scripts/workflow.py --root . record-context"
+                        f" --key change_id --value \"{linked_change}\""
+                        f" --subject-type roadmap_item --subject-id {fm_id}"
+                        f", then advance through create_change."
+                        f" Re-run \"workflow.py governance-check\" until block=false."
+                    )
+                else:
+                    remediation = (
+                        f"Roadmap item \"{fm_id}\" ({rel_path}) links to"
+                        f" \"{linked_change}\" without workflow evidence."
+                        f" Start a run: python3 .ai/workflows/scripts/workflow.py --root . start"
+                        f" --subject-type roadmap_item --subject-id {fm_id}"
+                        f" and advance to create_change."
+                        f" Re-run \"workflow.py governance-check\" until block=false."
+                    )
                 fh = _finding_hash(
-                    "archived_linked_item_no_evidence",
+                    "linked_item_no_workflow_evidence",
                     item_id=fm_id or "",
                     change_id=linked_change,
                 )
                 findings.append({
-                    "type": "archived_linked_item_no_evidence",
+                    "type": "linked_item_no_workflow_evidence",
                     "item_id": fm_id,
                     "change_id": linked_change,
                     "file_path": rel_path,
@@ -1909,8 +1983,16 @@ def _infer_phase(root, subject_type, subject_id):
         item_status = loader_roadmap_item_status(root, subject_id)
         if item_status:
             status = item_status.get("status", "")
-            if status == "review":
+            if status == "idea":
                 return "review_roadmap"
+            if status == "ready":
+                linked_change = _read_roadmap_item_openspec_change(root, subject_id)
+                if linked_change and linked_change != "None":
+                    return "create_change"
+                return "review_roadmap"
+            if status == "active":
+                return "apply_change"
+            # done, cancelled, or unknown: start new lifecycle
         return "create_roadmap"
     if subject_type != "openspec_change":
         return "input"
@@ -2051,6 +2133,7 @@ COMMANDS = {
     "readiness",
     "resolve",
     "record-evidence",
+    "record-context",
     "complete-phase",
     "complete-hook",
     "advance",
@@ -2109,6 +2192,8 @@ def main():
         cmd_resolve(root, args)
     elif args.command == "record-evidence":
         cmd_record_evidence(root, args)
+    elif args.command == "record-context":
+        cmd_record_context(root, args)
     elif args.command == "complete-phase":
         cmd_complete_phase(root, args)
     elif args.command == "complete-hook":

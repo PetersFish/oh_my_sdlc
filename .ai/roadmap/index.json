@@ -101,7 +101,7 @@
     },
     {
       "id": "RM-EVAL-003",
-      "status": "cancelled",
+      "status": "done",
       "title": "隐藏目录发现与 Roadmap Preflight 加固",
       "stage": "v2",
       "priority": "p0",
@@ -138,15 +138,13 @@
     },
     {
       "id": "RM-EVAL-004",
-      "status": "idea",
+      "status": "ready",
       "title": "Promptfoo Eval 加速：并发 + 增量运行",
       "stage": "v2",
       "priority": "p0",
       "order": 40,
-      "depends_on": [
-        "RM-EVAL-003"
-      ],
-      "openspec_change": null,
+      "depends_on": [],
+      "openspec_change": "evalops-concurrency-incremental-eval",
       "area": "workflow.ai-evalops"
     },
     {
