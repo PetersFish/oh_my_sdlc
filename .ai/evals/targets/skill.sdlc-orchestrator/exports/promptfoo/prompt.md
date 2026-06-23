@@ -51,13 +51,21 @@ or any request that enters the OpenSpec lifecycle):
    Governed actions: `openspec_create`, `openspec_continue`, `openspec_apply`, `openspec_archive`.
 3. If preflight blocks (`allowed: false`), the orchestrator SHALL follow the `next_action.command`
    in the decision to create/resume/advance the run, then re-run preflight until `allowed: true`.
-4. Only after preflight passes may the orchestrator dispatch
+4. After preflight passes, the orchestrator SHALL ensure the workflow run exists:
+   - If no active run matches, call `workflow.py start --workflow sdlc-main --subject-type openspec_change --subject-id <change-id>`.
+   - If an active run exists, call `workflow.py resume`.
+5. After the run exists, the orchestrator SHALL call `workflow.py readiness` and check
+   `phase_readiness.ready`. If `ready` is `false`, the orchestrator SHALL resolve missing
+   inputs or ask the user for required decisions before dispatching the worker.
+6. Only after the run exists and readiness passes may the orchestrator dispatch
    the OpenSpec worker (e.g., `openspec-propose`, `openspec-new-change`).
 
 This preflight is NOT optional. Invoking `openspec-propose` or `openspec-new-change`
 without first passing the blocking gate (`workflow.py preflight`) violates the SDLC
 governance contract. Even if the user did not literally say "start workflow",
-requesting OpenSpec IS a stateful SDLC run that MUST be tracked.
+requesting OpenSpec IS a stateful SDLC run that MUST be tracked. The orchestrator
+SHALL NOT jump from preflight directly to OpenSpec worker dispatch without ensuring
+a workflow run exists and readiness is satisfied.
 
 **Governed action → preflight mapping:**
 
@@ -116,6 +124,8 @@ follow-up run handling using single-subject runtime primitives in a loop:
 The orchestrator SHALL NOT use a bulk workflow command for replan. Replan uses single-subject
 runtime primitives in a loop.
 
+For roadmap replan, the route decision SHALL mention that post-worker runtime coordination will cancel old item runs and start new item runs using single-subject workflow commands.
+
 ### Canonical-Run Promotion From Roadmap Item To OpenSpec Change
 
 When a roadmap item is promoted to an OpenSpec change, the existing `roadmap_item` run
@@ -135,6 +145,11 @@ SHALL serve as the canonical run for the entire lifecycle:
 
 The orchestrator SHALL NOT create a second workflow run for a promoted roadmap item.
 The roadmap item run is the canonical run.
+
+For roadmap item promotion, the route decision SHALL explicitly state:
+- The existing `roadmap_item` run is the canonical run for this lifecycle.
+- No new `openspec_change` workflow run will be created.
+- Next action is roadmap promotion, then OpenSpec creation via the linked canonical run.
 
 ## SDLC Workflow Runtime
 
@@ -351,7 +366,7 @@ Before delegating, the orchestrator SHALL produce a concise decision:
 ```markdown
 ## SDLC Route Decision
 
-Route: <superpowers-direct | spec-driven-propose-flow | spec-driven-incremental-flow>
+Route: <superpowers-direct | spec-driven-propose-flow | spec-driven-incremental-flow | roadmap-first | evalops-gated | memory-sync>
 
 Reason:
 - ...
@@ -378,6 +393,8 @@ EvalOps exceptions MUST be explicit and human-confirmed:
 ## Final Golden Eval Reporting
 
 For EvalOps-gated changes, the final implementation summary SHALL report golden eval status in one of three states:
+
+**Hard gate:** When the user requests to close, archive, or mark a change as done for an EvalOps-gated target, the orchestrator SHALL first check whether golden eval has been run for that target. If golden eval evidence is missing, the orchestrator SHALL output the blocked state ("Golden eval not yet run for target `<target-id>`") and SHALL NOT claim completion, archive the change, or mark the workflow as done. The orchestrator SHALL ask whether the user wants to proceed with an explicit EvalOps exception. This gate applies regardless of whether pytest passed or the user says "close this change".
 
 ### Pass State (all golden cases pass)
 
@@ -613,6 +630,14 @@ Roadmap items that are ready for implementation return to the orchestrator for O
 |---|---|
 | Prompts when to sync | Persists durable facts |
 | Post-completion signal | Long-term knowledge store |
+
+## Governance Prompt Handling
+
+When the governance plugin runs after a workflow turn:
+
+- **`block=false` with no injected prompt:** The governance check found no issues. The orchestrator SHALL proceed normally with the next task or ask the user what to do next. The orchestrator SHALL NOT mention governance, governance-check, remediation, or claim that "governance passed" or "no blocking issues were found." Governance is a background gate; when it passes silently, the user-facing response should not surface it.
+- **Governance prompt injected with findings:** The orchestrator SHALL acknowledge the specific finding(s), identify the relevant change id and context from the prompt, and propose or execute concrete remediation steps. The orchestrator SHALL NOT ignore the prompt or dismiss it as informational only.
+- **Governance prompt with remediation instructions:** The orchestrator SHALL follow the remediation instructions (e.g., resume SDLC governance, run post-archive hooks, re-run `governance-check`). For `dangling_archive` findings, the orchestrator SHALL identify the change id and propose remediation; it does NOT need to reproduce the exact archive path, but MUST identify the affected change.
 
 ## Examples
 

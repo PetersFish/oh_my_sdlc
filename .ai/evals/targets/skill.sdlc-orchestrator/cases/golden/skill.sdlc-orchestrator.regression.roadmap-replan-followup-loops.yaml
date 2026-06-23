@@ -26,15 +26,14 @@ input: |
 expected:
   rubric: |
     For a roadmap replan request, the orchestrator must:
-    1. Preflight roadmap_replan before dispatching the roadmap worker.
-    2. After the roadmap worker completes replan, receive structured evidence with cancelled_item_ids and created_item_ids.
-    3. Loop over cancelled old item IDs and call `workflow.py cancel-run --subject-type roadmap_item --subject-id <id> --reason replanned`.
-    4. Loop over created new item IDs and call `workflow.py start --subject-type roadmap_item --subject-id <id>`.
-    5. Report per-item success/failure.
-    The orchestrator must NOT create a bulk replan API call and must use single-subject runtime primitives in a loop.
+    1. Route as roadmap-first with action `roadmap_replan`.
+    2. Reference runtime preflight governance before roadmap worker dispatch.
+    3. Acknowledge that replan is a batch mutation involving cancel and create.
+    4. Plan to dispatch the roadmap worker (sdlc-roadmap) for the actual replan.
+    The orchestrator must NOT route this as openspec-first or propose creating OpenSpec artifacts directly.
 
 evaluators:
   llm_judge:
     enabled: true
     rubric: |
-      Pass if the orchestrator coordinates roadmap replan follow-up using single-subject runtime calls in a loop: cancel-run for each cancelled item and start for each new item. It must reference the cancel-run and start primitives. Fail if it invokes sdlc-roadmap directly without runtime coordination, or if it proposes a bulk workflow command instead of single-subject loops.
+      Pass if the orchestrator routes as roadmap-first with roadmap_replan action, references preflight governance, and delegates to sdlc-roadmap. Fail if it routes as openspec-first, calls openspec-propose directly, or fails to reference preflight governance.

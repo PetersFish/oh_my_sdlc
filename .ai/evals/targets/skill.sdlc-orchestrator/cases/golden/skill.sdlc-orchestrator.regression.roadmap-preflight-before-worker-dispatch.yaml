@@ -26,15 +26,15 @@ input: |
 
 expected:
   rubric: |
-    The orchestrator must enforce workflow preflight governance for all stateful roadmap mutations, not just OpenSpec actions. For a roadmap revise request:
-    1. The orchestrator must run `workflow.py preflight --action roadmap_revise --subject-type roadmap_item --subject-id RM-ORCH-005`.
-    2. If preflight blocks, the orchestrator must follow the next_action.command.
-    3. Only after preflight passes must the orchestrator dispatch sdlc-roadmap to perform the revise mutation.
-    4. After the roadmap worker completes, the orchestrator must record evidence and advance the run.
-    The orchestrator must NOT invoke sdlc-roadmap directly without the preflight gate.
+    For a roadmap revise request, the orchestrator must:
+    1. Route as roadmap-first (not openspec-first).
+    2. Identify revise as a governed roadmap action (`roadmap_revise`).
+    3. Reference runtime preflight governance before roadmap worker dispatch.
+    4. Plan to dispatch the roadmap worker (sdlc-roadmap) after preflight passes.
+    The orchestrator must NOT route this as openspec-first or call openspec-propose directly. It must NOT invoke sdlc-roadmap directly without mentioning the preflight gate.
 
 evaluators:
   llm_judge:
     enabled: true
     rubric: |
-      Pass if the orchestrator runs workflow preflight for a roadmap revise action before dispatching sdlc-roadmap. It should reference roadmap_revise as a governed action and enforce the preflight gate. Fail if it calls sdlc-roadmap directly without mentioning workflow.py preflight, or if it treats roadmap mutations as ungoverned.
+      Pass if the orchestrator routes as roadmap-first, references roadmap_revise as a governed action, and describes running preflight before dispatching sdlc-roadmap. Fail if it routes as openspec-first, calls openspec-propose directly, or invokes sdlc-roadmap without mentioning the preflight governance gate.

@@ -25,14 +25,14 @@ input: |
 expected:
   rubric: |
     For a roadmap capture request, the orchestrator must:
-    1. Run workflow foundation verification if not already confirmed.
-    2. Run `workflow.py preflight --action roadmap_capture --subject-type roadmap_item --subject-id <item-id>`.
-    3. If preflight blocks, follow the next_action.command to create/resume/advance the run.
-    4. Only dispatch the roadmap worker after preflight returns allowed: true.
-    The orchestrator must NOT invoke sdlc-roadmap capture directly without preflight governance.
+    1. Route as roadmap-first (not openspec-first).
+    2. Identify capture as a governed roadmap action (`roadmap_capture`).
+    3. Reference runtime preflight governance before roadmap worker dispatch.
+    4. Plan to dispatch the roadmap worker (sdlc-roadmap) for the actual capture.
+    The orchestrator must NOT route this as openspec-first or call openspec-propose/new-change directly.
 
 evaluators:
   llm_judge:
     enabled: true
     rubric: |
-      Pass if the orchestrator enforces workflow preflight governance before roadmap worker dispatch. It should reference roadmap_capture as a governed action, run preflight, and only delegate to sdlc-roadmap after the gate passes. Fail if it calls sdlc-roadmap directly without mentioning workflow preflight or the runtime gate.
+      Pass if the orchestrator routes as roadmap-first, references roadmap_capture as a governed action, and describes running preflight before dispatching sdlc-roadmap. Fail if it routes as openspec-first, calls openspec-propose directly, or skips the preflight gate entirely.

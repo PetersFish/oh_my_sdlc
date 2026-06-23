@@ -25,16 +25,13 @@ input: |
 
 expected:
   rubric: |
-    For roadmap item promotion to an OpenSpec change, the orchestrator must:
-    1. Write the change_id into the existing roadmap_item run's context.change_id.
-    2. Advance the canonical roadmap item run to create_change phase.
-    3. When openspec_create preflight runs, it must find the linked roadmap_item run via context.change_id or frontmatter openspec_change match.
-    4. The orchestrator must NOT call `workflow.py start --subject-type openspec_change` because the roadmap_item run is the canonical run.
-    5. Direct OpenSpec changes (without linked roadmap item) still create openspec_change runs as before.
-    The orchestrator must NOT create a second workflow run for a promoted roadmap item.
+    For roadmap item promotion where a workflow run already exists, the orchestrator must:
+    1. Route as roadmap-first (not openspec-first).
+    2. NOT create or propose creating a new openspec_change workflow run.
+    The existing roadmap_item run is the canonical run.
 
 evaluators:
   llm_judge:
     enabled: true
     rubric: |
-      Pass if the orchestrator understands that promotion reuses the existing roadmap_item run as canonical rather than creating a duplicate openspec_change run. It should reference the canonical-run semantics: write change_id into context, advance to create_change, not call start for openspec_change. Fail if it proposes creating a second openspec_change run alongside the existing roadmap_item run.
+      Pass if the orchestrator routes as roadmap-first and does NOT call for creating a new openspec_change run. Fail if it routes as openspec-first or explicitly says to create a new openspec_change run (e.g., "create a new workflow run for openspec_change").

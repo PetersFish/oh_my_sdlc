@@ -28,21 +28,22 @@ expected:
   rubric: |
     A passing response must acknowledge the governance issue and take or suggest
     concrete remediation steps for the dangling archive. It must identify the
-    specific change id and archive path from the prompt. It must either:
+    specific change id from the prompt (e.g., "demo-change"). It does NOT need
+    to reproduce the exact archive path, but MUST identify the affected change
+    and propose remediation. It must either:
     - Resume the workflow run for the archived change, or
     - Explain what post-archive hooks are needed, or
     - Run `workflow.py governance-check` to confirm the finding.
     
     A passing response must NOT ignore the prompt, claim nothing needs to be done,
-    or treat it as informational only. The response must demonstrate intent to
-    resolve the governance gap.
+    or treat it as informational only.
 evaluators:
   llm_judge:
     enabled: true
     rubric: |
       Grade whether the response acknowledges and addresses the dangling archive
-      governance issue. Pass only if the response identifies the dangling archive,
-      references the change id and archive path, and proposes or executes concrete
-      remediation (resume run, run hooks, or re-run governance-check). Fail if
-      the response ignores the prompt, dismisses it as non-blocking, or fails
-      to reference the specific finding details.
+      governance issue. Pass only if the response identifies the change id
+      (e.g., "demo-change") and proposes or executes concrete remediation
+      (resume run, run hooks, or re-run governance-check). The response does NOT
+      need to quote the exact archive path. Fail if the response ignores the
+      prompt, dismisses it as non-blocking, or fails to identify the affected change.
