@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -38,14 +39,19 @@ def get_git_baseline(repo_root: Path) -> str | None:
 
 
 def get_changed_golden_files(repo_root: Path, baseline: str, golden_dir: Path) -> list[str]:
-    """Return list of golden case file names changed relative to baseline."""
+    """Return list of golden case file *basenames* changed relative to baseline."""
     try:
         result = subprocess.run(
             ["git", "diff", "--name-only", baseline, "--", str(golden_dir) + "/"],
             capture_output=True, text=True, cwd=str(repo_root), timeout=10,
         )
         if result.returncode == 0:
-            return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+            basenames = set()
+            for line in result.stdout.splitlines():
+                line = line.strip()
+                if line:
+                    basenames.add(os.path.basename(line))
+            return sorted(basenames)
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         pass
     return []
