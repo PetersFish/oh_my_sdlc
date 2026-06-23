@@ -19,7 +19,6 @@ Reports land under .ai/evals/targets/<target-id>/reports/<run-id>/
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import subprocess
@@ -34,9 +33,9 @@ from run_index import (
     build_run_entry,
 )
 from case_selection import (
-    get_case_identity, collect_case_files, select_only_new,
-    select_only_failed, build_case_status,
+    collect_case_files, select_only_new, select_only_failed, build_case_status,
 )
+from promptfoo_shared import generate_cases_yaml
 
 def generate_prompt_for_target(t_manifest: dict) -> str:
     source_paths = t_manifest.get("source_paths", [])
@@ -85,7 +84,7 @@ def generate_promptfoo_config(target_id: str, provider: dict,
 def write_run_scoped_promptfoo_files(run_dir: Path, selected_cases: list[dict],
                                      t_manifest: dict, provider: dict,
                                      grader: dict | None) -> None:
-    from export_promptfoo import generate_cases_yaml
+    run_dir.mkdir(parents=True, exist_ok=True)
     prompt_content = generate_prompt_for_target(t_manifest)
     cases_content = generate_cases_yaml(selected_cases, t_manifest)
     config_content = generate_promptfoo_config(
@@ -265,8 +264,8 @@ def parse_promptfoo_output(output_path: Path) -> dict:
 
 
 def write_summary_md(reports_dir: Path, target_id: str, run_id: str,
-                     export_fresh: bool, parsed: dict, run_mode: str = "full",
-                     failure_source: str | None = None,
+                     export_fresh: bool, parsed: dict, config_path: Path,
+                     run_mode: str = "full", failure_source: str | None = None,
                      max_concurrency: int = 1) -> None:
     total = parsed.get("total", 0)
     passed = parsed.get("passed", 0)
@@ -299,7 +298,7 @@ def write_summary_md(reports_dir: Path, target_id: str, run_id: str,
         f"| Pass Rate | {parsed.get('pass_rate', '?')}% |",
         "",
         f"**Eval Command:** `OPENCODE_GO_API_KEY=<key> promptfoo eval -c "
-        f".ai/evals/targets/{target_id}/exports/promptfoo/promptfooconfig.yaml "
+        f"{config_path.as_posix()} "
         f"-o .ai/evals/targets/{target_id}/reports/{run_id}/promptfoo-output.json "
         f"--max-concurrency {max_concurrency} --no-cache`",
         "",
@@ -479,8 +478,8 @@ def main() -> None:
         sys.exit(1)
 
     write_summary_md(reports_dir, target_id, run_id, export_fresh, parsed,
-                     run_mode=run_mode, failure_source=failure_source,
-                     max_concurrency=max_concurrency)
+                     config_path=config_path, run_mode=run_mode,
+                     failure_source=failure_source, max_concurrency=max_concurrency)
     write_failures_yaml(reports_dir, parsed)
 
     passed = parsed.get("passed", 0)

@@ -40,8 +40,7 @@ from run_index import (
     build_run_entry,
 )
 from case_selection import (
-    get_case_identity, collect_case_files, select_only_new,
-    select_only_failed,
+    collect_case_files, select_only_new, select_only_failed,
 )
 
 def find_repo_root() -> Path:
@@ -530,6 +529,34 @@ def write_aggregate_summary(target_reports_dir: Path, target_id: str,
     log(f"Wrote aggregate summary: {target_reports_dir / 'summary.md'}")
 
 
+def aggregate_case_status(selected_cases: list[dict], model_results: list[dict]) -> tuple[dict, list[str]]:
+    case_status = {}
+    failed_case_ids: set[str] = set()
+
+    for idx, case in enumerate(selected_cases):
+        case_id = case.get("id", "?")
+        all_passed = True
+        for mr in model_results:
+            parsed = mr.get("parsed", {})
+            if mr.get("failed"):
+                all_passed = False
+            err = parsed.get("error", "")
+            if err and err.endswith("cancelled by fail_fast"):
+                all_passed = False
+                continue
+            mr_cases = parsed.get("cases", [])
+            if idx >= len(mr_cases):
+                all_passed = False
+                continue
+            if not mr_cases[idx].get("passed", False):
+                all_passed = False
+        case_status[case_id] = "passed" if all_passed else "failed"
+        if not all_passed:
+            failed_case_ids.add(case_id)
+
+    return case_status, sorted(failed_case_ids)
+
+
 def resolve_api_key(from_auth: bool = False) -> str:
     api_key = os.environ.get("OPENCODE_GO_API_KEY", "")
     if api_key:
@@ -793,16 +820,19 @@ def main() -> None:
 
                 fail_fast_triggered = False
                 for future in concurrent.futures.as_completed(future_to_model):
-                    if fail_fast_triggered:
-                        try:
-                            future.result(timeout=0)
-                        except concurrent.futures.CancelledError:
-                            pass
-                        except Exception:
-                            pass
-                        continue
                     try:
                         result = future.result()
+                    except concurrent.futures.CancelledError:
+                        model_entry = future_to_model[future]
+                        result = {
+                            "model_name": model_safe_name(model_entry),
+                            "cfg_name": model_entry.get("name", "?"),
+                            "observed_provider": "?",
+                            "report_dir": str(target_reports_dir / model_safe_name(model_entry)),
+                            "parsed": {"total": 0, "passed": 0, "failed": 0, "errors": 1, "error": "cancelled by fail_fast"},
+                            "exit_code": -1,
+                            "failed": True,
+                        }
                     except Exception as e:
                         model_entry = future_to_model[future]
                         result = {
@@ -821,19 +851,6 @@ def main() -> None:
                         for f in future_to_model:
                             if not f.done():
                                 f.cancel()
-
-                for future in future_to_model:
-                    if future.cancelled():
-                        model_entry = future_to_model[future]
-                        model_results.append({
-                            "model_name": model_safe_name(model_entry),
-                            "cfg_name": model_entry.get("name", "?"),
-                            "observed_provider": "?",
-                            "report_dir": str(target_reports_dir / model_safe_name(model_entry)),
-                            "parsed": {"total": 0, "passed": 0, "failed": 0, "errors": 1, "error": "cancelled by fail_fast"},
-                            "exit_code": -1,
-                            "failed": True,
-                        })
         else:
             for model_entry in model_entries:
                 result = run_single_model(
@@ -847,31 +864,7 @@ def main() -> None:
                     break
 
         # Calculate per-case status aggregation across all model results
-        case_status = {}
-        failed_case_ids = set()
-        for case in selected_cases:
-            case_id = case.get("id", "?")
-            all_passed = True
-            for mr in model_results:
-                parsed = mr.get("parsed", {})
-                # Skip cancelled model runs that have no case results
-                err = parsed.get("error", "")
-                if err and err.endswith("cancelled by fail_fast"):
-                    continue
-                mr_cases = parsed.get("cases", [])
-                if not mr_cases:
-                    continue
-                try:
-                    case_idx = selected_cases.index(case)
-                except ValueError:
-                    continue
-                if case_idx < len(mr_cases):
-                    passed = mr_cases[case_idx].get("passed", False)
-                    if not passed:
-                        all_passed = False
-            case_status[case_id] = "passed" if all_passed else "failed"
-            if not all_passed:
-                failed_case_ids.add(case_id)
+        case_status, failed_case_ids = aggregate_case_status(selected_cases, model_results)
 
         case_files = collect_case_files(selected_cases, golden_dir)
 

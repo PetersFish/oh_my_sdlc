@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import importlib.util
 from pathlib import Path
 
 
@@ -21,6 +22,15 @@ SKILL_SCRIPTS = REPO_ROOT / "skills" / "sdlc-evalops" / "scripts"
 
 def inject_scripts_to_path():
     sys.path.insert(0, str(SKILL_SCRIPTS))
+
+
+def load_script_module(module_name: str, filename: str):
+    path = SKILL_SCRIPTS / filename
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec and spec.loader
+    spec.loader.exec_module(module)
+    return module
 
 
 class FixtureBase(unittest.TestCase):
@@ -279,7 +289,110 @@ class TestRunIndex(FixtureBase):
         self.assertEqual(result["run_id"], "r2")
 
 
+class TestPromptfooRunnerHelpers(FixtureBase):
+    def test_write_run_scoped_promptfoo_files_creates_subset_files(self):
+        mod = load_script_module("run_promptfoo_eval", "run-promptfoo-eval.py")
+
+        run_dir = self.tmp / "reports" / "test-run" / "promptfoo"
+        selected_cases = [
+            {"id": "case-1", "_file": "case-1.yaml", "input": "hello", "expected": {"must_include": ["hello"]}},
+        ]
+        t_manifest = {
+            "target_id": "test-target",
+            "target_type": "skill",
+            "source_paths": [],
+            "canonical_case_directories": {"golden": "cases/golden"},
+        }
+        provider = {
+            "id": "openai:chat:test-v1",
+            "label": "test/test-v1",
+            "config": {"apiBaseUrl": "https://example.com", "apiKeyEnvar": "TEST_KEY"},
+        }
+
+        mod.write_run_scoped_promptfoo_files(run_dir, selected_cases, t_manifest, provider, None)
+
+        self.assertTrue((run_dir / "prompt.md").is_file())
+        self.assertTrue((run_dir / "cases.yaml").is_file())
+        self.assertTrue((run_dir / "promptfooconfig.yaml").is_file())
+
+        cases_content = (run_dir / "cases.yaml").read_text(encoding="utf-8")
+        self.assertIn("hello", cases_content)
+        self.assertNotIn("world", cases_content)
+
+    def test_write_summary_md_uses_config_path(self):
+        mod = load_script_module("run_promptfoo_eval_summary", "run-promptfoo-eval.py")
+
+        reports_dir = self.tmp / "reports" / "test-run"
+        reports_dir.mkdir(parents=True, exist_ok=True)
+        parsed = {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "errors": 0,
+            "pass_rate": 100.0,
+            "failures": [],
+        }
+        config_path = reports_dir / "promptfoo" / "promptfooconfig.yaml"
+        mod.write_summary_md(
+            reports_dir,
+            "test-target",
+            "test-run",
+            True,
+            parsed,
+            config_path=config_path,
+            run_mode="only-new",
+            failure_source=None,
+            max_concurrency=1,
+        )
+
+        summary = (reports_dir / "summary.md").read_text(encoding="utf-8")
+        self.assertIn(config_path.as_posix(), summary)
+        self.assertIn("Run Mode", summary)
+
+
 class TestMatrixFailFast(FixtureBase):
+    def test_aggregate_case_status_marks_any_model_failure_as_failed(self):
+        mod = load_script_module("run_eval_matrix_agg", "run-eval-matrix.py")
+
+        selected_cases = [
+            {"id": "case-1", "_file": "case-1.yaml"},
+            {"id": "case-2", "_file": "case-2.yaml"},
+        ]
+        model_results = [
+            {
+                "failed": False,
+                "parsed": {
+                    "cases": [
+                        {"passed": True},
+                        {"passed": True},
+                    ]
+                },
+            },
+            {
+                "failed": True,
+                "parsed": {"error": "promptfoo crashed"},
+            },
+        ]
+
+        case_status, failed_cases = mod.aggregate_case_status(selected_cases, model_results)
+
+        self.assertEqual(case_status["case-1"], "failed")
+        self.assertEqual(case_status["case-2"], "failed")
+        self.assertEqual(failed_cases, ["case-1", "case-2"])
+
+    def test_aggregate_case_status_all_pass(self):
+        mod = load_script_module("run_eval_matrix_agg2", "run-eval-matrix.py")
+
+        selected_cases = [{"id": "case-1", "_file": "case-1.yaml"}]
+        model_results = [
+            {"failed": False, "parsed": {"cases": [{"passed": True}]}}
+        ]
+
+        case_status, failed_cases = mod.aggregate_case_status(selected_cases, model_results)
+
+        self.assertEqual(case_status["case-1"], "passed")
+        self.assertEqual(failed_cases, [])
+
     def test_fail_fast_cancels_remaining_futures(self):
         import concurrent.futures
         import time
