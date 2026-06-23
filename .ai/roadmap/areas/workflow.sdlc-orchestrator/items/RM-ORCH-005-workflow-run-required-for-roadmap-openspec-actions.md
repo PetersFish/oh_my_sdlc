@@ -1,7 +1,7 @@
 ---
 id: RM-ORCH-005
 title: "Workflow Run Required For Roadmap And OpenSpec Actions"
-status: active
+status: done
 stage: v2
 priority: p0
 order: 40
@@ -9,9 +9,9 @@ depends_on:
   - RM-ORCH-001
   - RM-ORCH-006
 openspec_change: workflow-run-required-for-roadmap-and-openspec-actions
-created_at: 2026-06-21
+created_at: 2026-06-20
 started_at: 2026-06-22
-completed_at: null
+completed_at: 2026-06-23
 ---
 
 # Goal
@@ -124,7 +124,23 @@ Promote after RM-ORCH-006 defines multi-run active state and the `current.json` 
 
 # Completion Notes
 
-Not started.
+Implemented workflow runtime governance for all roadmap mutations (capture, insert, review, revise, cancel, reorder, replan, done). Added canonical-run promotion from roadmap items to OpenSpec changes, replan follow-up coordination with single-subject loop primitives, and extended governance-check for roadmap items. EvalOps coverage added with 4 golden regression cases and 24/24 golden eval pass. Documented orchestrator-roadmap boundary in both SKILL.md files. All phases completed: create_change → apply_change → archive_change → post_archive_actions → done.
+
+**Accomplished:**
+- 8 roadmap governed actions registered in workflow.py policy
+- Roadmap-first runtime governance (verify-foundations → preflight → dispatch)
+- Canonical-run promotion (roadmap_item run is canonical, no duplicate openspec_change run)
+- Replan follow-up coordination (cancel-run loop + start loop)
+- Governance-check extension (ungoverned roadmap items, duplicate promotion, archived linked items)
+- 12 new tests (105 total, all passing)
+- 4 golden EvalOps regression cases (24/24 golden eval pass)
+- Skill documentation for orchestrator and roadmap boundary
+
+**Deferred:**
+- Promptfoo runner/output-level filtering for model thinking blocks (deferred by user decision)
+
+**Follow-up items:**
+- Consider pre-existing 4 golden eval failure fixes across other targets
 
 # Design Reference
 

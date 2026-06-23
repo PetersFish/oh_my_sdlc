@@ -2,8 +2,8 @@
   "version": 1,
   "run_id": "2026-06-22-RM-ORCH-005",
   "workflow": "sdlc-main",
-  "status": "running",
-  "current_phase": "apply_change",
+  "status": "done",
+  "current_phase": "done",
   "primary_subject": {
     "type": "roadmap_item",
     "id": "RM-ORCH-005"
@@ -13,16 +13,22 @@
     "roadmap_item_id": "RM-ORCH-005"
   },
   "phase_readiness": {
-    "phase": "apply_change",
+    "phase": "done",
     "ready": true,
     "missing_required_inputs": []
   },
   "pending_hooks": [],
   "completed_hooks": [
-    "roadmap_status_ready_if_linked"
+    "roadmap_status_ready_if_linked",
+    "roadmap_apply_start_if_ready",
+    "roadmap_done_if_relevant",
+    "memory_sync"
   ],
   "completed_phases": [
-    "create_change"
+    "create_change",
+    "apply_change",
+    "archive_change",
+    "post_archive_actions"
   ],
   "gates": {},
   "evidence": {
@@ -35,8 +41,8 @@
       "items": [
         {
           "item_id": "RM-ORCH-005",
-          "status": "ready",
-          "completed_at": "None",
+          "status": "done",
+          "completed_at": "2026-06-23",
           "file": ".ai/roadmap/areas/workflow.sdlc-orchestrator/items/RM-ORCH-005-workflow-run-required-for-roadmap-openspec-actions.md",
           "area": "workflow.sdlc-orchestrator"
         }
@@ -54,10 +60,23 @@
     },
     "roadmap_item_status": {
       "item_id": "RM-ORCH-005",
-      "status": "ready",
-      "completed_at": "None"
-    }
+      "status": "done",
+      "completed_at": "2026-06-23"
+    },
+    "apply_completion": {
+      "status": "complete",
+      "pytest_pass": true,
+      "golden_eval_pass": true,
+      "golden_eval_results": "24/24 pass",
+      "committed": "3c36fa2"
+    },
+    "archive_path": "openspec/changes/archive/2026-06-23-workflow-run-required-for-roadmap-and-openspec-actions",
+    "{\"roadmap_link\": {\"count\": 1, \"items\": [{\"item_id\": \"RM-ORCH-005\", \"status\": \"done\", \"completed_at\": \"2026-06-23\", \"file\": \".ai/roadmap/areas/workflow.sdlc-orchestrator/items/RM-ORCH-005-workflow-run-required-for-roadmap-openspec-actions.md\", \"area\": \"workflow.sdlc-orchestrator\"}]}, \"roadmap_item_status\": {\"item_id\": \"RM-ORCH-005\", \"status\": \"done\", \"completed_at\": \"2026-06-23\"}}": null,
+    "roadmap_hook_resolution": "done",
+    "roadmap_item_run_finalized": "2026-06-22-RM-ORCH-005",
+    "memory_sync_resolution": "not_needed",
+    "memory_sync_reason": "No durable facts to persist beyond what is already in roadmap item and SKILL.md"
   },
   "block": null,
-  "updated_at": "2026-06-22T21:27:23.746949"
+  "updated_at": "2026-06-23T22:18:54.011803"
 }

@@ -149,7 +149,7 @@
     },
     {
       "id": "RM-ORCH-005",
-      "status": "active",
+      "status": "done",
       "title": "Workflow Run Required For Roadmap And OpenSpec Actions",
       "stage": "v2",
       "priority": "p0",

@@ -26,3 +26,5 @@ Every roadmap mutation appends to this file.
 | 2026-06-22T13:05:00Z | review | RM-ORCH-005 | Roadmap review passed; promote to OpenSpec | Created OpenSpec artifacts and marked item ready for apply. | - | workflow-run-required-for-roadmap-and-openspec-actions |
 | 2026-06-22T13:26:49Z | revise | RM-ORCH-005 | Incorporate canonical-run promotion design from debug findings | Added canonical-run promotion semantics: roadmap item run is canonical, openspec_create preflight finds linked roadmap item runs, no duplicate openspec_change run created. Cleaned up existing duplicate run. | snapshots/RM-ORCH-005-20260622T132649Z.md | - |
 | 2026-06-22T13:55:00Z | apply-start | RM-ORCH-005 | Implementation in progress | Applying change workflow-run-required-for-roadmap-and-openspec-actions. Sections 1-5 and 7 implemented with 105 tests passing. | - | workflow-run-required-for-roadmap-and-openspec-actions |
+
+| 2026-06-23T22:15:00 | done | RM-ORCH-005 | Archive complete | Marked as done after archive_change completed | - | workflow-run-required-for-roadmap-and-openspec-actions |

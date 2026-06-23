@@ -987,6 +987,32 @@ class TestGovernanceCheck(FixtureBase):
         with open(os.path.join(hist_dir, f"{state['run_id']}.json"), "w") as f:
             json.dump(state, f)
 
+    def _make_done_roadmap_history_run(self, item_id, change_id):
+        hist_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "history")
+        os.makedirs(hist_dir, exist_ok=True)
+        state = {
+            "version": 1,
+            "run_id": f"2026-06-20-{item_id}",
+            "workflow": "sdlc-main",
+            "status": "done",
+            "current_phase": "done",
+            "primary_subject": {
+                "type": "roadmap_item",
+                "id": item_id,
+            },
+            "context": {"change_id": change_id, "roadmap_item_id": item_id},
+            "phase_readiness": {"phase": "done", "ready": True, "missing_required_inputs": []},
+            "pending_hooks": [],
+            "completed_hooks": [],
+            "completed_phases": [],
+            "gates": {},
+            "evidence": {},
+            "block": None,
+            "updated_at": "2026-06-20T00:00:00",
+        }
+        with open(os.path.join(hist_dir, f"{state['run_id']}.json"), "w") as f:
+            json.dump(state, f)
+
     # 3.2: clean state returns block=false
     def test_clean_state_returns_block_false(self):
         data = self._run_gc()
@@ -1020,6 +1046,13 @@ class TestGovernanceCheck(FixtureBase):
     def test_archived_with_done_history_not_dangling(self):
         self._make_openspec_archive("demo-change", "2026-06-20")
         self._make_done_history_run("demo-change")
+        data = self._run_gc()
+        self.assertFalse(data["block"])
+        self.assertEqual(data["findings"], [])
+
+    def test_archived_with_done_roadmap_history_not_dangling(self):
+        self._make_openspec_archive("canonical-change", "2026-06-20")
+        self._make_done_roadmap_history_run("RM-GOV-CANONICAL", "canonical-change")
         data = self._run_gc()
         self.assertFalse(data["block"])
         self.assertEqual(data["findings"], [])

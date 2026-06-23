@@ -1757,6 +1757,13 @@ def cmd_governance_check(root, args):
                     governed_change_ids.add(ps["id"])
                 if ps.get("type") == "roadmap_item" and ps.get("id"):
                     governed_roadmap_ids.add(ps["id"])
+                    change_id = (
+                        hist.get("context", {}).get("change_id")
+                        or hist.get("evidence", {}).get("change_id")
+                        or _read_roadmap_item_openspec_change(root, ps["id"])
+                    )
+                    if change_id:
+                        governed_change_ids.add(change_id)
 
     if os.path.isdir(archive_dir):
         for entry in _list_dirs(archive_dir):

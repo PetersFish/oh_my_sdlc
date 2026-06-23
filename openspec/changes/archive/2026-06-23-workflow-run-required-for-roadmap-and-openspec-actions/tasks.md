@@ -41,7 +41,7 @@
 
 - [x] 6.1 Add or update `skill.sdlc-orchestrator` EvalOps cases covering roadmap mutation preflight, roadmap replan follow-up loops, canonical-run promotion, and prevention of direct roadmap worker dispatch before preflight.
 - [x] 6.2 Triage any new EvalOps cases and promote accepted cases to golden before implementation is considered complete.
-- [ ] 6.3 Export Promptfoo cases and run the golden eval for `skill.sdlc-orchestrator`; report target id, case counts, export freshness, eval command, result counts, and report path.
+- [x] 6.3 Export Promptfoo cases and run the golden eval for `skill.sdlc-orchestrator`; report target id, case counts, export freshness, eval command, result counts, and report path.
 
 ## 7. Template And Distribution Sync
 
