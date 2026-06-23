@@ -158,6 +158,37 @@ def save_run_state(root, state):
     _set_pointer(root, run_id)
 
 
+def _finalize_run_to_history(root, state):
+    """Mark an active run done, move it to history, and remove the active file."""
+    state = dict(state)
+    state["status"] = "done"
+    state["current_phase"] = "done"
+    state["phase_readiness"] = {
+        "phase": "done",
+        "ready": True,
+        "missing_required_inputs": [],
+    }
+    state["pending_hooks"] = []
+    state["block"] = None
+    state["updated_at"] = _ts()
+
+    history_dir = _resolve_path(root, ".ai/workflows/runs/history/")
+    _ensure_dir(history_dir)
+    history_path = os.path.join(history_dir, f"{state['run_id']}.json")
+    with open(history_path, "w") as f:
+        json.dump(state, f, indent=2)
+
+    active_path = _active_path(root, state["run_id"])
+    if os.path.exists(active_path):
+        os.remove(active_path)
+
+    pointer = _read_pointer(root)
+    if pointer and pointer.get("run_id") == state["run_id"]:
+        _clear_pointer(root)
+
+    return state
+
+
 def validate_run_state(state):
     errors = []
     for key in RUN_STATE_KEYS:
@@ -904,6 +935,28 @@ def cmd_ensure_run(root, args):
             print(json.dumps(decision, indent=2))
             sys.exit(1)
 
+        if subject_type == "openspec_change":
+            linked = _find_linked_roadmap_run(root, subject_id)
+            if linked:
+                linked_ps = linked.get("primary_subject", {})
+                decision = _make_preflight_decision(
+                    False, "blocked", "linked_roadmap_run_exists",
+                    next_action={
+                        "command": (
+                            f"python3 .ai/workflows/scripts/workflow.py --root . resume"
+                            f" --subject-type {linked_ps.get('type', 'roadmap_item')}"
+                            f" --subject-id {linked_ps.get('id', subject_id)}"
+                        ),
+                        "description": (
+                            f"A linked roadmap_item run already exists for '{subject_id}'."
+                            f" Resume or complete the canonical roadmap run before creating"
+                            f" a repair run."
+                        ),
+                    },
+                )
+                print(json.dumps(decision, indent=2))
+                sys.exit(1)
+
         # For openspec_change subjects, verify subject is archived before creating a repair run
         if subject_type == "openspec_change":
             status = loader_openspec_change_status(root, subject_id)
@@ -1354,11 +1407,31 @@ def cmd_complete_hook(root, args):
                 item = items[0]
                 status = item.get("status", "")
                 if status == "done" and item.get("completed_at"):
-                    state.setdefault("evidence", {})["roadmap_hook_resolution"] = "idempotent_done"
+                    linked_item_run = _find_active_run_by_subject(
+                        root, "roadmap_item", item.get("item_id")
+                    )
+                    if linked_item_run:
+                        linked_change = linked_item_run.get("context", {}).get("change_id") or _read_roadmap_item_openspec_change(root, item.get("item_id"))
+                        if linked_change == state.get("context", {}).get("change_id"):
+                            _finalize_run_to_history(root, linked_item_run)
+                            state.setdefault("evidence", {})["roadmap_hook_resolution"] = "done"
+                            state.setdefault("evidence", {})["roadmap_item_run_finalized"] = linked_item_run.get("run_id")
+                        else:
+                            state.setdefault("evidence", {})["roadmap_hook_resolution"] = "idempotent_done"
+                    else:
+                        state.setdefault("evidence", {})["roadmap_hook_resolution"] = "idempotent_done"
                 elif status == "active":
                     latest_status = loader_roadmap_item_status(root, item.get("item_id"))
                     if latest_status and latest_status.get("status") == "done" and latest_status.get("completed_at"):
-                        state.setdefault("evidence", {})["roadmap_hook_resolution"] = "done"
+                        linked_item_run = _find_active_run_by_subject(
+                            root, "roadmap_item", item.get("item_id")
+                        )
+                        if linked_item_run:
+                            _finalize_run_to_history(root, linked_item_run)
+                            state.setdefault("evidence", {})["roadmap_hook_resolution"] = "done"
+                            state.setdefault("evidence", {})["roadmap_item_run_finalized"] = linked_item_run.get("run_id")
+                        else:
+                            state.setdefault("evidence", {})["roadmap_hook_resolution"] = "done"
                     else:
                         state["status"] = "blocked"
                         state["block"] = {
@@ -1779,6 +1852,49 @@ def cmd_governance_check(root, args):
                 "remediation": remediation,
                 "hash": fh,
             })
+
+    # Detect stale active roadmap_item runs whose item is already done/cancelled.
+    for run_id, active_state in active_runs:
+        ps = active_state.get("primary_subject", {})
+        if ps.get("type") != "roadmap_item":
+            continue
+        if active_state.get("status") not in ("running", "blocked"):
+            continue
+        item_id = ps.get("id")
+        if not item_id:
+            continue
+        item_status = loader_roadmap_item_status(root, item_id)
+        if not item_status or item_status.get("status") not in ("done", "cancelled"):
+            continue
+        rel_path = active_state.get("evidence", {}).get("roadmap_item_path", item_id)
+        message = (
+            f'Active roadmap_item run "{run_id}" remains running after '
+            f'roadmap item "{item_id}" became {item_status.get("status")}. '
+            f"The active run is stale."
+        )
+        remediation = (
+            f'Run: python3 .ai/workflows/scripts/workflow.py --root . cancel-run'
+            f' --subject-type roadmap_item --subject-id {item_id}'
+            f' --reason "stale active run for completed roadmap item".'
+            f' Re-run "workflow.py governance-check" until block=false.'
+        )
+        fh = _finding_hash(
+            "stale_active_roadmap_run",
+            run_id=run_id,
+            item_id=item_id,
+            status=item_status.get("status"),
+            file_path=rel_path,
+        )
+        findings.append({
+            "type": "stale_active_roadmap_run",
+            "run_id": run_id,
+            "item_id": item_id,
+            "status": item_status.get("status"),
+            "file_path": rel_path,
+            "message": message,
+            "remediation": remediation,
+            "hash": fh,
+        })
 
     # Detect ungoverned active roadmap items without matching active run or done history
     areas_dir = _resolve_path(root, ".ai/roadmap/areas")

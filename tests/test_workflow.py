@@ -121,6 +121,32 @@ class FixtureBase(unittest.TestCase):
     def _read_history(self, run_id):
         return load_json(self.tmp, f".ai/workflows/runs/history/{run_id}.json")
 
+    def _make_active_roadmap_run(self, item_id, change_id, current_phase="apply_change"):
+        runs_dir = os.path.join(self.tmp, ".ai", "workflows", "runs")
+        active_dir = os.path.join(runs_dir, "active")
+        os.makedirs(active_dir, exist_ok=True)
+        run_id = f"2026-06-20-{item_id}"
+        state = {
+            "version": 1,
+            "run_id": run_id,
+            "workflow": "sdlc-main",
+            "status": "running",
+            "current_phase": current_phase,
+            "primary_subject": {"type": "roadmap_item", "id": item_id},
+            "context": {"change_id": change_id, "roadmap_item_id": item_id},
+            "phase_readiness": {"phase": current_phase, "ready": True, "missing_required_inputs": []},
+            "pending_hooks": [],
+            "completed_hooks": ["roadmap_status_ready_if_linked"],
+            "completed_phases": ["create_change"],
+            "gates": {},
+            "evidence": {"roadmap_item_path": f".ai/roadmap/areas/area1/items/{item_id}.md"},
+            "block": None,
+            "updated_at": "2026-06-20T00:00:00",
+        }
+        with open(os.path.join(active_dir, f"{run_id}.json"), "w") as f:
+            json.dump(state, f)
+        return run_id
+
 
 class TestStartAndStatus(FixtureBase):
     def test_status_no_run(self):
@@ -395,6 +421,25 @@ class TestPostArchiveHooks(FixtureBase):
         self.assertEqual(rc, 0)
         data = json.loads(out)
         self.assertEqual(data["evidence"]["roadmap_hook_resolution"], "done")
+
+    def test_roadmap_done_hook_finalizes_linked_roadmap_run(self):
+        """If the linked roadmap item is already done, the hook should retire its active run."""
+        self._start_archived_workflow("finalize-change", [
+            {"item_id": "RM-FINAL-001", "status": "done", "openspec_change": "finalize-change", "completed_at": "2026-06-22"},
+        ])
+        roadmap_run_id = self._make_active_roadmap_run("RM-FINAL-001", "finalize-change", current_phase="apply_change")
+        self._add_hook("roadmap_done_if_relevant")
+
+        rc, out, _ = run_workflow(
+            self.tmp, "complete-hook",
+            hook="roadmap_done_if_relevant",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["evidence"]["roadmap_hook_resolution"], "done")
+        self.assertEqual(data["evidence"]["roadmap_item_run_finalized"], roadmap_run_id)
+        self.assertFalse(os.path.exists(os.path.join(self.tmp, ".ai", "workflows", "runs", "active", f"{roadmap_run_id}.json")))
+        self.assertIsNotNone(self._read_history(roadmap_run_id))
 
     def test_archived_active_roadmap_blocks_done(self):
         self._start_archived_workflow("arch-block", [
@@ -1413,6 +1458,21 @@ class TestPreflightAndEnsureRun(FixtureBase):
         self.assertIn("pending_hooks_empty", desc,
                       "next_action must reference pending_hooks_empty exit criteria")
 
+    def test_ensure_run_dangling_archive_blocks_when_linked_roadmap_run_exists(self):
+        self._make_openspec_archive("block-linked", "2026-06-20")
+        self._make_roadmap_item("RM-BLOCK-LINK", "done", openspec_change="block-linked", completed_at="2026-06-22")
+        self._make_active_roadmap_run("RM-BLOCK-LINK", "block-linked", current_phase="apply_change")
+        rc, data, _ = self._run_ensure_run(
+            "dangling_archive_repair",
+            subject_type="openspec_change",
+            subject_id="block-linked",
+        )
+        self.assertEqual(rc, 1)
+        self.assertFalse(data["allowed"])
+        self.assertEqual(data["reason"], "linked_roadmap_run_exists")
+        self.assertIsNotNone(data.get("next_action"))
+        self.assertIn("resume", data["next_action"].get("command", ""))
+
     # --- ensure-run superpowers_direct returns not_required ---
 
     def test_ensure_run_superpowers_direct_returns_not_required(self):
@@ -1818,6 +1878,18 @@ class TestGovernanceCheckExtended(FixtureBase):
         ungoverned = [f for f in data["findings"] if f["type"] == "ungoverned_roadmap_item"
                       and f["item_id"] == "RM-GOV-004"]
         self.assertEqual(len(ungoverned), 0)
+
+    def test_governance_check_flags_stale_active_roadmap_run(self):
+        """A done roadmap item with an active run should be reported as stale."""
+        self._make_roadmap_item("RM-GOV-STALE", "done", openspec_change="stale-change", completed_at="2026-06-22")
+        self._make_active_roadmap_run("RM-GOV-STALE", "stale-change", current_phase="apply_change")
+        rc, out, _ = run_workflow(self.tmp, "governance-check")
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        stale = [f for f in data["findings"] if f["type"] == "stale_active_roadmap_run"]
+        self.assertEqual(len(stale), 1)
+        self.assertEqual(stale[0]["item_id"], "RM-GOV-STALE")
+        self.assertIn("cancel-run", stale[0]["remediation"])
 
     def test_governance_check_duplicate_promotion_runs(self):
         """Both a roadmap_item and openspec_change run for the same change should be flagged."""
