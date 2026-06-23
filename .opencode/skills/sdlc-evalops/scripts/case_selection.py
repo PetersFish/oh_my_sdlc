@@ -68,7 +68,7 @@ def build_case_status(eval_results: list[dict], selected_cases: list[dict]) -> t
         if idx < len(eval_results):
             passed = eval_results[idx].get("passed", False)
         else:
-            passed = True
+            passed = False
         status = "passed" if passed else "failed"
         case_status[case_id] = status
         if not passed:

@@ -588,6 +588,8 @@ def run_single_model(model_entry: dict, target_id: str, workspace: Path,
             "observed_provider": "?",
             "report_dir": str(target_reports_dir / model_name),
             "parsed": {"total": 0, "passed": 0, "failed": 0, "errors": 1, "error": "no promptfoo config"},
+            "exit_code": -1,
+            "failed": True,
         }
 
     model_export_dir = target_reports_dir / model_name / "promptfoo"

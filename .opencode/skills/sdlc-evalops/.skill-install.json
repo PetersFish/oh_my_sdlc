@@ -5,9 +5,9 @@
   "source_ref": "HEAD",
   "status": "stable",
   "target": ".opencode/skills/sdlc-evalops",
-  "installed_at": "2026-06-23T11:19:09.208866Z",
+  "installed_at": "2026-06-23T12:02:32.374453Z",
   "backport_policy": "review-required",
-  "payload_hash": "2f045a0103d6290f4877634d5ed854471d73af5de27258544a9d63e45fb877c5",
+  "payload_hash": "38236966e59322f75253a808f2808b8009910cfe3e9635f1a52ec3dcb6bedd7f",
   "files": [
     "SKILL.md",
     "scripts/case_selection.py",

@@ -344,6 +344,10 @@ def write_failures_yaml(reports_dir: Path, parsed: dict) -> None:
     log(f"Wrote: {failures_path}")
 
 
+def eval_run_failed(parsed: dict, failed_case_ids: list[str]) -> bool:
+    return parsed.get("failed", 0) > 0 or parsed.get("errors", 0) > 0 or bool(failed_case_ids)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Run Promptfoo eval and write reports to repo"
@@ -506,7 +510,7 @@ def main() -> None:
     log(f"\nResults: {passed}/{total} passed, {failed} failed, {errors} errors")
     print(f"Report: {reports_dir}")
 
-    if failed > 0 or errors > 0:
+    if eval_run_failed(parsed, failed_case_ids):
         sys.exit(1)
     sys.exit(0)
 

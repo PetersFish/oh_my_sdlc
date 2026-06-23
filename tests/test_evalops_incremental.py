@@ -211,6 +211,15 @@ class TestCaseSelection(FixtureBase):
         self.assertEqual(case_status, {})
         self.assertEqual(failed_cases, [])
 
+    def test_build_case_status_marks_missing_results_failed(self):
+        from case_selection import build_case_status
+        selected = [{"id": "case-1"}, {"id": "case-2"}]
+        eval_results = [{"passed": True, "input_preview": "hello"}]
+        case_status, failed_cases = build_case_status(eval_results, selected)
+        self.assertEqual(case_status["case-1"], "passed")
+        self.assertEqual(case_status["case-2"], "failed")
+        self.assertEqual(failed_cases, ["case-2"])
+
 
 class TestRunIndex(FixtureBase):
     def test_get_changed_golden_files_returns_basenames(self):
@@ -349,6 +358,13 @@ class TestPromptfooRunnerHelpers(FixtureBase):
         self.assertIn(config_path.as_posix(), summary)
         self.assertIn("Run Mode", summary)
 
+    def test_eval_run_failed_when_case_status_has_failed_ids(self):
+        mod = load_script_module("run_promptfoo_eval_failure_decision", "run-promptfoo-eval.py")
+
+        parsed = {"failed": 0, "errors": 0}
+
+        self.assertTrue(mod.eval_run_failed(parsed, ["case-2"]))
+
 
 class TestMatrixFailFast(FixtureBase):
     def test_aggregate_case_status_marks_any_model_failure_as_failed(self):
@@ -392,6 +408,36 @@ class TestMatrixFailFast(FixtureBase):
 
         self.assertEqual(case_status["case-1"], "passed")
         self.assertEqual(failed_cases, [])
+
+    def test_run_single_model_without_promptfoo_fails(self):
+        mod = load_script_module("run_eval_matrix_missing_promptfoo", "run-eval-matrix.py")
+
+        model_entry = {"name": "bad-model", "provider": "test", "model": "test-v1"}
+        target_ws = self.evals_root / "targets" / "test-target"
+        t_manifest = {
+            "target_id": "test-target",
+            "target_type": "skill",
+            "source_paths": [],
+            "canonical_case_directories": {"golden": "cases/golden"},
+        }
+        golden_cases = [{"id": "case-1", "_file": "case-1.yaml"}]
+        target_reports_dir = target_ws / "reports" / "matrix-test"
+
+        result = mod.run_single_model(
+            model_entry,
+            "test-target",
+            target_ws,
+            t_manifest,
+            golden_cases,
+            target_reports_dir,
+            {"max_concurrency": 1, "timeout_seconds": 30, "retry_count": 0},
+            run_mode="full",
+            failure_source=None,
+        )
+
+        self.assertTrue(result["failed"])
+        self.assertEqual(result["parsed"]["errors"], 1)
+        self.assertIn("no promptfoo config", result["parsed"]["error"])
 
     def test_fail_fast_cancels_remaining_futures(self):
         import concurrent.futures
