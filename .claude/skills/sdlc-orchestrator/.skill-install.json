@@ -1,9 +1,14 @@
 {
   "skill": "sdlc-orchestrator",
   "source_repo": ".",
+  "source_path": "skills/sdlc-orchestrator",
   "source_ref": "HEAD",
   "status": "stable",
   "target": ".claude/skills/sdlc-orchestrator",
-  "installed_at": "2026-06-22T13:55:14.708644Z",
-  "backport_policy": "review-required"
+  "installed_at": "2026-06-23T06:52:58.353574Z",
+  "backport_policy": "review-required",
+  "payload_hash": "94f259d09c520ef2f19e7001b59c7836f0323a7b3200fd5cc9fd9b1d41ad4807",
+  "files": [
+    "SKILL.md"
+  ]
 }

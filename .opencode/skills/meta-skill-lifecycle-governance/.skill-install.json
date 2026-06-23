@@ -1,9 +1,27 @@
 {
   "skill": "meta-skill-lifecycle-governance",
   "source_repo": ".",
+  "source_path": "skills/meta-skill-lifecycle-governance",
   "source_ref": "HEAD",
   "status": "stable",
   "target": ".opencode/skills/meta-skill-lifecycle-governance",
-  "installed_at": "2026-06-22T04:47:44.245815Z",
-  "backport_policy": "review-required"
+  "installed_at": "2026-06-23T06:56:18.091174Z",
+  "backport_policy": "review-required",
+  "payload_hash": "384ec55b1bb4ed21bee78857d5b31546a6e370d6a31097ef1716cd7f8946f13c",
+  "files": [
+    "SKILL.md",
+    "evals/evals.json",
+    "references/backport-classification.md",
+    "references/cli-targets.md",
+    "references/lifecycle-actions.md",
+    "scripts/check_skill_distribution.py",
+    "scripts/compare_skill_copy.py",
+    "scripts/install_skill.py",
+    "scripts/lifecycle_utils.py",
+    "scripts/prepare_backport.py",
+    "scripts/verify_install.py",
+    "templates/backport-review.md",
+    "templates/install-metadata.yaml",
+    "templates/release-notes.md"
+  ]
 }

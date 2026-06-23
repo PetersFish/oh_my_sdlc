@@ -1,9 +1,25 @@
 {
   "skill": "sdlc-evalops",
   "source_repo": ".",
+  "source_path": "skills/sdlc-evalops",
   "source_ref": "HEAD",
   "status": "stable",
   "target": ".claude/skills/sdlc-evalops",
-  "installed_at": "2026-06-23T05:57:06.469184Z",
-  "backport_policy": "review-required"
+  "installed_at": "2026-06-23T06:52:58.019883Z",
+  "backport_policy": "review-required",
+  "payload_hash": "ffbe7ee1966a9b4a609befc0ca52e3d4fde88e845608220bf8ce9142b483c4e6",
+  "files": [
+    "SKILL.md",
+    "scripts/export-promptfoo.py",
+    "scripts/run-eval-matrix.py",
+    "scripts/run-promptfoo-eval.py",
+    "scripts/run_index.py",
+    "templates/default-case.yaml",
+    "templates/default-coverage.yaml",
+    "templates/eval-policy.yaml",
+    "templates/model-matrix.yaml",
+    "templates/promptfoo-cases.yaml",
+    "templates/promptfooconfig.yaml",
+    "templates/target-index.yaml"
+  ]
 }

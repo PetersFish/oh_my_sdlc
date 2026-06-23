@@ -1,13 +1,13 @@
 {
   "skill": "sdlc-repository-memory-sync",
-  "source_repo": "/Users/yuping/Documents/workspace/oh_my_skills",
-  "source_ref": "HEAD",
+  "source_repo": ".",
   "source_path": "skills/sdlc-repository-memory-sync",
-  "target": ".cursor/skills/sdlc-repository-memory-sync",
-  "installed_at": "2026-05-30T14:26:15.086576Z",
+  "source_ref": "HEAD",
   "status": "stable",
+  "target": ".cursor/skills/sdlc-repository-memory-sync",
+  "installed_at": "2026-06-23T06:52:58.992701Z",
   "backport_policy": "review-required",
-  "payload_hash": "4fb925ddff08027aadf6db0a559318fcb22da8920b5bff07bdada4752fcb21e8",
+  "payload_hash": "c17b471c8a7f2f736b6212b7acfe5fcd2fe63be502219e7548a20e27ca79ae11",
   "files": [
     "SKILL.md",
     "schemas/discovery-prefs.schema.json",

@@ -1,9 +1,27 @@
 {
   "skill": "sdlc-roadmap",
   "source_repo": ".",
+  "source_path": "skills/sdlc-roadmap",
   "source_ref": "HEAD",
   "status": "stable",
   "target": ".cursor/skills/sdlc-roadmap",
-  "installed_at": "2026-06-22T13:55:16.862495Z",
-  "backport_policy": "review-required"
+  "installed_at": "2026-06-23T06:52:59.118859Z",
+  "backport_policy": "review-required",
+  "payload_hash": "87aac5b2ff638dc64ca8a80250df509106ac705ed9bd86d332e37df10496288d",
+  "files": [
+    "SKILL.md",
+    "scripts/list.py",
+    "scripts/rebuild_index.py",
+    "scripts/sync.py",
+    "scripts/validate.py",
+    "templates/area-manifest.json",
+    "templates/area-roadmap.md",
+    "templates/batch-revision.md",
+    "templates/changelog.md",
+    "templates/decisions.md",
+    "templates/item.md",
+    "templates/manifest.json",
+    "templates/roadmap.md",
+    "templates/snapshot-item.md"
+  ]
 }

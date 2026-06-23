@@ -1,0 +1,14 @@
+{
+  "skill": "sdlc-openspec-init",
+  "source_repo": ".",
+  "source_path": "skills/sdlc-openspec-init",
+  "source_ref": "HEAD",
+  "status": "stable",
+  "target": ".claude/skills/sdlc-openspec-init",
+  "installed_at": "2026-06-23T06:52:58.135272Z",
+  "backport_policy": "review-required",
+  "payload_hash": "1536f07f6c7bf296c328f706ec1427d9cd9debe1408ca6cb998a7f89c35777ca",
+  "files": [
+    "SKILL.md"
+  ]
+}

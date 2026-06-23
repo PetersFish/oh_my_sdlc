@@ -1,13 +1,13 @@
 {
   "skill": "sdlc-repository-memory-reset",
-  "source_repo": "/Users/yuping/Documents/workspace/oh_my_skills",
-  "source_ref": "HEAD",
+  "source_repo": ".",
   "source_path": "skills/sdlc-repository-memory-reset",
-  "target": ".cursor/skills/sdlc-repository-memory-reset",
-  "installed_at": "2026-05-30T14:26:15.086576Z",
+  "source_ref": "HEAD",
   "status": "stable",
+  "target": ".cursor/skills/sdlc-repository-memory-reset",
+  "installed_at": "2026-06-23T06:52:58.863943Z",
   "backport_policy": "review-required",
-  "payload_hash": "8b742ef0e9d6c5c9a13a37df164a92cd0bc19632d2169dcb4eac9995c7ba6f5b",
+  "payload_hash": "0f93f269c4c2826c79e04bd536fd46c975f634953ab86458ebb017ed14b45bb9",
   "files": [
     "SKILL.md"
   ]

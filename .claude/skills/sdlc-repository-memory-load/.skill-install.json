@@ -1,0 +1,21 @@
+{
+  "skill": "sdlc-repository-memory-load",
+  "source_repo": ".",
+  "source_path": "skills/sdlc-repository-memory-load",
+  "source_ref": "HEAD",
+  "status": "stable",
+  "target": ".claude/skills/sdlc-repository-memory-load",
+  "installed_at": "2026-06-23T06:52:58.711577Z",
+  "backport_policy": "review-required",
+  "payload_hash": "fee6504ba99f0ed3fb860ab2ec968b2a208b37ba7a75bd1331bb2f2cab368625",
+  "files": [
+    "SKILL.md",
+    "schemas/index.schema.json",
+    "schemas/manifest.schema.json",
+    "schemas/memory-frontmatter.schema.json",
+    "schemas/review-queue.schema.json",
+    "scripts/select_memory.py",
+    "scripts/validate_memory.py",
+    "templates/context-pack.md"
+  ]
+}

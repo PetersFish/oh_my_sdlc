@@ -1,9 +1,19 @@
 {
   "skill": "sdlc-project-bootstrap",
   "source_repo": ".",
+  "source_path": "skills/sdlc-project-bootstrap",
   "source_ref": "HEAD",
   "status": "stable",
   "target": ".cursor/skills/sdlc-project-bootstrap",
-  "installed_at": "2026-06-22T12:17:08.305180Z",
-  "backport_policy": "review-required"
+  "installed_at": "2026-06-23T06:52:58.508534Z",
+  "backport_policy": "review-required",
+  "payload_hash": "3faadc1a90ca93639d8b5042d187303f971923cfacc6ee8126e97d4cc00799ca",
+  "files": [
+    "SKILL.md",
+    "scripts/init_foundations.py",
+    "scripts/sync_templates.py",
+    "templates/AGENTS.md",
+    "templates/workflow/sdlc-main.yaml",
+    "templates/workflow/workflow.py"
+  ]
 }
