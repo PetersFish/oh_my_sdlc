@@ -15,6 +15,7 @@ This document defines the classification system for skills in this repository. I
 | `integration-*` | External service integration skills. Sync data to/from third-party platforms. | `integration-notion-sync` |
 | `ops-*` | Operational / backup skills. Filesystem backup and configuration management. | `ops-mackup-backup` |
 | `meta-skill-*` | Skills about managing skills themselves. Lifecycle governance, creation, evaluation. | `meta-skill-lifecycle-governance` |
+| discipline-oriented names | Cross-cutting engineering guardrails that are loaded only at the relevant work phase. | `implementation-contract-discipline`, `behavioral-test-design` |
 
 ## Skill Types
 
@@ -26,6 +27,7 @@ This document defines the classification system for skills in this repository. I
 | **qa** | Conversational coaching. Answers questions with structured analysis. No file artifact creation. | `qa-*` skills |
 | **lifecycle** | Manages a stateful workflow with multiple phases (init, create, run, archive). Filesystem is the source of truth. | `research-*`, `sdlc-*` skills |
 | **utility** | Performs a specific operational task. Stateless or minimal state. | `ops-*`, `integration-*`, `media-*` skills |
+| **discipline** | Enforces cross-cutting engineering quality rules for implementation or test design. Loaded on demand to avoid bloating global instructions. | `implementation-contract-discipline`, `behavioral-test-design` |
 
 ## Trigger Conflict Priorities
 

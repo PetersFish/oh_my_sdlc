@@ -4,6 +4,14 @@
 
 Shared test helpers live under `tests/support/`. Do not duplicate helper logic inside individual test files when a support helper exists.
 
+## Behavioral Coverage
+
+Load `behavioral-test-design` before writing or reviewing tests for executable behavior.
+
+- String-presence assertions are acceptable for docs, templates, frontmatter, and static copy.
+- For CLI flags, config fields, runners, filters, state files, retries, concurrency, and workflow behavior, tests must invoke a focused helper or executable path and assert observable output, command arguments, generated files, or state round trips.
+- A test should fail if a flag is parsed but unused, a selected subset is ignored, or a state file has the right fields but cannot drive the next command.
+
 ## Frontmatter Parsing
 
 For Markdown/YAML frontmatter, use `tests/support/frontmatter.py::read_frontmatter`.

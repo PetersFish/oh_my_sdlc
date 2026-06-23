@@ -76,6 +76,18 @@ description: >-
 
 Do not use unquoted plain scalar descriptions for long natural-language text. `: ` inside values such as `Triggers include: ...` or `.ai/evals/: ...` breaks YAML parsing and causes skills to be silently filtered out.
 
+## Contract And Test Discipline
+
+Keep global routing short; load detailed norms only when needed.
+
+- When implementing behavior from a spec, design, task list, CLI flag, config field, state file, runner, or workflow contract, load `implementation-contract-discipline` before editing code.
+- When writing or reviewing tests for executable behavior, load `behavioral-test-design` before adding or accepting tests.
+- Do not treat string-presence checks as proof of executable behavior unless the subject is static documentation, templates, frontmatter, or copy.
+
+## Skill Taxonomy
+
+When creating, renaming, or classifying skills, read `skills/TAXONOMY.md` first.
+
 ## Repository Memory
 
 If `.ai/memory/index.json` exists and the task involves planning, editing, reviewing, or continuing work in this repository, load relevant repository memory first using `sdlc-repository-memory-load`.
