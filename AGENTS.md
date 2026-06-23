@@ -82,6 +82,16 @@ If `.ai/memory/index.json` exists and the task involves planning, editing, revie
 
 Do not load `.ai/memory/sync-history/`, `.ai/memory/sessions/`, `.ai/memory/snapshots/`, `.ai/memory/tmp/`, `.ai/memory/cache/`, or `.ai/memory/review-queue.json` by default.
 
+## Hidden Directory Discovery
+
+**Never conclude a hidden directory doesn't exist based on Glob returning empty results.** Glob excludes dotfiles and hidden directories by default. An empty result for patterns like `.ai/roadmap/*`, `.ai/evals/*`, or `.ai/memory/*` does NOT mean those directories are absent — it means Glob didn't match visible entries inside them.
+
+When checking for the existence of `.ai/roadmap/`, `.ai/evals/`, `.ai/memory/`, or any other hidden runtime directory:
+- Use `Read` on the directory path directly, or
+- Use `Bash ls -d <path>` to confirm presence/absence.
+
+This applies to all tooling and skill workflows that inspect `.ai/` state, including SDLC roadmap, EvalOps, and repository memory gates.
+
 ## Workflow Template Sync
 
 When modifying files under `.ai/workflows/scripts/workflow.py` or `.ai/workflows/definitions/sdlc-main.yaml`, the corresponding templates in `sdlc-project-bootstrap/templates/workflow/` MUST be synced before commit. The pre-commit hook enforces this.
