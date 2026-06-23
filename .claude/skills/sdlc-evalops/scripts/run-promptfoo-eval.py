@@ -33,6 +33,68 @@ from run_index import (
     get_changed_golden_files, find_last_full_run, find_latest_run,
     build_run_entry,
 )
+from case_selection import (
+    get_case_identity, collect_case_files, select_only_new,
+    select_only_failed, build_case_status,
+)
+
+def generate_prompt_for_target(t_manifest: dict) -> str:
+    source_paths = t_manifest.get("source_paths", [])
+    target_id = t_manifest.get("target_id", "")
+    target_type = t_manifest.get("target_type", "")
+    source_lines = []
+    for sp in source_paths:
+        src_path = REPO_ROOT / sp
+        if src_path.is_file():
+            source_lines.append(f"# Source: {sp}\n")
+            source_lines.append(src_path.read_text(encoding="utf-8"))
+            source_lines.append("\n")
+        else:
+            log(f"Warning: source file not found: {sp}")
+    source_block = "".join(source_lines) if source_lines else ""
+    return f"""You are evaluating the `{target_id}` {target_type}. Apply these {target_type} instructions as the source of truth before responding.
+
+# {target_id} evaluation context
+
+The assistant is acting as the `{target_id}`.
+
+{source_block}
+
+User input:
+
+{{{{input}}}}
+
+Provide only the assistant's final user-facing reply — one natural message as the user would see it. Do NOT output chain of thought, hidden reasoning, "Thinking:" text, or any other internal deliberation. Output the direct reply only.
+"""
+
+
+def generate_promptfoo_config(target_id: str, provider: dict,
+                               grader: dict | None) -> str:
+    import yaml as _yaml
+    config = {
+        "description": f"EvalOps target run for {target_id}",
+        "prompts": ["file://prompt.md"],
+        "providers": [provider],
+        "tests": "cases.yaml",
+    }
+    if grader:
+        config["defaultTest"] = {"options": {"provider": grader}}
+    return _yaml.dump(config, default_flow_style=False, allow_unicode=True, sort_keys=False)
+
+
+def write_run_scoped_promptfoo_files(run_dir: Path, selected_cases: list[dict],
+                                     t_manifest: dict, provider: dict,
+                                     grader: dict | None) -> None:
+    from export_promptfoo import generate_cases_yaml
+    prompt_content = generate_prompt_for_target(t_manifest)
+    cases_content = generate_cases_yaml(selected_cases, t_manifest)
+    config_content = generate_promptfoo_config(
+        t_manifest.get("target_id", ""), provider, grader
+    )
+    (run_dir / "prompt.md").write_text(prompt_content, encoding="utf-8")
+    (run_dir / "cases.yaml").write_text(cases_content, encoding="utf-8")
+    (run_dir / "promptfooconfig.yaml").write_text(config_content, encoding="utf-8")
+
 
 def find_repo_root() -> Path:
     p = Path.cwd().resolve()
@@ -325,9 +387,12 @@ def main() -> None:
     if run_index_data.get("target_id") != target_id:
         run_index_data["target_id"] = target_id
 
-    run_mode = "full"
-    failure_source = None
-    selected_cases = None
+    t_manifest = yaml.safe_load((workspace / "manifest.yaml").read_text("utf-8")) or {}
+    golden_rel = t_manifest.get("canonical_case_directories", {}).get("golden", "cases/golden")
+    golden_dir = workspace / golden_rel
+    golden_cases = load_golden_cases(golden_dir)
+
+    failure_source: str | None = None
 
     if args.only_failed:
         run_mode = "only-failed"
@@ -346,10 +411,13 @@ def main() -> None:
         if not failed_ids:
             log("No failed cases to retry. Exiting.")
             sys.exit(0)
-        selected_cases = failed_ids
-        log(f"Only-failed ({failure_source}): {len(selected_cases)} failed case(s) to retry")
+        selected_cases = select_only_failed(golden_cases, failed_ids)
+        if not selected_cases:
+            log("Failed case ids no longer present in golden dir. Exiting.")
+            sys.exit(0)
+        log(f"Only-failed ({failure_source}): {len(selected_cases)} case(s) to retry")
 
-    if args.only_new:
+    elif args.only_new:
         run_mode = "only-new"
         run_index_data = load_run_index(reports_base)
         if run_index_data.get("target_id") != target_id:
@@ -362,32 +430,43 @@ def main() -> None:
         if not baseline:
             error("Last full run has no Git baseline. Run a full eval to record one.")
             sys.exit(2)
-        t_manifest = yaml.safe_load((workspace / "manifest.yaml").read_text("utf-8")) or {}
-        golden_rel = t_manifest.get("canonical_case_directories", {}).get("golden", "cases/golden")
-        golden_dir = workspace / golden_rel
         changed_files = get_changed_golden_files(REPO_ROOT, baseline, golden_dir)
         if not changed_files:
             log("No changed golden case files since last full run. Exiting.")
             sys.exit(0)
-        all_cases = load_golden_cases(golden_dir)
-        selected_cases = [c for c in all_cases if c.get("_file") in changed_files]
+        selected_cases = select_only_new(golden_cases, changed_files)
         if not selected_cases:
             log("Changed files have no matching golden cases. Exiting.")
             sys.exit(0)
         log(f"Only-new: {len(selected_cases)} case(s) changed since baseline {baseline[:8]}")
-
-    export_exit = run_export(target_id)
-    export_fresh = export_exit == 0
-    if export_exit != 0 and export_exit != 5:
-        error("Export failed; aborting eval")
-        sys.exit(export_exit)
+    else:
+        run_mode = "full"
+        selected_cases = golden_cases
 
     run_id = generate_run_id(target_id)
     reports_dir = reports_base / run_id
     reports_dir.mkdir(parents=True, exist_ok=True)
     log(f"Reports dir: {reports_dir}")
 
-    config_path = workspace / "exports" / "promptfoo" / "promptfooconfig.yaml"
+    if run_mode == "full":
+        export_exit = run_export(target_id)
+        export_fresh = export_exit == 0
+        if export_exit != 0 and export_exit != 5:
+            error("Export failed; aborting eval")
+            sys.exit(export_exit)
+        config_path = workspace / "exports" / "promptfoo" / "promptfooconfig.yaml"
+    else:
+        export_fresh = True
+        model_matrix = load_model_matrix()
+        first_model = model_matrix.get("models", [{}])[0]
+        provider = first_model.get("promptfoo")
+        grader = first_model.get("grader")
+        run_promptfoo_dir = reports_dir / "promptfoo"
+        write_run_scoped_promptfoo_files(
+            run_promptfoo_dir, selected_cases, t_manifest, provider, grader
+        )
+        config_path = run_promptfoo_dir / "promptfooconfig.yaml"
+
     output_path = reports_dir / "promptfoo-output.json"
 
     eval_exit = run_promptfoo_eval(config_path, output_path, max_concurrency=max_concurrency)
@@ -412,16 +491,8 @@ def main() -> None:
     # Build run index entry
     git_baseline = get_git_baseline(REPO_ROOT)
     case_details = parsed.get("cases", [])
-    case_files = {}
-    case_status = {}
-    failed_case_ids = []
-    for idx, c in enumerate(case_details):
-        case_name = f"case-{idx}"
-        case_files[case_name] = ""
-        outcome = "passed" if c.get("passed") else "failed"
-        case_status[case_name] = outcome
-        if not c.get("passed"):
-            failed_case_ids.append(case_name)
+    case_status, failed_case_ids = build_case_status(case_details, selected_cases)
+    case_files = collect_case_files(selected_cases, golden_dir)
 
     entry = build_run_entry(
         run_id=run_id, mode=run_mode, git_baseline=git_baseline,
