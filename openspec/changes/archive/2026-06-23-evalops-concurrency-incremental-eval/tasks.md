@@ -67,4 +67,4 @@
 - [x] 9.5 Add test for report summary including `Run Mode` field
 - [x] 9.6 Add test verifying serial fallback when `parallel` is false
 - [x] 9.7 Run full test suite: `python3 -m pytest tests/ -v` and verify all pass
-- [ ] 9.8 Run live golden eval for `skill.sdlc-orchestrator` and verify pass/concurrency behavior
+- [x] 9.8 Run live golden eval for `skill.sdlc-orchestrator` and verify pass/concurrency behavior

@@ -138,7 +138,7 @@
     },
     {
       "id": "RM-EVAL-004",
-      "status": "ready",
+      "status": "done",
       "title": "Promptfoo Eval 加速：并发 + 增量运行",
       "stage": "v2",
       "priority": "p0",

@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "run_id": "2026-06-23-evalops-concurrency-incremental-eval",
+  "workflow": "sdlc-main",
+  "status": "done",
+  "current_phase": "done",
+  "primary_subject": {
+    "type": "openspec_change",
+    "id": "evalops-concurrency-incremental-eval"
+  },
+  "context": {
+    "change_id": "evalops-concurrency-incremental-eval",
+    "roadmap_item_id": "RM-EVAL-004"
+  },
+  "phase_readiness": {
+    "phase": "done",
+    "ready": true,
+    "missing_required_inputs": []
+  },
+  "pending_hooks": [],
+  "completed_hooks": [
+    "memory_sync",
+    "roadmap_done_if_relevant"
+  ],
+  "completed_phases": [
+    "post_archive_actions"
+  ],
+  "gates": {},
+  "evidence": {
+    "archive_path": "openspec/changes/archive/2026-06-23-evalops-concurrency-incremental-eval",
+    "roadmap_link": {
+      "count": 1,
+      "items": [
+        {
+          "item_id": "RM-EVAL-004",
+          "status": "done",
+          "completed_at": "2026-06-23",
+          "file": ".ai/roadmap/areas/workflow.ai-evalops/items/RM-EVAL-004-promptfoo-eval-speedup-concurrency-incremental.md",
+          "area": "workflow.ai-evalops"
+        }
+      ]
+    },
+    "roadmap_item_status": {
+      "item_id": "RM-EVAL-004",
+      "status": "done",
+      "completed_at": "2026-06-23"
+    },
+    "memory_sync_resolution": "synced",
+    "memory_sync_reason": "",
+    "roadmap_done_item": "RM-EVAL-004",
+    "roadmap_done_completed_at": "2026-06-23",
+    "roadmap_hook_resolution": "idempotent_done"
+  },
+  "block": null,
+  "updated_at": "2026-06-23T21:32:42.070540"
+}

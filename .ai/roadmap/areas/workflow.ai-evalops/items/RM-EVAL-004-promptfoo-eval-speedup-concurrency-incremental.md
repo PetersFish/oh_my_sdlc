@@ -1,15 +1,15 @@
 ---
 id: RM-EVAL-004
 title: "Promptfoo Eval 加速：并发 + 增量运行"
-status: ready
+status: done
 stage: v2
 priority: p0
 order: 40
 depends_on: []
 openspec_change: evalops-concurrency-incremental-eval
 created_at: 2026-06-16
-started_at: null
-completed_at: null
+started_at: 2026-06-23
+completed_at: 2026-06-23
 ---
 
 # Goal
@@ -82,3 +82,5 @@ completed_at: null
 边界清晰、风险可控：主要修改 runner 脚本和 model-matrix 配置，不进入 source-level 影响面分析。RM-EVAL-003 已取消，本项不再依赖它；隐藏目录发现规则已由仓库协作规则兜底。
 
 # Completion Notes
+
+Implemented and verified: model-matrix concurrency config fields, single-target runner `--max-concurrency`, matrix runner `ThreadPoolExecutor` parallel execution with fail-fast cancellation, run index at `reports/run-index.json`, `--only-new` and `--only-failed --failed-from latest|full` flags on both runners, report summary run mode labels. Three correctness bugs (missing-case passed, model-config silent success, exit code ignoring failed_case_ids) found and fixed in review. 608 tests pass. Change archived 2026-06-23.
