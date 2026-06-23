@@ -5,7 +5,7 @@
   "source_ref": "HEAD",
   "status": "stable",
   "target": ".cursor/skills/sdlc-evalops",
-  "installed_at": "2026-06-23T10:45:45.422683Z",
+  "installed_at": "2026-06-23T10:48:36.784634Z",
   "backport_policy": "review-required",
   "payload_hash": "065bdbf60660f311fc2ab77203768c23f418c52b8d74f8eae3b8472782b56906",
   "files": [
