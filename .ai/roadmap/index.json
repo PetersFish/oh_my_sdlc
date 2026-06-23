@@ -112,7 +112,7 @@
     },
     {
       "id": "RM-ORCH-004",
-      "status": "idea",
+      "status": "done",
       "title": "Verify Done Run Cleanup From Active Directory",
       "stage": "v2",
       "priority": "p1",

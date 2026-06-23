@@ -1,7 +1,7 @@
 ---
 id: RM-ORCH-004
 title: "Verify Done Run Cleanup From Active Directory"
-status: idea
+status: done
 stage: v2
 priority: p1
 order: 35
@@ -9,8 +9,8 @@ depends_on:
   - RM-ORCH-006
 openspec_change: null
 created_at: 2026-06-21
-started_at: null
-completed_at: null
+started_at: 2026-06-22
+completed_at: 2026-06-24
 ---
 
 # Goal
@@ -70,7 +70,22 @@ RM-ORCH-006 keeps `current.json` as a pointer (`{"run_id": "..."}`) and stores r
 
 # Completion Notes
 
-Not started.
+Implemented as a side-effect of RM-ORCH-006 (Multi-Run Concurrent Support, commit `33a46db`) and RM-ORCH-005 (Workflow Run Required, commit `2227ca6`). No separate OpenSpec change was created — the cleanup logic was a natural consequence of the `active/` + pointer model.
+
+**Accomplished:**
+- `_finalize_run_to_history()`: done cleanup contract (write history → remove active → clear pointer to `{}`)
+- `_clear_pointer()`: explicit pointer clearing
+- Stale pointer detection: `cmd_status` reports stale pointer when active file is missing
+- Idempotent done: `cmd_done` on already-missing active file writes history if missing and clears pointer
+- Spec updated (`openspec/specs/sdlc-workflow-engine/spec.md`) with `active/` + `current.json` pointer + `history/` layout
+- Templates synced to all distributed copies (`.opencode/`, `.claude/`, `.cursor/`)
+- Tests added (commit `33a46db`: +72 lines in `test_workflow.py`)
+
+**Deferred:**
+- None.
+
+**Follow-up items:**
+- None — cleanup is fully integrated into workflow.py done codepaths.
 
 # Design Reference
 

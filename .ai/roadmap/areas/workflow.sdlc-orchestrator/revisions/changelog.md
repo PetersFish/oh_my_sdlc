@@ -28,3 +28,4 @@ Every roadmap mutation appends to this file.
 | 2026-06-22T13:55:00Z | apply-start | RM-ORCH-005 | Implementation in progress | Applying change workflow-run-required-for-roadmap-and-openspec-actions. Sections 1-5 and 7 implemented with 105 tests passing. | - | workflow-run-required-for-roadmap-and-openspec-actions |
 
 | 2026-06-23T22:15:00 | done | RM-ORCH-005 | Archive complete | Marked as done after archive_change completed | - | workflow-run-required-for-roadmap-and-openspec-actions |
+| 2026-06-24T00:00:00 | done | RM-ORCH-004 | Implementation verified — cleanup logic landed in RM-ORCH-006/005 commits | `_finalize_run_to_history`, `_clear_pointer`, stale pointer detection, idempotent done, spec update, template sync all in place since commits 33a46db and 2227ca6. No separate OpenSpec change needed. | - | - |
