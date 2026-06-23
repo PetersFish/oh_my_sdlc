@@ -101,7 +101,7 @@
     },
     {
       "id": "RM-EVAL-003",
-      "status": "ready",
+      "status": "cancelled",
       "title": "隐藏目录发现与 Roadmap Preflight 加固",
       "stage": "v2",
       "priority": "p0",
