@@ -323,6 +323,7 @@ Coverage + golden cases
   → implementation (gate: pre-implementation eval assets ready)
 --- Run Phase: execute and report ---
 Implementation
+  → observed deviation → session eval capture → inbox → mandatory triage (see Session Eval Checkpoints)
   → pytest pass (gate: TDD verification)
 Pytest pass
   → golden eval run (gate: run Promptfoo golden eval)
@@ -330,6 +331,7 @@ Golden eval run
   → golden eval pass → completion (gate: all evals green)
 Golden eval run
   → golden eval fail → failure analysis (gate: user-confirmed fix plan)
+  → failure pattern → session eval capture → inbox → mandatory triage (see Session Eval Checkpoints)
 ```
 
 Build Phase and Run Phase are distinct gate categories. Build Phase creates eval assets (coverage, cases, golden promotion); Run Phase executes and reports them (pytest, Promptfoo golden eval). Creating cases without running them does NOT satisfy the EvalOps gate — both categories must be satisfied independently.
@@ -345,6 +347,15 @@ Each transition requires either:
 - **Pytest + golden eval before completion.** The orchestrator SHALL require both pytest pass and golden eval run before claiming completion for EvalOps-gated changes. If pytest fails, route to `systematic-debugging` or `test-driven-development`. If golden eval passes, proceed to completion with evidence.
 - **Golden eval failure blocks forward progress.** The orchestrator SHALL route to `sdlc-evalops` for failure classification and a user-confirmed fix plan. The orchestrator SHALL NOT permit direct fix or modification until the fix plan is confirmed.
 - **Completion cannot be claimed before golden eval pass.** The final implementation summary SHALL NOT claim completion if the EvalOps state is before `golden-eval-pass`. If golden eval has not been run, report "Golden eval not yet run for target `<target-id>`".
+
+**Session Eval Checkpoint Rules:**
+
+- **Capture before fix when user reports wrong output.** When the user says AI output is wrong, incomplete, or not as expected for an EvalOps-gated target, the orchestrator SHALL prioritize `sdlc-evalops` capture-regression over immediate fix. Only after the capture interaction resolves (captured or skipped) may the orchestrator proceed to fix the behavior.
+- **Pre-verify capture prompt.** Before routing to `openspec-verify-change` for an EvalOps-gated target, the orchestrator SHALL ask whether any behavioral deviations observed during implementation should be captured as regression cases.
+- **Post-eval-failure capture.** After golden eval failure analysis produces a confirmed fix plan, the orchestrator SHALL suggest capturing the failure pattern as a regression case before executing the fix.
+- **Session eval is discovery, not a gate.** Every Session Eval checkpoint MUST offer a clear Skip option. Session Eval discovers and accumulates regression cases; it does NOT block forward progress. Skipping capture at any checkpoint does not affect the workflow lifecycle.
+- **Session eval does not replace Promptfoo golden eval.** Session Eval produces inbox cases that feed into triage and potentially golden promotion. The final completion gate still requires Promptfoo golden eval (or an explicit EvalOps exception).
+- **Target identification for verify deviation.** When `openspec-verify-change` detects a behavioral deviation and the user wants to capture it, the orchestrator SHALL analyze the deviation context, list candidate target-ids that could be affected, present them via the question tool, and let the user select the correct target before routing to `sdlc-evalops` capture-regression.
 
 **Exception handling:**
 - **User explicitly opts out**: the orchestrator MAY proceed after acknowledging the exception and naming the residual risk.
@@ -373,6 +384,7 @@ Reason:
 
 Required gates:
 - ...
+- (evalops-gated only: Session Eval checkpoints at post-implementation, pre-verify, post-eval-failure)
 
 Expected artifacts:
 - ...
@@ -426,6 +438,67 @@ When golden eval returns failures, the summary SHALL report:
 - Reference to the failure classification from `sdlc-evalops` `eval-failure-analysis` workflow
 - The orchestrator SHALL NOT claim completion
 - The orchestrator SHALL route to `sdlc-evalops` for failure classification and a user-confirmed fix plan
+
+## Session Eval Checkpoints
+
+For EvalOps-gated changes, the orchestrator SHALL trigger Session Eval capture at three checkpoints. Session Eval captures regression cases to inbox (never golden), triggers mandatory triage, and does NOT block progress. Session Eval is a discovery and accumulation mechanism, distinct from Promptfoo golden eval which serves as the regression verification gate.
+
+### Checkpoint 1: Post-Implementation (User Reports Wrong Output)
+
+**Trigger:** After `apply_change` completes for an EvalOps-gated target, when:
+- The user points out AI output is wrong or incomplete
+- The user corrects the AI's output
+- The implementation produces unexpected behavior in the AI target
+
+**Action:**
+1. Ask: "Should I capture this as a regression case for `<target-id>`?" Use the question tool with options: [Capture as regression case] / [Skip].
+2. If confirmed: route to `sdlc-evalops` for the `capture-regression` workflow. The case enters inbox, followed by mandatory triage.
+3. After capture (or skip), proceed with the fix.
+
+**Rule:** When the user says "this output is wrong" / "这个不对" / "输出不符合预期" / etc., the orchestrator SHALL prioritize capture-regression over immediate fix. Only after the capture interaction resolves (captured or skipped) may the orchestrator proceed to fix the behavior.
+
+### Checkpoint 2: Pre-Verify (Deviations Observed During Implementation)
+
+**Trigger:** Before routing to `openspec-verify-change` for an EvalOps-gated target.
+
+**Action:**
+1. Ask: "Any behavioral deviations observed during implementation that should be captured as regression cases for `<target-id>`?" Use the question tool with options: [Capture deviations] / [Skip, proceed to verify].
+2. If the user describes deviations: route to `sdlc-evalops` `capture-regression` for each deviation. Each capture enters inbox with mandatory triage.
+3. After all captures (or skip), proceed to verify.
+
+### Checkpoint 3: Post-Eval-Failure (Capture Failure Pattern)
+
+**Trigger:** After golden eval returns failures and the failure classification produces a user-confirmed fix plan — but BEFORE executing the fix.
+
+**Action:**
+1. Ask: "Should I capture this failure pattern as a regression case for `<target-id>`?" Use the question tool with options: [Capture failure pattern] / [Skip].
+2. If confirmed: route to `sdlc-evalops` `capture-regression` with the failure input, actual output, and expected behavior from the eval output. The case enters inbox, followed by mandatory triage.
+3. After capture (or skip), proceed with executing the fix plan.
+
+### Verify Deviation Target Identification
+
+When `openspec-verify-change` detects a behavioral deviation and the user wants to capture it during Checkpoint 2:
+
+1. The orchestrator SHALL analyze the deviation context and the change's scope to identify candidate target-ids (skills, agents, workflows mentioned in the deviation or change artifacts).
+2. Present candidates via the question tool: "Which target does this deviation belong to?" with the top 2-3 candidates listed, plus a [Different target (specify)] option.
+3. After the user selects a target, route to `sdlc-evalops` `capture-regression`.
+
+### Skip Policy
+
+Every Session Eval checkpoint MUST offer a clear Skip option. Session Eval is a discovery aid, not a gate — the user may always decline capture and continue the workflow. The orchestrator SHALL NOT loop back to re-offer capture after a skip.
+
+### Session Eval vs Promptfoo Eval
+
+| Session Eval | Promptfoo Eval |
+|---|---|
+| Discovery and accumulation | Regression verification and gate |
+| Captures real failures to inbox | Runs canonical golden exports |
+| Interactive, user-confirmed | Automated, evidence-based |
+| Triggers mandatory triage after capture | Triggers failure analysis on failure |
+| Does NOT block workflow progress | May block completion if not run |
+| Never writes to golden directly | Runs against golden cases only |
+
+The orchestrator SHALL maintain this distinction in all Session Eval interactions. Session Eval feeds the eval pipeline; Promptfoo golden eval gates completion.
 
 ## Plan Mode Handoff
 
@@ -699,7 +772,9 @@ User: the research-general skill should also search ArXiv
 Route: spec-driven-propose-flow + evalops-gated
 Reason: skill behavior scope expansion, score = 4 (AI behavior target)
 Target id: skill.research-general
-Required gates: EvalOps gate (coverage + golden cases before implementation), TDD
+Required gates: EvalOps gate (coverage + golden cases before implementation), TDD,
+  Session Eval checkpoints (post-implementation capture if user reports wrong output,
+  pre-verify capture of observed deviations, post-eval-failure capture of failure patterns)
 Expected artifacts: eval coverage review, golden cases, then OpenSpec artifacts
 Next action: check eval coverage for skill.research-general under .ai/evals/targets/skill.research-general/
 ```
