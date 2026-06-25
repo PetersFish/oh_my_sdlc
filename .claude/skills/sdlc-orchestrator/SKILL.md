@@ -1,13 +1,13 @@
 ---
 name: sdlc-orchestrator
 description: >-
-  Thin SDLC orchestration layer that classifies task complexity, selects the right workflow path,
-  and coordinates Roadmap, OpenSpec, EvalOps, Superpowers, and Memory gates without replacing them.
-  Triggers include uncertain task scope, "how should I do this", multi-step SDLC work,
-  any new development task, "start workflow", "use openspec", "continue workflow",
-  OpenSpec lifecycle requests, and explicit workflow initialization.
-  Produces a route decision and starts the workflow runtime before delegating to downstream skills.
-  Do NOT use for tasks already inside an active OpenSpec change or for single-step information queries.
+  Legacy SDLC orchestration reference — manual invocation only.
+  Provides route decision templates, policy documentation, and user-interaction patterns
+  for explicit SDLC lifecycle queries. Use ONLY when the user explicitly says
+  "use sdlc-orchestrator" or "run the SDLC orchestrator".
+  Do NOT auto-trigger on "new development task", "how should I do this",
+  "start workflow", "use openspec", "continue workflow", or any general task description.
+  Default SDLC routing and execution dispatch is handled by dev-orchestrator.
 license: MIT
 ---
 
@@ -17,20 +17,16 @@ Pre-OpenSpec decision layer. Classifies every development task into a workflow p
 
 ## When to Use
 
-- A new development task arrives and the right workflow is unclear.
-- The user asks "how should I approach this", "is this OpenSpec-worthy", or equivalent.
-- A task spans multiple SDLC concerns: planning, implementation, evaluation, and memory.
-- The user describes work that might be small (direct Superpowers), medium (propose flow), or very complex (incremental flow).
-- A roadmap item is ready for promotion.
-- An AI behavior target (skill, agent, prompt, workflow, RAG) is being created or modified.
-- A change completed and durable facts should be persisted.
-- User mentions "orchestrator", "route", "which workflow", "SDLC".
+- The user explicitly says "use sdlc-orchestrator", "run the SDLC orchestrator", or equivalent.
+- The user wants to inspect legacy route decision templates or policy documentation.
+- The user asks how SDLC lifecycle governance worked before `dev-orchestrator`.
 
 ## When Not to Use
 
+- New development tasks, workflow routing, or execution dispatch (use `dev-orchestrator` instead).
 - Tasks already inside an active OpenSpec change (continue with the current flow).
 - Pure informational or Q&A questions.
-- The orchestrator SHALL NOT implement, test, debug, or create artifacts. It classifies and delegates.
+- Any task not explicitly requesting `sdlc-orchestrator` by name.
 
 ## Runtime Preflight Requirement
 
