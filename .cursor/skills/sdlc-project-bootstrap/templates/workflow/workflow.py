@@ -378,7 +378,8 @@ def loader_openspec_change_status(root, change_id):
             if all_tasks and not incomplete:
                 return {"classification": "complete", "source": "active"}
             return {"classification": "in-progress", "source": "active"}
-        return {"classification": "active", "source": "active"}
+        # directory exists but no tasks.md: not yet ready for implementation
+        return {"classification": "scaffold", "source": "active"}
 
     if os.path.isdir(archives):
         for entry in _list_dirs(archives):
@@ -1258,12 +1259,52 @@ def cmd_resolve(root, args):
             if state["phase_readiness"].get("ready"):
                 state["block"] = None
                 state["status"] = "running"
+            else:
+                still_missing = state["phase_readiness"].get("missing_required_inputs", [])
+                print(
+                    json.dumps(
+                        {
+                            "error": "block not resolved",
+                            "block_type": block_type,
+                            "reason": f"still missing inputs: {still_missing}",
+                            "next_allowed": block.get("next_allowed", []),
+                        },
+                        indent=2,
+                    )
+                )
+                sys.exit(1)
         elif block_type == "domain_state_mismatch":
-            # Re-evaluate: if loader updated evidence, domain may now match
-            # For now, clear if phase is complete (which implies domain resolved)
             if is_phase_complete(state, state["current_phase"]):
                 state["block"] = None
                 state["status"] = "running"
+            else:
+                print(
+                    json.dumps(
+                        {
+                            "error": "block not resolved",
+                            "block_type": block_type,
+                            "reason": "phase is not yet complete",
+                            "next_allowed": block.get("next_allowed", []),
+                        },
+                        indent=2,
+                    )
+                )
+                sys.exit(1)
+        else:
+            print(
+                json.dumps(
+                    {
+                        "error": "block cannot be automatically resolved",
+                        "block_type": block_type,
+                        "block_message": block.get("message"),
+                        "current_phase": state["current_phase"],
+                        "next_allowed": block.get("next_allowed", []),
+                        "recommendation": "review the block cause and take explicit action",
+                    },
+                    indent=2,
+                )
+            )
+            sys.exit(1)
     else:
         state["status"] = "running"
 
@@ -1512,7 +1553,28 @@ def cmd_advance(root, args):
         sys.exit(1)
 
     if state.get("status") == "blocked":
-        print(json.dumps({"error": "run is blocked, cannot advance"}, indent=2))
+        block = state.get("block", {})
+        phase_complete = is_phase_complete(state, state["current_phase"])
+        print(
+            json.dumps(
+                {
+                    "error": "run is blocked, cannot advance",
+                    "current_phase": state["current_phase"],
+                    "phase_complete": phase_complete,
+                    "block": {
+                        "type": block.get("type"),
+                        "message": block.get("message"),
+                        "next_allowed": block.get("next_allowed", []),
+                    },
+                    "recommendation": (
+                        "resolve the block before advancing"
+                        if not phase_complete
+                        else "phase is complete — resolve block then advance"
+                    ),
+                },
+                indent=2,
+            )
+        )
         sys.exit(1)
 
     wf = load_workflow(root, state.get("workflow", "sdlc-main"))
@@ -1691,14 +1753,17 @@ def cmd_done(root, args):
         sys.exit(1)
 
     if state.get("current_phase") != "done":
-        state["status"] = "blocked"
-        state["block"] = {
-            "type": "exit_criteria_failed",
-            "message": "current phase is not done",
-            "next_allowed": ["advance", "resolve", "block"],
-        }
-        save_run_state(root, state)
-        print(json.dumps(state, indent=2))
+        print(
+            json.dumps(
+                {
+                    "error": "run is not in terminal phase",
+                    "current_phase": state["current_phase"],
+                    "completed_phases": state.get("completed_phases", []),
+                    "hint": "advance through phases until 'done' before calling done",
+                },
+                indent=2,
+            )
+        )
         sys.exit(1)
 
     if state.get("status") == "blocked":
@@ -2127,6 +2192,7 @@ def _infer_phase(root, subject_type, subject_id):
         return "archive_change"
     if classification in ("active", "in-progress"):
         return "apply_change"
+    # scaffold, missing, unknown: artifact creation still pending
     return "create_change"
 
 

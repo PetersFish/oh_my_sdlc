@@ -213,12 +213,39 @@ class TestPhaseInference(FixtureBase):
         data = json.loads(out)
         self.assertEqual(data["current_phase"], "create_change")
 
-    def test_active_change_starts_at_apply_change(self):
+    def test_scaffold_change_starts_at_create_change(self):
+        """Change dir with .openspec.yaml but no tasks.md starts at create_change."""
         self._make_openspec_change("my-change")
         rc, out, _ = run_workflow(
             self.tmp, "start",
             subject_type="openspec_change",
             subject_id="my-change",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["current_phase"], "create_change")
+
+    def test_empty_change_dir_starts_at_create_change(self):
+        """Change dir with no files at all starts at create_change."""
+        empty_dir = os.path.join(self.tmp, "openspec", "changes", "empty-change")
+        os.makedirs(empty_dir, exist_ok=True)
+        rc, out, _ = run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="empty-change",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["current_phase"], "create_change")
+
+    def test_in_progress_change_starts_at_apply_change(self):
+        """Change with incomplete tasks starts at apply_change."""
+        self._make_openspec_change("wip-change")
+        self._make_task_file("wip-change", completed=False)
+        rc, out, _ = run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="wip-change",
         )
         self.assertEqual(rc, 0)
         data = json.loads(out)
@@ -1564,6 +1591,7 @@ class TestPreflightAndEnsureRun(FixtureBase):
 
     def test_preflight_openspec_apply_in_apply_phase_allows(self):
         self._make_openspec_change("apply-ok")
+        self._make_task_file("apply-ok", completed=False)
         run_workflow(
             self.tmp, "start",
             subject_type="openspec_change",
@@ -2408,6 +2436,80 @@ class TestCompletePhaseClearsBlock(FixtureBase):
         self.assertIsNone(data.get("block"))
         self.assertEqual(data["status"], "running")
         self.assertIn("create_roadmap", data.get("completed_phases", []))
+
+
+class TestBlockedRunNoAutoProgress(FixtureBase):
+    """Blocked runs must not auto-progress; errors must explain why."""
+
+    def test_done_not_at_done_phase_errors_no_block_written(self):
+        self._make_openspec_change("d-blk")
+        run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="d-blk",
+        )
+        rc, out, _ = run_workflow(self.tmp, "done")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertIn("error", data)
+        self.assertEqual(data["error"], "run is not in terminal phase")
+        self.assertIn("current_phase", data)
+        self.assertIn("hint", data)
+        # Verify no side effects: run is not blocked or archived
+        state = self._read_current_state()
+        self.assertIsNone(state.get("block"))
+        self.assertEqual(state["status"], "running")
+
+    def test_advance_blocked_reports_block_details(self):
+        self._make_openspec_change("adv-blk")
+        run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="adv-blk",
+        )
+        state = self._read_current_state()
+        state["status"] = "blocked"
+        state["block"] = {
+            "type": "user_decision_required",
+            "message": "approval needed",
+            "next_allowed": ["resolve", "block", "advance"],
+        }
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(self.tmp, "advance")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertIn("error", data)
+        self.assertEqual(data["error"], "run is blocked, cannot advance")
+        self.assertIn("phase_complete", data)
+        blk = data.get("block", {})
+        self.assertEqual(blk.get("type"), "user_decision_required")
+        self.assertEqual(blk.get("message"), "approval needed")
+        self.assertIn("advance", blk.get("next_allowed", []))
+
+    def test_resolve_unhandled_block_type_errors_with_explanation(self):
+        self._make_openspec_change("res-blk")
+        run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="res-blk",
+        )
+        state = self._read_current_state()
+        state["status"] = "blocked"
+        state["block"] = {
+            "type": "user_decision_required",
+            "message": "choose next action",
+            "next_allowed": ["resolve", "block"],
+        }
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(self.tmp, "resolve")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertIn("error", data)
+        self.assertEqual(data["error"], "block cannot be automatically resolved")
+        self.assertEqual(data["block_type"], "user_decision_required")
+        self.assertIn("recommendation", data)
 
 
 if __name__ == "__main__":
