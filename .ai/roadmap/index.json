@@ -163,7 +163,7 @@
     },
     {
       "id": "RM-ORCH-008",
-      "status": "idea",
+      "status": "ready",
       "title": "Workflow State Machine Contract Enhancements",
       "stage": "v2",
       "priority": "p1",
@@ -171,7 +171,7 @@
       "depends_on": [
         "RM-ORCH-007"
       ],
-      "openspec_change": null,
+      "openspec_change": "workflow-state-machine-contract-enhancements",
       "area": "workflow.sdlc-orchestrator"
     },
     {

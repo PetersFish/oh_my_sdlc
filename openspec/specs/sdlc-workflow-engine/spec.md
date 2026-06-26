@@ -39,7 +39,7 @@ The system SHALL persist active workflow runs using a directory-based layout wit
 
 #### Scenario: Active run file records required fields
 - **WHEN** `.ai/workflows/runs/active/<run_id>.json` exists for an active run
-- **THEN** it SHALL include `version`, `run_id`, `workflow`, `status`, `current_phase`, `primary_subject`, `context`, `phase_readiness`, `pending_hooks`, `completed_hooks`, `completed_phases`, `evidence`, and `updated_at`
+- **THEN** it SHALL include `version`, `run_id`, `workflow`, `flow_type`, `status`, `current_phase`, `primary_subject`, `context`, `phase_readiness`, `pending_hooks`, `completed_hooks`, `completed_phases`, `evidence`, and `updated_at`
 
 #### Scenario: Pointer file is minimal
 - **WHEN** `current.json` exists as a pointer
@@ -56,6 +56,18 @@ The system SHALL persist active workflow runs using a directory-based layout wit
 #### Scenario: Blocked run records block details
 - **WHEN** a workflow run is blocked
 - **THEN** the run state SHALL include a `block` object with the block type, message, and next allowed actions
+
+#### Scenario: Flow type defaults to spec-flow
+- **WHEN** `workflow.py start` creates a new run without `--flow-type`
+- **THEN** the persisted run state SHALL set `flow_type` to `spec-flow`
+
+#### Scenario: Flow type preserves explicit choice
+- **WHEN** `workflow.py start` creates a new run with `--flow-type lightweight-flow`
+- **THEN** the persisted run state SHALL set `flow_type` to `lightweight-flow`
+
+#### Scenario: Resume preserves stored flow type
+- **WHEN** `workflow.py resume` reloads an existing active run
+- **THEN** it SHALL preserve the stored `flow_type` instead of recomputing it from context
 
 #### Scenario: Done run writes history
 - **WHEN** a workflow run reaches `done`
@@ -107,6 +119,25 @@ The workflow runtime SHALL use a minimal status model for workflow runs.
 - **WHEN** a blocked run state is validated
 - **THEN** `block.type` SHALL be one of `missing_required_inputs`, `user_decision_required`, `worker_failed`, `exit_criteria_failed`, `eval_failed`, `hook_blocked`, or `domain_state_mismatch`
 
+### Requirement: Flow Type Selection And Confirmation
+The system SHALL support `lightweight-flow` selection when an external agent (e.g., LLM) passes `--flow-type lightweight-flow`, but SHALL block the run at creation time until the user explicitly confirms the flow type choice. The runtime SHALL NOT infer flow type from subject type or other signals — flow type selection is an external decision.
+
+#### Scenario: Default flow type is spec-flow
+- **WHEN** `workflow.py start` runs without `--flow-type`
+- **THEN** the runtime SHALL set `flow_type` to `spec-flow` and create a running run
+
+#### Scenario: Explicit lightweight-flow requires user confirmation
+- **WHEN** `workflow.py start` runs with `--flow-type lightweight-flow`
+- **THEN** the created run SHALL have `status: blocked`, `block.type: user_decision_required`, a block message that names the flow type, and `block.next_allowed` listing the confirmation action
+
+#### Scenario: Confirmed lightweight-flow becomes running
+- **WHEN** the required confirmation action is recorded for a run blocked on `lightweight-flow`
+- **THEN** the runtime SHALL clear the block, set `status: running`, set `flow_type: lightweight-flow`, and allow the run to advance
+
+#### Scenario: Spec-flow never requires confirmation
+- **WHEN** `workflow.py start` creates a `spec-flow` run (explicitly or as default)
+- **THEN** the runtime SHALL NOT block for flow-type confirmation
+
 ### Requirement: SDLC Main Workflow Definition
 The system SHALL define `sdlc-main` as the first workflow that models the full SDLC path instead of only the OpenSpec subset.
 
@@ -124,7 +155,7 @@ The system SHALL define `sdlc-main` as the first workflow that models the full S
 
 #### Scenario: Workflow definition uses supported phase fields
 - **WHEN** `.ai/workflows/definitions/sdlc-main.yaml` is validated
-- **THEN** each phase SHALL use only supported MVP fields: `required_inputs`, `context_loaders`, `allowed_workers`, `exit_criteria`, `post_hooks`, `branches`, `next`, and `terminal`
+- **THEN** each phase SHALL use only supported workflow fields: `required_inputs`, `context_loaders`, `allowed_workers`, `evidence_keys`, `exit_criteria`, `post_hooks`, `branches`, `next`, and `terminal`
 
 #### Scenario: Branch phase requires branch decision
 - **WHEN** `workflow.py advance` runs for a phase with `branches`
@@ -211,6 +242,18 @@ The workflow runtime SHALL provide deterministic commands for run lifecycle, rea
 - **THEN** it SHALL create a new `active/<run_id>.json` without conflict
 - **AND** it SHALL update `current.json` to `{"run_id": "<run_id>"}`
 
+#### Scenario: Start defaults flow type to spec-flow
+- **WHEN** `workflow.py start` runs without `--flow-type`
+- **THEN** the created run SHALL persist `flow_type: spec-flow`
+
+#### Scenario: Start accepts explicit lightweight-flow
+- **WHEN** `workflow.py start` runs with `--flow-type lightweight-flow`
+- **THEN** the created run SHALL have `status: blocked`, `block.type: user_decision_required`, a block message naming the flow type, and `block.next_allowed` containing the confirmation action
+
+#### Scenario: Confirmation unblocks lightweight-flow run
+- **WHEN** the confirmation action is recorded for a run blocked on `lightweight-flow`
+- **THEN** the runtime SHALL clear the block, set `status: running`, set `flow_type: lightweight-flow`, and allow the run to advance
+
 #### Scenario: Resume recalculates without executing
 - **WHEN** `workflow.py resume` runs with `--subject-type` and `--subject-id` matching an active run
 - **THEN** it SHALL reload deterministic context, recalculate readiness, update the pointer, and SHALL NOT execute phase workers or hooks
@@ -238,6 +281,10 @@ The workflow runtime SHALL provide deterministic commands for run lifecycle, rea
 - **WHEN** `workflow.py complete-phase` runs
 - **THEN** it SHALL verify the current phase exit criteria before adding the phase to `completed_phases`
 
+#### Scenario: Complete phase requires declared evidence keys
+- **WHEN** `workflow.py complete-phase` runs for a phase that declares `evidence_keys`
+- **THEN** it SHALL fail unless every declared evidence key is present and non-empty in the run evidence
+
 #### Scenario: Complete hook verifies hook evidence
 - **WHEN** `workflow.py complete-hook` runs
 - **THEN** it SHALL verify the hook completion evidence before removing the hook from `pending_hooks`
@@ -261,6 +308,10 @@ The workflow runtime SHALL provide deterministic commands for run lifecycle, rea
 #### Scenario: Validate is read-only
 - **WHEN** `workflow.py validate` runs
 - **THEN** it SHALL validate workflow definitions and run state without modifying files
+
+#### Scenario: Validate rejects unknown flow type
+- **WHEN** `workflow.py validate` runs against run state with a missing or unsupported `flow_type`
+- **THEN** it SHALL report validation failure
 
 ### Requirement: Deterministic Context Loaders
 The workflow runtime SHALL provide deterministic loaders for observable workflow inputs and evidence.

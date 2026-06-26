@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "run_id": "2026-06-26-RM-ORCH-008",
+  "workflow": "sdlc-main",
+  "status": "done",
+  "current_phase": "done",
+  "primary_subject": {
+    "type": "roadmap_item",
+    "id": "RM-ORCH-008"
+  },
+  "context": {
+    "change_id": "workflow-state-machine-contract-enhancements",
+    "roadmap_item_id": "RM-ORCH-008"
+  },
+  "phase_readiness": {
+    "phase": "done",
+    "ready": true,
+    "missing_required_inputs": []
+  },
+  "pending_hooks": [],
+  "completed_hooks": [
+    "roadmap_status_ready_if_linked",
+    "roadmap_apply_start_if_ready",
+    "memory_sync"
+  ],
+  "completed_phases": [
+    "create_change",
+    "apply_change",
+    "archive_change"
+  ],
+  "gates": {},
+  "evidence": {
+    "openspec_change_id": "workflow-state-machine-contract-enhancements",
+    "openspec_status": {
+      "classification": "archived",
+      "source": "openspec/changes/archive/2026-06-26-workflow-state-machine-contract-enhancements"
+    },
+    "roadmap_link": {
+      "count": 1,
+      "items": [
+        {
+          "item_id": "RM-ORCH-008",
+          "status": "done",
+          "completed_at": "2026-06-26",
+          "file": ".ai/roadmap/areas/workflow.sdlc-orchestrator/items/RM-ORCH-008-workflow-state-machine-contract-enhancements.md",
+          "area": "workflow.sdlc-orchestrator"
+        }
+      ]
+    },
+    "roadmap_item_status": {
+      "item_id": "RM-ORCH-008",
+      "status": "done",
+      "completed_at": "2026-06-26"
+    },
+    "tasks_complete": true,
+    "tdd_passed": true,
+    "eval_passed_or_human_decision_recorded": "human_decision:change_archived",
+    "archive_path": "openspec/changes/archive/2026-06-26-workflow-state-machine-contract-enhancements",
+    "memory_sync_resolution": "synced",
+    "memory_sync_reason": ""
+  },
+  "block": null,
+  "updated_at": "2026-06-26T20:52:35.008245",
+  "flow_type": "spec-flow"
+}

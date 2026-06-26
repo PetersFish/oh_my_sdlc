@@ -388,6 +388,53 @@ class TestAdvanceGuarded(FixtureBase):
         self.assertNotEqual(rc, 0)
         self.assertIn("blocked", out.lower())
 
+    def test_advance_to_done_does_not_recreate_active_run(self):
+        run_id = "2026-06-20-advance-done"
+        state = {
+            "version": 1,
+            "run_id": run_id,
+            "workflow": "sdlc-main",
+            "status": "running",
+            "current_phase": "post_archive_actions",
+            "primary_subject": {"type": "openspec_change", "id": "advance-done"},
+            "context": {"change_id": "advance-done"},
+            "phase_readiness": {
+                "phase": "post_archive_actions",
+                "ready": True,
+                "missing_required_inputs": [],
+            },
+            "pending_hooks": [],
+            "completed_hooks": ["memory_sync", "roadmap_done_if_relevant"],
+            "completed_phases": [
+                "create_change",
+                "apply_change",
+                "archive_change",
+                "post_archive_actions",
+            ],
+            "gates": {},
+            "evidence": {
+                "archive_path": "openspec/changes/archive/2026-06-22-advance-done",
+            },
+            "block": None,
+            "updated_at": "2026-06-20T00:00:00",
+            "flow_type": "spec-flow",
+        }
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(self.tmp, "advance")
+
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "done")
+        self.assertEqual(data["current_phase"], "done")
+        self.assertIsNone(self._read_active_file(run_id))
+        pointer = load_json(self.tmp, ".ai/workflows/runs/current.json")
+        self.assertFalse(pointer.get("run_id"))
+        history = self._read_history(run_id)
+        self.assertIsNotNone(history)
+        self.assertEqual(history["status"], "done")
+        self.assertEqual(history["current_phase"], "done")
+
 
 class TestBranchPhase(FixtureBase):
     def test_branch_with_unknown_decision_blocks(self):
@@ -467,6 +514,152 @@ class TestPostArchiveHooks(FixtureBase):
         self.assertEqual(data["evidence"]["roadmap_item_run_finalized"], roadmap_run_id)
         self.assertFalse(os.path.exists(os.path.join(self.tmp, ".ai", "workflows", "runs", "active", f"{roadmap_run_id}.json")))
         self.assertIsNotNone(self._read_history(roadmap_run_id))
+
+    def test_roadmap_done_hook_does_not_recreate_current_run_after_finalizing_itself(self):
+        """Completing the roadmap-done hook on the current roadmap run must not resurrect it in active/."""
+        self._make_roadmap_item(
+            "RM-SELF-001",
+            "done",
+            openspec_change="self-finalize-change",
+            completed_at="2026-06-22",
+        )
+        run_id = "2026-06-20-RM-SELF-001"
+        state = {
+            "version": 1,
+            "run_id": run_id,
+            "workflow": "sdlc-main",
+            "status": "running",
+            "current_phase": "archive_change",
+            "primary_subject": {"type": "roadmap_item", "id": "RM-SELF-001"},
+            "context": {
+                "change_id": "self-finalize-change",
+                "roadmap_item_id": "RM-SELF-001",
+            },
+            "phase_readiness": {
+                "phase": "archive_change",
+                "ready": True,
+                "missing_required_inputs": [],
+            },
+            "pending_hooks": ["roadmap_done_if_relevant"],
+            "completed_hooks": [
+                "roadmap_status_ready_if_linked",
+                "roadmap_apply_start_if_ready",
+                "memory_sync",
+            ],
+            "completed_phases": ["create_change", "apply_change", "archive_change"],
+            "gates": {},
+            "evidence": {
+                "openspec_change_id": "self-finalize-change",
+                "archive_path": "openspec/changes/archive/2026-06-22-self-finalize-change",
+                "roadmap_link": {
+                    "count": 1,
+                    "items": [
+                        {
+                            "item_id": "RM-SELF-001",
+                            "status": "done",
+                            "completed_at": "2026-06-22",
+                            "file": ".ai/roadmap/areas/area1/items/RM-SELF-001.md",
+                            "area": "area1",
+                        }
+                    ],
+                },
+                "roadmap_item_status": {
+                    "item_id": "RM-SELF-001",
+                    "status": "done",
+                    "completed_at": "2026-06-22",
+                },
+            },
+            "block": None,
+            "updated_at": "2026-06-20T00:00:00",
+            "flow_type": "spec-flow",
+        }
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(
+            self.tmp, "complete-hook",
+            hook="roadmap_done_if_relevant",
+        )
+
+        self.assertEqual(rc, 0)
+        self.assertIsNone(self._read_active_file(run_id))
+        pointer = load_json(self.tmp, ".ai/workflows/runs/current.json")
+        self.assertFalse(pointer.get("run_id"))
+        history = self._read_history(run_id)
+        self.assertIsNotNone(history)
+        self.assertEqual(history["status"], "done")
+        self.assertEqual(history["current_phase"], "done")
+
+    def test_roadmap_done_hook_does_not_recreate_current_run_when_latest_status_turns_done(self):
+        """Refreshing roadmap status from active->done must not resurrect the current roadmap run."""
+        self._make_roadmap_item(
+            "RM-SELF-002",
+            "done",
+            openspec_change="self-latest-done-change",
+            completed_at="2026-06-22",
+        )
+        run_id = "2026-06-20-RM-SELF-002"
+        state = {
+            "version": 1,
+            "run_id": run_id,
+            "workflow": "sdlc-main",
+            "status": "running",
+            "current_phase": "archive_change",
+            "primary_subject": {"type": "roadmap_item", "id": "RM-SELF-002"},
+            "context": {
+                "change_id": "self-latest-done-change",
+                "roadmap_item_id": "RM-SELF-002",
+            },
+            "phase_readiness": {
+                "phase": "archive_change",
+                "ready": True,
+                "missing_required_inputs": [],
+            },
+            "pending_hooks": ["roadmap_done_if_relevant"],
+            "completed_hooks": [
+                "roadmap_status_ready_if_linked",
+                "roadmap_apply_start_if_ready",
+                "memory_sync",
+            ],
+            "completed_phases": ["create_change", "apply_change", "archive_change"],
+            "gates": {},
+            "evidence": {
+                "openspec_change_id": "self-latest-done-change",
+                "archive_path": "openspec/changes/archive/2026-06-22-self-latest-done-change",
+                "roadmap_link": {
+                    "count": 1,
+                    "items": [
+                        {
+                            "item_id": "RM-SELF-002",
+                            "status": "active",
+                            "file": ".ai/roadmap/areas/area1/items/RM-SELF-002.md",
+                            "area": "area1",
+                        }
+                    ],
+                },
+                "roadmap_item_status": {
+                    "item_id": "RM-SELF-002",
+                    "status": "active",
+                },
+            },
+            "block": None,
+            "updated_at": "2026-06-20T00:00:00",
+            "flow_type": "spec-flow",
+        }
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(
+            self.tmp, "complete-hook",
+            hook="roadmap_done_if_relevant",
+        )
+
+        self.assertEqual(rc, 0)
+        self.assertIsNone(self._read_active_file(run_id))
+        pointer = load_json(self.tmp, ".ai/workflows/runs/current.json")
+        self.assertFalse(pointer.get("run_id"))
+        history = self._read_history(run_id)
+        self.assertIsNotNone(history)
+        self.assertEqual(history["status"], "done")
+        self.assertEqual(history["current_phase"], "done")
 
     def test_archived_active_roadmap_blocks_done(self):
         self._start_archived_workflow("arch-block", [
@@ -2376,6 +2569,411 @@ class TestRoadmapPhaseInference(FixtureBase):
         self.assertEqual(rc, 0)
         data = json.loads(out)
         self.assertEqual(data["current_phase"], "create_roadmap")
+
+    def test_start_roadmap_item_default_is_running_not_blocked(self):
+        """Default start (no --flow-type) for roadmap_item creates running spec-flow, not blocked."""
+        self._make_roadmap_item("RM-PI-006", "idea")
+        rc, out, _ = run_workflow(
+            self.tmp, "start",
+            subject_type="roadmap_item",
+            subject_id="RM-PI-006",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "running")
+        self.assertEqual(data["flow_type"], "spec-flow")
+        self.assertIsNone(data.get("block"))
+
+
+class TestFlowType(FixtureBase):
+    """Tests for flow_type persistence (spec: Run State Schema / Flow Type Inference)."""
+
+    def test_start_without_flow_type_defaults_to_spec_flow(self):
+        rc, out, _ = run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="ft-default",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data.get("flow_type"), "spec-flow")
+
+    def test_start_with_explicit_lightweight_flow_persists(self):
+        self._make_roadmap_item("ft-lightweight", "idea")
+        rc, out, _ = run_workflow(
+            self.tmp, "start",
+            subject_type="roadmap_item",
+            subject_id="ft-lightweight",
+            flow_type="lightweight-flow",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data.get("status"), "blocked")
+        self.assertEqual(data.get("flow_type"), "lightweight-flow")
+        # Confirm
+        run_workflow(self.tmp, "record-evidence", key="lightweight_flow_confirmed", value='"true"')
+        rc, out, _ = run_workflow(self.tmp, "resolve")
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data.get("flow_type"), "lightweight-flow")
+        self.assertEqual(data.get("status"), "running")
+
+    def test_resume_preserves_stored_flow_type(self):
+        self._make_roadmap_item("ft-resume", "idea")
+        run_workflow(
+            self.tmp, "start",
+            subject_type="roadmap_item",
+            subject_id="ft-resume",
+            flow_type="lightweight-flow",
+        )
+        # Confirm so flow_type gets persisted
+        run_workflow(self.tmp, "record-evidence", key="lightweight_flow_confirmed", value='"true"')
+        run_workflow(self.tmp, "resolve")
+        rc, out, _ = run_workflow(
+            self.tmp, "resume",
+            subject_type="roadmap_item",
+            subject_id="ft-resume",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data.get("flow_type"), "lightweight-flow")
+
+    def test_validate_rejects_missing_flow_type(self):
+        rdir = os.path.join(self.tmp, ".ai", "workflows", "runs")
+        active_dir = os.path.join(rdir, "active")
+        os.makedirs(active_dir, exist_ok=True)
+        state = {
+            "version": 1,
+            "run_id": "2026-06-26-no-ft",
+            "workflow": "sdlc-main",
+            "status": "running",
+            "current_phase": "input",
+            "primary_subject": {"type": "openspec_change", "id": "no-ft"},
+            "context": {},
+            "phase_readiness": {"phase": "input", "ready": True, "missing_required_inputs": []},
+            "pending_hooks": [],
+            "completed_hooks": [],
+            "completed_phases": [],
+            "gates": {},
+            "evidence": {},
+            "block": None,
+            "updated_at": "",
+        }
+        with open(os.path.join(active_dir, "2026-06-26-no-ft.json"), "w") as f:
+            json.dump(state, f)
+        pointer_path = os.path.join(rdir, "current.json")
+        with open(pointer_path, "w") as f:
+            json.dump({"run_id": "2026-06-26-no-ft"}, f)
+
+        rc, _, stderr = run_workflow(self.tmp, "validate")
+        self.assertNotEqual(rc, 0)
+        self.assertIn("flow_type", stderr.lower())
+
+    def test_validate_rejects_unsupported_flow_type(self):
+        rdir = os.path.join(self.tmp, ".ai", "workflows", "runs")
+        active_dir = os.path.join(rdir, "active")
+        os.makedirs(active_dir, exist_ok=True)
+        state = {
+            "version": 1,
+            "run_id": "2026-06-26-bad-ft",
+            "workflow": "sdlc-main",
+            "status": "running",
+            "current_phase": "input",
+            "flow_type": "bogus-flow",
+            "primary_subject": {"type": "openspec_change", "id": "bad-ft"},
+            "context": {},
+            "phase_readiness": {"phase": "input", "ready": True, "missing_required_inputs": []},
+            "pending_hooks": [],
+            "completed_hooks": [],
+            "completed_phases": [],
+            "gates": {},
+            "evidence": {},
+            "block": None,
+            "updated_at": "",
+        }
+        with open(os.path.join(active_dir, "2026-06-26-bad-ft.json"), "w") as f:
+            json.dump(state, f)
+        pointer_path = os.path.join(rdir, "current.json")
+        with open(pointer_path, "w") as f:
+            json.dump({"run_id": "2026-06-26-bad-ft"}, f)
+
+        rc, _, stderr = run_workflow(self.tmp, "validate")
+        self.assertNotEqual(rc, 0)
+        self.assertIn("flow_type", stderr.lower())
+
+    def test_start_rejects_invalid_flow_type(self):
+        """--flow-type bogus-flow is rejected by argparse."""
+        rc, _, stderr = run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="ft-bogus",
+            flow_type="bogus-flow",
+        )
+        self.assertNotEqual(rc, 0)
+
+    def test_explicit_lightweight_flow_creates_blocked_run(self):
+        """Explicit --flow-type lightweight-flow creates blocked run for user confirmation."""
+        self._make_roadmap_item("RM-INFER-001", "idea")
+        rc, out, _ = run_workflow(
+            self.tmp, "start",
+            subject_type="roadmap_item",
+            subject_id="RM-INFER-001",
+            flow_type="lightweight-flow",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "blocked")
+        self.assertEqual(data.get("flow_type"), "lightweight-flow")
+        self.assertEqual(data["block"]["type"], "user_decision_required")
+        self.assertIn("lightweight-flow", data["block"]["message"])
+        self.assertIn("confirm_lightweight_flow", data["block"]["next_allowed"])
+
+    def test_confirmation_unblocks_explicit_lightweight_flow(self):
+        """Recording confirmation clears the block and sets flow_type to lightweight-flow."""
+        self._make_roadmap_item("RM-CONFIRM-001", "idea")
+        run_workflow(
+            self.tmp, "start",
+            subject_type="roadmap_item",
+            subject_id="RM-CONFIRM-001",
+            flow_type="lightweight-flow",
+        )
+        # Record the confirmation evidence
+        run_workflow(
+            self.tmp, "record-evidence",
+            key="lightweight_flow_confirmed",
+            value='"true"',
+        )
+        # Resolve should clear the block
+        rc, out, _ = run_workflow(self.tmp, "resolve")
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertIsNone(data.get("block"))
+        self.assertEqual(data["status"], "running")
+        self.assertEqual(data.get("flow_type"), "lightweight-flow")
+
+
+class TestEvidenceKeyValidation(FixtureBase):
+    """Tests for evidence_keys validation (spec: Workflow Phase Evidence Contracts)."""
+
+    def test_evidence_keys_rejects_non_list(self):
+        tc = tempfile.mkdtemp()
+        try:
+            wf_dir = os.path.join(tc, ".ai", "workflows", "definitions")
+            os.makedirs(wf_dir, exist_ok=True)
+            wf_def = {
+                "version": 1,
+                "id": "sdlc-main",
+                "phases": {
+                    "input": {
+                        "evidence_keys": "not_a_list",
+                        "terminal": True,
+                    },
+                },
+            }
+            import yaml
+            with open(os.path.join(wf_dir, "sdlc-main.yaml"), "w") as f:
+                yaml.dump(wf_def, f)
+            rc, _, stderr = run_workflow(tc, "validate")
+            self.assertNotEqual(rc, 0)
+            self.assertIn("evidence_keys", stderr.lower())
+        finally:
+            shutil.rmtree(tc, ignore_errors=True)
+
+    def test_evidence_keys_rejects_empty_string_entries(self):
+        tc = tempfile.mkdtemp()
+        try:
+            wf_dir = os.path.join(tc, ".ai", "workflows", "definitions")
+            os.makedirs(wf_dir, exist_ok=True)
+            wf_def = {
+                "version": 1,
+                "id": "sdlc-main",
+                "phases": {
+                    "input": {
+                        "evidence_keys": ["", "valid_key"],
+                        "terminal": True,
+                    },
+                },
+            }
+            import yaml
+            with open(os.path.join(wf_dir, "sdlc-main.yaml"), "w") as f:
+                yaml.dump(wf_def, f)
+            rc, _, stderr = run_workflow(tc, "validate")
+            self.assertNotEqual(rc, 0)
+            self.assertIn("evidence_keys", stderr.lower())
+        finally:
+            shutil.rmtree(tc, ignore_errors=True)
+
+    def test_complete_phase_fails_missing_evidence_key(self):
+        """1.8: complete-phase fails when a declared evidence key is missing."""
+        tc = tempfile.mkdtemp()
+        try:
+            src_def = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                "..", ".ai", "workflows", "definitions",
+            )
+            dst_def = os.path.join(tc, ".ai", "workflows", "definitions")
+            if os.path.isdir(src_def):
+                shutil.copytree(src_def, dst_def)
+
+            run_workflow(
+                tc, "start",
+                subject_type="openspec_change",
+                subject_id="evk-missing",
+            )
+            state = load_json(tc, ".ai/workflows/runs/current.json")
+            active = load_json(tc, f".ai/workflows/runs/active/{state['run_id']}.json")
+
+            # Add evidence_keys to the current phase definition and clear exit criteria
+            wf_path = os.path.join(tc, ".ai", "workflows", "definitions", "sdlc-main.yaml")
+            import yaml as _yaml
+            with open(wf_path, "r") as f:
+                wf = _yaml.safe_load(f)
+            wf["phases"][active["current_phase"]]["evidence_keys"] = ["required_key"]
+            wf["phases"][active["current_phase"]]["exit_criteria"] = []
+            with open(wf_path, "w") as f:
+                _yaml.dump(wf, f)
+
+            rc, out, _ = run_workflow(tc, "complete-phase")
+            self.assertNotEqual(rc, 0)
+            self.assertIn("missing evidence", out.lower())
+        finally:
+            shutil.rmtree(tc, ignore_errors=True)
+
+    def test_complete_phase_fails_empty_evidence_value(self):
+        """1.9: complete-phase fails when a declared evidence key has empty value."""
+        tc = tempfile.mkdtemp()
+        try:
+            src_def = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                "..", ".ai", "workflows", "definitions",
+            )
+            dst_def = os.path.join(tc, ".ai", "workflows", "definitions")
+            if os.path.isdir(src_def):
+                shutil.copytree(src_def, dst_def)
+
+            run_workflow(
+                tc, "start",
+                subject_type="openspec_change",
+                subject_id="evk-empty",
+            )
+            state = load_json(tc, ".ai/workflows/runs/current.json")
+            active = load_json(tc, f".ai/workflows/runs/active/{state['run_id']}.json")
+
+            # Record evidence with empty value
+            active_path = os.path.join(tc, ".ai", "workflows", "runs", "active", f"{state['run_id']}.json")
+            active["evidence"]["required_key"] = ""
+            with open(active_path, "w") as f:
+                json.dump(active, f)
+
+            # Add evidence_keys to the current phase definition and clear exit criteria
+            wf_path = os.path.join(tc, ".ai", "workflows", "definitions", "sdlc-main.yaml")
+            import yaml as _yaml
+            with open(wf_path, "r") as f:
+                wf = _yaml.safe_load(f)
+            wf["phases"][active["current_phase"]]["evidence_keys"] = ["required_key"]
+            wf["phases"][active["current_phase"]]["exit_criteria"] = []
+            with open(wf_path, "w") as f:
+                _yaml.dump(wf, f)
+
+            rc, out, _ = run_workflow(tc, "complete-phase")
+            self.assertNotEqual(rc, 0)
+            self.assertIn("empty evidence", out.lower())
+        finally:
+            shutil.rmtree(tc, ignore_errors=True)
+
+    def test_complete_phase_succeeds_with_all_evidence_keys_present(self):
+        """1.10: complete-phase succeeds when all evidence keys are present and non-empty."""
+        tc = tempfile.mkdtemp()
+        try:
+            src_def = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                "..", ".ai", "workflows", "definitions",
+            )
+            dst_def = os.path.join(tc, ".ai", "workflows", "definitions")
+            if os.path.isdir(src_def):
+                shutil.copytree(src_def, dst_def)
+
+            # Start at create_roadmap phase (which has exit_criteria: roadmap_item_created)
+            # We'll set it to a phase with just the evidence_keys
+            run_workflow(
+                tc, "start",
+                subject_type="openspec_change",
+                subject_id="evk-ok",
+            )
+            state = load_json(tc, ".ai/workflows/runs/current.json")
+            active = load_json(tc, f".ai/workflows/runs/active/{state['run_id']}.json")
+            active_path = os.path.join(tc, ".ai", "workflows", "runs", "active", f"{state['run_id']}.json")
+
+            # Use a phase with no exit_criteria (or just evidence_keys) so we can test evidence gate alone
+            current = active["current_phase"]
+            active["current_phase"] = current
+            active["evidence"]["required_key"] = "some_value"
+            with open(active_path, "w") as f:
+                json.dump(active, f)
+
+            # Modify workflow: add evidence_keys to current phase and clear exit_criteria
+            wf_path = os.path.join(tc, ".ai", "workflows", "definitions", "sdlc-main.yaml")
+            import yaml as _yaml
+            with open(wf_path, "r") as f:
+                wf = _yaml.safe_load(f)
+            phase_def = wf["phases"][current]
+            phase_def["evidence_keys"] = ["required_key"]
+            phase_def["exit_criteria"] = []  # no exit criteria needed, just evidence check
+            with open(wf_path, "w") as f:
+                _yaml.dump(wf, f)
+
+            rc, out, _ = run_workflow(tc, "complete-phase")
+            self.assertEqual(rc, 0)
+            data = json.loads(out)
+            self.assertIn(current, data.get("completed_phases", []))
+        finally:
+            shutil.rmtree(tc, ignore_errors=True)
+
+    def test_complete_phase_fails_falsy_json_evidence_values(self):
+        """Falsy JSON values (False, 0, [], {}) are treated as empty evidence."""
+        falsy_cases = [
+            ("bool_false", False),
+            ("int_zero", 0),
+            ("empty_list", []),
+            ("empty_dict", {}),
+        ]
+        for key, value in falsy_cases:
+            with self.subTest(key=key, value=value):
+                tc = tempfile.mkdtemp()
+                try:
+                    src_def = os.path.join(
+                        os.path.dirname(os.path.abspath(__file__)),
+                        "..", ".ai", "workflows", "definitions",
+                    )
+                    dst_def = os.path.join(tc, ".ai", "workflows", "definitions")
+                    if os.path.isdir(src_def):
+                        shutil.copytree(src_def, dst_def)
+
+                    run_workflow(
+                        tc, "start",
+                        subject_type="openspec_change",
+                        subject_id=f"falsy-{key}",
+                    )
+                    state = load_json(tc, ".ai/workflows/runs/current.json")
+                    active = load_json(tc, f".ai/workflows/runs/active/{state['run_id']}.json")
+                    active_path = os.path.join(tc, ".ai", "workflows", "runs", "active", f"{state['run_id']}.json")
+                    active["evidence"]["required_key"] = value
+                    with open(active_path, "w") as f:
+                        json.dump(active, f)
+
+                    wf_path = os.path.join(tc, ".ai", "workflows", "definitions", "sdlc-main.yaml")
+                    import yaml as _yaml
+                    with open(wf_path, "r") as f:
+                        wf = _yaml.safe_load(f)
+                    wf["phases"][active["current_phase"]]["evidence_keys"] = ["required_key"]
+                    wf["phases"][active["current_phase"]]["exit_criteria"] = []
+                    with open(wf_path, "w") as f:
+                        _yaml.dump(wf, f)
+
+                    rc, _, _ = run_workflow(tc, "complete-phase")
+                    self.assertNotEqual(rc, 0, f"expected failure for {key}={value!r}")
+                finally:
+                    shutil.rmtree(tc, ignore_errors=True)
 
 
 class TestResolveResolvedBlocks(FixtureBase):

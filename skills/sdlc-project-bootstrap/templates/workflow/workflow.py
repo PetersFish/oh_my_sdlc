@@ -65,11 +65,13 @@ def _finding_hash(finding_type, **fields):
 # ---------------------------------------------------------------------------
 
 RUN_STATE_KEYS = {
-    "version", "run_id", "workflow", "status", "current_phase",
+    "version", "run_id", "workflow", "flow_type", "status", "current_phase",
     "primary_subject", "context", "phase_readiness", "pending_hooks",
     "completed_hooks", "completed_phases", "gates", "evidence", "block",
     "updated_at",
 }
+
+VALID_FLOW_TYPES = {"spec-flow", "lightweight-flow"}
 
 
 def _read_pointer(root):
@@ -188,6 +190,8 @@ def _finalize_run_to_history(root, state):
 
     return state
 
+    return state
+
 
 def validate_run_state(state):
     errors = []
@@ -196,6 +200,8 @@ def validate_run_state(state):
             errors.append(f"missing required field: {key}")
     if state.get("status") not in VALID_STATUSES:
         errors.append(f"invalid status: {state.get('status')}")
+    if state.get("flow_type") not in VALID_FLOW_TYPES:
+        errors.append(f"invalid flow_type: {state.get('flow_type')}")
     if state.get("block") and isinstance(state["block"], dict):
         bt = state["block"].get("type", "")
         if bt not in VALID_BLOCK_TYPES:
@@ -212,7 +218,7 @@ def validate_run_state(state):
 
 SUPPORTED_PHASE_FIELDS = {
     "required_inputs", "context_loaders", "allowed_workers",
-    "exit_criteria", "post_hooks", "branches", "next", "terminal",
+    "evidence_keys", "exit_criteria", "post_hooks", "branches", "next", "terminal",
 }
 
 
@@ -242,6 +248,14 @@ def validate_workflow(wf):
         for key in phase:
             if key not in SUPPORTED_PHASE_FIELDS:
                 errors.append(f"phase {name}: unsupported field: {key}")
+        evidence_keys = phase.get("evidence_keys")
+        if evidence_keys is not None:
+            if not isinstance(evidence_keys, list):
+                errors.append(f"phase {name}: evidence_keys must be a list")
+            else:
+                for ek in evidence_keys:
+                    if not isinstance(ek, str) or not ek.strip():
+                        errors.append(f"phase {name}: evidence_keys must be non-empty strings")
         if not phase.get("terminal") and not phase.get("next") and not phase.get("branches"):
             errors.append(f"phase {name}: must have next, branches, or terminal")
         if phase.get("branches"):
@@ -854,6 +868,7 @@ def _create_workflow_run(root, subject_type, subject_id, pending_hooks):
         "version": 1,
         "run_id": run_id,
         "workflow": workflow_id,
+        "flow_type": "spec-flow",
         "status": "running",
         "current_phase": phase,
         "primary_subject": {"type": subject_type, "id": subject_id},
@@ -1139,11 +1154,45 @@ def cmd_start(root, args):
             sys.exit(1)
 
     phase = _infer_phase(root, subject_type, subject_id)
+    flow_type = args.flow_type or "spec-flow"
+
+    # Confirmation-gated lightweight-flow: LLM decides externally, runtime blocks until user confirms
+    if args.flow_type == "lightweight-flow":
+        state = {
+            "version": 1,
+            "run_id": run_id,
+            "workflow": workflow_id,
+            "flow_type": "lightweight-flow",
+            "status": "blocked",
+            "current_phase": phase,
+            "primary_subject": {"type": subject_type, "id": subject_id},
+            "context": {"change_id": subject_id} if subject_type == "openspec_change" else {},
+            "phase_readiness": {"phase": phase, "ready": False, "missing_required_inputs": []},
+            "pending_hooks": [],
+            "completed_hooks": [],
+            "completed_phases": [],
+            "gates": {},
+            "evidence": {},
+            "block": {
+                "type": "user_decision_required",
+                "message": "Flow type: lightweight-flow. Confirm to continue.",
+                "next_allowed": ["confirm_lightweight_flow"],
+            },
+            "updated_at": "",
+        }
+        wf = load_workflow(root, workflow_id)
+        if wf:
+            _run_loaders(root, state, wf)
+        save_run_state(root, state)
+        state["updated_at"] = _ts()
+        print(json.dumps(state, indent=2))
+        return
 
     state = {
         "version": 1,
         "run_id": run_id,
         "workflow": workflow_id,
+        "flow_type": flow_type,
         "status": "running",
         "current_phase": phase,
         "primary_subject": {"type": subject_type, "id": subject_id},
@@ -1290,6 +1339,27 @@ def cmd_resolve(root, args):
                     )
                 )
                 sys.exit(1)
+        elif block_type == "user_decision_required" and "confirm_lightweight_flow" in block.get("next_allowed", []):
+            # Lightweight-flow confirmation: LLM chose externally, user confirms
+            confirmed = state.get("evidence", {}).get("lightweight_flow_confirmed")
+            if confirmed:
+                state["block"] = None
+                state["status"] = "running"
+                state["flow_type"] = "lightweight-flow"
+            else:
+                print(
+                    json.dumps(
+                        {
+                            "error": "block not resolved",
+                            "block_type": block_type,
+                            "reason": "lightweight-flow not yet confirmed",
+                            "next_allowed": block.get("next_allowed", []),
+                            "recommendation": "record evidence: lightweight_flow_confirmed",
+                        },
+                        indent=2,
+                    )
+                )
+                sys.exit(1)
         else:
             print(
                 json.dumps(
@@ -1371,6 +1441,31 @@ def cmd_complete_phase(root, args):
         save_run_state(root, state)
         print(json.dumps(state, indent=2))
         sys.exit(1)
+
+    # Evidence key validation
+    evidence_keys = phase_def.get("evidence_keys", [])
+    if evidence_keys:
+        run_evidence = state.get("evidence", {})
+        missing = []
+        empty_vals = []
+        for ek in evidence_keys:
+            if ek not in run_evidence:
+                missing.append(ek)
+            elif not run_evidence[ek] or (isinstance(run_evidence[ek], str) and not run_evidence[ek].strip()):
+                empty_vals.append(ek)
+        if missing or empty_vals:
+            parts = []
+            if missing:
+                parts.append(f"missing evidence keys: {missing}")
+            if empty_vals:
+                parts.append(f"empty evidence keys: {empty_vals}")
+            print(
+                json.dumps(
+                    {"error": "; ".join(parts)},
+                    indent=2,
+                )
+            )
+            sys.exit(1)
 
     # Clear any stale block and restore running status
     if state.get("block"):
@@ -1454,9 +1549,17 @@ def cmd_complete_hook(root, args):
                     if linked_item_run:
                         linked_change = linked_item_run.get("context", {}).get("change_id") or _read_roadmap_item_openspec_change(root, item.get("item_id"))
                         if linked_change == state.get("context", {}).get("change_id"):
-                            _finalize_run_to_history(root, linked_item_run)
                             state.setdefault("evidence", {})["roadmap_hook_resolution"] = "done"
                             state.setdefault("evidence", {})["roadmap_item_run_finalized"] = linked_item_run.get("run_id")
+                            if linked_item_run.get("run_id") == state.get("run_id"):
+                                pending.remove(hook_name)
+                                completed = state.setdefault("completed_hooks", [])
+                                if hook_name not in completed:
+                                    completed.append(hook_name)
+                                finalized = _finalize_run_to_history(root, state)
+                                print(json.dumps(finalized, indent=2))
+                                return
+                            _finalize_run_to_history(root, linked_item_run)
                         else:
                             state.setdefault("evidence", {})["roadmap_hook_resolution"] = "idempotent_done"
                     else:
@@ -1468,9 +1571,17 @@ def cmd_complete_hook(root, args):
                             root, "roadmap_item", item.get("item_id")
                         )
                         if linked_item_run:
-                            _finalize_run_to_history(root, linked_item_run)
                             state.setdefault("evidence", {})["roadmap_hook_resolution"] = "done"
                             state.setdefault("evidence", {})["roadmap_item_run_finalized"] = linked_item_run.get("run_id")
+                            if linked_item_run.get("run_id") == state.get("run_id"):
+                                pending.remove(hook_name)
+                                completed = state.setdefault("completed_hooks", [])
+                                if hook_name not in completed:
+                                    completed.append(hook_name)
+                                finalized = _finalize_run_to_history(root, state)
+                                print(json.dumps(finalized, indent=2))
+                                return
+                            _finalize_run_to_history(root, linked_item_run)
                         else:
                             state.setdefault("evidence", {})["roadmap_hook_resolution"] = "done"
                     else:
@@ -2358,6 +2469,7 @@ def main():
     parser.add_argument("--reason", default=None, help="reason for resolution")
     parser.add_argument("--residual-risk", default=None, help="residual risk for deferred")
     parser.add_argument("--branch", default=None, help="branch decision label")
+    parser.add_argument("--flow-type", default=None, choices=sorted(VALID_FLOW_TYPES), help="flow type")
     parser.add_argument("--block-type", default=None, help="block type")
     parser.add_argument("--message", default=None, help="block/status message")
     parser.add_argument("--next-allowed", default=None, help="comma-separated next allowed actions")
