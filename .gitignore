@@ -38,3 +38,7 @@ htmlcov/
 
 # OS files
 .DS_Store
+
+# obsidian
+.smart-env
+.smtcmp*
