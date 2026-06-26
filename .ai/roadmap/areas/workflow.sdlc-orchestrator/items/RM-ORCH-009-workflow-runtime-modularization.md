@@ -4,7 +4,7 @@ title: "Workflow Runtime Modularization"
 status: idea
 stage: v2
 priority: p1
-order: 47
+order: 48
 depends_on:
   - RM-ORCH-008
 openspec_change: null

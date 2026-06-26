@@ -35,3 +35,4 @@ Every roadmap mutation appends to this file.
 | 2026-06-26T03:38:57Z | insert | RM-ORCH-008 | Capture pre-wrapper workflow contract enhancement | Added roadmap item for minimal `flow_type`, evidence key, and agent evidence contracts needed before agent-backed wrapper implementation. | - | - |
 | 2026-06-26T03:38:57Z | insert | RM-ORCH-009 | Capture post-wrapper modularization need | Added roadmap item for behavior-preserving workflow runtime module split after the wrapper architecture lands. | - | - |
 | 2026-06-26T03:38:57Z | insert | RM-ORCH-010 | Capture class-based state machine follow-up | Added roadmap item for a class-based workflow state-machine core after modularization. | - | - |
+| 2026-06-26T11:50:00Z | reorder | RM-ORCH-007, RM-ORCH-009, RM-ORCH-010 | User-requested priority adjustment | RM-ORCH-008 first, then 007, 009, 010, 003 last. RM-ORCH-007: order 45→47, RM-ORCH-009: 47→48, RM-ORCH-010: 48→49. | - | - |

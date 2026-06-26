@@ -4,7 +4,7 @@ title: "Agent-Backed Lifecycle Wrapper Architecture"
 status: ready
 stage: v2
 priority: p1
-order: 45
+order: 47
 depends_on:
   - RM-ORCH-005
 openspec_change: agent-backed-lifecycle-wrapper-architecture

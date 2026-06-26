@@ -4,7 +4,7 @@ title: "Class-Based Workflow State Machine"
 status: idea
 stage: v2
 priority: p1
-order: 48
+order: 49
 depends_on:
   - RM-ORCH-009
 openspec_change: null
