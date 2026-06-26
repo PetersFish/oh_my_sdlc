@@ -1,0 +1,100 @@
+---
+id: RM-ORCH-008
+title: "Workflow State Machine Contract Enhancements"
+status: idea
+stage: v2
+priority: p1
+order: 46
+depends_on:
+  - RM-ORCH-007
+openspec_change: null
+created_at: 2026-06-26
+started_at: null
+completed_at: null
+---
+
+# Goal
+
+Add the minimal deterministic workflow runtime contract needed by the agent-backed lifecycle wrapper architecture, without broad file splitting or a full object-oriented state machine rewrite.
+
+# Problem Context
+
+The agent-backed lifecycle wrapper architecture requires `workflow.py` to remain the deterministic owner of state transitions while agents and wrappers return structured evidence. The current runtime already guards phase transitions, hooks, and gates, but it lacks several explicit contract fields needed by downstream agents: `flow_type`, evidence-backed phase completion, and a clear convention for agent handoff evidence.
+
+This item intentionally keeps scope narrow so it can be completed before or during the wrapper architecture implementation. It should unlock `agent-backed-lifecycle-wrapper-architecture` while avoiding a high-risk rewrite of the existing workflow runtime.
+
+# Scope
+
+## In
+
+- Add explicit `flow_type: spec-flow | lightweight-flow` support to workflow run state.
+- Add `--flow-type` support to run creation paths, defaulting to `spec-flow` for current behavior.
+- Validate `flow_type` in `validate_run_state`.
+- Allow workflow phase definitions to declare required `evidence_keys`.
+- Require declared evidence keys to be present and non-empty before `complete-phase` can mark a phase complete.
+- Preserve existing command names, JSON output shape, run state storage, and transition behavior except for the new contract validation.
+- Sync live workflow runtime/template copies after implementation.
+
+## Out
+
+- No module split of `workflow.py`.
+- No full class-based state machine rewrite.
+- No new top-level `dev-orchestrator` workflow command.
+- No replacement of concrete workers in `sdlc-main.yaml` unless required for the minimal contract.
+
+# Design Notes
+
+## Key Decisions
+
+- Treat this as a contract enhancement, not an architecture rewrite.
+- Keep `workflow.py` as the only owner of workflow state transitions, hooks, gates, and run files.
+- Agents and wrappers interact through existing commands: `record-evidence`, `complete-phase`, `advance`, and `block`.
+- Reuse `worker_failed` for agent blockers instead of introducing a new block type.
+- Represent agent handoff as an evidence convention such as `evidence.agent_phase`, not as a required state-machine field.
+
+## Tradeoffs
+
+- This leaves `workflow.py` large for now, but minimizes risk while the wrapper architecture is being implemented.
+- Evidence key validation is deliberately simple: presence and non-empty value, not typed schemas. This avoids overfitting before wrapper contracts stabilize.
+- Defaulting to `spec-flow` preserves existing OpenSpec behavior, but downstream agents must still treat `flow_type` as explicit state once present.
+
+## Initial Approach
+
+1. Add behavior tests for `flow_type` round-trip, validation failure on bad values, and default behavior.
+2. Add behavior tests for `evidence_keys` fail-closed and pass-after-record-evidence behavior.
+3. Implement the minimal state field, CLI argument, validation, and phase definition support.
+4. Keep `advance`, `resolve`, `done`, and run storage behavior unchanged.
+5. Sync workflow templates and validate no template drift.
+
+## Open Questions
+
+- Should `lightweight-flow` ever be inferred from subject type, or must callers always specify it explicitly?
+- Should evidence key validation eventually support typed evidence contracts once wrappers stabilize?
+
+# Acceptance Criteria
+
+- `workflow.py start --flow-type lightweight-flow` writes `flow_type: lightweight-flow` to run state.
+- `workflow.py start` without `--flow-type` preserves existing behavior by writing `flow_type: spec-flow`.
+- `workflow.py resume` preserves the stored `flow_type`.
+- `workflow.py validate` rejects missing or unknown `flow_type` values according to the finalized migration policy.
+- `validate_workflow` accepts phase-level `evidence_keys`.
+- `complete-phase` fails closed when a phase declares missing or empty evidence keys.
+- `complete-phase` succeeds when exit criteria are supplied and required evidence keys are present.
+- Existing workflow behavior tests continue passing.
+- Workflow templates and distributed copies are in sync after implementation.
+
+# Promotion Notes
+
+Promote before or at the start of `agent-backed-lifecycle-wrapper-architecture` implementation. This item is a prerequisite contract layer for agent/wrapper execution.
+
+# Completion Notes
+
+Not started.
+
+# Design Reference
+
+- `docs/manual/plans/workflow-py-state-machine-contract.md`
+- `docs/manual/design/state_machine_design.md`
+- `openspec/changes/agent-backed-lifecycle-wrapper-architecture/design.md`
+- `.ai/workflows/scripts/workflow.py`
+- `.ai/workflows/definitions/sdlc-main.yaml`

@@ -163,13 +163,52 @@
     },
     {
       "id": "RM-ORCH-007",
-      "status": "idea",
-      "title": "Workflow Wrapper Abstraction",
+      "status": "ready",
+      "title": "Agent-Backed Lifecycle Wrapper Architecture",
       "stage": "v2",
       "priority": "p1",
       "order": 45,
       "depends_on": [
         "RM-ORCH-005"
+      ],
+      "openspec_change": "agent-backed-lifecycle-wrapper-architecture",
+      "area": "workflow.sdlc-orchestrator"
+    },
+    {
+      "id": "RM-ORCH-008",
+      "status": "idea",
+      "title": "Workflow State Machine Contract Enhancements",
+      "stage": "v2",
+      "priority": "p1",
+      "order": 46,
+      "depends_on": [
+        "RM-ORCH-007"
+      ],
+      "openspec_change": null,
+      "area": "workflow.sdlc-orchestrator"
+    },
+    {
+      "id": "RM-ORCH-009",
+      "status": "idea",
+      "title": "Workflow Runtime Modularization",
+      "stage": "v2",
+      "priority": "p1",
+      "order": 47,
+      "depends_on": [
+        "RM-ORCH-008"
+      ],
+      "openspec_change": null,
+      "area": "workflow.sdlc-orchestrator"
+    },
+    {
+      "id": "RM-ORCH-010",
+      "status": "idea",
+      "title": "Class-Based Workflow State Machine",
+      "stage": "v2",
+      "priority": "p1",
+      "order": 48,
+      "depends_on": [
+        "RM-ORCH-009"
       ],
       "openspec_change": null,
       "area": "workflow.sdlc-orchestrator"
