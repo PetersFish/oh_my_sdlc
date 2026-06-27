@@ -9,6 +9,7 @@ The current `sdlc-orchestrator` directly names concrete workers (OpenSpec, Super
 - Define TDD as a cross-cutting discipline: `plan-agent` plans TDD tasks, `implement-agent` executes red/green loops, `test-agent` performs independent verification/debug/regression/EvalOps capture
 - Keep `workflow.py` as the deterministic owner of state transitions, hooks, and gates; agents handle worker dispatch and evidence normalization
 - Map current OpenSpec, Superpowers, Roadmap, Memory, and EvalOps skills as wrapped backends behind agent-facing contracts
+- Add provider-configurable wrapper routing so spec and memory backends can be selected from configuration rather than hardcoded in prompts or workflow phases
 - Move safe parallel dispatch to `dev-orchestrator` to avoid nested subagent orchestration limits
 - Preserve current user-visible workflow behavior during the first migration
 
@@ -20,6 +21,7 @@ The current `sdlc-orchestrator` directly names concrete workers (OpenSpec, Super
 - `agent-contracts`: Fixed input/output contracts for plan-agent, implement-agent, test-agent, review-agent, and finish-agent, including phase-agent mappings, evidence keys, exit criteria, and failure modes
 - `flow-type-routing`: Explicit `flow_type: spec-flow | lightweight-flow` field in workflow run state with per-flow agent routing rules and behavior differences
 - `wrapper-contracts`: Module-level wrapper contracts for spec, memory, roadmap, eval, and verification modules that normalize agent/tool output into workflow evidence
+- `provider-configurable-wrapper-routing`: Configurable provider selection for wrapper-backed modules, including `spec.provider` and `memory.provider`, defaults, capability mapping, and fail-closed behavior for unknown or unsupported providers
 
 ### Modified Capabilities
 
@@ -29,5 +31,5 @@ The current `sdlc-orchestrator` directly names concrete workers (OpenSpec, Super
 
 - Affected code: `skills/sdlc-orchestrator/SKILL.md`, `.ai/workflows/definitions/sdlc-main.yaml`, `.ai/workflows/scripts/workflow.py`
 - Affected specs: `openspec/specs/sdlc-orchestrator/spec.md` (delta), `openspec/specs/sdlc-workflow-engine/spec.md` (delta)
-- New dependencies: wrapper contract document, phase-agent mapping configuration
+- New dependencies: wrapper contract document, phase-agent mapping configuration, provider configuration schema/registry for wrapper-backed modules
 - No changes to: `skills/sdlc-roadmap/`, `skills/sdlc-repository-memory-*`, `skills/sdlc-evalops/`, OpenSpec skills, Superpowers skills (they remain wrapped backends)

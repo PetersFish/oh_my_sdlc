@@ -10,13 +10,14 @@ The `sdlc-orchestrator` currently routes directly to concrete worker skills (Ope
 - Support explicit `spec-flow` and `lightweight-flow` flow types
 - Keep `workflow.py` as the only owner of state transitions, hooks, and gates
 - Map current skills as wrapped backends without changing user-visible behavior
+- Allow wrapper-backed modules to choose their backend provider from configuration, starting with spec and memory providers
 - Move safe parallel dispatch to `dev-orchestrator` level
 - Downgrade `sdlc-orchestrator` to manual-trigger only; default SDLC routing migrates to `dev-orchestrator`
 
 **Non-Goals:**
 - No replacement of existing skills in the first phase
 - No generic agent framework rewrite
-- No marketplace/plugin registry
+- No general marketplace/plugin registry beyond the small explicit provider registries needed for wrapper-backed modules
 - No nested subagent delegation for parallelism
 - No full object-oriented state-machine rewrite of `workflow.py` in this change
 - No rewrite of `sdlc-main.yaml` into the future high-level `plan` / `implement` / `review` / `finalize` / `done` phase model in this change
@@ -26,6 +27,8 @@ The `sdlc-orchestrator` currently routes directly to concrete worker skills (Ope
 **Decision 1: Agent-backed wrappers as module contracts**
 
 Each lifecycle module (spec, memory, roadmap, eval, planning, implementation, testing, review, finish, verification) gets a wrapper contract that defines inputs, outputs, evidence keys, exit criteria, and failure modes. Wrappers normalize agent/tool output into workflow evidence so downstream gates do not depend on tool-specific formats.
+
+For wrapper-backed modules that support multiple implementations, the wrapper contract is paired with a small provider registry and configuration schema. Provider selection is explicit and deterministic, not inferred from prompts or conversational context.
 
 Rationale: Pure Python wrappers are predictable but rigid; raw agent calls are flexible but nondeterministic. Wrapper contracts at the boundary create a stable interface that both sides depend on, letting either side evolve independently.
 
@@ -83,6 +86,78 @@ OpenSpec, Superpowers, Roadmap, Memory, and EvalOps skills are not replaced. The
 
 Rationale: A big-bang migration risks regression and blocks other work. Wrapping existing skills lets us verify the architecture without disrupting current capabilities.
 
+**Decision 7b: Spec and memory wrappers are provider-configurable**
+
+The first provider-configurable modules are `spec` and `memory`.
+
+- `spec.provider` selects which spec lifecycle backend the wrapper uses, starting with `openspec` by default and allowing alternate providers such as `github/spec-kit` once implemented.
+- `memory.provider` selects which memory backend the wrapper uses, starting with `local` by default and allowing alternate providers once implemented.
+- Provider configuration lives in project-level per-client files under `.opencode/`, `.cursor/`, and `.claude/`.
+- Provider registries are stored in YAML and resolved through a Python loader rather than hardcoded entirely in prompts.
+- Provider choice comes from repository configuration, not from agent prompt wording.
+- The wrapper fails closed with a structured blocker when a provider name is unknown, the provider does not implement the required action, or required provider configuration is missing.
+
+Example provider configuration (live file, per client):
+
+```yaml
+# .opencode/sdlc-providers.yaml  (same content replicated to .cursor/ and .claude/)
+
+version: 1
+
+spec:
+  provider: openspec
+
+memory:
+  provider: local
+```
+
+Example provider registry (canonical, loaded by Python):
+
+```yaml
+# skills/_lib/provider_registry.yaml
+
+version: 1
+
+modules:
+  spec:
+    default_provider: openspec
+    providers:
+      openspec:
+        capabilities:
+          create: true
+          continue: true
+          apply: true
+          archive: true
+        backend:
+          create: openspec-propose
+          continue: openspec-continue-change
+          apply: openspec-apply-change
+          archive: openspec-archive-change
+      github/spec-kit:
+        capabilities:
+          create: true
+          continue: false
+          apply: false
+          archive: false
+        backend:
+          create: github-spec-kit-create
+
+  memory:
+    default_provider: local
+    providers:
+      local:
+        capabilities:
+          load: true
+          repository_sync: true
+          spec_post_archive_sync: true
+        backend:
+          load: sdlc-repository-memory-load
+          repository_sync: sdlc-repository-memory-sync
+          spec_post_archive_sync: sdlc-openspec-memory-sync
+```
+
+Rationale: The wrapper boundary only decouples lifecycle governance from implementation choice if backend choice is explicit, configurable, and validated. Hardcoding provider selection into prompts would reintroduce the same coupling under a different name.
+
 **Decision 8: `dev-orchestrator` is a top-level agent, not a subagent of `sdlc-orchestrator`**
 
 `dev-orchestrator` operates at the same level as opencode `plan`/`build` agents. It receives the current allowed phase action from `workflow.py` and may dispatch `plan-agent`, `implement-agent`, `test-agent`, `review-agent`, or `finish-agent` — all of which are subagents of `dev-orchestrator`, not of `sdlc-orchestrator`. `dev-orchestrator` does NOT sit beneath `sdlc-orchestrator` in the agent hierarchy.
@@ -127,6 +202,17 @@ Structured evidence may include `artifacts.raw_log_paths[]` entries that point t
 
 Rationale: Raw logs are useful for debugging and post-hoc inspection, but making them part of deterministic gate logic would create unstable, verbose, tool-specific behavior. Keeping them as optional referenced artifacts preserves traceability without turning log text into an execution contract.
 
+**Decision 13: Phase 1 lands contract skeletons before full backend cutover**
+
+The first implementation slice of this change is allowed to land in two layers:
+
+- Contract skeletons: workflow runtime hooks, shared contract registries, and agent prompt/frontmatter files that define the intended routing and evidence model.
+- Executable cutover: live `dev-orchestrator` dispatch, backend wrapper adapters that call existing skills, provider selection and validation, phase-evidence mapping, and default workflow routing updates that make the architecture the active execution path.
+
+Contract skeleton work is necessary but not sufficient to claim the wrapper architecture is fully implemented. Tasks and verification for this change therefore distinguish between documented/prompted behavior and executable runtime integration.
+
+Rationale: The current repository already contains useful scaffolding for the target architecture, but treating that scaffolding as full implementation would hide the remaining integration work. Making the two-layer rollout explicit keeps task completion honest while preserving the value of the contract skeleton already in place.
+
 ## Risks / Trade-offs
 
 [Abstraction overhead] → Mitigation: Wrapper contracts are minimal and follow a fixed template. New wrappers are added only when a new module joins the lifecycle.
@@ -143,5 +229,5 @@ Rationale: Raw logs are useful for debugging and post-hoc inspection, but making
 
 ## Open Questions
 
-- Where should wrapper and agent configuration live? Options: workflow YAML, orchestrator skill documentation, or a small module registry. First implementation picks the smallest option that records `flow_type` and phase-agent mappings deterministically.
+- Provider configuration lives in `.opencode/sdlc-providers.yaml`, `.cursor/sdlc-providers.yaml`, and `.claude/sdlc-providers.yaml`. Provider registries live in YAML and are resolved through a Python loader.
 - Which evidence fields should be mandatory per phase vs optional raw logs? The contract must be strict enough for gate validation without overfitting to a single CLI tool.
