@@ -523,6 +523,25 @@ class TestAgentFilesExist(unittest.TestCase):
             path = _agent_path(".cursor", name)
             self.assertTrue(os.path.exists(path), f"Missing agent file: {path}")
 
+    def test_no_agent_named_skill_dirs(self):
+        """Agent names must NOT have stale empty skill directories.
+        Agents are opencode agents (*/agents/*.md), not skills (*/skills/*/SKILL.md)."""
+        agent_names_set = set(AGENT_NAMES) | {"sdlc-dev-orchestrator"}
+        for client_dir in AGENT_DIRS:
+            skills_dir = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                "..", client_dir, "skills",
+            )
+            if not os.path.isdir(skills_dir):
+                continue
+            for entry in os.listdir(skills_dir):
+                entry_path = os.path.join(skills_dir, entry)
+                if entry in agent_names_set:
+                    self.assertFalse(
+                        os.path.isdir(entry_path),
+                        f"Stale skill dir for agent: {entry_path} (agents belong in {client_dir}/agents/, not skills/)",
+                    )
+
 
 class TestAgentFrontmatter(unittest.TestCase):
     """Agent frontmatter uses valid opencode agent schema fields."""

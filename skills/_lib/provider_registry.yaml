@@ -1,0 +1,38 @@
+version: 1
+
+modules:
+  spec:
+    default_provider: openspec
+    providers:
+      openspec:
+        capabilities:
+          create: true
+          continue: true
+          apply: true
+          archive: true
+        backend:
+          create: openspec-propose
+          continue: openspec-continue-change
+          apply: openspec-apply-change
+          archive: openspec-archive-change
+      github/spec-kit:
+        capabilities:
+          create: true
+          continue: false
+          apply: false
+          archive: false
+        backend:
+          create: github-spec-kit-create
+
+  memory:
+    default_provider: local
+    providers:
+      local:
+        capabilities:
+          load: true
+          repository_sync: true
+          spec_post_archive_sync: true
+        backend:
+          load: sdlc-repository-memory-load
+          repository_sync: sdlc-repository-memory-sync
+          spec_post_archive_sync: sdlc-openspec-memory-sync

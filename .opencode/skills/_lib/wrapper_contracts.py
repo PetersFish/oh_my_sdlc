@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field, asdict
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
 # ---------------------------------------------------------------------------
@@ -623,3 +624,51 @@ def get_wrapper(module: str) -> Optional[WrapperContract]:
 def logs_optional_policy(status: str) -> bool:
     """Raw logs are expected for failures/blockers, optional for success."""
     return status != "success"
+
+
+# ---------------------------------------------------------------------------
+# Provider resolution integration: wrapper contracts → provider backends
+# ---------------------------------------------------------------------------
+
+
+def resolve_wrapper_provider_blockers(
+    module: str,
+    capability: str,
+    repo_root: Optional[str] = None,
+) -> List[Dict[str, str]]:
+    """Resolve a wrapper module's provider backend for the given capability.
+
+    Verifies the wrapper contract exists, then delegates to provider resolution.
+    Returns empty list on success, or structured blocker dicts on failure.
+    """
+    if module not in WRAPPER_REGISTRY:
+        return [make_blocker(
+            reason="unknown_module",
+            message=f"Module {module!r} not in wrapper contract registry",
+            recommended_action=f"Module must be one of {sorted(WRAPPER_REGISTRY.keys())}",
+        )]
+
+    from .provider_registry_loader import resolve_provider_or_blocker, load_provider_configs, load_registry
+
+    root = Path(repo_root) if repo_root else Path.cwd()
+
+    try:
+        registry = load_registry()
+    except Exception as exc:
+        return [make_blocker(
+            reason="registry_load_failed",
+            message=str(exc),
+            recommended_action="Verify skills/_lib/provider_registry.yaml exists",
+        )]
+
+    if module not in registry:
+        return [make_blocker(
+            reason="not_provider_managed",
+            message=f"Module {module!r} is a wrapper contract but not yet provider-managed",
+            recommended_action=f"Add module {module!r} to provider_registry.yaml or use direct wrapper",
+        )]
+
+    configs = load_provider_configs(root)
+    config = next(iter(configs.values()), None) if configs else None
+
+    return resolve_provider_or_blocker(module, capability, registry=registry, config=config)

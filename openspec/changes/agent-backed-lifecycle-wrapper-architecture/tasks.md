@@ -47,14 +47,14 @@ Note: this phase now separates architecture skeleton work already landed (runtim
 - [x] 3.3 Implement thin dispatch lifecycle conventions: `before_dispatch` records dispatch intent and validates agent/phase/`flow_type`, and `after_dispatch` records normalized agent results inside `workflow.py` state before suggesting deterministic next actions
 - [x] 3.4 Add phase-agent mapping and agent-backed execution references to workflow/runtime contracts where applicable, without yet cutting every phase over to `dev-orchestrator` as the sole allowed worker
 - [x] 3.5 Update `sdlc-orchestrator` SKILL.md description to manual-trigger only; execution dispatch routing migrates to `dev-orchestrator`
-- [ ] 3.6 Implement `dev-orchestrator` agent routing logic
+- [x] 3.6 Implement `dev-orchestrator` agent routing logic (agent file: `.opencode/agents/dev-orchestrator.md`; distributed copies in `.claude/agents/` and `.cursor/agents/`)
 - [x] 3.7 Implement wrapper contract registry for lifecycle modules
 - [ ] 3.7b Implement executable wrapper adapters for lifecycle modules that call current backends and normalize outputs into phase evidence keys
-- [ ] 3.7c Implement provider configuration loading and validation for wrapper-backed modules, starting with `spec.provider` and `memory.provider`
-- [ ] 3.7d Implement provider registries/capability maps for `spec` and `memory`, with defaults and fail-closed behavior for unknown or incomplete providers
-- [ ] 3.7e Add project-level provider config files under `.opencode/sdlc-providers.yaml`, `.cursor/sdlc-providers.yaml`, and `.claude/sdlc-providers.yaml`
-- [ ] 3.7f Implement a YAML registry plus Python loader that resolves module, provider, and capability selection for wrapper-backed modules
-- [ ] 3.7g Model memory provider capabilities with `load`, `repository_sync`, and `spec_post_archive_sync`
+- [x] 3.7c Implement provider configuration loading and validation for wrapper-backed modules, starting with `spec.provider` and `memory.provider`
+- [x] 3.7d Implement provider registries/capability maps for `spec` and `memory`, with defaults and fail-closed behavior for unknown or incomplete providers
+- [x] 3.7e Add project-level provider config files under `.opencode/sdlc-providers.yaml`, `.cursor/sdlc-providers.yaml`, and `.claude/sdlc-providers.yaml`
+- [x] 3.7f Implement a YAML registry plus Python loader that resolves module, provider, and capability selection for wrapper-backed modules
+- [x] 3.7g Model memory provider capabilities with `load`, `repository_sync`, and `spec_post_archive_sync`
 - [x] 3.8 Implement agent prompt/frontmatter contracts, including shared evidence envelope requirements, handoff structure requirements, and raw-log reference requirements
 - [ ] 3.8b Implement executable agent behavior integration so those contracts are enforced by the default dispatch path rather than documentation alone
 - [ ] 3.8c Wire `after_dispatch` evidence mapping so normalized agent results satisfy phase-level `evidence_keys` without manual reshaping

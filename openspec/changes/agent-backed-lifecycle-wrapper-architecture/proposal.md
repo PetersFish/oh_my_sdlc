@@ -30,6 +30,7 @@ The current `sdlc-orchestrator` directly names concrete workers (OpenSpec, Super
 ## Impact
 
 - Affected code: `skills/sdlc-orchestrator/SKILL.md`, `.ai/workflows/definitions/sdlc-main.yaml`, `.ai/workflows/scripts/workflow.py`
+- Affected agent files (opencode agent model, NOT skills): `.opencode/agents/{dev-orchestrator,plan-agent,implement-agent,test-agent,review-agent,finish-agent}.md` and distributed copies under `.claude/agents/`, `.cursor/agents/`
 - Affected specs: `openspec/specs/sdlc-orchestrator/spec.md` (delta), `openspec/specs/sdlc-workflow-engine/spec.md` (delta)
 - New dependencies: wrapper contract document, phase-agent mapping configuration, provider configuration schema/registry for wrapper-backed modules
 - No changes to: `skills/sdlc-roadmap/`, `skills/sdlc-repository-memory-*`, `skills/sdlc-evalops/`, OpenSpec skills, Superpowers skills (they remain wrapped backends)
