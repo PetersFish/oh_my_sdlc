@@ -3,7 +3,7 @@
 
 Commands: status, start, resume, readiness, resolve, record-evidence,
 complete-phase, complete-hook, advance, block, done, validate,
-governance-check, preflight, ensure-run.
+governance-check, preflight, ensure-run, before-dispatch, after-dispatch.
 """
 
 import argparse
@@ -1382,6 +1382,245 @@ def cmd_resolve(root, args):
     print(json.dumps(state, indent=2))
 
 
+VALID_AGENT_NAMES = {
+    "plan-agent", "plan_agent",
+    "implement-agent", "implement_agent",
+    "test-agent", "test_agent",
+    "review-agent", "review_agent",
+    "finish-agent", "finish_agent",
+}
+
+CANONICAL_AGENT_NAMES = {
+    "plan-agent": "plan-agent",
+    "plan_agent": "plan-agent",
+    "implement-agent": "implement-agent",
+    "implement_agent": "implement-agent",
+    "test-agent": "test-agent",
+    "test_agent": "test-agent",
+    "review-agent": "review-agent",
+    "review_agent": "review-agent",
+    "finish-agent": "finish-agent",
+    "finish_agent": "finish-agent",
+}
+
+PHASE_AGENT_MAP = {
+    "create_change": {"plan-agent"},
+    "apply_change": {"implement-agent", "test-agent", "review-agent"},
+    "archive_change": {"finish-agent"},
+    "post_archive_actions": {"finish-agent"},
+}
+
+
+def _canonical_agent_name(agent):
+    return CANONICAL_AGENT_NAMES.get(agent, agent)
+
+
+def _phase_allows_agent(phase, agent):
+    canonical = _canonical_agent_name(agent)
+    allowed = PHASE_AGENT_MAP.get(phase)
+    if allowed is None:
+        return False
+    return canonical in allowed
+
+
+def cmd_before_dispatch(root, args):
+    state = load_run_state(root)
+    if not state:
+        blocker = {
+            "agent": getattr(args, "agent", "unknown"),
+            "status": "blocked",
+            "phase": getattr(args, "phase", state.get("current_phase", "")) if state else "",
+            "slice_id": getattr(args, "slice_id", ""),
+            "flow_type": "",
+            "evidence": {},
+            "artifacts": {},
+            "blockers": [{
+                "reason": "no_active_run",
+                "message": "No active workflow run exists",
+                "recommended_action": "call workflow.py start or ensure-run first",
+            }],
+            "recommended_next_action": "start_run",
+        }
+        print(json.dumps(blocker, indent=2))
+        sys.exit(1)
+
+    agent = getattr(args, "agent", "") or ""
+    canonical_agent = _canonical_agent_name(agent)
+    current_phase = state.get("current_phase", "")
+    phase = args.phase or current_phase
+    flow_type = state.get("flow_type", "")
+
+    blocker_reasons = []
+    if agent not in VALID_AGENT_NAMES:
+        blocker_reasons.append({
+            "reason": "invalid_agent",
+            "message": f"Unknown agent: {agent}. Must be one of: {sorted(VALID_AGENT_NAMES)}",
+            "recommended_action": "correct the --agent argument",
+        })
+    if args.phase and args.phase != current_phase:
+        blocker_reasons.append({
+            "reason": "phase_mismatch",
+            "message": f"Requested phase '{args.phase}' does not match active phase '{current_phase}'",
+            "recommended_action": "dispatch using the active workflow phase",
+        })
+    if not flow_type:
+        blocker_reasons.append({
+            "reason": "missing_flow_type",
+            "message": "flow_type is not set in the workflow run state",
+            "recommended_action": "set --flow-type on workflow.py start",
+        })
+    if flow_type and flow_type not in VALID_FLOW_TYPES:
+        blocker_reasons.append({
+            "reason": "invalid_flow_type",
+            "message": f"flow_type '{flow_type}' is not a valid value",
+            "recommended_action": f"flow_type must be one of: {sorted(VALID_FLOW_TYPES)}",
+        })
+    if state.get("status") == "blocked" and agent not in {"finish-agent", "finish_agent"}:
+        block = state.get("block", {})
+        blocker_reasons.append({
+            "reason": "run_is_blocked",
+            "message": f"Workflow run is blocked: {block.get('type', 'unknown')} — {block.get('message', 'no message')}",
+            "recommended_action": "resolve the block before dispatching agents",
+        })
+    if agent in VALID_AGENT_NAMES and not _phase_allows_agent(current_phase, canonical_agent):
+        blocker_reasons.append({
+            "reason": "agent_not_allowed_for_phase",
+            "message": f"Agent '{canonical_agent}' is not allowed in phase '{current_phase}'",
+            "recommended_action": "select an agent mapped to the current phase",
+        })
+
+    if blocker_reasons:
+        blocker = {
+            "agent": agent,
+            "status": "blocked",
+            "phase": phase,
+            "slice_id": getattr(args, "slice_id", ""),
+            "flow_type": flow_type,
+            "evidence": {},
+            "artifacts": {},
+            "blockers": blocker_reasons,
+            "recommended_next_action": "resolve_blockers",
+        }
+        print(json.dumps(blocker, indent=2))
+        sys.exit(1)
+
+    dispatch_intent = {
+        "agent_phase": phase,
+        "agent": canonical_agent,
+        "flow_type": flow_type,
+        "dispatched_at": _ts(),
+    }
+    if args.slice_id:
+        dispatch_intent["slice_id"] = args.slice_id
+
+    state.setdefault("evidence", {})["agent_phase"] = dispatch_intent
+    state["updated_at"] = _ts()
+    save_run_state(root, state)
+
+    result = {
+        "agent": canonical_agent,
+        "status": "dispatched",
+        "phase": phase,
+        "slice_id": getattr(args, "slice_id", ""),
+        "flow_type": flow_type,
+        "evidence": {"dispatched_at": _ts()},
+        "artifacts": {},
+        "blockers": [],
+        "recommended_next_action": "execute_agent",
+    }
+    print(json.dumps(result, indent=2))
+
+
+def cmd_after_dispatch(root, args):
+    state = load_run_state(root)
+    if not state:
+        blocker = {
+            "agent": getattr(args, "agent", "unknown"),
+            "status": "blocked",
+            "phase": getattr(args, "phase", ""),
+            "slice_id": getattr(args, "slice_id", ""),
+            "flow_type": "",
+            "evidence": {},
+            "artifacts": {},
+            "blockers": [{
+                "reason": "no_active_run",
+                "message": "No active workflow run exists",
+                "recommended_action": "call workflow.py start or ensure-run first",
+            }],
+            "recommended_next_action": "start_run",
+        }
+        print(json.dumps(blocker, indent=2))
+        sys.exit(1)
+
+    agent = getattr(args, "agent", "") or ""
+    canonical_agent = _canonical_agent_name(agent)
+    phase = args.phase or state.get("current_phase", "")
+    flow_type = state.get("flow_type", "")
+    agent_result_value = getattr(args, "value", None)
+
+    agent_result = {}
+    if agent_result_value:
+        try:
+            agent_result = json.loads(agent_result_value)
+        except (json.JSONDecodeError, TypeError):
+            agent_result = {"raw_result": agent_result_value}
+
+    agent_status = agent_result.get("status", "unknown")
+    agent_evidence = agent_result.get("evidence", {})
+    agent_blockers = agent_result.get("blockers", [])
+    agent_recommended = agent_result.get("recommended_next_action", "")
+    slice_id = getattr(args, "slice_id", "") or "default"
+
+    latest_result = {
+        "agent": canonical_agent,
+        "status": agent_status,
+        "phase": phase,
+        "slice_id": slice_id,
+        "flow_type": flow_type,
+        "evidence": agent_evidence,
+        "blockers": agent_blockers,
+        "recorded_at": _ts(),
+    }
+    evidence = state.setdefault("evidence", {})
+    evidence["agent_result"] = latest_result
+    evidence.setdefault("agent_results", {}).setdefault(slice_id, {})[canonical_agent] = latest_result
+    state["updated_at"] = _ts()
+    save_run_state(root, state)
+
+    next_cmd = "complete-phase"
+    recommended_next_action = agent_recommended or "complete_phase"
+    if agent_blockers:
+        next_cmd = "block"
+    elif canonical_agent == "implement-agent":
+        next_cmd = ""
+        recommended_next_action = "dispatch_test_agent"
+    elif canonical_agent == "test-agent":
+        next_cmd = ""
+        recommended_next_action = "dispatch_review_agent"
+
+    transition = {
+        "agent": canonical_agent,
+        "status": agent_status,
+        "phase": phase,
+        "slice_id": slice_id,
+        "flow_type": flow_type,
+        "evidence": agent_evidence,
+        "artifacts": agent_result.get("artifacts", {}),
+        "blockers": agent_blockers,
+        "recommended_next_action": recommended_next_action,
+        "workflow_command": f"workflow.py {next_cmd}" if next_cmd else "",
+        "workflow_args": {
+            "exit_criteria_satisfied": agent_evidence.get("criteria_satisfied", ""),
+            "block_type": "worker_failed" if agent_blockers else "",
+            "message": "; ".join(b.get("reason", b.get("message", "")) for b in agent_blockers) if agent_blockers else "",
+            "next_allowed": ",".join(
+                b.get("recommended_action", "resolve") for b in agent_blockers
+            ) if agent_blockers else "",
+        },
+    }
+    print(json.dumps(transition, indent=2))
+
+
 def cmd_record_evidence(root, args):
     state = load_run_state(root)
     if not state:
@@ -2445,6 +2684,8 @@ COMMANDS = {
     "preflight",
     "ensure-run",
     "verify-foundations",
+    "before-dispatch",
+    "after-dispatch",
 }
 
 
@@ -2470,6 +2711,9 @@ def main():
     parser.add_argument("--residual-risk", default=None, help="residual risk for deferred")
     parser.add_argument("--branch", default=None, help="branch decision label")
     parser.add_argument("--flow-type", default=None, choices=sorted(VALID_FLOW_TYPES), help="flow type")
+    parser.add_argument("--agent", default=None, help="agent name for dispatch hooks")
+    parser.add_argument("--phase", default=None, help="phase for dispatch validation")
+    parser.add_argument("--slice-id", default=None, help="implementation slice identifier")
     parser.add_argument("--block-type", default=None, help="block type")
     parser.add_argument("--message", default=None, help="block/status message")
     parser.add_argument("--next-allowed", default=None, help="comma-separated next allowed actions")
@@ -2515,6 +2759,10 @@ def main():
         cmd_ensure_run(root, args)
     elif args.command == "verify-foundations":
         cmd_verify_foundations(root, args)
+    elif args.command == "before-dispatch":
+        cmd_before_dispatch(root, args)
+    elif args.command == "after-dispatch":
+        cmd_after_dispatch(root, args)
 
 
 if __name__ == "__main__":

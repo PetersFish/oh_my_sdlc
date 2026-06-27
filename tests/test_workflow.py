@@ -1125,6 +1125,7 @@ class TestCompletePhase(FixtureBase):
         state = self._read_current_state()
         state["current_phase"] = "archive_change"
         state["evidence"]["archive_path"] = "openspec/changes/archive/2026-06-18-cp-test"
+        state["evidence"]["archive_path_exists"] = True
         self._write_current_state(state)
 
         rc, out, _ = run_workflow(
@@ -1136,6 +1137,30 @@ class TestCompletePhase(FixtureBase):
         self.assertIn("archive_change", data.get("completed_phases", []))
         self.assertIn("memory_sync", data.get("pending_hooks", []))
         self.assertIn("roadmap_done_if_relevant", data.get("pending_hooks", []))
+
+    def test_apply_change_requires_execution_evidence_keys(self):
+        self._make_roadmap_item("RM-APPLY-001", "active", openspec_change="apply-evidence-test")
+        run_workflow(
+            self.tmp, "start",
+            subject_type="roadmap_item",
+            subject_id="RM-APPLY-001",
+        )
+        state = self._read_current_state()
+        state["current_phase"] = "apply_change"
+        state["evidence"]["openspec_status"] = {"classification": "in-progress", "source": "active"}
+        state["evidence"]["roadmap_item_status"] = {"item_id": "RM-APPLY-001", "status": "active"}
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(
+            self.tmp, "complete-phase",
+            exit_criteria_satisfied="tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded",
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertIn("error", data)
+        self.assertIn("tasks_complete", data["error"])
+        self.assertIn("tdd_passed", data["error"])
+        self.assertIn("eval_passed_or_human_decision_recorded", data["error"])
 
 
 class TestGovernanceCheck(FixtureBase):
@@ -3108,6 +3133,324 @@ class TestBlockedRunNoAutoProgress(FixtureBase):
         self.assertEqual(data["error"], "block cannot be automatically resolved")
         self.assertEqual(data["block_type"], "user_decision_required")
         self.assertIn("recommendation", data)
+
+
+class TestDispatchHooks(FixtureBase):
+    """Tests for before_dispatch and after_dispatch lifecycle hooks."""
+
+    def _create_run(self):
+        self._make_roadmap_item("RM-DH-001", "ready", openspec_change="agent-backed-lifecycle-wrapper-architecture")
+        run_workflow(
+            self.tmp, "start",
+            subject_type="roadmap_item",
+            subject_id="RM-DH-001",
+        )
+
+    def test_before_dispatch_no_active_run_returns_blocker(self):
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="implement-agent",
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "blocked")
+        self.assertEqual(len(data["blockers"]), 1)
+        self.assertEqual(data["blockers"][0]["reason"], "no_active_run")
+
+    def test_before_dispatch_rejects_invalid_agent(self):
+        self._create_run()
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="garbage-agent",
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "blocked")
+        reasons = [b["reason"] for b in data.get("blockers", [])]
+        self.assertIn("invalid_agent", reasons)
+
+    def test_before_dispatch_rejects_missing_flow_type(self):
+        # Create a run, then remove flow_type from state
+        self._create_run()
+        state = self._read_current_state()
+        state.pop("flow_type", None)
+        self._write_current_state(state)
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="implement-agent",
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "blocked")
+        reasons = [b["reason"] for b in data.get("blockers", [])]
+        self.assertIn("missing_flow_type", reasons)
+
+    def test_before_dispatch_rejects_blocked_run(self):
+        self._create_run()
+        state = self._read_current_state()
+        state["status"] = "blocked"
+        state["block"] = {
+            "type": "user_decision_required",
+            "message": "choose next action",
+            "next_allowed": ["resolve", "block"],
+        }
+        self._write_current_state(state)
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="implement-agent",
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "blocked")
+        reasons = [b["reason"] for b in data.get("blockers", [])]
+        self.assertIn("run_is_blocked", reasons)
+
+    def test_before_dispatch_finish_agent_skips_blocked_check(self):
+        self._create_run()
+        state = self._read_current_state()
+        state["current_phase"] = "archive_change"
+        state["status"] = "blocked"
+        state["block"] = {
+            "type": "user_decision_required",
+            "message": "choose next action",
+            "next_allowed": ["resolve", "block"],
+        }
+        self._write_current_state(state)
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="finish-agent",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "dispatched")
+
+    def test_before_dispatch_success_records_evidence(self):
+        self._create_run()
+        state = self._read_current_state()
+        state["current_phase"] = "apply_change"
+        self._write_current_state(state)
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="implement-agent",
+            slice_id="test-slice-1",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "dispatched")
+        self.assertEqual(data["agent"], "implement-agent")
+        self.assertEqual(data["recommended_next_action"], "execute_agent")
+
+        state = self._read_current_state()
+        agent_phase = state.get("evidence", {}).get("agent_phase", {})
+        self.assertEqual(agent_phase["agent"], "implement-agent")
+        self.assertEqual(agent_phase["slice_id"], "test-slice-1")
+
+    def test_before_dispatch_defaults_phase_from_state(self):
+        self._create_run()
+        state = self._read_current_state()
+        state["current_phase"] = "apply_change"
+        self._write_current_state(state)
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="test-agent",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        phase = data.get("phase", "")
+        self.assertNotEqual(phase, "")
+
+    def test_before_dispatch_supports_dash_and_underscore_agents(self):
+        cases = [
+            ("create_change", ["plan-agent", "plan_agent"]),
+            ("apply_change", ["implement-agent", "implement_agent", "test-agent", "test_agent", "review-agent", "review_agent"]),
+            ("archive_change", ["finish-agent", "finish_agent"]),
+        ]
+        for phase, agents in cases:
+            self._create_run()
+            state = self._read_current_state()
+            state["current_phase"] = phase
+            self._write_current_state(state)
+            for agent in agents:
+                rc, out, _ = run_workflow(
+                    self.tmp, "before-dispatch",
+                    agent=agent,
+                )
+                self.assertEqual(rc, 0, f"Agent {agent} should be valid in {phase}")
+
+    def test_before_dispatch_rejects_implement_agent_outside_apply_change(self):
+        self._create_run()
+        state = self._read_current_state()
+        state["current_phase"] = "create_change"
+        self._write_current_state(state)
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="implement-agent",
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [b["reason"] for b in data.get("blockers", [])]
+        self.assertIn("agent_not_allowed_for_phase", reasons)
+
+    def test_before_dispatch_rejects_agent_not_allowed_for_phase(self):
+        run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="dispatch-phase-test",
+        )
+        state = self._read_current_state()
+        state["current_phase"] = "create_change"
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="test-agent",
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "blocked")
+        reasons = [b["reason"] for b in data.get("blockers", [])]
+        self.assertIn("agent_not_allowed_for_phase", reasons)
+
+    def test_after_dispatch_no_active_run_returns_blocker(self):
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="implement-agent",
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "blocked")
+        self.assertEqual(data["blockers"][0]["reason"], "no_active_run")
+
+    def test_after_dispatch_records_agent_result(self):
+        self._create_run()
+        agent_result = json.dumps({
+            "status": "success",
+            "evidence": {"focused_tests": [{"command": "pytest -k flow_type", "result": "pass"}]},
+            "blockers": [],
+            "recommended_next_action": "complete_phase",
+        })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="implement-agent",
+            slice_id="test-slice-2",
+            value=agent_result,
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "success")
+        self.assertEqual(data["agent"], "implement-agent")
+        self.assertEqual(data["workflow_command"], "")
+        self.assertEqual(data["recommended_next_action"], "dispatch_test_agent")
+
+    def test_after_dispatch_with_blockers_recommends_block(self):
+        self._create_run()
+        agent_result = json.dumps({
+            "status": "failed",
+            "evidence": {"focused_tests": [{"command": "pytest", "result": "fail"}]},
+            "blockers": [{"reason": "test_failure", "message": "focused tests failed",
+                          "recommended_action": "back_to_implement"}],
+            "recommended_next_action": "back_to_implement",
+        })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="test-agent",
+            slice_id="test-slice-3",
+            value=agent_result,
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "failed")
+        self.assertEqual(data["workflow_command"], "workflow.py block")
+
+        state = self._read_current_state()
+        agent_result_evidence = state.get("evidence", {}).get("agent_result", {})
+        self.assertEqual(agent_result_evidence["status"], "failed")
+
+    def test_after_dispatch_preserves_per_slice_history(self):
+        self._create_run()
+        first_result = json.dumps({
+            "status": "success",
+            "evidence": {"focused_tests": [{"command": "pytest -k a", "result": "pass"}]},
+            "blockers": [],
+            "recommended_next_action": "dispatch_test_agent",
+        })
+        second_result = json.dumps({
+            "status": "failed",
+            "evidence": {"focused_tests": [{"command": "pytest -k b", "result": "fail"}]},
+            "blockers": [{"reason": "test_failure", "message": "slice b failed"}],
+            "recommended_next_action": "back_to_implement",
+        })
+
+        rc, _, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="implement-agent",
+            slice_id="slice-a",
+            value=first_result,
+        )
+        self.assertEqual(rc, 0)
+        rc, _, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="test-agent",
+            slice_id="slice-b",
+            value=second_result,
+        )
+        self.assertEqual(rc, 0)
+
+        state = self._read_current_state()
+        results = state.get("evidence", {}).get("agent_results", {})
+        self.assertIn("slice-a", results)
+        self.assertIn("slice-b", results)
+        self.assertEqual(results["slice-a"]["implement-agent"]["status"], "success")
+        self.assertEqual(results["slice-b"]["test-agent"]["status"], "failed")
+
+    def test_after_dispatch_preserves_artifacts_in_transition(self):
+        self._create_run()
+        agent_result = json.dumps({
+            "status": "success",
+            "evidence": {},
+            "blockers": [],
+            "artifacts": {
+                "handoff_path": ".ai/workflows/runs/run-1/handoffs/slice-a/implement-agent.md",
+                "raw_log_paths": [{"path": ".ai/workflows/runs/run-1/logs/slice-a/implement-agent/pytest.log",
+                                   "kind": "pytest", "command": "pytest -k flow_type", "result": "pass"}],
+            },
+        })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="implement-agent",
+            value=agent_result,
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertIn("artifacts", data)
+        self.assertIn("handoff_path", data["artifacts"])
+        self.assertEqual(len(data["artifacts"]["raw_log_paths"]), 1)
+
+    def test_before_dispatch_rejects_invalid_flow_type_value(self):
+        self._create_run()
+        state = self._read_current_state()
+        state["flow_type"] = "bogus-flow"
+        self._write_current_state(state)
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="implement-agent",
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "blocked")
+        reasons = [b["reason"] for b in data.get("blockers", [])]
+        self.assertIn("invalid_flow_type", reasons)
+
+    def test_after_dispatch_handles_non_json_value(self):
+        self._create_run()
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="plan-agent",
+            value="plain text result",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertIsNotNone(data)
 
 
 if __name__ == "__main__":

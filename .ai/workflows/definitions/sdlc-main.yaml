@@ -89,6 +89,8 @@ phases:
       - openspec-continue-change
     exit_criteria:
       - openspec_artifacts_done
+    evidence_keys:
+      - openspec_artifacts_done
     post_hooks:
       - roadmap_status_ready_if_linked
     next: apply_change
@@ -108,6 +110,10 @@ phases:
       - tasks_complete
       - tdd_passed
       - eval_passed_or_human_decision_recorded
+    evidence_keys:
+      - tasks_complete
+      - tdd_passed
+      - eval_passed_or_human_decision_recorded
     post_hooks:
       - roadmap_apply_start_if_ready
     next: archive_change
@@ -120,6 +126,8 @@ phases:
     allowed_workers:
       - openspec-archive-change
     exit_criteria:
+      - archive_path_exists
+    evidence_keys:
       - archive_path_exists
     post_hooks:
       - memory_sync
