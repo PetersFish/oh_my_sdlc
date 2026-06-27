@@ -1531,6 +1531,33 @@ def cmd_before_dispatch(root, args):
     print(json.dumps(result, indent=2))
 
 
+def _validate_evidence_envelope_contract(result: Dict[str, Any]) -> List[str]:
+    """Validate that agent result conforms to shared evidence envelope contract.
+    Returns a list of error messages (empty = valid).
+    The 'agent' field is optional here because after_dispatch receives it via CLI arg."""
+    errors: List[str] = []
+    if not isinstance(result, dict):
+        return ["agent result must be a dict"]
+    if "status" not in result:
+        errors.append("missing 'status' in evidence envelope")
+    if result.get("status") not in ("success", "failed", "blocked"):
+        errors.append(f"invalid status: {result.get('status')!r}")
+    evidence = result.get("evidence")
+    if evidence is not None and not isinstance(evidence, dict):
+        errors.append("'evidence' must be a dict")
+    elif evidence is not None:
+        focused = evidence.get("focused_tests")
+        if focused is not None and not isinstance(focused, list):
+            errors.append("evidence.focused_tests must be an array when present")
+    blockers = result.get("blockers")
+    if blockers is not None and not isinstance(blockers, list):
+        errors.append("'blockers' must be a list")
+    artifacts = result.get("artifacts")
+    if artifacts is not None and not isinstance(artifacts, dict):
+        errors.append("'artifacts' must be a dict")
+    return errors
+
+
 def cmd_after_dispatch(root, args):
     state = load_run_state(root)
     if not state:
@@ -1565,6 +1592,16 @@ def cmd_after_dispatch(root, args):
         except (json.JSONDecodeError, TypeError):
             agent_result = {"raw_result": agent_result_value}
 
+    # 3.8b: Validate agent result against evidence envelope contract
+    envelope_errors = _validate_evidence_envelope_contract(agent_result)
+    if envelope_errors:
+        agent_result.setdefault("blockers", []).extend(
+            {"reason": "envelope_contract_violation",
+             "message": err,
+             "recommended_action": "correct evidence envelope format"}
+            for err in envelope_errors
+        )
+
     agent_status = agent_result.get("status", "unknown")
     agent_evidence = agent_result.get("evidence", {})
     agent_blockers = agent_result.get("blockers", [])
@@ -1584,6 +1621,17 @@ def cmd_after_dispatch(root, args):
     evidence = state.setdefault("evidence", {})
     evidence["agent_result"] = latest_result
     evidence.setdefault("agent_results", {}).setdefault(slice_id, {})[canonical_agent] = latest_result
+
+    # 3.8c: Map agent evidence to phase-level evidence_keys
+    wf = load_workflow(root, state.get("workflow", "sdlc-main"))
+    if wf:
+        phase_def = get_phase(wf, phase)
+        if phase_def:
+            phase_evidence_keys = phase_def.get("evidence_keys", [])
+            for ek in phase_evidence_keys:
+                if ek in agent_evidence and ek not in evidence:
+                    evidence[ek] = agent_evidence[ek]
+
     state["updated_at"] = _ts()
     save_run_state(root, state)
 

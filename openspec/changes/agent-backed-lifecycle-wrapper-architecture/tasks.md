@@ -5,21 +5,21 @@ Note: this phase now distinguishes contract-level coverage already added for the
 - [x] 1.1 Write test: `flow_type` round-trips in workflow run state — `start`/`resume` preserves `flow_type` in the run JSON, and `validate_run_state` rejects unknown values
 - [x] 1.2 Write test: missing `flow_type` causes agent/wrapper to return a structured blocker rather than proceeding
 - [x] 1.3 Write contract-level test: normalized result dict uses the shared evidence envelope shape and keeps workflow state mutation inside `workflow.py`
-- [ ] 1.3b Write executable routing test: `dev-orchestrator` returns normalized result dict but never directly writes `.ai/workflows/runs/` files; runtime-visible state mutation is only through `workflow.py` commands and hooks
+- [x] 1.3b Write executable routing test: `dev-orchestrator` returns normalized result dict but never directly writes `.ai/workflows/runs/` files; runtime-visible state mutation is only through `workflow.py` commands and hooks
 - [x] 1.4 Write test: `complete-phase --exit-criteria-satisfied` fails when required evidence keys declared in the phase definition are missing or empty in run state
 - [x] 1.5 Write contract/helper test: parallel package disjointness rules reject shared files or modules and produce a blocker payload
-- [ ] 1.5b Write executable routing test: `dev-orchestrator` rejects parallel dispatch when proposed work packages share files or modules and returns that blocker before subagent dispatch
+- [x] 1.5b Write executable routing test: `dev-orchestrator` rejects parallel dispatch when proposed work packages share files or modules and returns that blocker before subagent dispatch
 - [x] 1.6 Write test: `sdlc-orchestrator` is manual-trigger only — its description must not auto-match on "new development task", "any new development task", or equivalent generic phrases
 - [x] 1.7 Write contract-level test: `test-agent` verification sequence and normalized evidence fields are defined in wrapper/agent contracts
-- [ ] 1.7b Write executable routing test: `test-agent` reruns the focused tests claimed by `implement-agent` first, then checks new or changed TDD tests for overfit, then runs broader regression/integration verification, and emits passing or failing verification evidence in normalized form
+- [x] 1.7b Write executable routing test: `test-agent` reruns the focused tests claimed by `implement-agent` first, then checks new or changed TDD tests for overfit, then runs broader regression/integration verification, and emits passing or failing verification evidence in normalized form
 - [x] 1.8 Write contract-level test: `test-agent` failure routing defaults to `implement-agent`, with ambiguity escalation to `plan-agent`
-- [ ] 1.8b Write executable routing test: `test-agent` preserves the implementation slice identifier and blocker evidence across the implement/test loop, and escalates to `plan-agent` only when verification reveals requirement ambiguity or design uncertainty
-- [ ] 1.9 Write executable routing test: `dev-orchestrator` does not request `review-agent`, `complete-phase`, or `advance` after `implement-agent` success alone; passing `test-agent` verification evidence is required first
+- [x] 1.8b Write executable routing test: `test-agent` preserves the implementation slice identifier and blocker evidence across the implement/test loop, and escalates to `plan-agent` only when verification reveals requirement ambiguity or design uncertainty
+- [x] 1.9 Write executable routing test: `dev-orchestrator` does not request `review-agent`, `complete-phase`, or `advance` after `implement-agent` success alone; passing `test-agent` verification evidence is required first
 - [x] 1.10 Write contract-level test: specialized agents emit the shared evidence envelope with required top-level fields and `focused_tests` is validated as an array when focused test evidence is present
 - [x] 1.11 Write contract-level test: cross-agent handoff artifacts use the required Markdown sections
-- [ ] 1.11b Write executable routing test: `dev-orchestrator` forwards `artifacts.handoff_path` to the next agent when cross-agent context is needed
+- [x] 1.11b Write executable routing test: `dev-orchestrator` forwards `artifacts.handoff_path` to the next agent when cross-agent context is needed
 - [x] 1.12 Write contract-level test: raw logs are exposed through `artifacts.raw_log_paths[]` and ignored by deterministic phase-gate decisions
-- [ ] 1.12b Write executable artifact test: raw logs are written under the workflow run only when an agent or wrapper retains them by reference
+- [x] 1.12b Write executable artifact test: raw logs are written under the workflow run only when an agent or wrapper retains them by reference
 
 ## 2. Design and Contract Artifacts
 
@@ -49,22 +49,22 @@ Note: this phase now separates architecture skeleton work already landed (runtim
 - [x] 3.5 Update `sdlc-orchestrator` SKILL.md description to manual-trigger only; execution dispatch routing migrates to `dev-orchestrator`
 - [x] 3.6 Implement `dev-orchestrator` agent routing logic (agent file: `.opencode/agents/dev-orchestrator.md`; distributed copies in `.claude/agents/` and `.cursor/agents/`)
 - [x] 3.7 Implement wrapper contract registry for lifecycle modules
-- [ ] 3.7b Implement executable wrapper adapters for lifecycle modules that call current backends and normalize outputs into phase evidence keys
+- [x] 3.7b Implement executable wrapper adapters for lifecycle modules that call current backends and normalize outputs into phase evidence keys
 - [x] 3.7c Implement provider configuration loading and validation for wrapper-backed modules, starting with `spec.provider` and `memory.provider`
 - [x] 3.7d Implement provider registries/capability maps for `spec` and `memory`, with defaults and fail-closed behavior for unknown or incomplete providers
 - [x] 3.7e Add project-level provider config files under `.opencode/sdlc-providers.yaml`, `.cursor/sdlc-providers.yaml`, and `.claude/sdlc-providers.yaml`
 - [x] 3.7f Implement a YAML registry plus Python loader that resolves module, provider, and capability selection for wrapper-backed modules
 - [x] 3.7g Model memory provider capabilities with `load`, `repository_sync`, and `spec_post_archive_sync`
 - [x] 3.8 Implement agent prompt/frontmatter contracts, including shared evidence envelope requirements, handoff structure requirements, and raw-log reference requirements
-- [ ] 3.8b Implement executable agent behavior integration so those contracts are enforced by the default dispatch path rather than documentation alone
-- [ ] 3.8c Wire `after_dispatch` evidence mapping so normalized agent results satisfy phase-level `evidence_keys` without manual reshaping
-- [ ] 3.8d Cut `sdlc-main.yaml` default execution path over to `dev-orchestrator` where this change intends agent-backed routing to be the live path
+- [x] 3.8b Implement executable agent behavior integration so those contracts are enforced by the default dispatch path rather than documentation alone
+- [x] 3.8c Wire `after_dispatch` evidence mapping so normalized agent results satisfy phase-level `evidence_keys` without manual reshaping
+- [x] 3.8d Cut `sdlc-main.yaml` default execution path over to `dev-orchestrator` where this change intends agent-backed routing to be the live path
 - [x] 3.9 Do not introduce a full `state_machine.py` rewrite or remap `sdlc-main.yaml` into `plan` / `implement` / `review` / `finalize` / `done` in this change
 
 ## 4. Verification
 
-- [ ] 4.1 Verify all behavior tests from Phase 1 pass
-- [ ] 4.2 Verify all existing workflow paths (`roadmap_item`, `openspec_change`, `superpowers_direct`) either pass through the new wrappers or remain on the documented legacy path without user-visible behavior drift during migration
-- [ ] 4.3 Verify executable wrapper integrations fail closed when required evidence is missing
-- [ ] 4.4 Verify configured provider selection works for `spec` and `memory`, including defaults and structured blockers for unknown or unsupported providers
-- [ ] 4.5 Verify provider configs remain consistent across `.opencode/`, `.cursor/`, and `.claude/`
+- [x] 4.1 Verify all behavior tests from Phase 1 pass
+- [x] 4.2 Verify all existing workflow paths (`roadmap_item`, `openspec_change`, `superpowers_direct`) either pass through the new wrappers or remain on the documented legacy path without user-visible behavior drift during migration
+- [x] 4.3 Verify executable wrapper integrations fail closed when required evidence is missing
+- [x] 4.4 Verify configured provider selection works for `spec` and `memory`, including defaults and structured blockers for unknown or unsupported providers
+- [x] 4.5 Verify provider configs remain consistent across `.opencode/`, `.cursor/`, and `.claude/`

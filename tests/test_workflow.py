@@ -13,6 +13,8 @@ import sys
 import tempfile
 import unittest
 
+import yaml
+
 
 WORKFLOW_PY = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
@@ -40,6 +42,12 @@ def load_json(root, relpath):
         return None
     with open(path) as f:
         return json.load(f)
+
+
+def load_yaml(root, relpath):
+    path = os.path.join(root, relpath)
+    with open(path) as f:
+        return yaml.safe_load(f)
 
 
 class FixtureBase(unittest.TestCase):
@@ -1161,6 +1169,53 @@ class TestCompletePhase(FixtureBase):
         self.assertIn("tasks_complete", data["error"])
         self.assertIn("tdd_passed", data["error"])
         self.assertIn("eval_passed_or_human_decision_recorded", data["error"])
+
+
+class TestWorkflowDefinitionContracts(FixtureBase):
+    def test_default_routing_phases_use_dev_orchestrator(self):
+        wf = load_yaml(self.tmp, ".ai/workflows/definitions/sdlc-main.yaml")
+        phases = wf["phases"]
+
+        for phase_name in (
+            "input",
+            "decide_intent",
+            "review_decision",
+            "create_change",
+            "apply_change",
+            "archive_change",
+            "post_archive_actions",
+            "done",
+        ):
+            allowed = phases[phase_name].get("allowed_workers", [])
+            self.assertIn(
+                "dev-orchestrator",
+                allowed,
+                f"{phase_name} should route through dev-orchestrator",
+            )
+            self.assertNotIn(
+                "sdlc-orchestrator",
+                allowed,
+                f"{phase_name} should not route through legacy sdlc-orchestrator",
+            )
+
+    def test_change_phases_do_not_hardcode_spec_backends(self):
+        wf = load_yaml(self.tmp, ".ai/workflows/definitions/sdlc-main.yaml")
+        phases = wf["phases"]
+
+        concrete_spec_workers = {
+            "openspec-propose",
+            "openspec-new-change",
+            "openspec-continue-change",
+            "openspec-apply-change",
+            "openspec-archive-change",
+        }
+
+        for phase_name in ("create_change", "apply_change", "archive_change"):
+            allowed = set(phases[phase_name].get("allowed_workers", []))
+            self.assertFalse(
+                allowed & concrete_spec_workers,
+                f"{phase_name} should not hardcode spec backends in allowed_workers",
+            )
 
 
 class TestGovernanceCheck(FixtureBase):
@@ -3440,6 +3495,89 @@ class TestDispatchHooks(FixtureBase):
         self.assertEqual(data["status"], "blocked")
         reasons = [b["reason"] for b in data.get("blockers", [])]
         self.assertIn("invalid_flow_type", reasons)
+
+    def test_after_dispatch_implement_agent_does_not_request_review(self):
+        """Task 1.9: implement-agent success recommends dispatch_test_agent, not review/complete."""
+        self._create_run()
+        agent_result = json.dumps({
+            "status": "success",
+            "evidence": {"focused_tests": [{"command": "pytest -k x", "result": "pass"}]},
+            "blockers": [],
+            "recommended_next_action": "continue",
+        })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="implement-agent",
+            value=agent_result,
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["agent"], "implement-agent")
+        self.assertNotEqual(data["recommended_next_action"], "dispatch_review_agent")
+        self.assertNotEqual(data["recommended_next_action"], "complete_phase")
+        self.assertEqual(data["recommended_next_action"], "dispatch_test_agent")
+        self.assertEqual(data["workflow_command"], "")
+
+    def test_after_dispatch_test_agent_success_recommends_review(self):
+        """Task 1.9: test-agent success recommends dispatch_review_agent."""
+        self._create_run()
+        agent_result = json.dumps({
+            "status": "success",
+            "evidence": {"verification_passed": True, "overfit_check_passed": True, "regression_passed": True},
+            "blockers": [],
+            "recommended_next_action": "dispatch_review_agent",
+        })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="test-agent",
+            value=agent_result,
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["recommended_next_action"], "dispatch_review_agent")
+
+    def test_dispatch_hooks_only_write_under_workflows_runs(self):
+        """Task 1.3b: before-dispatch and after-dispatch only write under .ai/workflows/runs/."""
+        self._create_run()
+        state = self._read_current_state()
+        state["current_phase"] = "apply_change"
+        self._write_current_state(state)
+
+        original_files = set()
+        for root_dir, dirs, files in os.walk(self.tmp):
+            for f in files:
+                original_files.add(os.path.join(root_dir, f))
+
+        run_workflow(
+            self.tmp, "before-dispatch",
+            agent="implement-agent",
+            slice_id="slice-1",
+        )
+
+        agent_result = json.dumps({
+            "status": "success",
+            "evidence": {"focused_tests": [{"command": "pytest -k x", "result": "pass"}]},
+            "blockers": [],
+            "artifacts": {"handoff_path": ".ai/workflows/runs/run-1/handoff.md"},
+        })
+        run_workflow(
+            self.tmp, "after-dispatch",
+            agent="implement-agent",
+            slice_id="slice-1",
+            value=agent_result,
+        )
+
+        new_files = set()
+        for root_dir, dirs, files in os.walk(self.tmp):
+            for f in files:
+                new_files.add(os.path.join(root_dir, f))
+
+        for nf in new_files - original_files:
+            rel = os.path.relpath(nf, self.tmp)
+            self.assertTrue(
+                rel.startswith(".ai/workflows/runs/"),
+                f"dispatch hooks wrote outside .ai/workflows/runs/: {rel}",
+            )
 
     def test_after_dispatch_handles_non_json_value(self):
         self._create_run()

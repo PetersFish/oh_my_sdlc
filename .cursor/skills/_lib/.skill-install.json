@@ -1,0 +1,18 @@
+{
+  "skill": "_lib",
+  "source_repo": ".",
+  "source_path": "skills/_lib",
+  "source_ref": "HEAD",
+  "status": "stable",
+  "target": ".cursor/skills/_lib",
+  "installed_at": "2026-06-27T15:52:06.450613Z",
+  "backport_policy": "review-required",
+  "payload_hash": "90c1fff754739d17e0ef1fa6c4c67fbcd8ba5c3798a0f770b408ff74d34d90c1",
+  "files": [
+    "provider_registry.yaml",
+    "provider_registry_loader.py",
+    "sdlc_runtime_paths.py",
+    "wrapper_adapters.py",
+    "wrapper_contracts.py"
+  ]
+}

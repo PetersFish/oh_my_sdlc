@@ -6,7 +6,7 @@ phases:
     required_inputs: []
     context_loaders: []
     allowed_workers:
-      - sdlc-orchestrator
+      - dev-orchestrator
     exit_criteria:
       - primary_subject_recorded
     post_hooks: []
@@ -36,7 +36,7 @@ phases:
     required_inputs: []
     context_loaders: []
     allowed_workers:
-      - sdlc-orchestrator
+      - dev-orchestrator
     exit_criteria:
       - workflow_branch_selected
     post_hooks: []
@@ -69,7 +69,7 @@ phases:
       - context.review_decision
     context_loaders: []
     allowed_workers:
-      - sdlc-orchestrator
+      - dev-orchestrator
     exit_criteria:
       - review_passed_or_failed
     post_hooks: []
@@ -84,9 +84,7 @@ phases:
       - openspec_change_status
       - roadmap_linked_item
     allowed_workers:
-      - openspec-propose
-      - openspec-new-change
-      - openspec-continue-change
+      - dev-orchestrator
     exit_criteria:
       - openspec_artifacts_done
     evidence_keys:
@@ -102,10 +100,7 @@ phases:
       - openspec_change_status
       - roadmap_item_status
     allowed_workers:
-      - openspec-apply-change
-      - sdlc-evalops
-      - requesting-code-review
-      - receiving-code-review
+      - dev-orchestrator
     exit_criteria:
       - tasks_complete
       - tdd_passed
@@ -124,7 +119,7 @@ phases:
     context_loaders:
       - openspec_archive_path
     allowed_workers:
-      - openspec-archive-change
+      - dev-orchestrator
     exit_criteria:
       - archive_path_exists
     evidence_keys:
@@ -141,10 +136,7 @@ phases:
       - roadmap_linked_item
       - roadmap_item_status
     allowed_workers:
-      - sdlc-orchestrator
-      - sdlc-repository-memory-sync
-      - sdlc-openspec-memory-sync
-      - sdlc-roadmap
+      - dev-orchestrator
     exit_criteria:
       - pending_hooks_empty
     post_hooks: []
@@ -154,7 +146,7 @@ phases:
     required_inputs: []
     context_loaders: []
     allowed_workers:
-      - sdlc-orchestrator
+      - dev-orchestrator
     exit_criteria:
       - run_status_done
     post_hooks: []

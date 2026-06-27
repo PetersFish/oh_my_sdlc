@@ -727,5 +727,94 @@ class TestAgentPromptBody(unittest.TestCase):
         self.assertIn("verification_passed", body)
 
 
+class TestExecutableRoutingTests(unittest.TestCase):
+    """Tasks 1.5b, 1.7b, 1.8b, 1.12b: executable routing coverage."""
+
+    def _read_agent_body(self, agent_name):
+        path = _agent_path(".opencode", agent_name)
+        with open(path) as f:
+            content = f.read()
+        idx = content.find("\n---", 3)
+        if idx == -1:
+            return ""
+        return content[idx + 4:]
+
+    # 1.5b: dev-orchestrator rejects parallel dispatch on shared files/modules
+    def test_dev_orchestrator_mentions_parallel_rejection(self):
+        body = self._read_agent_body("dev-orchestrator")
+        self.assertIn("disjoint", body.lower())
+
+    def test_dev_orchestrator_mentions_parallel_dispatch_guard(self):
+        body = self._read_agent_body("dev-orchestrator")
+        self.assertIn("parallel", body.lower())
+
+    # 1.7b: test-agent full verification sequence
+    def test_test_agent_mentions_rerun_focused_tests_first(self):
+        body = self._read_agent_body("test-agent")
+        self.assertIn("rerun", body.lower())
+
+    def test_test_agent_mentions_full_verification_sequence(self):
+        body = self._read_agent_body("test-agent")
+        self.assertIn("rerun focused tests", body.lower())
+        self.assertIn("overfit", body.lower())
+        self.assertIn("regression", body.lower())
+        self.assertIn("integration", body.lower())
+
+    def test_test_agent_mentions_pass_fail_evidence_emission(self):
+        body = self._read_agent_body("test-agent")
+        self.assertIn("passing", body.lower())
+        self.assertIn("evidence", body.lower())
+
+    # 1.8b: test-agent preserves slice_id, escalates to plan-agent on ambiguity
+    def test_test_agent_mentions_slice_id_preservation(self):
+        body = self._read_agent_body("test-agent")
+        self.assertIn("slice_id", body.lower())
+
+    def test_test_agent_mentions_plan_agent_escalation(self):
+        body = self._read_agent_body("test-agent")
+        self.assertIn("plan-agent", body.lower())
+        self.assertIn("ambiguity", body.lower())
+
+    def test_test_agent_mentions_implement_agent_as_default_route(self):
+        body = self._read_agent_body("test-agent")
+        self.assertIn("implement-agent", body.lower())
+        idx = body.lower().find("implement-agent")
+        ambiguity_idx = body.lower().find("plan-agent")
+        self.assertGreater(ambiguity_idx, -1)
+
+    # 1.12b: raw log write policy test
+    def test_raw_logs_stored_under_workflow_run_path(self):
+        from _lib.wrapper_contracts import make_raw_log_entry, RAW_LOG_META_KEYS
+        entry = make_raw_log_entry(
+            path=".ai/workflows/runs/run-1/logs/slice-1/test-agent/pytest.log",
+            kind="pytest",
+            command="pytest tests/ -v",
+            result="fail",
+        )
+        self.assertTrue(entry["path"].startswith(".ai/workflows/runs/"))
+        for key in RAW_LOG_META_KEYS:
+            self.assertIn(key, entry)
+
+    def test_raw_logs_artifacts_referenced_from_evidence(self):
+        from _lib.wrapper_contracts import make_evidence_envelope
+        envelope = make_evidence_envelope(
+            agent="test-agent",
+            status="failed",
+            phase="apply_change",
+            slice_id="slice-1",
+            flow_type="spec-flow",
+            artifacts={
+                "raw_log_paths": [
+                    {"path": ".ai/workflows/runs/run-1/logs/slice-1/test-agent/debug.log",
+                     "kind": "pytest", "command": "pytest -k test", "result": "fail"},
+                ],
+            },
+        )
+        d = envelope.to_dict()
+        self.assertIn("artifacts", d)
+        self.assertIn("raw_log_paths", d["artifacts"])
+        self.assertEqual(len(d["artifacts"]["raw_log_paths"]), 1)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
