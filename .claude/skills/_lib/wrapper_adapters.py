@@ -102,6 +102,33 @@ def run_wrapper_adapter(
 
     configs = load_provider_configs(root)
     config = next(iter(configs.values()), None) if configs else None
+    provider_managed = bool(registry and module in registry)
+
+    evidence: Dict[str, Any] = dict(extra_inputs or {})
+
+    if not provider_managed:
+        blocker = make_blocker(
+            reason="direct_backend_unimplemented",
+            message=(
+                f"Module {module!r} is not provider-managed and does not yet have an executable "
+                "direct backend adapter"
+            ),
+            recommended_action="Implement a direct wrapper backend before dispatching this module",
+        )
+        envelope = make_evidence_envelope(
+            agent=f"wrapper:{module}",
+            status="blocked",
+            phase=phase,
+            slice_id=slice_id,
+            flow_type=flow_type,
+            evidence=evidence,
+            blockers=[blocker],
+            recommended_next_action="implement_direct_backend",
+        )
+        return WrapperAdapterResult(
+            envelope=envelope,
+            raw_output={"module": module, "capability": capability, "routing_mode": "direct"},
+        )
 
     resolved = resolve_provider(
         module=module,
@@ -122,23 +149,11 @@ def run_wrapper_adapter(
             phase=phase,
             slice_id=slice_id,
             flow_type=flow_type,
+            evidence=evidence,
             blockers=[blocker],
             recommended_next_action="check_provider_configuration",
         )
         return WrapperAdapterResult(envelope=envelope)
-
-    evidence_keys = contract.evidence_keys
-    failure_modes = contract.failure_modes
-    remediation = contract.remediation
-
-    evidence: Dict[str, Any] = {}
-    for ek in evidence_keys:
-        evidence[ek] = True
-
-    if extra_inputs:
-        evidence.update(extra_inputs)
-
-    blockers: List[Dict[str, str]] = []
 
     envelope = make_evidence_envelope(
         agent=f"wrapper:{module}",
@@ -147,8 +162,8 @@ def run_wrapper_adapter(
         slice_id=slice_id,
         flow_type=flow_type,
         evidence=evidence,
-        blockers=blockers,
-        recommended_next_action="continue",
+        blockers=[],
+        recommended_next_action="dispatch_backend",
     )
     return WrapperAdapterResult(
         envelope=envelope,

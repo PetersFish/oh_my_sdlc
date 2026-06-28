@@ -1423,6 +1423,28 @@ def _phase_allows_agent(phase, agent):
     return canonical in allowed
 
 
+def _allows_replan_from_apply_change(state, agent):
+    canonical = _canonical_agent_name(agent)
+    if canonical != "plan-agent":
+        return False
+    if state.get("current_phase") != "apply_change":
+        return False
+    block = state.get("block") or {}
+    next_allowed = block.get("next_allowed", [])
+    if isinstance(next_allowed, str):
+        next_allowed = [next_allowed]
+    latest = state.get("evidence", {}).get("agent_result", {})
+    blockers = latest.get("blockers", []) if isinstance(latest, dict) else []
+    for blocker in blockers:
+        if not isinstance(blocker, dict):
+            continue
+        if blocker.get("reason") in {"requirement_ambiguity", "design_ambiguity"}:
+            return True
+        if blocker.get("recommended_action") == "dispatch_plan_agent":
+            return True
+    return "dispatch_plan_agent" in next_allowed
+
+
 def cmd_before_dispatch(root, args):
     state = load_run_state(root)
     if not state:
@@ -1475,14 +1497,15 @@ def cmd_before_dispatch(root, args):
             "message": f"flow_type '{flow_type}' is not a valid value",
             "recommended_action": f"flow_type must be one of: {sorted(VALID_FLOW_TYPES)}",
         })
-    if state.get("status") == "blocked" and agent not in {"finish-agent", "finish_agent"}:
+    allow_replan = _allows_replan_from_apply_change(state, canonical_agent)
+    if state.get("status") == "blocked" and agent not in {"finish-agent", "finish_agent"} and not allow_replan:
         block = state.get("block", {})
         blocker_reasons.append({
             "reason": "run_is_blocked",
             "message": f"Workflow run is blocked: {block.get('type', 'unknown')} — {block.get('message', 'no message')}",
             "recommended_action": "resolve the block before dispatching agents",
         })
-    if agent in VALID_AGENT_NAMES and not _phase_allows_agent(current_phase, canonical_agent):
+    if agent in VALID_AGENT_NAMES and not (_phase_allows_agent(current_phase, canonical_agent) or allow_replan):
         blocker_reasons.append({
             "reason": "agent_not_allowed_for_phase",
             "message": f"Agent '{canonical_agent}' is not allowed in phase '{current_phase}'",
@@ -1637,7 +1660,11 @@ def cmd_after_dispatch(root, args):
 
     next_cmd = "complete-phase"
     recommended_next_action = agent_recommended or "complete_phase"
-    if agent_blockers:
+    if agent_status != "success":
+        next_cmd = "block"
+        if not agent_recommended or agent_recommended in {"dispatch_test_agent", "dispatch_review_agent", "complete_phase"}:
+            recommended_next_action = "resolve_failure"
+    elif agent_blockers:
         next_cmd = "block"
     elif canonical_agent == "implement-agent":
         next_cmd = ""
@@ -1645,6 +1672,14 @@ def cmd_after_dispatch(root, args):
     elif canonical_agent == "test-agent":
         next_cmd = ""
         recommended_next_action = "dispatch_review_agent"
+
+    should_block = next_cmd == "block"
+    if agent_blockers:
+        block_message = "; ".join(b.get("reason", b.get("message", "")) for b in agent_blockers)
+        next_allowed = ",".join(b.get("recommended_action", recommended_next_action or "resolve") for b in agent_blockers)
+    else:
+        block_message = f"agent_status={agent_status}" if should_block else ""
+        next_allowed = recommended_next_action if should_block else ""
 
     transition = {
         "agent": canonical_agent,
@@ -1659,11 +1694,9 @@ def cmd_after_dispatch(root, args):
         "workflow_command": f"workflow.py {next_cmd}" if next_cmd else "",
         "workflow_args": {
             "exit_criteria_satisfied": agent_evidence.get("criteria_satisfied", ""),
-            "block_type": "worker_failed" if agent_blockers else "",
-            "message": "; ".join(b.get("reason", b.get("message", "")) for b in agent_blockers) if agent_blockers else "",
-            "next_allowed": ",".join(
-                b.get("recommended_action", "resolve") for b in agent_blockers
-            ) if agent_blockers else "",
+            "block_type": "worker_failed" if should_block else "",
+            "message": block_message,
+            "next_allowed": next_allowed,
         },
     }
     print(json.dumps(transition, indent=2))

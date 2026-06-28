@@ -137,6 +137,18 @@ def load_primary_provider_config(repo_root: Path) -> Optional[Dict[str, Any]]:
     return None
 
 
+def find_provider_config_mismatch(configs: Dict[str, Dict[str, Any]]) -> Optional[Dict[str, str]]:
+    """Return mismatch metadata when client configs differ, otherwise None."""
+    items = list(configs.items())
+    if len(items) <= 1:
+        return None
+    base_name, base_cfg = items[0]
+    for other_name, other_cfg in items[1:]:
+        if other_cfg != base_cfg:
+            return {"expected": base_name, "actual": other_name}
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Provider resolution with fail-closed behavior
 # ---------------------------------------------------------------------------

@@ -3260,6 +3260,41 @@ class TestDispatchHooks(FixtureBase):
         reasons = [b["reason"] for b in data.get("blockers", [])]
         self.assertIn("run_is_blocked", reasons)
 
+
+
+    def test_before_dispatch_allows_plan_agent_for_apply_change_ambiguity(self):
+        self._create_run()
+        state = self._read_current_state()
+        state["current_phase"] = "apply_change"
+        state["status"] = "blocked"
+        state["block"] = {
+            "type": "worker_failed",
+            "message": "requirement ambiguity needs replanning",
+            "next_allowed": ["dispatch_plan_agent"],
+        }
+        state.setdefault("evidence", {})["agent_result"] = {
+            "agent": "test-agent",
+            "status": "failed",
+            "phase": "apply_change",
+            "slice_id": "slice-1",
+            "flow_type": "spec-flow",
+            "evidence": {},
+            "blockers": [{
+                "reason": "requirement_ambiguity",
+                "message": "verification revealed missing requirement",
+                "recommended_action": "dispatch_plan_agent",
+            }],
+        }
+        self._write_current_state(state)
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="plan-agent",
+            slice_id="slice-1",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "dispatched")
+
     def test_before_dispatch_finish_agent_skips_blocked_check(self):
         self._create_run()
         state = self._read_current_state()
@@ -3420,6 +3455,26 @@ class TestDispatchHooks(FixtureBase):
         state = self._read_current_state()
         agent_result_evidence = state.get("evidence", {}).get("agent_result", {})
         self.assertEqual(agent_result_evidence["status"], "failed")
+
+
+
+    def test_after_dispatch_failed_without_blockers_still_blocks(self):
+        self._create_run()
+        agent_result = json.dumps({
+            "status": "failed",
+            "evidence": {},
+            "blockers": [],
+            "recommended_next_action": "dispatch_test_agent",
+        })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="implement-agent",
+            value=agent_result,
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["workflow_command"], "workflow.py block")
+        self.assertEqual(data["recommended_next_action"], "resolve_failure")
 
     def test_after_dispatch_preserves_per_slice_history(self):
         self._create_run()

@@ -5,6 +5,7 @@ import json
 import os
 import pathlib
 import sys
+import tempfile
 import unittest
 
 SKILLS_LIB = os.path.join(
@@ -40,6 +41,11 @@ from _lib.wrapper_contracts import (
     make_raw_log_entry,
     logs_optional_policy,
     get_wrapper,
+    resolve_wrapper_provider_blockers,
+)
+from _lib.wrapper_adapters import (
+    implementation_wrapper_adapter,
+    spec_wrapper_adapter,
 )
 
 
@@ -814,6 +820,53 @@ class TestExecutableRoutingTests(unittest.TestCase):
         self.assertIn("artifacts", d)
         self.assertIn("raw_log_paths", d["artifacts"])
         self.assertEqual(len(d["artifacts"]["raw_log_paths"]), 1)
+
+
+class TestExecutableWrapperAdapters(unittest.TestCase):
+    """Behavior tests for executable wrapper adapter routing."""
+
+    def test_spec_wrapper_does_not_synthesize_success_evidence(self):
+        result = spec_wrapper_adapter(
+            workflow_run_id="run-1",
+            phase="create_change",
+            action="create",
+            flow_type="spec-flow",
+            change_id="demo-change",
+            repo_root=os.path.abspath(os.path.join(os.path.dirname(__file__), "..")),
+        )
+        self.assertEqual(result.envelope.status, "success")
+        self.assertEqual(result.raw_output["backend"], "openspec-propose")
+        self.assertNotIn("openspec_artifacts_done", result.envelope.evidence)
+        self.assertEqual(result.envelope.evidence["change_id"], "demo-change")
+
+    def test_non_provider_managed_wrapper_is_not_blocked_by_registry_gap(self):
+        result = implementation_wrapper_adapter(
+            workflow_run_id="run-1",
+            phase="apply_change",
+            action="apply",
+            flow_type="spec-flow",
+            slice_id="slice-1",
+            tasks=["fix dispatch routing"],
+            repo_root=os.path.abspath(os.path.join(os.path.dirname(__file__), "..")),
+        )
+        reasons = [b.get("reason") for b in result.envelope.blockers]
+        self.assertNotIn("not_provider_managed", reasons)
+
+    def test_provider_config_mismatch_fails_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            (root / ".opencode").mkdir()
+            (root / ".cursor").mkdir()
+            (root / ".claude").mkdir()
+            (root / ".opencode" / "sdlc-providers.yaml").write_text(
+                "version: 1\nspec:\n  provider: openspec\nmemory:\n  provider: local\n"
+            )
+            (root / ".cursor" / "sdlc-providers.yaml").write_text(
+                "version: 1\nspec:\n  provider: github/spec-kit\nmemory:\n  provider: local\n"
+            )
+            blockers = resolve_wrapper_provider_blockers("spec", "create", repo_root=str(root))
+            reasons = [b.get("reason") for b in blockers]
+            self.assertIn("provider_config_mismatch", reasons)
 
 
 if __name__ == "__main__":
