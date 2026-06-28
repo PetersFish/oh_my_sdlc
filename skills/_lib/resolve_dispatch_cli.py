@@ -9,9 +9,13 @@ Output (JSON):
     "module": "spec",
     "capability": "create",
     "provider": "openspec",
-    "kind": "skill",
-    "target": "openspec-propose",
-    "verifier_target": "openspec.create",
+    "dispatch": {
+      "kind": "skill",
+      "target": "openspec-propose"
+    },
+    "verifier": {
+      "target": "openspec.create"
+    },
     "result_contract": "spec_change"
   }
 
@@ -27,7 +31,7 @@ SKILLS_DIR = os.path.dirname(SCRIPT_DIR)
 if SKILLS_DIR not in sys.path:
     sys.path.insert(0, SKILLS_DIR)
 
-from _lib.wrapper_resolution import resolve_wrapper_dispatch, WrapperResolutionBlocked
+from _lib.wrapper_resolution import WrapperResolutionBlocked, resolve_wrapper_dispatch
 
 
 def main():
@@ -59,9 +63,8 @@ def main():
             "module": resolved.module,
             "capability": resolved.capability,
             "provider": resolved.provider,
-            "kind": resolved.dispatch["kind"],
-            "target": resolved.dispatch["target"],
-            "verifier_target": resolved.verifier.get("target", ""),
+            "dispatch": resolved.dispatch,
+            "verifier": resolved.verifier,
             "result_contract": resolved.result_contract,
         }
         print(json.dumps(result))

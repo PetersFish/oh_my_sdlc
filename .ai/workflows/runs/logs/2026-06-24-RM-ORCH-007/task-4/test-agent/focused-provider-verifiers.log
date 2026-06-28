@@ -1,0 +1,11 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- /opt/homebrew/opt/python@3.14/bin/python3.14
+cachedir: .pytest_cache
+rootdir: /Users/yuping/Documents/workspace/oh_my_skills/.worktrees/wrapper-dispatch-resolution
+collecting ... collected 95 items / 92 deselected / 3 selected
+
+tests/test_wrapper_contracts.py::TestProviderVerifiers::test_local_repository_sync_verifier_reports_success_from_memory_artifacts PASSED [ 33%]
+tests/test_wrapper_contracts.py::TestProviderVerifiers::test_openspec_create_verifier_blocks_when_required_artifact_missing PASSED [ 66%]
+tests/test_wrapper_contracts.py::TestProviderVerifiers::test_openspec_create_verifier_succeeds_when_required_change_artifacts_exist PASSED [100%]
+
+======================= 3 passed, 92 deselected in 0.03s =======================

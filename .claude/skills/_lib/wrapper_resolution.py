@@ -4,11 +4,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Optional
 
-from .provider_registry_loader import load_provider_configs, load_registry, resolve_provider
-from .wrapper_contracts import resolve_wrapper_provider_blockers, validate_contract_inputs
+from .provider_registry_loader import (
+    SUPPORTED_DISPATCH_KINDS,
+    load_consistent_provider_config,
+    load_registry,
+    resolve_provider,
+)
+from .wrapper_contracts import make_blocker, resolve_wrapper_provider_blockers, validate_contract_inputs
 
 
-class WrapperResolutionBlocked(ValueError):
+class WrapperResolutionBlocked(Exception):
     def __init__(self, blockers):
         self.blockers = blockers
         message = blockers[0]["message"] if blockers else "Wrapper resolution blocked"
@@ -51,8 +56,10 @@ def resolve_wrapper_dispatch(
         raise WrapperResolutionBlocked(blockers)
 
     registry = load_registry()
-    configs = load_provider_configs(root)
-    config = next(iter(configs.values()), None) if configs else None
+    config, config_blockers = load_consistent_provider_config(root)
+    if config_blockers:
+        raise WrapperResolutionBlocked(config_blockers)
+
     resolved = resolve_provider(
         module=module,
         capability=capability,
@@ -62,18 +69,32 @@ def resolve_wrapper_dispatch(
     )
     if resolved is None:
         raise WrapperResolutionBlocked([
-            {
-                "reason": "provider_resolution_failed",
-                "message": f"Provider resolution failed for module {module!r}, capability {capability!r}",
-                "recommended_action": "verify provider registry and provider config are aligned",
-            }
+            make_blocker(
+                reason="provider_resolution_failed",
+                message=f"Provider resolution failed for module {module!r}, capability {capability!r}",
+                recommended_action="verify provider registry and provider config are aligned",
+            )
+        ])
+
+    dispatch = resolved.dispatch or {"kind": resolved.dispatch_kind, "target": resolved.dispatch_target}
+    dispatch_kind = dispatch.get("kind")
+    if dispatch_kind not in SUPPORTED_DISPATCH_KINDS:
+        raise WrapperResolutionBlocked([
+            make_blocker(
+                reason="unsupported_dispatch_kind",
+                message=(
+                    f"Resolved provider {resolved.provider!r} for module {module!r} returned unsupported "
+                    f"dispatch kind {dispatch_kind!r}"
+                ),
+                recommended_action=f"Use one of the supported dispatch kinds: {sorted(SUPPORTED_DISPATCH_KINDS)}",
+            )
         ])
 
     return WrapperDispatchResolution(
         module=module,
         capability=capability,
         provider=resolved.provider,
-        dispatch=resolved.dispatch or {"kind": resolved.dispatch_kind, "target": resolved.dispatch_target},
+        dispatch=dispatch,
         verifier=resolved.verifier or {"target": f"{resolved.provider}.{capability}"},
         result_contract=resolved.result_contract or f"{module}_result",
     )

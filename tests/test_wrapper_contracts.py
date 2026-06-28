@@ -4,9 +4,13 @@
 import json
 import os
 import pathlib
+import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
+
+import yaml
 
 SKILLS_LIB = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
@@ -42,9 +46,9 @@ from _lib.wrapper_contracts import (
     logs_optional_policy,
     get_wrapper,
 )
-from _lib.provider_registry_loader import resolve_provider_dispatch_spec
+from _lib.provider_registry_loader import ResolvedProvider, resolve_provider_dispatch_spec
 from _lib.provider_verifiers import get_provider_verifier, verify_provider_artifacts
-from _lib.wrapper_resolution import resolve_wrapper_dispatch
+from _lib.wrapper_resolution import WrapperResolutionBlocked, resolve_wrapper_dispatch
 
 
 class TestEvidenceEnvelope(unittest.TestCase):
@@ -822,12 +826,16 @@ class TestExecutableRoutingTests(unittest.TestCase):
 
 class TestWrapperDispatchResolution(unittest.TestCase):
     def _make_repo_root_with_provider_config(self, config_text: str) -> pathlib.Path:
+        return self._make_repo_root_with_provider_configs({".opencode": config_text})
+
+    def _make_repo_root_with_provider_configs(self, config_by_dir: dict[str, str]) -> pathlib.Path:
         temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(temp_dir.cleanup)
         repo_root = pathlib.Path(temp_dir.name)
-        config_dir = repo_root / ".opencode"
-        config_dir.mkdir(parents=True)
-        (config_dir / "sdlc-providers.yaml").write_text(config_text)
+        for client_dir, config_text in config_by_dir.items():
+            config_dir = repo_root / client_dir
+            config_dir.mkdir(parents=True)
+            (config_dir / "sdlc-providers.yaml").write_text(config_text)
         return repo_root
 
     def test_resolves_dispatch_verifier_and_contract_specs(self):
@@ -914,7 +922,7 @@ class TestWrapperDispatchResolution(unittest.TestCase):
 
     def test_resolve_provider_dispatch_spec_blocks_resolution_for_unsupported_configured_capability(self):
         repo_root = self._make_repo_root_with_provider_config(
-            "spec:\n  provider: github/spec-kit\n"
+            "spec:\n  provider: openspec\n"
         )
 
         resolved = resolve_provider_dispatch_spec(
@@ -930,7 +938,7 @@ class TestWrapperDispatchResolution(unittest.TestCase):
             "spec:\n  provider: missing-provider\n"
         )
 
-        with self.assertRaises(Exception) as ctx:
+        with self.assertRaises(WrapperResolutionBlocked) as ctx:
             resolve_wrapper_dispatch(
                 module="spec",
                 capability="create",
@@ -944,6 +952,91 @@ class TestWrapperDispatchResolution(unittest.TestCase):
         self.assertTrue(hasattr(ctx.exception, "blockers"))
         self.assertEqual(ctx.exception.blockers[0]["reason"], "unknown_provider")
         self.assertIn("recommended_action", ctx.exception.blockers[0])
+
+    def test_resolve_wrapper_dispatch_blocks_on_distributed_provider_config_mismatch(self):
+        repo_root = self._make_repo_root_with_provider_configs({
+            ".opencode": "spec:\n  provider: openspec\n",
+            ".cursor": "spec:\n  provider: github/spec-kit\n",
+        })
+
+        with self.assertRaises(WrapperResolutionBlocked) as ctx:
+            resolve_wrapper_dispatch(
+                module="spec",
+                capability="create",
+                workflow_run_id="run-1",
+                phase="create_change",
+                action="create",
+                flow_type="spec-flow",
+                repo_root=repo_root,
+            )
+
+        self.assertEqual(
+            ctx.exception.blockers[0]["reason"],
+            "distributed_provider_config_mismatch",
+        )
+
+    def test_wrapper_resolution_blocked_is_not_a_value_error(self):
+        self.assertTrue(issubclass(WrapperResolutionBlocked, Exception))
+        self.assertFalse(issubclass(WrapperResolutionBlocked, ValueError))
+
+    def test_resolve_wrapper_dispatch_blocks_on_unsupported_dispatch_kind(self):
+        unsupported = ResolvedProvider(
+            module="spec",
+            provider="openspec",
+            capability="create",
+            dispatch_kind="command",
+            dispatch_target="python3 do-something.py",
+            dispatch={"kind": "command", "target": "python3 do-something.py"},
+            verifier={"target": "openspec.create"},
+            result_contract="spec_change",
+        )
+
+        with mock.patch("_lib.wrapper_resolution.resolve_wrapper_provider_blockers", return_value=[]), \
+             mock.patch("_lib.wrapper_resolution.load_registry", return_value={}), \
+             mock.patch("_lib.wrapper_resolution.load_consistent_provider_config", return_value=({}, [])), \
+             mock.patch("_lib.wrapper_resolution.resolve_provider", return_value=unsupported):
+            with self.assertRaises(WrapperResolutionBlocked) as ctx:
+                resolve_wrapper_dispatch(
+                    module="spec",
+                    capability="create",
+                    workflow_run_id="run-1",
+                    phase="create_change",
+                    action="create",
+                    flow_type="spec-flow",
+                    repo_root=pathlib.Path(__file__).resolve().parent.parent,
+                )
+
+        self.assertEqual(ctx.exception.blockers[0]["reason"], "unsupported_dispatch_kind")
+
+    def test_resolve_wrapper_dispatch_falls_back_to_resolved_legacy_fields(self):
+        resolved_provider = ResolvedProvider(
+            module="spec",
+            provider="openspec",
+            capability="create",
+            dispatch_kind="skill",
+            dispatch_target="openspec-propose",
+            dispatch={},
+            verifier={},
+            result_contract="",
+        )
+
+        with mock.patch("_lib.wrapper_resolution.resolve_wrapper_provider_blockers", return_value=[]), \
+             mock.patch("_lib.wrapper_resolution.load_registry", return_value={}), \
+             mock.patch("_lib.wrapper_resolution.load_consistent_provider_config", return_value=({}, [])), \
+             mock.patch("_lib.wrapper_resolution.resolve_provider", return_value=resolved_provider):
+            resolved = resolve_wrapper_dispatch(
+                module="spec",
+                capability="create",
+                workflow_run_id="run-1",
+                phase="create_change",
+                action="create",
+                flow_type="spec-flow",
+                repo_root=pathlib.Path(__file__).resolve().parent.parent,
+            )
+
+        self.assertEqual(resolved.dispatch, {"kind": "skill", "target": "openspec-propose"})
+        self.assertEqual(resolved.verifier, {"target": "openspec.create"})
+        self.assertEqual(resolved.result_contract, "spec_result")
 
 
 class TestProviderVerifiers(unittest.TestCase):
@@ -1227,6 +1320,64 @@ class TestResultContractNormalizers(unittest.TestCase):
         self.assertEqual(result["reason"], "missing_change_id")
 
 
+class TestProviderRegistryDefinition(unittest.TestCase):
+    def _read_registry(self):
+        registry_path = pathlib.Path(__file__).resolve().parent.parent / "skills" / "_lib" / "provider_registry.yaml"
+        return yaml.safe_load(registry_path.read_text(encoding="utf-8"))
+
+    def test_registry_uses_version_2_dispatch_shape(self):
+        registry = self._read_registry()
+        self.assertEqual(registry["version"], 2)
+
+        openspec = registry["modules"]["spec"]["providers"]["openspec"]
+        self.assertNotIn("backend", openspec)
+        self.assertIn("dispatch", openspec)
+        self.assertIn("verifier", openspec)
+        self.assertIn("result_contract", openspec)
+
+    def test_registry_only_exposes_currently_verified_capabilities(self):
+        registry = self._read_registry()
+        spec_caps = {name for name, supported in registry["modules"]["spec"]["providers"]["openspec"]["capabilities"].items() if supported}
+        memory_caps = {name for name, supported in registry["modules"]["memory"]["providers"]["local"]["capabilities"].items() if supported}
+
+        self.assertEqual(spec_caps, {"create"})
+        self.assertEqual(memory_caps, {"repository_sync"})
+
+
+class TestResolveDispatchCLI(unittest.TestCase):
+    def _run_cli(self, *args: str):
+        script = pathlib.Path(__file__).resolve().parent.parent / "skills" / "_lib" / "resolve_dispatch_cli.py"
+        return subprocess.run([sys.executable, str(script), *args], capture_output=True, text=True, check=False)
+
+    def test_cli_outputs_nested_dispatch_and_verifier_specs(self):
+        repo_root = pathlib.Path(__file__).resolve().parent.parent
+        result = self._run_cli("spec", "create", "run-1", "create_change", "create", "spec-flow", str(repo_root))
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["dispatch"]["kind"], "skill")
+        self.assertEqual(payload["dispatch"]["target"], "openspec-propose")
+        self.assertEqual(payload["verifier"]["target"], "openspec.create")
+        self.assertEqual(payload["result_contract"], "spec_change")
+        self.assertNotIn("kind", payload)
+        self.assertNotIn("target", payload)
+        self.assertNotIn("verifier_target", payload)
+
+    def test_cli_surfaces_structured_blockers_for_resolution_failures(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo_root = pathlib.Path(tmp_dir)
+            (repo_root / ".opencode").mkdir()
+            (repo_root / ".cursor").mkdir()
+            (repo_root / ".opencode" / "sdlc-providers.yaml").write_text("spec:\n  provider: openspec\n")
+            (repo_root / ".cursor" / "sdlc-providers.yaml").write_text("spec:\n  provider: github/spec-kit\n")
+
+            result = self._run_cli("spec", "create", "run-1", "create_change", "create", "spec-flow", str(repo_root))
+
+        self.assertNotEqual(result.returncode, 0)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["blockers"][0]["reason"], "distributed_provider_config_mismatch")
+
+
 class TestDevOrchestratorWrapperDispatch(unittest.TestCase):
     """Task 6: dev-orchestrator resolves, dispatches, verifies, and normalizes kind=skill.
 
@@ -1274,6 +1425,12 @@ class TestDevOrchestratorWrapperDispatch(unittest.TestCase):
                        "dev-orchestrator must reference normalization of verification results")
         self.assertIn("result_contract", body,
                        "dev-orchestrator must reference result_contract for normalization")
+
+    def test_dev_orchestrator_prompt_models_nested_dispatch_spec(self):
+        body = self._read_agent_body("dev-orchestrator")
+        self.assertIn('"dispatch": {', body)
+        self.assertIn('"verifier": {', body)
+        self.assertNotIn('"verifier_target"', body)
 
     def test_dev_orchestrator_dynamic_resolution_displaces_hardcoded_routing(self):
         """Prompt must use dynamic wrapper resolution, not hardcoded backend routing.

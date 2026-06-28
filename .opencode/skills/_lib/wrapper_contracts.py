@@ -648,7 +648,7 @@ def resolve_wrapper_provider_blockers(
             recommended_action=f"Module must be one of {sorted(WRAPPER_REGISTRY.keys())}",
         )]
 
-    from .provider_registry_loader import resolve_provider_or_blocker, load_provider_configs, load_registry
+    from .provider_registry_loader import load_registry, resolve_provider_or_blocker
 
     root = Path(repo_root) if repo_root else Path.cwd()
 
@@ -668,7 +668,4 @@ def resolve_wrapper_provider_blockers(
             recommended_action=f"Add module {module!r} to provider_registry.yaml or use direct wrapper",
         )]
 
-    configs = load_provider_configs(root)
-    config = next(iter(configs.values()), None) if configs else None
-
-    return resolve_provider_or_blocker(module, capability, registry=registry, config=config)
+    return resolve_provider_or_blocker(module, capability, registry=registry, repo_root=root)

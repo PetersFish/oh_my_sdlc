@@ -106,9 +106,13 @@ Example output:
   "module": "spec",
   "capability": "create",
   "provider": "openspec",
-  "kind": "skill",
-  "target": "openspec-propose",
-  "verifier_target": "openspec.create",
+  "dispatch": {
+    "kind": "skill",
+    "target": "openspec-propose"
+  },
+  "verifier": {
+    "target": "openspec.create"
+  },
   "result_contract": "spec_change"
 }
 ```
@@ -117,9 +121,9 @@ If the command exits non-zero, surface the `error` / `blockers` and STOP.
 
 ### 2. Dispatch — invoke the resolved target
 
-Read `kind` and `target` from the dispatch spec.  For **kind=skill**:
+Read `dispatch.kind` and `dispatch.target` from the dispatch spec.  For **kind=skill**:
 
-- Load the skill named in `target` via the `skill` tool.
+- Load the skill named in `dispatch.target` via the `skill` tool.
 - Execute the skill according to its instructions.
 - Collect the raw provider result.
 
@@ -136,7 +140,7 @@ python3 -c "
 import sys, json
 sys.path.insert(0, 'skills')
 from _lib.provider_verifiers import verify_provider_artifacts
-blockers = verify_provider_artifacts('<verifier_target>', repo_root='.')
+blockers = verify_provider_artifacts('<resolved_json>["verifier"]["target"]', repo_root='.')
 print(json.dumps(blockers))
 "
 ```

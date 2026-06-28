@@ -1,0 +1,16 @@
+
+==================================== ERRORS ====================================
+_______________ ERROR collecting tests/test_wrapper_contracts.py _______________
+ImportError while importing test module '/Users/yuping/Documents/workspace/oh_my_skills/.worktrees/wrapper-dispatch-resolution/tests/test_wrapper_contracts.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/homebrew/Cellar/python@3.14/3.14.5/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_wrapper_contracts.py:44: in <module>
+    from _lib.provider_registry_loader import resolve_provider_dispatch_spec
+E   ImportError: cannot import name 'resolve_provider_dispatch_spec' from '_lib.provider_registry_loader' (/Users/yuping/Documents/workspace/oh_my_skills/.worktrees/wrapper-dispatch-resolution/skills/_lib/provider_registry_loader.py)
+=========================== short test summary info ============================
+ERROR tests/test_wrapper_contracts.py
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 0.06s

@@ -1,4 +1,4 @@
-version: 1
+version: 2
 
 modules:
   spec:
@@ -7,34 +7,13 @@ modules:
       openspec:
         capabilities:
           create: true
-          continue: true
-          apply: true
-          archive: true
-        dispatch:
-          create: {kind: skill, target: openspec-propose}
-          continue: {kind: skill, target: openspec-continue-change}
-          apply: {kind: skill, target: openspec-apply-change}
-          archive: {kind: skill, target: openspec-archive-change}
-        verifier:
-          create: {target: openspec.create}
-          continue: {target: openspec.continue}
-          apply: {target: openspec.apply}
-          archive: {target: openspec.archive}
-        result_contract:
-          create: spec_change
-          continue: spec_change
-          apply: spec_change
-          archive: spec_archive
-      github/spec-kit:
-        capabilities:
-          create: true
           continue: false
           apply: false
           archive: false
         dispatch:
-          create: {kind: skill, target: github-spec-kit-create}
+          create: {kind: skill, target: openspec-propose}
         verifier:
-          create: {target: github/spec-kit.create}
+          create: {target: openspec.create}
         result_contract:
           create: spec_change
 
@@ -43,18 +22,12 @@ modules:
     providers:
       local:
         capabilities:
-          load: true
+          load: false
           repository_sync: true
-          spec_post_archive_sync: true
+          spec_post_archive_sync: false
         dispatch:
-          load: {kind: skill, target: sdlc-repository-memory-load}
           repository_sync: {kind: skill, target: sdlc-repository-memory-sync}
-          spec_post_archive_sync: {kind: skill, target: sdlc-openspec-memory-sync}
         verifier:
-          load: {target: local.load}
           repository_sync: {target: local.repository_sync}
-          spec_post_archive_sync: {target: local.spec_post_archive_sync}
         result_contract:
-          load: memory_context
           repository_sync: memory_sync
-          spec_post_archive_sync: memory_sync

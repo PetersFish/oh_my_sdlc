@@ -1,0 +1,39 @@
+id: agent.dev-orchestrator.regression.wrapper-dispatch-nested-spec
+target:
+  id: agent.dev-orchestrator
+  type: agent
+  path: .opencode/agents/dev-orchestrator.md
+status: accepted
+case_type: regression
+source: observed
+severity: high
+created_at: '2026-06-28'
+coverage:
+  functional:
+  - wrapper-dispatch-resolution
+  - provider-verifier-normalizer-routing
+  quality:
+  - instruction-following-fidelity
+  - provider-agnostic-routing
+input: "The wrapper resolver returned this JSON for a wrapper-backed spec capability:\n\n{\n  \"module\": \"spec\",\n  \"capability\": \"create\",\n  \"provider\": \"openspec\",\n  \"dispatch\": {\"kind\": \"skill\", \"target\": \"openspec-propose\"},\n  \"verifier\": {\"target\": \"openspec.create\"},\n  \"result_contract\": \"spec_change\"\n}\n\nExplain exactly how dev-orchestrator should proceed next."
+actual: A prior prompt version described the resolver output as top-level `kind`, `target`, and `verifier_target`, which drifted from the design and risked flattening the dispatch contract.
+expected:
+  rubric: The response must treat the resolver output as a nested dispatch/verifier/result_contract spec. It must say dev-orchestrator reads `dispatch.kind` and `dispatch.target`, invokes the resolved skill target, runs the provider verifier from `verifier.target`, normalizes through `result_contract`, and sends only the normalized envelope to after-dispatch. It must not describe the contract as flattened top-level `kind`, `target`, or `verifier_target` fields.
+  must_include:
+  - dispatch.kind
+  - dispatch.target
+  - result_contract
+  - after-dispatch
+  must_not_include:
+  - verifier_target
+evaluators:
+  llm_judge:
+    enabled: true
+    rubric: 'Pass only if the answer follows the nested resolver contract: read dispatch.kind and dispatch.target from the resolved spec, call the resolved skill target, run verifier.target, normalize via result_contract, and send only normalized output to after-dispatch. Fail if the answer flattens the contract into top-level kind/target/verifier_target fields or skips verification/normalization.'
+  rule_based:
+    contains:
+    - dispatch.kind
+    - dispatch.target
+    - result_contract
+    not_contains:
+    - verifier_target
