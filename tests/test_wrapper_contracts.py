@@ -43,6 +43,7 @@ from _lib.wrapper_contracts import (
     get_wrapper,
 )
 from _lib.provider_registry_loader import resolve_provider_dispatch_spec
+from _lib.provider_verifiers import get_provider_verifier, verify_provider_artifacts
 from _lib.wrapper_resolution import resolve_wrapper_dispatch
 
 
@@ -943,6 +944,107 @@ class TestWrapperDispatchResolution(unittest.TestCase):
         self.assertTrue(hasattr(ctx.exception, "blockers"))
         self.assertEqual(ctx.exception.blockers[0]["reason"], "unknown_provider")
         self.assertIn("recommended_action", ctx.exception.blockers[0])
+
+
+class TestProviderVerifiers(unittest.TestCase):
+    def _make_openspec_change(self, repo_root: pathlib.Path, change_id: str) -> pathlib.Path:
+        change_dir = repo_root / "openspec" / "changes" / change_id
+        (change_dir / "specs").mkdir(parents=True)
+        (change_dir / "proposal.md").write_text("# Proposal\n", encoding="utf-8")
+        (change_dir / "design.md").write_text("# Design\n", encoding="utf-8")
+        (change_dir / "tasks.md").write_text("# Tasks\n", encoding="utf-8")
+        (change_dir / "specs" / "feature.md").write_text("# Spec\n", encoding="utf-8")
+        return change_dir
+
+    def test_openspec_create_verifier_succeeds_when_required_change_artifacts_exist(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo_root = pathlib.Path(tmp_dir)
+            self._make_openspec_change(repo_root, "demo-change")
+
+            blockers = verify_provider_artifacts(
+                "openspec.create",
+                repo_root=repo_root,
+                change_id="demo-change",
+            )
+
+        self.assertEqual(blockers, [])
+
+    def test_openspec_create_verifier_blocks_when_required_artifact_missing(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo_root = pathlib.Path(tmp_dir)
+            change_dir = self._make_openspec_change(repo_root, "demo-change")
+            (change_dir / "tasks.md").unlink()
+
+            blockers = verify_provider_artifacts(
+                "openspec.create",
+                repo_root=repo_root,
+                change_id="demo-change",
+            )
+
+        self.assertEqual(blockers[0]["reason"], "missing_required_artifact")
+        self.assertIn("tasks.md", blockers[0]["message"])
+
+    def test_local_repository_sync_verifier_reports_success_from_memory_artifacts(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo_root = pathlib.Path(tmp_dir)
+            memory_dir = repo_root / ".ai" / "memory"
+            memory_dir.mkdir(parents=True)
+            (memory_dir / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "1.0",
+                        "repository_id": "demo",
+                        "memory_version": 1,
+                        "git": {
+                            "available": True,
+                            "has_commits": True,
+                            "head": "abc123",
+                            "last_synced_commit": "abc123",
+                            "worktree_state": "clean",
+                        },
+                        "pending_snapshots": [],
+                        "last_sync": {"timestamp": "2026-06-28T00:00:00Z", "commit": "abc123"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (memory_dir / "index.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "1.0",
+                        "generated_at": "2026-06-28T00:00:00Z",
+                        "entries": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            verifier = get_provider_verifier("local.repository_sync")
+            self.assertIsNotNone(verifier)
+            blockers = verify_provider_artifacts("local.repository_sync", repo_root=repo_root)
+
+        self.assertEqual(blockers, [])
+
+    def test_local_repository_sync_verifier_blocks_when_manifest_missing(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo_root = pathlib.Path(tmp_dir)
+            memory_dir = repo_root / ".ai" / "memory"
+            memory_dir.mkdir(parents=True)
+            (memory_dir / "index.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "1.0",
+                        "generated_at": "2026-06-28T00:00:00Z",
+                        "entries": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            blockers = verify_provider_artifacts("local.repository_sync", repo_root=repo_root)
+
+        self.assertEqual(blockers[0]["reason"], "memory_sync_artifacts_missing")
+        self.assertIn("manifest.json", blockers[0]["message"])
 
 
 if __name__ == "__main__":
