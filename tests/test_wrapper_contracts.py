@@ -5,6 +5,7 @@ import json
 import os
 import pathlib
 import sys
+import tempfile
 import unittest
 
 SKILLS_LIB = os.path.join(
@@ -41,6 +42,8 @@ from _lib.wrapper_contracts import (
     logs_optional_policy,
     get_wrapper,
 )
+from _lib.provider_registry_loader import resolve_provider_dispatch_spec
+from _lib.wrapper_resolution import resolve_wrapper_dispatch
 
 
 class TestEvidenceEnvelope(unittest.TestCase):
@@ -814,6 +817,132 @@ class TestExecutableRoutingTests(unittest.TestCase):
         self.assertIn("artifacts", d)
         self.assertIn("raw_log_paths", d["artifacts"])
         self.assertEqual(len(d["artifacts"]["raw_log_paths"]), 1)
+
+
+class TestWrapperDispatchResolution(unittest.TestCase):
+    def _make_repo_root_with_provider_config(self, config_text: str) -> pathlib.Path:
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        repo_root = pathlib.Path(temp_dir.name)
+        config_dir = repo_root / ".opencode"
+        config_dir.mkdir(parents=True)
+        (config_dir / "sdlc-providers.yaml").write_text(config_text)
+        return repo_root
+
+    def test_resolves_dispatch_verifier_and_contract_specs(self):
+        repo_root = pathlib.Path(__file__).resolve().parent.parent
+
+        spec_resolved = resolve_provider_dispatch_spec(
+            module="spec",
+            capability="create",
+            repo_root=repo_root,
+        )
+        self.assertIsNotNone(spec_resolved)
+        self.assertEqual(spec_resolved.provider, "openspec")
+        self.assertEqual(spec_resolved.dispatch["kind"], "skill")
+        self.assertEqual(spec_resolved.dispatch["target"], "openspec-propose")
+        self.assertEqual(spec_resolved.verifier["target"], "openspec.create")
+        self.assertEqual(spec_resolved.result_contract, "spec_change")
+
+        memory_resolved = resolve_provider_dispatch_spec(
+            module="memory",
+            capability="repository_sync",
+            repo_root=repo_root,
+        )
+        self.assertIsNotNone(memory_resolved)
+        self.assertEqual(memory_resolved.provider, "local")
+        self.assertEqual(memory_resolved.dispatch["kind"], "skill")
+        self.assertEqual(memory_resolved.dispatch["target"], "sdlc-repository-memory-sync")
+        self.assertEqual(memory_resolved.verifier["target"], "local.repository_sync")
+        self.assertEqual(memory_resolved.result_contract, "memory_sync")
+
+    def test_resolve_wrapper_dispatch_replaces_old_execute_adapter_shape(self):
+        repo_root = pathlib.Path(__file__).resolve().parent.parent
+
+        resolved = resolve_wrapper_dispatch(
+            module="spec",
+            capability="create",
+            workflow_run_id="run-1",
+            phase="create_change",
+            action="create",
+            flow_type="spec-flow",
+            repo_root=repo_root,
+        )
+
+        self.assertEqual(resolved.module, "spec")
+        self.assertEqual(resolved.capability, "create")
+        self.assertEqual(resolved.provider, "openspec")
+        self.assertEqual(resolved.dispatch["kind"], "skill")
+        self.assertEqual(resolved.dispatch["target"], "openspec-propose")
+        self.assertEqual(resolved.verifier["target"], "openspec.create")
+        self.assertEqual(resolved.result_contract, "spec_change")
+
+    def test_resolve_wrapper_dispatch_propagates_registry_native_result_contract(self):
+        repo_root = pathlib.Path(__file__).resolve().parent.parent
+
+        resolved = resolve_wrapper_dispatch(
+            module="memory",
+            capability="repository_sync",
+            workflow_run_id="run-1",
+            phase="apply_change",
+            action="repository_sync",
+            flow_type="spec-flow",
+            repo_root=repo_root,
+        )
+
+        self.assertEqual(resolved.module, "memory")
+        self.assertEqual(resolved.capability, "repository_sync")
+        self.assertEqual(resolved.provider, "local")
+        self.assertEqual(resolved.dispatch["kind"], "skill")
+        self.assertEqual(resolved.dispatch["target"], "sdlc-repository-memory-sync")
+        self.assertEqual(resolved.verifier["target"], "local.repository_sync")
+        self.assertEqual(resolved.result_contract, "memory_sync")
+
+    def test_resolve_provider_dispatch_spec_blocks_resolution_for_configured_provider_mismatch(self):
+        repo_root = self._make_repo_root_with_provider_config(
+            "spec:\n  provider: missing-provider\n"
+        )
+
+        resolved = resolve_provider_dispatch_spec(
+            module="spec",
+            capability="create",
+            repo_root=repo_root,
+        )
+
+        self.assertIsNone(resolved)
+
+    def test_resolve_provider_dispatch_spec_blocks_resolution_for_unsupported_configured_capability(self):
+        repo_root = self._make_repo_root_with_provider_config(
+            "spec:\n  provider: github/spec-kit\n"
+        )
+
+        resolved = resolve_provider_dispatch_spec(
+            module="spec",
+            capability="continue",
+            repo_root=repo_root,
+        )
+
+        self.assertIsNone(resolved)
+
+    def test_resolve_wrapper_dispatch_blocks_resolution_with_structured_blocker_details(self):
+        repo_root = self._make_repo_root_with_provider_config(
+            "spec:\n  provider: missing-provider\n"
+        )
+
+        with self.assertRaises(Exception) as ctx:
+            resolve_wrapper_dispatch(
+                module="spec",
+                capability="create",
+                workflow_run_id="run-1",
+                phase="create_change",
+                action="create",
+                flow_type="spec-flow",
+                repo_root=repo_root,
+            )
+
+        self.assertTrue(hasattr(ctx.exception, "blockers"))
+        self.assertEqual(ctx.exception.blockers[0]["reason"], "unknown_provider")
+        self.assertIn("recommended_action", ctx.exception.blockers[0])
 
 
 if __name__ == "__main__":

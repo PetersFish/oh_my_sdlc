@@ -31,6 +31,9 @@ class ProviderDef:
     name: str
     capabilities: Dict[str, bool] = field(default_factory=dict)
     backends: Dict[str, str] = field(default_factory=dict)
+    dispatch_specs: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    verifier_specs: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    result_contracts: Dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -45,7 +48,11 @@ class ResolvedProvider:
     module: str
     provider: str
     capability: str
-    backend: str
+    dispatch_kind: str
+    dispatch_target: str
+    dispatch: Dict[str, Any] = field(default_factory=dict)
+    verifier: Dict[str, Any] = field(default_factory=dict)
+    result_contract: str = ""
     params: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -84,10 +91,40 @@ def _parse_registry(raw: Dict[str, Any]) -> Dict[str, ModuleProviderConfig]:
                 backends = {str(k): str(v) for k, v in backends.items()}
             else:
                 backends = {}
+            dispatch_specs = provider_data.get("dispatch")
+            if isinstance(dispatch_specs, dict):
+                dispatch_specs = {
+                    str(k): dict(v) for k, v in dispatch_specs.items() if isinstance(v, dict)
+                }
+            else:
+                dispatch_specs = {
+                    capability_name: {"kind": "skill", "target": target}
+                    for capability_name, target in backends.items()
+                }
+
+            verifier_specs = provider_data.get("verifier")
+            if isinstance(verifier_specs, dict):
+                verifier_specs = {
+                    str(k): dict(v) for k, v in verifier_specs.items() if isinstance(v, dict)
+                }
+            else:
+                verifier_specs = {
+                    capability_name: {"target": f"{provider_name}.{capability_name}"}
+                    for capability_name in dispatch_specs.keys()
+                }
+
+            result_contracts = provider_data.get("result_contract")
+            if isinstance(result_contracts, dict):
+                result_contracts = {str(k): str(v) for k, v in result_contracts.items()}
+            else:
+                result_contracts = {}
             providers[provider_name] = ProviderDef(
                 name=provider_name,
                 capabilities=provider_data.get("capabilities", {}),
                 backends=backends,
+                dispatch_specs=dispatch_specs,
+                verifier_specs=verifier_specs,
+                result_contracts=result_contracts,
             )
         parsed[module_name] = ModuleProviderConfig(
             module=module_name,
@@ -157,6 +194,31 @@ def resolve_provider(
     if registry is None:
         registry = load_registry()
 
+    resolved = resolve_provider_dispatch_spec(
+        module=module,
+        capability=capability,
+        registry=registry,
+        config=config,
+        repo_root=repo_root,
+    )
+    if resolved is None:
+        return None
+    return resolved
+
+
+def resolve_provider_dispatch_spec(
+    module: str,
+    capability: str,
+    registry: Optional[Dict[str, ModuleProviderConfig]] = None,
+    config: Optional[Dict[str, Any]] = None,
+    repo_root: Optional[Path] = None,
+) -> Optional[ResolvedProvider]:
+    if registry is None:
+        registry = load_registry()
+
+    if config is None and repo_root is not None:
+        config = load_primary_provider_config(Path(repo_root))
+
     module_config = registry.get(module)
     if module_config is None:
         return None
@@ -177,15 +239,25 @@ def resolve_provider(
     if not supported:
         return None
 
-    backend = provider_def.backends.get(capability, "")
-    if not backend:
+    dispatch = provider_def.dispatch_specs.get(capability)
+    if not isinstance(dispatch, dict) or not dispatch.get("target"):
         return None
+
+    verifier = provider_def.verifier_specs.get(capability, {})
+    if not isinstance(verifier, dict) or not verifier.get("target"):
+        verifier = {"target": f"{provider_name}.{capability}"}
+
+    result_contract = provider_def.result_contracts.get(capability, f"{module}_result")
 
     return ResolvedProvider(
         module=module,
         provider=provider_name,
         capability=capability,
-        backend=backend,
+        dispatch_kind=str(dispatch.get("kind", "skill")),
+        dispatch_target=str(dispatch.get("target", "")),
+        dispatch=dispatch,
+        verifier=verifier,
+        result_contract=result_contract,
     )
 
 
@@ -260,12 +332,12 @@ def resolve_provider_or_blocker(
         ))
         return blockers
 
-    backend = provider_def.backends.get(capability, "")
-    if not backend:
+    dispatch = provider_def.dispatch_specs.get(capability)
+    if not isinstance(dispatch, dict) or not dispatch.get("target"):
         blockers.append(make_blocker(
             reason="missing_backend",
-            message=f"Provider {provider_name!r} for module {module!r} has no backend mapped for capability {capability!r}",
-            recommended_action=f"Add a backend mapping in the provider registry for {provider_name!r}.{capability}",
+            message=f"Provider {provider_name!r} for module {module!r} has no dispatch target mapped for capability {capability!r}",
+            recommended_action=f"Add a dispatch mapping in the provider registry for {provider_name!r}.{capability}",
         ))
         return blockers
 
