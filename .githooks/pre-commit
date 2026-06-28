@@ -1,8 +1,10 @@
 #!/bin/sh
-# Pre-commit hook: enforces two consistency rules for .ai/workflows/ files.
+# Pre-commit hook: enforces consistency rules.
 #
 # Rule 1: live .ai/workflows/ files must match canonical skill templates.
 # Rule 2: canonical skill templates must match project-level distributed copies.
+# Rule 3: canonical skills/ must match project-level distributed skill copies.
+# Rule 4: canonical agents/ must match project-level distributed agent copies.
 #
 # Install: git config core.hooksPath .githooks
 
@@ -85,6 +87,81 @@ if [ -n "$STAGED_SKILLS" ]; then
         echo "    --source-repo . --skill-name <skill> --source-ref HEAD \\"
         echo "    --target .opencode/skills/<skill> --status stable"
         echo "  (repeat for .claude/skills/<skill> and .cursor/skills/<skill>)"
+        echo ""
+        BLOCKED=1
+    fi
+fi
+
+# Rule 4: canonical agents/ == project-level distributed copies
+# Canonical edits require distributed copies to be refreshed and staged.
+# Direct edits to distributed copies are blocked unless canonical agents/ are also staged.
+STAGED_CANONICAL_AGENTS=""
+STAGED_DISTRIBUTED_AGENTS=""
+for f in $STAGED_FILES; do
+    case "$f" in
+        agents/*)
+            STAGED_CANONICAL_AGENTS=1
+            ;;
+        .opencode/agents/*|.claude/agents/*|.cursor/agents/*)
+            STAGED_DISTRIBUTED_AGENTS=1
+            ;;
+    esac
+done
+
+if [ -n "$STAGED_DISTRIBUTED_AGENTS" ] && [ -z "$STAGED_CANONICAL_AGENTS" ]; then
+    echo ""
+    echo "============================================"
+    echo "  COMMIT BLOCKED: Direct distributed agent edit"
+    echo "============================================"
+    echo ""
+    echo "Do NOT edit .opencode/.claude/.cursor agent copies directly."
+    echo "Edit canonical files under agents/ first, then re-distribute:"
+    echo ""
+    echo "  python3 scripts/install_agents.py --target ./.opencode/agents --force"
+    echo "  python3 scripts/install_agents.py --target ./.claude/agents --force"
+    echo "  python3 scripts/install_agents.py --target ./.cursor/agents --force"
+    echo ""
+    BLOCKED=1
+fi
+
+if [ -n "$STAGED_CANONICAL_AGENTS" ] && [ -z "$STAGED_DISTRIBUTED_AGENTS" ]; then
+    echo ""
+    echo "============================================"
+    echo "  COMMIT BLOCKED: Distributed copies not staged"
+    echo "============================================"
+    echo ""
+    echo "Canonical agents/ changed, but distributed copies were not staged."
+    echo "Re-distribute and stage the generated copies before committing:"
+    echo ""
+    echo "  python3 scripts/install_agents.py --target ./.opencode/agents --force"
+    echo "  python3 scripts/install_agents.py --target ./.claude/agents --force"
+    echo "  python3 scripts/install_agents.py --target ./.cursor/agents --force"
+    echo "  git add agents/ .opencode/agents/ .claude/agents/ .cursor/agents/"
+    echo ""
+    BLOCKED=1
+fi
+
+if [ -n "$STAGED_CANONICAL_AGENTS" ] || [ -n "$STAGED_DISTRIBUTED_AGENTS" ]; then
+    AGENT_TOOL="$REPO_ROOT/scripts/install_agents.py"
+    AGENT_BLOCKED=0
+    for target in ".opencode/agents" ".claude/agents" ".cursor/agents"; do
+        python3 "$AGENT_TOOL" --target "$REPO_ROOT/$target" --check
+        if [ $? -ne 0 ]; then
+            AGENT_BLOCKED=1
+        fi
+    done
+    if [ $AGENT_BLOCKED -ne 0 ]; then
+        echo ""
+        echo "============================================"
+        echo "  COMMIT BLOCKED: Agent distribution drift"
+        echo "============================================"
+        echo ""
+        echo "Canonical agents/ differ from one or more distributed copies"
+        echo "(.opencode/, .claude/, .cursor/). Re-distribute to fix:"
+        echo ""
+        echo "  python3 scripts/install_agents.py --target ./.opencode/agents --force"
+        echo "  python3 scripts/install_agents.py --target ./.claude/agents --force"
+        echo "  python3 scripts/install_agents.py --target ./.cursor/agents --force"
         echo ""
         BLOCKED=1
     fi
