@@ -1047,5 +1047,185 @@ class TestProviderVerifiers(unittest.TestCase):
         self.assertIn("manifest.json", blockers[0]["message"])
 
 
+class TestResultContractNormalizers(unittest.TestCase):
+    """Task 5: contract normalizers for spec_change and memory_sync.
+
+    Normalizers map provider-verifier results into stable evidence envelopes
+    that are provider-verifier-agnostic.  A normalization failure or missing
+    contract returns a structured blocker rather than a silent envelope.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        from _lib.result_contracts import (
+            normalize_spec_change,
+            normalize_memory_sync,
+            normalize_result,
+        )
+        cls.normalize_spec_change = staticmethod(normalize_spec_change)
+        cls.normalize_memory_sync = staticmethod(normalize_memory_sync)
+        cls.normalize_result = staticmethod(normalize_result)
+
+    # -- spec_change normalizer -------------------------------------------------
+
+    def test_normalize_spec_change_success_envelope(self):
+        raw = {
+            "change_id": "demo-change",
+            "status": "success",
+            "artifact_paths": [
+                "openspec/changes/demo-change/proposal.md",
+                "openspec/changes/demo-change/tasks.md",
+            ],
+            "handoff_path": ".ai/workflows/runs/run-1/handoffs/slice-1/plan-agent.md",
+        }
+        result = self.normalize_spec_change(raw)
+        self.assertEqual(result["change_id"], "demo-change")
+        self.assertEqual(result["status"], "success")
+        self.assertIn("artifact_paths", result)
+        self.assertEqual(len(result["artifact_paths"]), 2)
+        self.assertEqual(
+            result["handoff_path"],
+            ".ai/workflows/runs/run-1/handoffs/slice-1/plan-agent.md",
+        )
+
+    def test_normalize_spec_change_missing_change_id_blocks(self):
+        raw = {"status": "success", "artifact_paths": []}
+        result = self.normalize_spec_change(raw)
+        self.assertIn("reason", result)
+        self.assertEqual(result["reason"], "missing_change_id")
+
+    def test_normalize_spec_change_missing_status_blocks(self):
+        raw = {"change_id": "demo-change", "artifact_paths": []}
+        result = self.normalize_spec_change(raw)
+        self.assertIn("reason", result)
+        self.assertEqual(result["reason"], "missing_status")
+
+    def test_normalize_spec_change_handoff_path_absent_still_valid(self):
+        raw = {
+            "change_id": "demo-change",
+            "status": "success",
+            "artifact_paths": [],
+        }
+        result = self.normalize_spec_change(raw)
+        self.assertEqual(result["status"], "success")
+        self.assertIsNone(result.get("handoff_path"))
+
+    def test_normalize_spec_change_failed_status_propagated(self):
+        raw = {
+            "change_id": "demo-change",
+            "status": "failed",
+            "artifact_paths": [],
+        }
+        result = self.normalize_spec_change(raw)
+        self.assertEqual(result["status"], "failed")
+
+    def test_normalize_spec_change_blocked_status_propagated(self):
+        raw = {
+            "change_id": "demo-change",
+            "status": "blocked",
+            "artifact_paths": [],
+        }
+        result = self.normalize_spec_change(raw)
+        self.assertEqual(result["status"], "blocked")
+
+    # -- memory_sync normalizer -------------------------------------------------
+
+    def test_normalize_memory_sync_success_envelope(self):
+        raw = {
+            "status": "success",
+            "loaded": {"timestamp": "2026-06-28T00:00:00Z", "entries_count": 5},
+            "synced": {"last_sync": "2026-06-28T00:00:00Z", "commit": "abc123"},
+        }
+        result = self.normalize_memory_sync(raw)
+        self.assertEqual(result["status"], "success")
+        self.assertIn("loaded", result)
+        self.assertIn("synced", result)
+        self.assertEqual(result["loaded"]["entries_count"], 5)
+
+    def test_normalize_memory_sync_missing_status_blocks(self):
+        raw = {"loaded": {}, "synced": {}}
+        result = self.normalize_memory_sync(raw)
+        self.assertIn("reason", result)
+        self.assertEqual(result["reason"], "missing_status")
+
+    def test_normalize_memory_sync_without_loaded_still_valid(self):
+        raw = {
+            "status": "success",
+            "synced": {"last_sync": "2026-06-28T00:00:00Z"},
+        }
+        result = self.normalize_memory_sync(raw)
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result.get("loaded"), {})
+
+    def test_normalize_memory_sync_without_synced_still_valid(self):
+        raw = {
+            "status": "success",
+            "loaded": {"timestamp": "2026-06-28T00:00:00Z"},
+        }
+        result = self.normalize_memory_sync(raw)
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result.get("synced"), {})
+
+    def test_normalize_memory_sync_propagates_report_references(self):
+        raw = {
+            "status": "success",
+            "loaded": {},
+            "synced": {"last_sync": "2026-06-28T00:00:00Z"},
+            "report_path": ".ai/memory/reports/sync-2026.md",
+        }
+        result = self.normalize_memory_sync(raw)
+        self.assertEqual(
+            result.get("report_path"),
+            ".ai/memory/reports/sync-2026.md",
+        )
+
+    def test_normalize_memory_sync_propagates_queue_references(self):
+        raw = {
+            "status": "success",
+            "loaded": {},
+            "synced": {},
+            "review_queue_path": ".ai/memory/review-queue.json",
+        }
+        result = self.normalize_memory_sync(raw)
+        self.assertEqual(
+            result.get("review_queue_path"),
+            ".ai/memory/review-queue.json",
+        )
+
+    # -- normalize_result dispatcher -------------------------------------------
+
+    def test_normalize_result_dispatches_spec_change(self):
+        raw = {
+            "change_id": "demo-change",
+            "status": "success",
+            "artifact_paths": [],
+        }
+        result = self.normalize_result("spec_change", raw)
+        self.assertEqual(result["change_id"], "demo-change")
+        self.assertEqual(result["status"], "success")
+
+    def test_normalize_result_dispatches_memory_sync(self):
+        raw = {
+            "status": "success",
+            "loaded": {},
+            "synced": {"last_sync": "2026-06-28T00:00:00Z"},
+        }
+        result = self.normalize_result("memory_sync", raw)
+        self.assertEqual(result["status"], "success")
+        self.assertIn("synced", result)
+
+    def test_normalize_result_unknown_contract_blocks(self):
+        raw = {"change_id": "demo-change", "status": "success"}
+        result = self.normalize_result("nonexistent_contract", raw)
+        self.assertIn("reason", result)
+        self.assertEqual(result["reason"], "unknown_contract")
+
+    def test_normalize_result_normalization_failure_blocks(self):
+        raw = {"status": "success"}  # missing change_id for spec_change
+        result = self.normalize_result("spec_change", raw)
+        self.assertIn("reason", result)
+        self.assertEqual(result["reason"], "missing_change_id")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
