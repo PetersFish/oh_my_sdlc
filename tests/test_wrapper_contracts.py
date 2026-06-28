@@ -1227,5 +1227,100 @@ class TestResultContractNormalizers(unittest.TestCase):
         self.assertEqual(result["reason"], "missing_change_id")
 
 
+class TestDevOrchestratorWrapperDispatch(unittest.TestCase):
+    """Task 6: dev-orchestrator resolves, dispatches, verifies, and normalizes kind=skill.
+
+    The dev-orchestrator prompt must teach the resolve→dispatch→verify→normalize
+    flow for wrapper-backed modules (spec and memory), using resolve_wrapper_dispatch,
+    dispatch spec kind/target, provider verifiers, and result contract normalizers.
+    """
+
+    def _read_agent_body(self, agent_name):
+        path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "..", ".opencode", "agents", f"{agent_name}.md",
+        )
+        with open(path) as f:
+            content = f.read()
+        idx = content.find("\n---", 3)
+        if idx == -1:
+            return ""
+        return content[idx + 4:]
+
+    def test_dev_orchestrator_references_wrapper_dispatch_resolution(self):
+        """Prompt must teach resolve_wrapper_dispatch for dynamic dispatch routing."""
+        body = self._read_agent_body("dev-orchestrator")
+        self.assertIn("resolve_wrapper_dispatch", body,
+                       "dev-orchestrator must reference resolve_wrapper_dispatch for wrapper dispatch")
+
+    def test_dev_orchestrator_wrapper_dispatch_mentions_kind_and_target(self):
+        """Prompt must mention dispatch spec kind and target fields."""
+        body = self._read_agent_body("dev-orchestrator")
+        self.assertIn("kind", body.lower(),
+                       "dev-orchestrator must reference dispatch kind for dynamic routing")
+        self.assertIn("target", body.lower(),
+                       "dev-orchestrator must reference dispatch target for dynamic routing")
+
+    def test_dev_orchestrator_wrapper_dispatch_mentions_verifier(self):
+        """Prompt must mention provider verifier for wrapper-backed module dispatch."""
+        body = self._read_agent_body("dev-orchestrator")
+        self.assertIn("verifier", body.lower(),
+                       "dev-orchestrator must reference provider verifier for wrapper dispatch")
+
+    def test_dev_orchestrator_wrapper_dispatch_mentions_normalize_and_result_contract(self):
+        """Prompt must mention result contract normalization after verification."""
+        body = self._read_agent_body("dev-orchestrator")
+        self.assertIn("normalize", body.lower(),
+                       "dev-orchestrator must reference normalization of verification results")
+        self.assertIn("result_contract", body,
+                       "dev-orchestrator must reference result_contract for normalization")
+
+    def test_dev_orchestrator_dynamic_resolution_displaces_hardcoded_routing(self):
+        """Prompt must use dynamic wrapper resolution, not hardcoded backend routing.
+
+        The dispatch routing logic must use resolve_wrapper_dispatch to determine
+        which skill to invoke for wrapper-backed modules.  Hardcoded routing patterns
+        like "use `openspec-propose` for spec creation" or "load `sdlc-repository-memory-sync`
+        for memory sync" indicate the old static dispatch approach and must be absent.
+        """
+        body = self._read_agent_body("dev-orchestrator")
+        # Dynamic resolution must be present
+        self.assertIn("resolve_wrapper_dispatch", body,
+                       "dev-orchestrator must use resolve_wrapper_dispatch for dynamic dispatch")
+
+        # The prompt must NOT contain a static dispatch routing rule that says
+        # "when you need X, use Y skill" — that's the old hardcoded pattern.
+        static_routing_phrases = [
+            "use the openspec-",
+            "load the sdlc-repository-",
+            "invoke openspec-",
+            "run openspec-",
+        ]
+        for phrase in static_routing_phrases:
+            self.assertNotIn(
+                phrase.lower(), body.lower(),
+                f"dev-orchestrator must not use static routing phrase '{phrase}' — "
+                f"use resolve_wrapper_dispatch with kind/target instead"
+            )
+
+    def test_dev_orchestrator_claude_cursor_copies_match_opencode_for_wrapper_dispatch(self):
+        """Claude and Cursor copies of dev-orchestrator must also have wrapper dispatch language."""
+        opencode_body = self._read_agent_body("dev-orchestrator")
+        self.assertIn("resolve_wrapper_dispatch", opencode_body,
+                       "opencode copy must have resolve_wrapper_dispatch first")
+
+        for target_dir in [".claude", ".cursor"]:
+            path = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                "..", target_dir, "agents", "dev-orchestrator.md",
+            )
+            with open(path) as f:
+                content = f.read()
+            idx = content.find("\n---", 3)
+            body = content[idx + 4:] if idx != -1 else ""
+            self.assertIn("resolve_wrapper_dispatch", body,
+                          f"{target_dir}/agents/dev-orchestrator.md must mirror wrapper dispatch changes")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
