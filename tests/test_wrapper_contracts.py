@@ -4,9 +4,13 @@
 import json
 import os
 import pathlib
+import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
+
+import yaml
 
 SKILLS_LIB = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
@@ -41,12 +45,10 @@ from _lib.wrapper_contracts import (
     make_raw_log_entry,
     logs_optional_policy,
     get_wrapper,
-    resolve_wrapper_provider_blockers,
 )
-from _lib.wrapper_adapters import (
-    implementation_wrapper_adapter,
-    spec_wrapper_adapter,
-)
+from _lib.provider_registry_loader import ResolvedProvider, resolve_provider_dispatch_spec
+from _lib.provider_verifiers import get_provider_verifier, verify_provider_artifacts
+from _lib.wrapper_resolution import WrapperResolutionBlocked, resolve_wrapper_dispatch
 
 
 class TestEvidenceEnvelope(unittest.TestCase):
@@ -822,51 +824,659 @@ class TestExecutableRoutingTests(unittest.TestCase):
         self.assertEqual(len(d["artifacts"]["raw_log_paths"]), 1)
 
 
-class TestExecutableWrapperAdapters(unittest.TestCase):
-    """Behavior tests for executable wrapper adapter routing."""
+class TestWrapperDispatchResolution(unittest.TestCase):
+    def _make_repo_root_with_provider_config(self, config_text: str) -> pathlib.Path:
+        return self._make_repo_root_with_provider_configs({".opencode": config_text})
 
-    def test_spec_wrapper_does_not_synthesize_success_evidence(self):
-        result = spec_wrapper_adapter(
+    def _make_repo_root_with_provider_configs(self, config_by_dir: dict[str, str]) -> pathlib.Path:
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        repo_root = pathlib.Path(temp_dir.name)
+        for client_dir, config_text in config_by_dir.items():
+            config_dir = repo_root / client_dir
+            config_dir.mkdir(parents=True)
+            (config_dir / "sdlc-providers.yaml").write_text(config_text)
+        return repo_root
+
+    def test_resolves_dispatch_verifier_and_contract_specs(self):
+        repo_root = pathlib.Path(__file__).resolve().parent.parent
+
+        spec_resolved = resolve_provider_dispatch_spec(
+            module="spec",
+            capability="create",
+            repo_root=repo_root,
+        )
+        self.assertIsNotNone(spec_resolved)
+        self.assertEqual(spec_resolved.provider, "openspec")
+        self.assertEqual(spec_resolved.dispatch["kind"], "skill")
+        self.assertEqual(spec_resolved.dispatch["target"], "openspec-propose")
+        self.assertEqual(spec_resolved.verifier["target"], "openspec.create")
+        self.assertEqual(spec_resolved.result_contract, "spec_change")
+
+        memory_resolved = resolve_provider_dispatch_spec(
+            module="memory",
+            capability="repository_sync",
+            repo_root=repo_root,
+        )
+        self.assertIsNotNone(memory_resolved)
+        self.assertEqual(memory_resolved.provider, "local")
+        self.assertEqual(memory_resolved.dispatch["kind"], "skill")
+        self.assertEqual(memory_resolved.dispatch["target"], "sdlc-repository-memory-sync")
+        self.assertEqual(memory_resolved.verifier["target"], "local.repository_sync")
+        self.assertEqual(memory_resolved.result_contract, "memory_sync")
+
+    def test_resolve_wrapper_dispatch_replaces_old_execute_adapter_shape(self):
+        repo_root = pathlib.Path(__file__).resolve().parent.parent
+
+        resolved = resolve_wrapper_dispatch(
+            module="spec",
+            capability="create",
             workflow_run_id="run-1",
             phase="create_change",
             action="create",
             flow_type="spec-flow",
-            change_id="demo-change",
-            repo_root=os.path.abspath(os.path.join(os.path.dirname(__file__), "..")),
+            repo_root=repo_root,
         )
-        self.assertEqual(result.envelope.status, "success")
-        self.assertEqual(result.raw_output["backend"], "openspec-propose")
-        self.assertNotIn("openspec_artifacts_done", result.envelope.evidence)
-        self.assertEqual(result.envelope.evidence["change_id"], "demo-change")
 
-    def test_non_provider_managed_wrapper_is_not_blocked_by_registry_gap(self):
-        result = implementation_wrapper_adapter(
+        self.assertEqual(resolved.module, "spec")
+        self.assertEqual(resolved.capability, "create")
+        self.assertEqual(resolved.provider, "openspec")
+        self.assertEqual(resolved.dispatch["kind"], "skill")
+        self.assertEqual(resolved.dispatch["target"], "openspec-propose")
+        self.assertEqual(resolved.verifier["target"], "openspec.create")
+        self.assertEqual(resolved.result_contract, "spec_change")
+
+    def test_resolve_wrapper_dispatch_propagates_registry_native_result_contract(self):
+        repo_root = pathlib.Path(__file__).resolve().parent.parent
+
+        resolved = resolve_wrapper_dispatch(
+            module="memory",
+            capability="repository_sync",
             workflow_run_id="run-1",
             phase="apply_change",
-            action="apply",
+            action="repository_sync",
             flow_type="spec-flow",
-            slice_id="slice-1",
-            tasks=["fix dispatch routing"],
-            repo_root=os.path.abspath(os.path.join(os.path.dirname(__file__), "..")),
+            repo_root=repo_root,
         )
-        reasons = [b.get("reason") for b in result.envelope.blockers]
-        self.assertNotIn("not_provider_managed", reasons)
 
-    def test_provider_config_mismatch_fails_closed(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = pathlib.Path(tmp)
-            (root / ".opencode").mkdir()
-            (root / ".cursor").mkdir()
-            (root / ".claude").mkdir()
-            (root / ".opencode" / "sdlc-providers.yaml").write_text(
-                "version: 1\nspec:\n  provider: openspec\nmemory:\n  provider: local\n"
+        self.assertEqual(resolved.module, "memory")
+        self.assertEqual(resolved.capability, "repository_sync")
+        self.assertEqual(resolved.provider, "local")
+        self.assertEqual(resolved.dispatch["kind"], "skill")
+        self.assertEqual(resolved.dispatch["target"], "sdlc-repository-memory-sync")
+        self.assertEqual(resolved.verifier["target"], "local.repository_sync")
+        self.assertEqual(resolved.result_contract, "memory_sync")
+
+    def test_resolve_provider_dispatch_spec_blocks_resolution_for_configured_provider_mismatch(self):
+        repo_root = self._make_repo_root_with_provider_config(
+            "spec:\n  provider: missing-provider\n"
+        )
+
+        resolved = resolve_provider_dispatch_spec(
+            module="spec",
+            capability="create",
+            repo_root=repo_root,
+        )
+
+        self.assertIsNone(resolved)
+
+    def test_resolve_provider_dispatch_spec_blocks_resolution_for_unsupported_configured_capability(self):
+        repo_root = self._make_repo_root_with_provider_config(
+            "spec:\n  provider: openspec\n"
+        )
+
+        resolved = resolve_provider_dispatch_spec(
+            module="spec",
+            capability="continue",
+            repo_root=repo_root,
+        )
+
+        self.assertIsNone(resolved)
+
+    def test_resolve_wrapper_dispatch_blocks_resolution_with_structured_blocker_details(self):
+        repo_root = self._make_repo_root_with_provider_config(
+            "spec:\n  provider: missing-provider\n"
+        )
+
+        with self.assertRaises(WrapperResolutionBlocked) as ctx:
+            resolve_wrapper_dispatch(
+                module="spec",
+                capability="create",
+                workflow_run_id="run-1",
+                phase="create_change",
+                action="create",
+                flow_type="spec-flow",
+                repo_root=repo_root,
             )
-            (root / ".cursor" / "sdlc-providers.yaml").write_text(
-                "version: 1\nspec:\n  provider: github/spec-kit\nmemory:\n  provider: local\n"
+
+        self.assertTrue(hasattr(ctx.exception, "blockers"))
+        self.assertEqual(ctx.exception.blockers[0]["reason"], "unknown_provider")
+        self.assertIn("recommended_action", ctx.exception.blockers[0])
+
+    def test_resolve_wrapper_dispatch_blocks_on_distributed_provider_config_mismatch(self):
+        repo_root = self._make_repo_root_with_provider_configs({
+            ".opencode": "spec:\n  provider: openspec\n",
+            ".cursor": "spec:\n  provider: github/spec-kit\n",
+        })
+
+        with self.assertRaises(WrapperResolutionBlocked) as ctx:
+            resolve_wrapper_dispatch(
+                module="spec",
+                capability="create",
+                workflow_run_id="run-1",
+                phase="create_change",
+                action="create",
+                flow_type="spec-flow",
+                repo_root=repo_root,
             )
-            blockers = resolve_wrapper_provider_blockers("spec", "create", repo_root=str(root))
-            reasons = [b.get("reason") for b in blockers]
-            self.assertIn("provider_config_mismatch", reasons)
+
+        self.assertEqual(
+            ctx.exception.blockers[0]["reason"],
+            "distributed_provider_config_mismatch",
+        )
+
+    def test_wrapper_resolution_blocked_is_not_a_value_error(self):
+        self.assertTrue(issubclass(WrapperResolutionBlocked, Exception))
+        self.assertFalse(issubclass(WrapperResolutionBlocked, ValueError))
+
+    def test_resolve_wrapper_dispatch_blocks_on_unsupported_dispatch_kind(self):
+        unsupported = ResolvedProvider(
+            module="spec",
+            provider="openspec",
+            capability="create",
+            dispatch_kind="command",
+            dispatch_target="python3 do-something.py",
+            dispatch={"kind": "command", "target": "python3 do-something.py"},
+            verifier={"target": "openspec.create"},
+            result_contract="spec_change",
+        )
+
+        with mock.patch("_lib.wrapper_resolution.resolve_wrapper_provider_blockers", return_value=[]), \
+             mock.patch("_lib.wrapper_resolution.load_registry", return_value={}), \
+             mock.patch("_lib.wrapper_resolution.load_consistent_provider_config", return_value=({}, [])), \
+             mock.patch("_lib.wrapper_resolution.resolve_provider", return_value=unsupported):
+            with self.assertRaises(WrapperResolutionBlocked) as ctx:
+                resolve_wrapper_dispatch(
+                    module="spec",
+                    capability="create",
+                    workflow_run_id="run-1",
+                    phase="create_change",
+                    action="create",
+                    flow_type="spec-flow",
+                    repo_root=pathlib.Path(__file__).resolve().parent.parent,
+                )
+
+        self.assertEqual(ctx.exception.blockers[0]["reason"], "unsupported_dispatch_kind")
+
+    def test_resolve_wrapper_dispatch_falls_back_to_resolved_legacy_fields(self):
+        resolved_provider = ResolvedProvider(
+            module="spec",
+            provider="openspec",
+            capability="create",
+            dispatch_kind="skill",
+            dispatch_target="openspec-propose",
+            dispatch={},
+            verifier={},
+            result_contract="",
+        )
+
+        with mock.patch("_lib.wrapper_resolution.resolve_wrapper_provider_blockers", return_value=[]), \
+             mock.patch("_lib.wrapper_resolution.load_registry", return_value={}), \
+             mock.patch("_lib.wrapper_resolution.load_consistent_provider_config", return_value=({}, [])), \
+             mock.patch("_lib.wrapper_resolution.resolve_provider", return_value=resolved_provider):
+            resolved = resolve_wrapper_dispatch(
+                module="spec",
+                capability="create",
+                workflow_run_id="run-1",
+                phase="create_change",
+                action="create",
+                flow_type="spec-flow",
+                repo_root=pathlib.Path(__file__).resolve().parent.parent,
+            )
+
+        self.assertEqual(resolved.dispatch, {"kind": "skill", "target": "openspec-propose"})
+        self.assertEqual(resolved.verifier, {"target": "openspec.create"})
+        self.assertEqual(resolved.result_contract, "spec_result")
+
+
+class TestProviderVerifiers(unittest.TestCase):
+    def _make_openspec_change(self, repo_root: pathlib.Path, change_id: str) -> pathlib.Path:
+        change_dir = repo_root / "openspec" / "changes" / change_id
+        (change_dir / "specs").mkdir(parents=True)
+        (change_dir / "proposal.md").write_text("# Proposal\n", encoding="utf-8")
+        (change_dir / "design.md").write_text("# Design\n", encoding="utf-8")
+        (change_dir / "tasks.md").write_text("# Tasks\n", encoding="utf-8")
+        (change_dir / "specs" / "feature.md").write_text("# Spec\n", encoding="utf-8")
+        return change_dir
+
+    def test_openspec_create_verifier_succeeds_when_required_change_artifacts_exist(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo_root = pathlib.Path(tmp_dir)
+            self._make_openspec_change(repo_root, "demo-change")
+
+            blockers = verify_provider_artifacts(
+                "openspec.create",
+                repo_root=repo_root,
+                change_id="demo-change",
+            )
+
+        self.assertEqual(blockers, [])
+
+    def test_openspec_create_verifier_blocks_when_required_artifact_missing(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo_root = pathlib.Path(tmp_dir)
+            change_dir = self._make_openspec_change(repo_root, "demo-change")
+            (change_dir / "tasks.md").unlink()
+
+            blockers = verify_provider_artifacts(
+                "openspec.create",
+                repo_root=repo_root,
+                change_id="demo-change",
+            )
+
+        self.assertEqual(blockers[0]["reason"], "missing_required_artifact")
+        self.assertIn("tasks.md", blockers[0]["message"])
+
+    def test_local_repository_sync_verifier_reports_success_from_memory_artifacts(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo_root = pathlib.Path(tmp_dir)
+            memory_dir = repo_root / ".ai" / "memory"
+            memory_dir.mkdir(parents=True)
+            (memory_dir / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "1.0",
+                        "repository_id": "demo",
+                        "memory_version": 1,
+                        "git": {
+                            "available": True,
+                            "has_commits": True,
+                            "head": "abc123",
+                            "last_synced_commit": "abc123",
+                            "worktree_state": "clean",
+                        },
+                        "pending_snapshots": [],
+                        "last_sync": {"timestamp": "2026-06-28T00:00:00Z", "commit": "abc123"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (memory_dir / "index.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "1.0",
+                        "generated_at": "2026-06-28T00:00:00Z",
+                        "entries": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            verifier = get_provider_verifier("local.repository_sync")
+            self.assertIsNotNone(verifier)
+            blockers = verify_provider_artifacts("local.repository_sync", repo_root=repo_root)
+
+        self.assertEqual(blockers, [])
+
+    def test_local_repository_sync_verifier_blocks_when_manifest_missing(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo_root = pathlib.Path(tmp_dir)
+            memory_dir = repo_root / ".ai" / "memory"
+            memory_dir.mkdir(parents=True)
+            (memory_dir / "index.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "1.0",
+                        "generated_at": "2026-06-28T00:00:00Z",
+                        "entries": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            blockers = verify_provider_artifacts("local.repository_sync", repo_root=repo_root)
+
+        self.assertEqual(blockers[0]["reason"], "memory_sync_artifacts_missing")
+        self.assertIn("manifest.json", blockers[0]["message"])
+
+
+class TestResultContractNormalizers(unittest.TestCase):
+    """Task 5: contract normalizers for spec_change and memory_sync.
+
+    Normalizers map provider-verifier results into stable evidence envelopes
+    that are provider-verifier-agnostic.  A normalization failure or missing
+    contract returns a structured blocker rather than a silent envelope.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        from _lib.result_contracts import (
+            normalize_spec_change,
+            normalize_memory_sync,
+            normalize_result,
+        )
+        cls.normalize_spec_change = staticmethod(normalize_spec_change)
+        cls.normalize_memory_sync = staticmethod(normalize_memory_sync)
+        cls.normalize_result = staticmethod(normalize_result)
+
+    # -- spec_change normalizer -------------------------------------------------
+
+    def test_normalize_spec_change_success_envelope(self):
+        raw = {
+            "change_id": "demo-change",
+            "status": "success",
+            "artifact_paths": [
+                "openspec/changes/demo-change/proposal.md",
+                "openspec/changes/demo-change/tasks.md",
+            ],
+            "handoff_path": ".ai/workflows/runs/run-1/handoffs/slice-1/plan-agent.md",
+        }
+        result = self.normalize_spec_change(raw)
+        self.assertEqual(result["change_id"], "demo-change")
+        self.assertEqual(result["status"], "success")
+        self.assertIn("artifact_paths", result)
+        self.assertEqual(len(result["artifact_paths"]), 2)
+        self.assertEqual(
+            result["handoff_path"],
+            ".ai/workflows/runs/run-1/handoffs/slice-1/plan-agent.md",
+        )
+
+    def test_normalize_spec_change_missing_change_id_blocks(self):
+        raw = {"status": "success", "artifact_paths": []}
+        result = self.normalize_spec_change(raw)
+        self.assertIn("reason", result)
+        self.assertEqual(result["reason"], "missing_change_id")
+
+    def test_normalize_spec_change_missing_status_blocks(self):
+        raw = {"change_id": "demo-change", "artifact_paths": []}
+        result = self.normalize_spec_change(raw)
+        self.assertIn("reason", result)
+        self.assertEqual(result["reason"], "missing_status")
+
+    def test_normalize_spec_change_handoff_path_absent_still_valid(self):
+        raw = {
+            "change_id": "demo-change",
+            "status": "success",
+            "artifact_paths": [],
+        }
+        result = self.normalize_spec_change(raw)
+        self.assertEqual(result["status"], "success")
+        self.assertIsNone(result.get("handoff_path"))
+
+    def test_normalize_spec_change_failed_status_propagated(self):
+        raw = {
+            "change_id": "demo-change",
+            "status": "failed",
+            "artifact_paths": [],
+        }
+        result = self.normalize_spec_change(raw)
+        self.assertEqual(result["status"], "failed")
+
+    def test_normalize_spec_change_blocked_status_propagated(self):
+        raw = {
+            "change_id": "demo-change",
+            "status": "blocked",
+            "artifact_paths": [],
+        }
+        result = self.normalize_spec_change(raw)
+        self.assertEqual(result["status"], "blocked")
+
+    # -- memory_sync normalizer -------------------------------------------------
+
+    def test_normalize_memory_sync_success_envelope(self):
+        raw = {
+            "status": "success",
+            "loaded": {"timestamp": "2026-06-28T00:00:00Z", "entries_count": 5},
+            "synced": {"last_sync": "2026-06-28T00:00:00Z", "commit": "abc123"},
+        }
+        result = self.normalize_memory_sync(raw)
+        self.assertEqual(result["status"], "success")
+        self.assertIn("loaded", result)
+        self.assertIn("synced", result)
+        self.assertEqual(result["loaded"]["entries_count"], 5)
+
+    def test_normalize_memory_sync_missing_status_blocks(self):
+        raw = {"loaded": {}, "synced": {}}
+        result = self.normalize_memory_sync(raw)
+        self.assertIn("reason", result)
+        self.assertEqual(result["reason"], "missing_status")
+
+    def test_normalize_memory_sync_without_loaded_still_valid(self):
+        raw = {
+            "status": "success",
+            "synced": {"last_sync": "2026-06-28T00:00:00Z"},
+        }
+        result = self.normalize_memory_sync(raw)
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result.get("loaded"), {})
+
+    def test_normalize_memory_sync_without_synced_still_valid(self):
+        raw = {
+            "status": "success",
+            "loaded": {"timestamp": "2026-06-28T00:00:00Z"},
+        }
+        result = self.normalize_memory_sync(raw)
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result.get("synced"), {})
+
+    def test_normalize_memory_sync_propagates_report_references(self):
+        raw = {
+            "status": "success",
+            "loaded": {},
+            "synced": {"last_sync": "2026-06-28T00:00:00Z"},
+            "report_path": ".ai/memory/reports/sync-2026.md",
+        }
+        result = self.normalize_memory_sync(raw)
+        self.assertEqual(
+            result.get("report_path"),
+            ".ai/memory/reports/sync-2026.md",
+        )
+
+    def test_normalize_memory_sync_propagates_queue_references(self):
+        raw = {
+            "status": "success",
+            "loaded": {},
+            "synced": {},
+            "review_queue_path": ".ai/memory/review-queue.json",
+        }
+        result = self.normalize_memory_sync(raw)
+        self.assertEqual(
+            result.get("review_queue_path"),
+            ".ai/memory/review-queue.json",
+        )
+
+    # -- normalize_result dispatcher -------------------------------------------
+
+    def test_normalize_result_dispatches_spec_change(self):
+        raw = {
+            "change_id": "demo-change",
+            "status": "success",
+            "artifact_paths": [],
+        }
+        result = self.normalize_result("spec_change", raw)
+        self.assertEqual(result["change_id"], "demo-change")
+        self.assertEqual(result["status"], "success")
+
+    def test_normalize_result_dispatches_memory_sync(self):
+        raw = {
+            "status": "success",
+            "loaded": {},
+            "synced": {"last_sync": "2026-06-28T00:00:00Z"},
+        }
+        result = self.normalize_result("memory_sync", raw)
+        self.assertEqual(result["status"], "success")
+        self.assertIn("synced", result)
+
+    def test_normalize_result_unknown_contract_blocks(self):
+        raw = {"change_id": "demo-change", "status": "success"}
+        result = self.normalize_result("nonexistent_contract", raw)
+        self.assertIn("reason", result)
+        self.assertEqual(result["reason"], "unknown_contract")
+
+    def test_normalize_result_normalization_failure_blocks(self):
+        raw = {"status": "success"}  # missing change_id for spec_change
+        result = self.normalize_result("spec_change", raw)
+        self.assertIn("reason", result)
+        self.assertEqual(result["reason"], "missing_change_id")
+
+
+class TestProviderRegistryDefinition(unittest.TestCase):
+    def _read_registry(self):
+        registry_path = pathlib.Path(__file__).resolve().parent.parent / "skills" / "_lib" / "provider_registry.yaml"
+        return yaml.safe_load(registry_path.read_text(encoding="utf-8"))
+
+    def test_registry_uses_version_2_dispatch_shape(self):
+        registry = self._read_registry()
+        self.assertEqual(registry["version"], 2)
+
+        openspec = registry["modules"]["spec"]["providers"]["openspec"]
+        self.assertNotIn("backend", openspec)
+        self.assertIn("dispatch", openspec)
+        self.assertIn("verifier", openspec)
+        self.assertIn("result_contract", openspec)
+
+    def test_registry_only_exposes_currently_verified_capabilities(self):
+        registry = self._read_registry()
+        spec_caps = {name for name, supported in registry["modules"]["spec"]["providers"]["openspec"]["capabilities"].items() if supported}
+        memory_caps = {name for name, supported in registry["modules"]["memory"]["providers"]["local"]["capabilities"].items() if supported}
+
+        self.assertEqual(spec_caps, {"create"})
+        self.assertEqual(memory_caps, {"repository_sync"})
+
+
+class TestResolveDispatchCLI(unittest.TestCase):
+    def _run_cli(self, *args: str):
+        script = pathlib.Path(__file__).resolve().parent.parent / "skills" / "_lib" / "resolve_dispatch_cli.py"
+        return subprocess.run([sys.executable, str(script), *args], capture_output=True, text=True, check=False)
+
+    def test_cli_outputs_nested_dispatch_and_verifier_specs(self):
+        repo_root = pathlib.Path(__file__).resolve().parent.parent
+        result = self._run_cli("spec", "create", "run-1", "create_change", "create", "spec-flow", str(repo_root))
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["dispatch"]["kind"], "skill")
+        self.assertEqual(payload["dispatch"]["target"], "openspec-propose")
+        self.assertEqual(payload["verifier"]["target"], "openspec.create")
+        self.assertEqual(payload["result_contract"], "spec_change")
+        self.assertNotIn("kind", payload)
+        self.assertNotIn("target", payload)
+        self.assertNotIn("verifier_target", payload)
+
+    def test_cli_surfaces_structured_blockers_for_resolution_failures(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo_root = pathlib.Path(tmp_dir)
+            (repo_root / ".opencode").mkdir()
+            (repo_root / ".cursor").mkdir()
+            (repo_root / ".opencode" / "sdlc-providers.yaml").write_text("spec:\n  provider: openspec\n")
+            (repo_root / ".cursor" / "sdlc-providers.yaml").write_text("spec:\n  provider: github/spec-kit\n")
+
+            result = self._run_cli("spec", "create", "run-1", "create_change", "create", "spec-flow", str(repo_root))
+
+        self.assertNotEqual(result.returncode, 0)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["blockers"][0]["reason"], "distributed_provider_config_mismatch")
+
+
+class TestDevOrchestratorWrapperDispatch(unittest.TestCase):
+    """Task 6: dev-orchestrator resolves, dispatches, verifies, and normalizes kind=skill.
+
+    The dev-orchestrator prompt must teach the resolve→dispatch→verify→normalize
+    flow for wrapper-backed modules (spec and memory), using resolve_wrapper_dispatch,
+    dispatch spec kind/target, provider verifiers, and result contract normalizers.
+    """
+
+    def _read_agent_body(self, agent_name):
+        path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "..", ".opencode", "agents", f"{agent_name}.md",
+        )
+        with open(path) as f:
+            content = f.read()
+        idx = content.find("\n---", 3)
+        if idx == -1:
+            return ""
+        return content[idx + 4:]
+
+    def test_dev_orchestrator_references_wrapper_dispatch_resolution(self):
+        """Prompt must teach resolve_wrapper_dispatch for dynamic dispatch routing."""
+        body = self._read_agent_body("dev-orchestrator")
+        self.assertIn("resolve_wrapper_dispatch", body,
+                       "dev-orchestrator must reference resolve_wrapper_dispatch for wrapper dispatch")
+
+    def test_dev_orchestrator_wrapper_dispatch_mentions_kind_and_target(self):
+        """Prompt must mention dispatch spec kind and target fields."""
+        body = self._read_agent_body("dev-orchestrator")
+        self.assertIn("kind", body.lower(),
+                       "dev-orchestrator must reference dispatch kind for dynamic routing")
+        self.assertIn("target", body.lower(),
+                       "dev-orchestrator must reference dispatch target for dynamic routing")
+
+    def test_dev_orchestrator_wrapper_dispatch_mentions_verifier(self):
+        """Prompt must mention provider verifier for wrapper-backed module dispatch."""
+        body = self._read_agent_body("dev-orchestrator")
+        self.assertIn("verifier", body.lower(),
+                       "dev-orchestrator must reference provider verifier for wrapper dispatch")
+
+    def test_dev_orchestrator_wrapper_dispatch_mentions_normalize_and_result_contract(self):
+        """Prompt must mention result contract normalization after verification."""
+        body = self._read_agent_body("dev-orchestrator")
+        self.assertIn("normalize", body.lower(),
+                       "dev-orchestrator must reference normalization of verification results")
+        self.assertIn("result_contract", body,
+                       "dev-orchestrator must reference result_contract for normalization")
+
+    def test_dev_orchestrator_prompt_models_nested_dispatch_spec(self):
+        body = self._read_agent_body("dev-orchestrator")
+        self.assertIn('"dispatch": {', body)
+        self.assertIn('"verifier": {', body)
+        self.assertNotIn('"verifier_target"', body)
+
+    def test_dev_orchestrator_dynamic_resolution_displaces_hardcoded_routing(self):
+        """Prompt must use dynamic wrapper resolution, not hardcoded backend routing.
+
+        The dispatch routing logic must use resolve_wrapper_dispatch to determine
+        which skill to invoke for wrapper-backed modules.  Hardcoded routing patterns
+        like "use `openspec-propose` for spec creation" or "load `sdlc-repository-memory-sync`
+        for memory sync" indicate the old static dispatch approach and must be absent.
+        """
+        body = self._read_agent_body("dev-orchestrator")
+        # Dynamic resolution must be present
+        self.assertIn("resolve_wrapper_dispatch", body,
+                       "dev-orchestrator must use resolve_wrapper_dispatch for dynamic dispatch")
+
+        # The prompt must NOT contain a static dispatch routing rule that says
+        # "when you need X, use Y skill" — that's the old hardcoded pattern.
+        static_routing_phrases = [
+            "use the openspec-",
+            "load the sdlc-repository-",
+            "invoke openspec-",
+            "run openspec-",
+        ]
+        for phrase in static_routing_phrases:
+            self.assertNotIn(
+                phrase.lower(), body.lower(),
+                f"dev-orchestrator must not use static routing phrase '{phrase}' — "
+                f"use resolve_wrapper_dispatch with kind/target instead"
+            )
+
+    def test_dev_orchestrator_claude_cursor_copies_match_opencode_for_wrapper_dispatch(self):
+        """Claude and Cursor copies of dev-orchestrator must also have wrapper dispatch language."""
+        opencode_body = self._read_agent_body("dev-orchestrator")
+        self.assertIn("resolve_wrapper_dispatch", opencode_body,
+                       "opencode copy must have resolve_wrapper_dispatch first")
+
+        for target_dir in [".claude", ".cursor"]:
+            path = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                "..", target_dir, "agents", "dev-orchestrator.md",
+            )
+            with open(path) as f:
+                content = f.read()
+            idx = content.find("\n---", 3)
+            body = content[idx + 4:] if idx != -1 else ""
+            self.assertIn("resolve_wrapper_dispatch", body,
+                          f"{target_dir}/agents/dev-orchestrator.md must mirror wrapper dispatch changes")
 
 
 if __name__ == "__main__":

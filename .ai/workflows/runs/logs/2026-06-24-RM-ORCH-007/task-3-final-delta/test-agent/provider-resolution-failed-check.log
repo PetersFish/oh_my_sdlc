@@ -1,0 +1,4 @@
+WrapperResolutionBlocked_is_ValueError=True
+blocker_reason=provider_resolution_failed
+has_recommended_action=True
+message=Provider resolution failed for module 'spec', capability 'create'

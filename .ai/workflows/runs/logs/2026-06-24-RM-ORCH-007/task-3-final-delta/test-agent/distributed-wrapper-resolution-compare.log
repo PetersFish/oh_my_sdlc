@@ -1,0 +1,4 @@
+canonical=skills/_lib/wrapper_resolution.py
+.claude/skills/_lib/wrapper_resolution.py: MATCH
+.cursor/skills/_lib/wrapper_resolution.py: MATCH
+.opencode/skills/_lib/wrapper_resolution.py: MATCH

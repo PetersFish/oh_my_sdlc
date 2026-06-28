@@ -1,0 +1,8 @@
+=== Targeted Regression: tests/test_wrapper_contracts.py + tests/test_workflow.py ===
+280 passed, 15 subtests passed in 16.29s
+
+Test files:
+- tests/test_wrapper_contracts.py: 220 tests
+- tests/test_workflow.py: 60 tests + 15 subtests
+
+All tests passed. Zero failures. Zero errors.

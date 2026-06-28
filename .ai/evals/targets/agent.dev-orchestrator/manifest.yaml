@@ -1,0 +1,26 @@
+target_id: agent.dev-orchestrator
+target_type: agent
+description: Primary SDLC dev-orchestrator agent prompt behavior
+source_paths:
+- .opencode/agents/dev-orchestrator.md
+canonical_case_directories:
+  inbox: cases/inbox
+  accepted: cases/accepted
+  rejected: cases/rejected
+  golden: cases/golden
+coverage_file: coverage.yaml
+promptfoo_export_outputs:
+  directory: exports/promptfoo
+  config: exports/promptfoo/promptfooconfig.yaml
+  cases: exports/promptfoo/cases.yaml
+  prompt: exports/promptfoo/prompt.md
+report_directory: reports
+assertion_policy:
+  prefer_deterministic: true
+  allow_llm_rubric: true
+  prohibit_global_assertions: true
+export_freshness_inputs:
+- golden_cases
+- source_paths
+- templates
+- coverage_file

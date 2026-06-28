@@ -1,4 +1,4 @@
-version: 1
+version: 2
 
 modules:
   spec:
@@ -7,32 +7,27 @@ modules:
       openspec:
         capabilities:
           create: true
-          continue: true
-          apply: true
-          archive: true
-        backend:
-          create: openspec-propose
-          continue: openspec-continue-change
-          apply: openspec-apply-change
-          archive: openspec-archive-change
-      github/spec-kit:
-        capabilities:
-          create: true
           continue: false
           apply: false
           archive: false
-        backend:
-          create: github-spec-kit-create
+        dispatch:
+          create: {kind: skill, target: openspec-propose}
+        verifier:
+          create: {target: openspec.create}
+        result_contract:
+          create: spec_change
 
   memory:
     default_provider: local
     providers:
       local:
         capabilities:
-          load: true
+          load: false
           repository_sync: true
-          spec_post_archive_sync: true
-        backend:
-          load: sdlc-repository-memory-load
-          repository_sync: sdlc-repository-memory-sync
-          spec_post_archive_sync: sdlc-openspec-memory-sync
+          spec_post_archive_sync: false
+        dispatch:
+          repository_sync: {kind: skill, target: sdlc-repository-memory-sync}
+        verifier:
+          repository_sync: {target: local.repository_sync}
+        result_contract:
+          repository_sync: memory_sync

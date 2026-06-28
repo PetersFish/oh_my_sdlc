@@ -1,0 +1,25 @@
+=== Full Regression: tests/ (excl. test_evalops_root.py, test_evalops_cases.py) ===
+676 passed, 37 subtests passed in 21.80s
+
+Test files included:
+- tests/test_wrapper_contracts.py
+- tests/test_workflow.py
+- tests/test_repository_memory_load.py
+- tests/test_repository_memory_init.py
+- tests/test_evalops_skill.py
+- tests/test_research_skill.py
+- tests/test_evalops_incremental.py
+- tests/test_repository_memory_skill_copies.py
+- tests/test_sdlc_roadmap.py
+- tests/test_lifecycle_utils.py
+- tests/test_sdlc_orchestrator.py
+- tests/test_project_bootstrap_skills.py
+- tests/test_sdlc_runtime_paths.py
+- tests/test_ocr_router_skill.py
+- tests/test_meta_skill_evaluator.py
+- tests/test_repository_memory_sync.py
+- tests/test_module_discovery.py
+- tests/test_sync_templates.py
+- tests/test_init_foundations.py
+
+All tests passed. Zero failures. Zero errors.

@@ -11,6 +11,7 @@ permission:
   edit: deny
   bash:
     "python3 .ai/workflows/scripts/workflow.py *": allow
+    "python3 skills/_lib/resolve_dispatch_cli.py *": allow
     "git status*": allow
     "git diff*": allow
     "git log*": allow
@@ -84,6 +85,95 @@ plan-agent → implement-agent → test-agent → review-agent → finish-agent
 4. After test-agent success, dispatch review-agent.
 5. After review-agent success, complete phase and advance.
 6. Dispatch finish-agent for archive_change and post_archive_actions.
+
+## Wrapper Dispatch Resolution (kind=skill)
+
+When dispatching wrapper-backed lifecycle modules (spec and memory), NEVER
+hardcode which skill to invoke.  Instead use the resolve→dispatch→verify→normalize
+flow with `resolve_wrapper_dispatch`.
+
+### 1. Resolve — get the dispatch spec
+
+Call the CLI resolver to surface provider-agnostic dispatch instructions:
+
+```
+python3 skills/_lib/resolve_dispatch_cli.py <module> <capability> <run_id> <phase> <action> <flow_type>
+```
+
+Example output:
+```json
+{
+  "module": "spec",
+  "capability": "create",
+  "provider": "openspec",
+  "dispatch": {
+    "kind": "skill",
+    "target": "openspec-propose"
+  },
+  "verifier": {
+    "target": "openspec.create"
+  },
+  "result_contract": "spec_change"
+}
+```
+
+If the command exits non-zero, surface the `error` / `blockers` and STOP.
+
+### 2. Dispatch — invoke the resolved target
+
+Read `dispatch.kind` and `dispatch.target` from the dispatch spec.  For **kind=skill**:
+
+- Load the skill named in `dispatch.target` via the `skill` tool.
+- Execute the skill according to its instructions.
+- Collect the raw provider result.
+
+For kind=agent or kind=command: not yet implemented — block with reason
+`dispatch_kind_not_implemented`.
+
+### 3. Verify — run the provider-specific verifier
+
+After the skill completes, run the resolved verifier to validate provider-specific
+artifacts exist and are parsable:
+
+```
+python3 -c "
+import sys, json
+sys.path.insert(0, 'skills')
+from _lib.provider_verifiers import verify_provider_artifacts
+blockers = verify_provider_artifacts('<resolved_json>["verifier"]["target"]', repo_root='.')
+print(json.dumps(blockers))
+"
+```
+
+If blockers are returned, surface them and do NOT proceed to normalization.
+
+### 4. Normalize — produce a stable evidence envelope
+
+Pass the verified raw result through the resolved `result_contract` normalizer:
+
+```
+python3 -c "
+import sys, json
+sys.path.insert(0, 'skills')
+from _lib.result_contracts import normalize_result
+result = normalize_result('<result_contract>', json.loads('<raw_result_json>'))
+print(json.dumps(result))
+"
+```
+
+A normalization failure returns a structured blocker dict — read `reason` and
+`recommended_action` from it and surface to the caller.
+
+### 5. Send normalized envelope to after_dispatch
+
+Only the normalized envelope goes to `after_dispatch`:
+
+```
+python3 .ai/workflows/scripts/workflow.py --root . after-dispatch \
+  --agent <agent-name> --value '<normalized_json>' [--slice-id <slice-id>]
+```
+
+Never send raw provider output to after_dispatch — always normalize first.
 
 ## Verification Gate
 

@@ -7,12 +7,12 @@
   "target": ".opencode/skills/_lib",
   "installed_at": "2026-06-27T15:52:06.369924Z",
   "backport_policy": "review-required",
-  "payload_hash": "90c1fff754739d17e0ef1fa6c4c67fbcd8ba5c3798a0f770b408ff74d34d90c1",
+  "payload_hash": "640eb5d92a1bfda94cd344dbe81e8942f068ba5220fdcb70921b53f93c13fde0",
   "files": [
     "provider_registry.yaml",
     "provider_registry_loader.py",
     "sdlc_runtime_paths.py",
-    "wrapper_adapters.py",
-    "wrapper_contracts.py"
+    "wrapper_contracts.py",
+    "wrapper_resolution.py"
   ]
 }

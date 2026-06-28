@@ -1,0 +1,32 @@
+target:
+  id: agent.dev-orchestrator
+  type: agent
+  path: .opencode/agents/dev-orchestrator.md
+coverage:
+  functional:
+  - wrapper-dispatch-resolution
+  - provider-verifier-normalizer-routing
+  - fail-closed-resolution-handling
+  quality:
+  - instruction-following-fidelity
+  - provider-agnostic-routing
+  - guardrail-enforcement
+  edge_cases:
+  - nested-dispatch-spec-shape
+  - unsupported-dispatch-kind
+  - distributed-provider-config-mismatch
+  output_constraints:
+  - must-route-via-resolved-dispatch-spec
+  - must-not-flatten-dispatch-shape
+  - must-normalize-before-after-dispatch
+risk_focus:
+  critical_failures:
+  - dev-orchestrator reads flattened kind/target/verifier_target fields instead of
+    nested dispatch/verifier spec
+  - dev-orchestrator skips provider verifier or sends raw provider output to after-dispatch
+  - dev-orchestrator does not fail closed on distributed provider config mismatch
+    or unsupported dispatch kind
+review:
+  status: draft
+  reviewed_by_user: false
+  last_reviewed_at: null
