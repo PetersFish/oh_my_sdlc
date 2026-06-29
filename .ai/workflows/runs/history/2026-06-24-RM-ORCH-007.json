@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "run_id": "2026-06-24-RM-ORCH-007",
+  "workflow": "sdlc-main",
+  "flow_type": "spec-flow",
+  "status": "done",
+  "current_phase": "done",
+  "primary_subject": {
+    "type": "roadmap_item",
+    "id": "RM-ORCH-007"
+  },
+  "context": {
+    "review_decision": "review_passed",
+    "change_id": "agent-backed-lifecycle-wrapper-architecture",
+    "roadmap_item_id": "RM-ORCH-007"
+  },
+  "phase_readiness": {
+    "phase": "done",
+    "ready": true,
+    "missing_required_inputs": []
+  },
+  "pending_hooks": [],
+  "completed_hooks": [
+    "roadmap_status_ready_if_linked",
+    "roadmap_apply_start_if_ready",
+    "memory_sync",
+    "roadmap_done_if_relevant"
+  ],
+  "completed_phases": [
+    "review_roadmap",
+    "review_decision",
+    "create_change",
+    "apply_change",
+    "archive_change"
+  ],
+  "gates": {},
+  "evidence": {
+    "review_decision_recorded": true,
+    "openspec_status": {
+      "classification": "in-progress",
+      "source": "active"
+    },
+    "roadmap_link": {
+      "count": 1,
+      "items": [
+        {
+          "item_id": "RM-ORCH-007",
+          "status": "done",
+          "completed_at": "2026-06-29",
+          "file": ".ai/roadmap/areas/workflow.sdlc-orchestrator/items/RM-ORCH-007-workflow-wrapper-abstraction.md",
+          "area": "workflow.sdlc-orchestrator"
+        }
+      ]
+    },
+    "openspec_artifacts_done": true,
+    "roadmap_item_status": {
+      "item_id": "RM-ORCH-007",
+      "status": "done",
+      "completed_at": "2026-06-29"
+    },
+    "tasks_complete": true,
+    "workflow_state_repair_authorized": {
+      "flow_type": "spec-flow",
+      "source": "user_confirmation"
+    },
+    "tdd_passed": true,
+    "eval_passed_or_human_decision_recorded": true,
+    "agent_phase": {
+      "agent_phase": "archive_change",
+      "agent": "finish-agent",
+      "flow_type": "spec-flow",
+      "dispatched_at": "2026-06-29T16:29:51.014327"
+    },
+    "verification_passed": true,
+    "review_complete": true,
+    "archive_path_exists": true,
+    "memory_sync_residual_risk": "Repository memory does not yet capture RM-ORCH-007 wrapper-architecture decisions in durable memory files.",
+    "memory_sync_resolution": "user_deferred",
+    "memory_sync_reason": "Post-archive memory sync requires explicit user confirmation for new architecture/decision memory entries; no confirmed durable memory write was performed in this hook run.",
+    "roadmap_hook_resolution": "done",
+    "roadmap_item_run_finalized": "2026-06-24-RM-ORCH-007"
+  },
+  "block": null,
+  "updated_at": "2026-06-29T16:41:54.160608"
+}

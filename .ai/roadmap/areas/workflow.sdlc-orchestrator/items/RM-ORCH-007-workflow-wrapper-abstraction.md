@@ -1,7 +1,7 @@
 ---
 id: RM-ORCH-007
 title: "Agent-Backed Lifecycle Wrapper Architecture"
-status: ready
+status: done
 stage: v2
 priority: p1
 order: 47
@@ -10,7 +10,7 @@ depends_on:
 openspec_change: agent-backed-lifecycle-wrapper-architecture
 created_at: 2026-06-22
 started_at: 2026-06-24
-completed_at: null
+completed_at: 2026-06-29
 ---
 
 # Goal
@@ -124,7 +124,12 @@ Ready for promotion.
 
 # Completion Notes
 
-Not started.
+Implemented and archived as `2026-06-29-agent-backed-lifecycle-wrapper-architecture`.
+
+- Added the agent-backed wrapper contract and routing model across the SDLC workflow runtime.
+- Recorded explicit `flow_type` handling and normalized evidence expectations for agent-backed phases.
+- Landed the dev-orchestrator / plan-agent / implement-agent / test-agent / review-agent / finish-agent lifecycle split without moving workflow state ownership out of `workflow.py`.
+- Follow-up roadmap work remains in RM-ORCH-008/009/010 for contract refinement and later runtime modularization.
 
 # Design Reference
 
