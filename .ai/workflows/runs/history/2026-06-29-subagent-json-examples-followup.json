@@ -1,0 +1,208 @@
+{
+  "version": 1,
+  "run_id": "2026-06-29-subagent-json-examples-followup",
+  "workflow": "sdlc-main",
+  "flow_type": "lightweight-flow",
+  "status": "done",
+  "current_phase": "done",
+  "primary_subject": {
+    "type": "openspec_change",
+    "id": "subagent-json-examples-followup"
+  },
+  "context": {
+    "change_id": "subagent-json-examples-followup"
+  },
+  "phase_readiness": {
+    "phase": "done",
+    "ready": true,
+    "missing_required_inputs": []
+  },
+  "pending_hooks": [],
+  "completed_hooks": [
+    "roadmap_status_ready_if_linked",
+    "roadmap_apply_start_if_ready",
+    "memory_sync",
+    "roadmap_done_if_relevant"
+  ],
+  "completed_phases": [
+    "create_change",
+    "apply_change",
+    "archive_change",
+    "post_archive_actions"
+  ],
+  "gates": {},
+  "evidence": {
+    "openspec_status": {
+      "classification": "missing",
+      "source": null
+    },
+    "roadmap_link": {
+      "count": 0,
+      "items": []
+    },
+    "lightweight_flow_confirmed": true,
+    "agent_phase": {
+      "agent_phase": "post_archive_actions",
+      "agent": "finish-agent",
+      "flow_type": "lightweight-flow",
+      "dispatched_at": "2026-06-29T20:37:12.963006",
+      "slice_id": "default"
+    },
+    "agent_result": {
+      "agent": "finish-agent",
+      "status": "success",
+      "phase": "archive_change",
+      "slice_id": "default",
+      "flow_type": "lightweight-flow",
+      "evidence": {
+        "archive_path_exists": "true",
+        "pending_hooks_empty": "true"
+      },
+      "blockers": [],
+      "recorded_at": "2026-06-29T20:37:12.708134"
+    },
+    "agent_results": {
+      "default": {
+        "plan-agent": {
+          "agent": "plan-agent",
+          "status": "success",
+          "phase": "create_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "spec_artifacts_done": true,
+            "plan_produced": true,
+            "user_confirmation_required": true,
+            "plan_summary": {
+              "objective": "Add the smallest follow-up prompt-contract change so success-only worker examples no longer leave blocked/failed JSON output ambiguous in implement-agent, review-agent, and finish-agent.",
+              "approach": "Use test-agent as the failure-example clarity baseline, but keep scope minimal: add only the missing non-success JSON examples plus small static prompt-contract tests in tests/test_wrapper_contracts.py to lock them in. Implement-agent should gain blocked + failed examples, review-agent should gain blocked-only examples (one to implement-agent and one to plan-agent), and finish-agent should gain blocked + failed examples.",
+              "key_steps": [
+                "Add failing static prompt-contract tests for the three missing example sets in tests/test_wrapper_contracts.py.",
+                "Update agents/implement-agent.md with one blocked example for replanning/workflow-context issues and one failed example for unrecoverable artifact/wrapper failure.",
+                "Update agents/review-agent.md with two blocked examples: executable review issue -> dispatch_implement_agent, and requirement/design ambiguity -> dispatch_plan_agent.",
+                "Update agents/finish-agent.md with one blocked example for verification/hook preconditions and one failed example for archive_failed.",
+                "Regenerate distributed agent copies under .opencode/, .claude/, and .cursor/, then rerun focused contract tests."
+              ],
+              "focused_tests": [
+                "python3 -m pytest tests/test_wrapper_contracts.py -k \"implement_agent_includes_blocked_and_failed_examples or review_agent_includes_blocked_routing_examples or finish_agent_includes_blocked_and_failed_examples\" -v",
+                "python3 -m pytest tests/test_wrapper_contracts.py -k \"claude_cursor_copies_match_opencode\" -v"
+              ],
+              "open_decisions": []
+            },
+            "focused_tests": [
+              {
+                "command": "python3 -m pytest tests/test_wrapper_contracts.py -k \"implement_agent_includes_blocked_and_failed_examples or review_agent_includes_blocked_routing_examples or finish_agent_includes_blocked_and_failed_examples\" -v",
+                "result": "N/A - planning only"
+              },
+              {
+                "command": "python3 -m pytest tests/test_wrapper_contracts.py -k \"claude_cursor_copies_match_opencode\" -v",
+                "result": "N/A - planning only"
+              }
+            ]
+          },
+          "blockers": [],
+          "recorded_at": "2026-06-29T19:49:16.440610"
+        },
+        "implement-agent": {
+          "agent": "implement-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "tasks_complete": true,
+            "tdd_passed": true,
+            "focused_tests": [
+              {
+                "command": "python3 -m pytest tests/test_wrapper_contracts.py -k \"implement_agent_includes_blocked_and_failed_examples or review_agent_includes_blocked_routing_examples or finish_agent_includes_blocked_and_failed_examples\" -v",
+                "result": "fail"
+              },
+              {
+                "command": "python3 -m pytest tests/test_wrapper_contracts.py -k \"implement_agent_includes_blocked_and_failed_examples or review_agent_includes_blocked_routing_examples or finish_agent_includes_blocked_and_failed_examples or claude_cursor_copies_match_opencode\" -v",
+                "result": "pass"
+              }
+            ]
+          },
+          "blockers": [],
+          "recorded_at": "2026-06-29T19:58:47.743669"
+        },
+        "test-agent": {
+          "agent": "test-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "verification_passed": true,
+            "overfit_check_passed": true,
+            "regression_passed": true,
+            "tdd_passed": true,
+            "focused_tests": [
+              {
+                "command": "python3 -m pytest tests/test_wrapper_contracts.py -k \"implement_agent_includes_blocked_and_failed_examples or review_agent_includes_blocked_routing_examples or finish_agent_includes_blocked_and_failed_examples\" -v",
+                "result": "pass"
+              },
+              {
+                "command": "python3 -m pytest tests/test_wrapper_contracts.py -k \"implement_agent_includes_blocked_and_failed_examples or review_agent_includes_blocked_routing_examples or finish_agent_includes_blocked_and_failed_examples or claude_cursor_copies_match_opencode\" -v",
+                "result": "pass"
+              }
+            ]
+          },
+          "blockers": [],
+          "recorded_at": "2026-06-29T20:02:35.260277"
+        },
+        "review-agent": {
+          "agent": "review-agent",
+          "status": "blocked",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "review_complete": false,
+            "verification_passed": true,
+            "focused_tests": [
+              {
+                "command": "python3 -m pytest tests/ -q --tb=short",
+                "result": "pass"
+              }
+            ]
+          },
+          "blockers": [
+            {
+              "reason": "review_blocked",
+              "message": "The intended example coverage is present in implement/review/finish prompts, and full verification passed, but the slice did not stay minimal: the workspace also changes agents/test-agent.md plus its distributed copies, updates .agent-install manifests, and expands tests/test_wrapper_contracts.py with unrelated contract assertions beyond the planned minimum lock for the new blocked/failed examples. This introduces unrelated contract drift relative to the approved follow-up scope.",
+              "recommended_action": "dispatch_implement_agent"
+            }
+          ],
+          "recorded_at": "2026-06-29T20:06:17.358479"
+        },
+        "finish-agent": {
+          "agent": "finish-agent",
+          "status": "success",
+          "phase": "archive_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "archive_path_exists": "true",
+            "pending_hooks_empty": "true"
+          },
+          "blockers": [],
+          "recorded_at": "2026-06-29T20:37:12.708134"
+        }
+      }
+    },
+    "user_plan_approved": true,
+    "openspec_artifacts_done": true,
+    "tasks_complete": true,
+    "tdd_passed": true,
+    "review_complete": true,
+    "eval_passed_or_human_decision_recorded": true,
+    "archive_path_exists": true,
+    "memory_sync_resolution": "not_needed",
+    "memory_sync_reason": "Minimal prompt-example follow-up; no repository memory sync required.",
+    "roadmap_hook_resolution": "no_linked_item",
+    "pending_hooks_empty": true
+  },
+  "block": null,
+  "updated_at": "2026-06-29T20:38:20.883095"
+}

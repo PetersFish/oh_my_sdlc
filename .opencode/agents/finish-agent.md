@@ -66,6 +66,60 @@ From dev-orchestrator:
 }
 ```
 
+Blocked example when preconditions or hooks are unresolved:
+```json
+{
+  "agent": "finish-agent",
+  "status": "blocked",
+  "phase": "post_archive_actions",
+  "slice_id": "default",
+  "flow_type": "spec-flow",
+  "evidence": {
+    "archive_path_exists": true,
+    "pending_hooks_empty": false,
+    "focused_tests": [
+      {"command": "git status --short --branch", "result": "pass"}
+    ]
+  },
+  "artifacts": {
+    "handoff_path": ".ai/workflows/runs/<run_id>/handoffs/default/finish-agent.md",
+    "raw_log_paths": []
+  },
+  "blockers": [
+    {"reason": "hook_blocked", "message": "memory_sync is still pending and requires hook-specific remediation before finish can complete."}
+  ],
+  "recommended_next_action": "complete_phase"
+}
+```
+
+Failed example when archive/finish execution itself fails:
+```json
+{
+  "agent": "finish-agent",
+  "status": "failed",
+  "phase": "archive_change",
+  "slice_id": "default",
+  "flow_type": "lightweight-flow",
+  "evidence": {
+    "archive_path_exists": false,
+    "pending_hooks_empty": false,
+    "focused_tests": [
+      {"command": "git status --short --branch", "result": "fail"}
+    ]
+  },
+  "artifacts": {
+    "handoff_path": ".ai/workflows/runs/<run_id>/handoffs/default/finish-agent.md",
+    "raw_log_paths": [
+      {"path": ".ai/workflows/runs/<run_id>/logs/default/finish-agent/archive.log", "kind": "finish", "command": "finish flow", "result": "fail"}
+    ]
+  },
+  "blockers": [
+    {"reason": "archive_failed", "message": "Archive/finish execution failed before the flow could complete."}
+  ],
+  "recommended_next_action": "surface_error"
+}
+```
+
 ## Flow Type Handling
 
 | flow_type | Method |

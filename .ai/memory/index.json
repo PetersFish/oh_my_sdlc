@@ -1,7 +1,45 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-06-21T10:45:43.117131Z",
+  "generated_at": "2026-06-29T12:35:24.814054Z",
   "entries": [
+    {
+      "id": "agents",
+      "type": "module",
+      "path": "modules/agents.md",
+      "title": "Agent Prompts",
+      "summary": ">-",
+      "tags": [
+        "agents",
+        "prompts",
+        "sdlc",
+        "subagents"
+      ],
+      "updated_at": "2026-06-29T20:27:00Z",
+      "confidence": "medium",
+      "status": "pending_commit",
+      "parent_id": "root",
+      "owned_paths": [
+        "agents/"
+      ],
+      "path_hints": [
+        "agents/",
+        ".opencode/agents/",
+        ".claude/agents/",
+        ".cursor/agents/"
+      ],
+      "keywords": [
+        "agent",
+        "prompt",
+        "subagent",
+        "sdlc",
+        "orchestrator",
+        "json-examples"
+      ],
+      "test_paths": [
+        "tests/test_wrapper_contracts.py"
+      ],
+      "spec_paths": []
+    },
     {
       "id": "skills/integration-notion-sync",
       "type": "module",
@@ -556,6 +594,17 @@
       "updated_at": "2026-06-13T08:50:00Z",
       "confidence": "high",
       "status": "synced"
+    },
+    {
+      "id": "pitfalls/roadmap-done-hook-recreates-active-run",
+      "type": "pitfalls",
+      "path": "pitfalls/roadmap-done-hook-recreates-active-run.md",
+      "title": "roadmap_done_if_relevant hook recreates active run after self-finalization, causing governance-check infinite loop",
+      "summary": ">-",
+      "tags": [],
+      "updated_at": "2026-06-26T21:00:00Z",
+      "confidence": "high",
+      "status": "pending_commit"
     },
     {
       "id": "skill-copies-drift",

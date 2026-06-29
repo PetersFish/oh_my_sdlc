@@ -80,6 +80,58 @@ If not, STOP — return blocker and DO NOT begin review.
 }
 ```
 
+Blocked example when review finds an executable issue that implement-agent must fix:
+```json
+{
+  "agent": "review-agent",
+  "status": "blocked",
+  "phase": "apply_change",
+  "slice_id": "default",
+  "flow_type": "lightweight-flow",
+  "evidence": {
+    "review_complete": false,
+    "verification_passed": false,
+    "focused_tests": [
+      {"command": "python3 -m pytest tests/ -q --tb=short", "result": "fail"}
+    ]
+  },
+  "artifacts": {
+    "handoff_path": ".ai/workflows/runs/<run_id>/handoffs/default/review-agent.md",
+    "raw_log_paths": []
+  },
+  "blockers": [
+    {"reason": "completion_verification_failed", "message": "Focused verification failed during review; implementation changes are required."}
+  ],
+  "recommended_next_action": "dispatch_implement_agent"
+}
+```
+
+Blocked example when review exposes requirement or design ambiguity that needs replanning:
+```json
+{
+  "agent": "review-agent",
+  "status": "blocked",
+  "phase": "apply_change",
+  "slice_id": "default",
+  "flow_type": "spec-flow",
+  "evidence": {
+    "review_complete": false,
+    "verification_passed": true,
+    "focused_tests": [
+      {"command": "python3 -m pytest tests/ -q --tb=short", "result": "pass"}
+    ]
+  },
+  "artifacts": {
+    "handoff_path": ".ai/workflows/runs/<run_id>/handoffs/default/review-agent.md",
+    "raw_log_paths": []
+  },
+  "blockers": [
+    {"reason": "review_blocked", "message": "Review found requirement ambiguity that must be resolved in plan/spec artifacts before implementation continues."}
+  ],
+  "recommended_next_action": "dispatch_plan_agent"
+}
+```
+
 ## Review Feedback Handling
 
 When review finds issues:

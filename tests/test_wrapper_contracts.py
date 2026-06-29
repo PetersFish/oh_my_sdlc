@@ -702,6 +702,17 @@ class TestAgentPromptBody(unittest.TestCase):
         self.assertIn("failing test", body.lower())
         self.assertIn("focused_tests", body)
 
+    def test_implement_agent_includes_blocked_and_failed_examples(self):
+        body = self._read_agent_body("implement-agent")
+        self.assertIn('"status": "blocked"', body)
+        self.assertIn('"status": "failed"', body)
+
+    def test_review_agent_includes_blocked_routing_examples(self):
+        body = self._read_agent_body("review-agent")
+        self.assertIn('"status": "blocked"', body)
+        self.assertIn('"recommended_next_action": "dispatch_implement_agent"', body)
+        self.assertIn('"recommended_next_action": "dispatch_plan_agent"', body)
+
     def test_test_agent_mentions_overfit(self):
         body = self._read_agent_body("test-agent")
         self.assertIn("overfit", body)
@@ -729,6 +740,11 @@ class TestAgentPromptBody(unittest.TestCase):
         body = self._read_agent_body("finish-agent")
         self.assertIn("memory_sync", body)
         self.assertIn("roadmap_done_if_relevant", body)
+
+    def test_finish_agent_includes_blocked_and_failed_examples(self):
+        body = self._read_agent_body("finish-agent")
+        self.assertIn('"status": "blocked"', body)
+        self.assertIn('"status": "failed"', body)
 
     def test_review_agent_waits_for_test_evidence(self):
         body = self._read_agent_body("review-agent")

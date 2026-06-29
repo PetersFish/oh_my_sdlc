@@ -1,0 +1,198 @@
+{
+  "version": 1,
+  "run_id": "2026-06-29-subagent-consistency-audit",
+  "workflow": "sdlc-main",
+  "flow_type": "lightweight-flow",
+  "status": "done",
+  "current_phase": "done",
+  "primary_subject": {
+    "type": "openspec_change",
+    "id": "subagent-consistency-audit"
+  },
+  "context": {
+    "change_id": "subagent-consistency-audit"
+  },
+  "phase_readiness": {
+    "phase": "done",
+    "ready": true,
+    "missing_required_inputs": []
+  },
+  "pending_hooks": [],
+  "completed_hooks": [
+    "roadmap_status_ready_if_linked",
+    "roadmap_apply_start_if_ready",
+    "memory_sync",
+    "roadmap_done_if_relevant"
+  ],
+  "completed_phases": [
+    "create_change",
+    "apply_change",
+    "archive_change",
+    "post_archive_actions"
+  ],
+  "gates": {},
+  "evidence": {
+    "openspec_status": {
+      "classification": "missing",
+      "source": null
+    },
+    "roadmap_link": {
+      "count": 0,
+      "items": []
+    },
+    "lightweight_flow_confirmed": true,
+    "agent_phase": {
+      "agent_phase": "post_archive_actions",
+      "agent": "finish-agent",
+      "flow_type": "lightweight-flow",
+      "dispatched_at": "2026-06-29T18:38:16.693178",
+      "slice_id": "default"
+    },
+    "agent_result": {
+      "agent": "finish-agent",
+      "status": "success",
+      "phase": "post_archive_actions",
+      "slice_id": "default",
+      "flow_type": "lightweight-flow",
+      "evidence": {
+        "archive_path_exists": "true",
+        "pending_hooks_empty": "true"
+      },
+      "blockers": [],
+      "recorded_at": "2026-06-29T18:40:07.543366"
+    },
+    "agent_results": {
+      "default": {
+        "plan-agent": {
+          "agent": "plan-agent",
+          "status": "success",
+          "phase": "create_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "spec_artifacts_done": true,
+            "plan_produced": true,
+            "user_confirmation_required": true,
+            "plan_summary": {
+              "objective": "Align implement-agent, test-agent, review-agent, and finish-agent with the tightened dev-orchestrator/plan-agent contract while keeping this change prompt-only.",
+              "approach": "Normalize worker-agent boundaries, permissions, provider abstraction, routing names, evidence envelopes, and handoff/raw-log requirements against the current orchestrator/runtime baseline; defer run-directory unification to a separate follow-up and prefer run.json over manifest.json for any future per-run metadata naming.",
+              "key_steps": [
+                "Reconfirm shared worker-agent contract from dev-orchestrator, plan-agent, and current runtime behavior.",
+                "Normalize routing and role boundaries first, including dispatch_implement_agent / dispatch_plan_agent and review success completion behavior.",
+                "Tighten skill and bash allowlists per subagent, then rewrite evidence-envelope and handoff/raw-log requirements with valid JSON examples.",
+                "Run static prompt checks and workflow-contract verification before sign-off."
+              ],
+              "focused_tests": [
+                "Static prompt grep for stale routes, broad skill permissions, workflow.py ownership wording, and hardcoded provider names.",
+                "Workflow contract verification via python3 -m pytest tests/test_workflow.py -v if repository tests cover these semantics."
+              ],
+              "open_decisions": [
+                "Run-directory unification remains deferred to a separate change."
+              ]
+            },
+            "focused_tests": [
+              {
+                "command": "rg -n \"back_to_|dispatch_finish_agent|skill: allow|workflow.py \\*|openspec-apply-change|openspec-archive-change|complete-hook\" agents/*.md",
+                "result": "N/A - planning only"
+              },
+              {
+                "command": "python3 -m pytest tests/test_workflow.py -v",
+                "result": "N/A - planning only"
+              }
+            ]
+          },
+          "blockers": [],
+          "recorded_at": "2026-06-29T18:05:19.396899"
+        },
+        "implement-agent": {
+          "agent": "implement-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "tasks_complete": true,
+            "tdd_passed": true,
+            "focused_tests": [
+              {
+                "command": "python3 -m pytest tests/test_wrapper_contracts.py -k \"worker_agents_use_explicit_skill_allowlists or worker_prompts_do_not_use_back_to_routes or review_agent_success_completes_phase or finish_agent_does_not_claim_runtime_hook_ownership or worker_prompts_use_real_json_booleans or worker_prompts_share_normalized_handoff_sections or only_routing_agents_have_workflow_py_bash_allow\" -v",
+                "result": "fail"
+              },
+              {
+                "command": "python3 -m pytest tests/test_wrapper_contracts.py -k \"worker_agents_use_explicit_skill_allowlists or worker_prompts_do_not_use_back_to_routes or review_agent_success_completes_phase or finish_agent_does_not_claim_runtime_hook_ownership or worker_prompts_use_real_json_booleans or worker_prompts_share_normalized_handoff_sections or only_routing_agents_have_workflow_py_bash_allow\" -v",
+                "result": "pass"
+              },
+              {
+                "command": "python3 -m pytest tests/test_wrapper_contracts.py -v",
+                "result": "pass"
+              }
+            ]
+          },
+          "blockers": [],
+          "recorded_at": "2026-06-29T18:20:23.799365"
+        },
+        "test-agent": {
+          "agent": "test-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "verification_passed": true,
+            "overfit_check_passed": true,
+            "regression_passed": true,
+            "tdd_passed": true,
+            "focused_tests": [
+              {
+                "command": "python3 -m pytest tests/test_wrapper_contracts.py -k \"worker_agents_use_explicit_skill_allowlists or worker_prompts_do_not_use_back_to_routes or review_agent_success_completes_phase or finish_agent_does_not_claim_runtime_hook_ownership or worker_prompts_use_real_json_booleans or worker_prompts_share_normalized_handoff_sections or only_routing_agents_have_workflow_py_bash_allow\" -v",
+                "result": "pass"
+              },
+              {
+                "command": "python3 -m pytest tests/test_wrapper_contracts.py -v",
+                "result": "pass"
+              }
+            ]
+          },
+          "blockers": [],
+          "recorded_at": "2026-06-29T18:26:38.410621"
+        },
+        "review-agent": {
+          "agent": "review-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "review_complete": true
+          },
+          "blockers": [],
+          "recorded_at": "2026-06-29T18:32:29.522057"
+        },
+        "finish-agent": {
+          "agent": "finish-agent",
+          "status": "success",
+          "phase": "post_archive_actions",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "archive_path_exists": "true",
+            "pending_hooks_empty": "true"
+          },
+          "blockers": [],
+          "recorded_at": "2026-06-29T18:40:07.543366"
+        }
+      }
+    },
+    "user_plan_approved": true,
+    "openspec_artifacts_done": true,
+    "tasks_complete": true,
+    "tdd_passed": true,
+    "eval_passed_or_human_decision_recorded": true,
+    "archive_path_exists": true,
+    "memory_sync_resolution": "not_needed",
+    "memory_sync_reason": "Prompt-contract normalization change; no repository memory sync required in this workflow run.",
+    "roadmap_hook_resolution": "no_linked_item"
+  },
+  "block": null,
+  "updated_at": "2026-06-29T18:40:07.598006"
+}

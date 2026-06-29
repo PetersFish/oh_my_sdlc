@@ -8,7 +8,7 @@ sync_status: synced
 evidence_mode: discovery
 linked_commits: []
 linked_specs: []
-linked_sessions: []
+linked_sessions: ["20260629-202700"]
 updated_at: 2026-05-30T11:47:00Z
 confidence: high
 tags: [tests]

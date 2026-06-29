@@ -42,3 +42,6 @@ htmlcov/
 # obsidian
 .smart-env
 .smtcmp*
+
+# exclude logs
+**/*.log

@@ -72,6 +72,58 @@ Return JSON:
 }
 ```
 
+Blocked example when workflow context prevents safe execution:
+```json
+{
+  "agent": "implement-agent",
+  "status": "blocked",
+  "phase": "apply_change",
+  "slice_id": "default",
+  "flow_type": "lightweight-flow",
+  "evidence": {
+    "tasks_complete": false,
+    "tdd_passed": false,
+    "focused_tests": []
+  },
+  "artifacts": {
+    "handoff_path": ".ai/workflows/runs/<run_id>/handoffs/default/implement-agent.md",
+    "raw_log_paths": []
+  },
+  "blockers": [
+    {"reason": "missing_change_id", "message": "Spec-flow dispatch did not provide context.change_id."}
+  ],
+  "recommended_next_action": "fix_workflow_context"
+}
+```
+
+Failed example when OpenSpec apply cannot produce the requested artifact:
+```json
+{
+  "agent": "implement-agent",
+  "status": "failed",
+  "phase": "apply_change",
+  "slice_id": "default",
+  "flow_type": "spec-flow",
+  "evidence": {
+    "tasks_complete": false,
+    "tdd_passed": false,
+    "focused_tests": [
+      {"command": "python3 -m pytest tests/ -k test_x -v", "result": "pass"}
+    ]
+  },
+  "artifacts": {
+    "handoff_path": ".ai/workflows/runs/<run_id>/handoffs/default/implement-agent.md",
+    "raw_log_paths": [
+      {"path": ".ai/workflows/runs/<run_id>/logs/default/implement-agent/apply.log", "kind": "wrapper", "command": "openspec apply", "result": "fail"}
+    ]
+  },
+  "blockers": [
+    {"reason": "artifact_generation_failed", "message": "OpenSpec apply failed while generating the implementation artifact."}
+  ],
+  "recommended_next_action": "surface_error"
+}
+```
+
 ## Flow Type Handling
 
 Read flow_type from dev-orchestrator input. NEVER infer from context.
