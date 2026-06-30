@@ -811,6 +811,30 @@ class TestAgentPromptBody(unittest.TestCase):
             self.assertIn("flow_type", body,
                          f"{name}: missing flow_type handling")
 
+    def test_plan_agent_uses_provider_agnostic_spec_gate(self):
+        body = self._read_agent_body("plan-agent")
+        self.assertIn("spec_artifacts_done", body)
+        self.assertIn("criteria_satisfied", body)
+        self.assertNotIn("openspec_artifacts_done", body)
+
+    def test_plan_agent_requires_resolved_dispatch_and_provider_verification(self):
+        body = self._read_agent_body("plan-agent")
+        self.assertIn("resolved wrapper dispatch", body.lower())
+        self.assertIn("missing_resolved_dispatch", body)
+        self.assertIn("provider verifier", body.lower())
+        self.assertIn("must not return success", body.lower())
+
+    def test_plan_agent_distributed_copies_match_contract_markers(self):
+        for target in (".opencode", ".claude", ".cursor"):
+            path = _agent_path(target, "plan-agent")
+            with open(path) as f:
+                content = f.read()
+            idx = content.find("\n---", 3)
+            body = content[idx + 4:] if idx != -1 else ""
+            self.assertIn("spec_artifacts_done", body, f"{target} plan-agent missing provider-agnostic spec gate")
+            self.assertIn("criteria_satisfied", body, f"{target} plan-agent missing criteria_satisfied contract")
+            self.assertNotIn("openspec_artifacts_done", body, f"{target} plan-agent leaked provider-specific gate")
+
     def test_finish_agent_mentions_hooks(self):
         body = self._read_agent_body("finish-agent")
         self.assertIn("memory_sync", body)

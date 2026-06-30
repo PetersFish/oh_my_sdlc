@@ -1234,6 +1234,13 @@ class TestWorkflowDefinitionContracts(FixtureBase):
                 f"{phase_name} should not hardcode spec backends in allowed_workers",
             )
 
+    def test_create_change_uses_provider_agnostic_spec_artifact_gate(self):
+        wf = load_yaml(self.tmp, ".ai/workflows/definitions/sdlc-main.yaml")
+        create_change = wf["phases"]["create_change"]
+
+        self.assertEqual(create_change.get("exit_criteria"), ["spec_artifacts_done"])
+        self.assertEqual(create_change.get("evidence_keys"), ["spec_artifacts_done"])
+
 
 class TestGovernanceCheck(FixtureBase):
     """Tests for read-only governance-check command."""
@@ -3689,6 +3696,97 @@ class TestDispatchHooks(FixtureBase):
         self.assertEqual(rc, 0)
         data = json.loads(out)
         self.assertIsNotNone(data)
+
+    def test_after_dispatch_blocks_success_missing_required_phase_evidence(self):
+        self._create_run()
+        state = self._read_current_state()
+        state["current_phase"] = "create_change"
+        self._write_current_state(state)
+
+        agent_result = json.dumps({
+            "status": "success",
+            "evidence": {
+                "plan_produced": True,
+                "criteria_satisfied": "spec_artifacts_done",
+            },
+            "blockers": [],
+            "artifacts": {
+                "plan_path": ".ai/workflows/runs/active/run-1/plans/default/plan.md",
+            },
+        })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="plan-agent",
+            value=agent_result,
+        )
+
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "success")
+        self.assertEqual(data["workflow_command"], "workflow.py block")
+        self.assertEqual(data["recommended_next_action"], "resolve_failure")
+        self.assertEqual(data["blockers"][0]["reason"], "missing_phase_evidence_keys")
+        self.assertIn("spec_artifacts_done", data["blockers"][0]["message"])
+
+    def test_after_dispatch_blocks_success_missing_required_exit_criteria_signal(self):
+        self._create_run()
+        state = self._read_current_state()
+        state["current_phase"] = "create_change"
+        self._write_current_state(state)
+
+        agent_result = json.dumps({
+            "status": "success",
+            "evidence": {
+                "plan_produced": True,
+                "spec_artifacts_done": True,
+            },
+            "blockers": [],
+            "artifacts": {
+                "plan_path": ".ai/workflows/runs/active/run-1/plans/default/plan.md",
+            },
+        })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="plan-agent",
+            value=agent_result,
+        )
+
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["workflow_command"], "workflow.py block")
+        self.assertEqual(data["blockers"][0]["reason"], "missing_exit_criteria_satisfied")
+        self.assertIn("spec_artifacts_done", data["blockers"][0]["message"])
+
+    def test_after_dispatch_allows_success_when_phase_evidence_and_criteria_are_present(self):
+        self._create_run()
+        state = self._read_current_state()
+        state["current_phase"] = "create_change"
+        self._write_current_state(state)
+
+        agent_result = json.dumps({
+            "status": "success",
+            "evidence": {
+                "plan_produced": True,
+                "spec_artifacts_done": True,
+                "criteria_satisfied": "spec_artifacts_done",
+            },
+            "blockers": [],
+            "artifacts": {
+                "plan_path": ".ai/workflows/runs/active/run-1/plans/default/plan.md",
+            },
+        })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="plan-agent",
+            value=agent_result,
+        )
+
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["workflow_command"], "workflow.py complete-phase")
+        self.assertEqual(data["workflow_args"]["exit_criteria_satisfied"], "spec_artifacts_done")
+        self.assertEqual(data["recommended_next_action"], "complete_phase")
+        self.assertEqual(data["blockers"], [])
 
 
 def _import_workflow():

@@ -86,9 +86,9 @@ phases:
     allowed_workers:
       - dev-orchestrator
     exit_criteria:
-      - openspec_artifacts_done
+      - spec_artifacts_done
     evidence_keys:
-      - openspec_artifacts_done
+      - spec_artifacts_done
     post_hooks:
       - roadmap_status_ready_if_linked
     next: apply_change

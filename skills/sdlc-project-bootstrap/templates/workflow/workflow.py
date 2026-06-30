@@ -1646,6 +1646,22 @@ def _validate_evidence_envelope_contract(result: Dict[str, Any]) -> List[str]:
     return errors
 
 
+def _missing_phase_evidence_keys(agent_evidence: Dict[str, Any], phase_def: Dict[str, Any]) -> List[str]:
+    missing: List[str] = []
+    for key in phase_def.get("evidence_keys", []):
+        value = agent_evidence.get(key)
+        if value is None or value == "" or value is False:
+            missing.append(key)
+    return missing
+
+
+def _missing_exit_criteria(agent_evidence: Dict[str, Any], phase_def: Dict[str, Any]) -> List[str]:
+    raw = agent_evidence.get("criteria_satisfied", "")
+    satisfied = {item for item in str(raw).split(",") if item}
+    required = set(phase_def.get("exit_criteria", []))
+    return sorted(required - satisfied)
+
+
 def cmd_after_dispatch(root, args):
     state = load_run_state(root)
     if not state:
@@ -1720,9 +1736,6 @@ def cmd_after_dispatch(root, args):
                 if ek in agent_evidence and ek not in evidence:
                     evidence[ek] = agent_evidence[ek]
 
-    state["updated_at"] = _ts()
-    save_run_state(root, state)
-
     next_cmd = "complete-phase"
     recommended_next_action = agent_recommended or "complete_phase"
     if agent_status != "success":
@@ -1737,6 +1750,30 @@ def cmd_after_dispatch(root, args):
     elif canonical_agent == "test-agent":
         next_cmd = ""
         recommended_next_action = "dispatch_review_agent"
+
+    if wf and phase_def and agent_status == "success" and not agent_blockers and next_cmd == "complete-phase":
+        missing_evidence_keys = _missing_phase_evidence_keys(agent_evidence, phase_def)
+        if missing_evidence_keys:
+            agent_blockers.append({
+                "reason": "missing_phase_evidence_keys",
+                "message": f"agent success is missing required phase evidence keys: {', '.join(missing_evidence_keys)}",
+                "recommended_action": "resolve_failure",
+            })
+        else:
+            missing_exit_criteria = _missing_exit_criteria(agent_evidence, phase_def)
+            if missing_exit_criteria:
+                agent_blockers.append({
+                    "reason": "missing_exit_criteria_satisfied",
+                    "message": f"agent success is missing criteria_satisfied entries for: {', '.join(missing_exit_criteria)}",
+                    "recommended_action": "resolve_failure",
+                })
+
+    state["updated_at"] = _ts()
+    save_run_state(root, state)
+
+    if agent_blockers and next_cmd == "complete-phase":
+        next_cmd = "block"
+        recommended_next_action = "resolve_failure"
 
     should_block = next_cmd == "block"
     if agent_blockers:

@@ -9,6 +9,8 @@ description: >-
   For lightweight-flow, uses writing-plans. Does NOT execute tests or
   modify code.
 mode: subagent
+model: openai/gpt-5.5
+variant: medium
 permission:
   edit: allow
   bash:
@@ -39,6 +41,11 @@ so it can ask the user and redispatch you.
 
 `edit: allow` exists only so you can write workflow artifacts required by
 your role. You may write workflow artifacts only.
+
+Exception: for `spec-flow`, you MAY trigger the resolved provider-owned spec
+artifact creation path when dev-orchestrator has already provided the resolved
+wrapper dispatch contract. Those provider-owned artifacts are part of the
+create_change contract and are not optional substitutes for workflow plan files.
 
 You must not modify source code, tests, prompts outside your own workflow
 artifact scope, configs, or user docs.
@@ -98,6 +105,7 @@ Return JSON:
   "flow_type": "spec-flow|lightweight-flow",
   "evidence": {
     "spec_artifacts_done": true,
+    "criteria_satisfied": "spec_artifacts_done",
     "plan_produced": true,
     "user_confirmation_required": true,
     "plan_summary": {
@@ -169,6 +177,27 @@ Read flow_type from dev-orchestrator input. NEVER infer from context.
 
 For spec-flow, NEVER hardcode a concrete backend such as OpenSpec.
 Use the resolved wrapper dispatch contract provided by dev-orchestrator.
+
+## Spec-Flow Required Procedure
+
+For `spec-flow`, you must enforce the provider-backed create_change contract.
+
+1. Require `context.change_id`. If missing, return `blocked` with reason
+   `missing_change_id`.
+2. Require the resolved wrapper dispatch contract from dev-orchestrator. If it
+   is missing or incomplete, return `blocked` with reason
+   `missing_resolved_dispatch`.
+3. Use that resolved wrapper dispatch to trigger provider-owned spec artifact
+   creation. Workflow plan artifacts under `.ai/workflows/.../plans/...` do NOT
+   satisfy this requirement by themselves.
+4. Require provider verifier confirmation before success. If provider artifacts
+   are missing or unverifiable, return `blocked` or `failed` instead of success.
+5. Only after provider verification may you return success with
+   `spec_artifacts_done: true` and
+   `criteria_satisfied: "spec_artifacts_done"`.
+
+You must not return success for `spec-flow` unless the resolved wrapper dispatch
+and provider verifier have both succeeded.
 
 ## TDD-Aware Planning
 
@@ -254,4 +283,5 @@ Plan-agent produces no raw logs (no commands executed).
 | Ambiguous requirements | `ambiguous_requirements` | Return `questions_for_user` to dev-orchestrator |
 | Design uncertainty requiring user choice | `design_uncertainty` | Return `questions_for_user` to dev-orchestrator |
 | Missing change_id | `missing_change_id` | Ensure context.change_id set |
+| Missing resolved wrapper dispatch | `missing_resolved_dispatch` | Ask dev-orchestrator to provide resolved dispatch.kind/target and verifier |
 | Artifact creation failed | `artifact_generation_failed` | Surface error to user |
