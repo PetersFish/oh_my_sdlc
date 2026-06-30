@@ -1,9 +1,0 @@
-Command: python3 -c <exercise wrapper dispatch for memory module>
-local
-{'kind': 'skill', 'target': 'sdlc-repository-memory-sync'}
-{'target': 'local.repository_sync'}
-memory_result
-
-Command: python3 -c <compare loader and wrapper memory contracts>
-loader_result_contract= memory_sync
-wrapper_result_contract= memory_result

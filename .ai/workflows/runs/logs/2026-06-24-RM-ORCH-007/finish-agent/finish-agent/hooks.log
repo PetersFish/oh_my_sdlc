@@ -1,5 +1,0 @@
-memory_sync resolution=user_deferred
-memory_sync reason=Post-archive memory sync requires explicit user confirmation for new architecture/decision memory entries; no confirmed durable memory write was performed in this hook run.
-memory_sync residual_risk=Repository memory does not yet capture RM-ORCH-007 wrapper-architecture decisions in durable memory files.
-roadmap_done_if_relevant resolution=done
-roadmap_item=RM-ORCH-007

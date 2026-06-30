@@ -1,3 +1,0 @@
-$ python3 -m pytest tests/test_wrapper_contracts.py -q -k "blocks_resolution"
-...                                                                      [100%]
-3 passed, 89 deselected in 0.03s
