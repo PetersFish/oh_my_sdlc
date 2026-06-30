@@ -102,7 +102,7 @@ If not, STOP — return blocker and DO NOT begin review.
     "review_complete": "true|false"
   },
   "artifacts": {
-    "handoff_path": ".ai/workflows/runs/<run_id>/handoffs/<slice_id>/review-agent.md"
+    "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/<slice_id>/review-agent.md"
   },
   "blockers": [],
   "recommended_next_action": "dispatch_finish_agent"
@@ -125,7 +125,7 @@ Blocked example when review finds an executable issue that implement-agent must 
     ]
   },
   "artifacts": {
-    "handoff_path": ".ai/workflows/runs/<run_id>/handoffs/default/review-agent.md",
+    "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/default/review-agent.md",
     "raw_log_paths": []
   },
   "blockers": [
@@ -151,7 +151,7 @@ Blocked example when review exposes requirement or design ambiguity that needs r
     ]
   },
   "artifacts": {
-    "handoff_path": ".ai/workflows/runs/<run_id>/handoffs/default/review-agent.md",
+    "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/default/review-agent.md",
     "raw_log_paths": []
   },
   "blockers": [
@@ -175,12 +175,12 @@ When review finds issues:
 
 ## Handoff Artifact
 
-Write at `.ai/workflows/runs/<run_id>/handoffs/<slice_id>/review-agent.md`.
+Write at `.ai/workflows/runs/active/<run_id>/handoffs/<slice_id>/review-agent.md`.
 
 ## Raw Logs
 
 Retain for verification commands. Store under
-`.ai/workflows/runs/<run_id>/logs/<slice_id>/review-agent/...`.
+`.ai/workflows/runs/active/<run_id>/logs/<slice_id>/review-agent/...`.
 
 ## Failure Modes
 

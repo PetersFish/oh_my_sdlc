@@ -163,10 +163,27 @@ class TestStartAndStatus(FixtureBase):
         data = json.loads(out)
         self.assertEqual(data["status"], "no_active_run")
 
+    def test_start_requires_subject_type(self):
+        rc, _, stderr = run_workflow(
+            self.tmp, "start",
+            subject_id="demo-change",
+        )
+        self.assertNotEqual(rc, 0)
+        self.assertIn("subject-type", stderr.lower())
+
+    def test_start_rejects_legacy_subject_type(self):
+        rc, _, stderr = run_workflow(
+            self.tmp, "start",
+            subject_type="openspec_change",
+            subject_id="demo-change",
+        )
+        self.assertNotEqual(rc, 0)
+        self.assertIn("invalid choice", stderr.lower())
+
     def test_start_creates_run(self):
         rc, out, _ = run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="demo-change",
         )
         self.assertEqual(rc, 0)
@@ -175,18 +192,18 @@ class TestStartAndStatus(FixtureBase):
         self.assertIn("demo-change", data["run_id"])
         self.assertEqual(
             data["primary_subject"],
-            {"type": "openspec_change", "id": "demo-change"},
+            {"type": "spec_change", "id": "demo-change"},
         )
 
     def test_start_existing_run_same_subject_reports_conflict(self):
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="demo-change",
         )
         rc, out, _ = run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="demo-change",
         )
         self.assertNotEqual(rc, 0)
@@ -196,12 +213,12 @@ class TestStartAndStatus(FixtureBase):
     def test_start_existing_run_different_subject_allows_concurrent(self):
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="demo-change-1",
         )
         rc, out, _ = run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="demo-change-2",
         )
         self.assertEqual(rc, 0)
@@ -214,7 +231,7 @@ class TestPhaseInference(FixtureBase):
     def test_missing_change_starts_at_create_change(self):
         rc, out, _ = run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="no-such-change",
         )
         self.assertEqual(rc, 0)
@@ -226,7 +243,7 @@ class TestPhaseInference(FixtureBase):
         self._make_openspec_change("my-change")
         rc, out, _ = run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="my-change",
         )
         self.assertEqual(rc, 0)
@@ -239,7 +256,7 @@ class TestPhaseInference(FixtureBase):
         os.makedirs(empty_dir, exist_ok=True)
         rc, out, _ = run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="empty-change",
         )
         self.assertEqual(rc, 0)
@@ -252,7 +269,7 @@ class TestPhaseInference(FixtureBase):
         self._make_task_file("wip-change", completed=False)
         rc, out, _ = run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="wip-change",
         )
         self.assertEqual(rc, 0)
@@ -263,7 +280,7 @@ class TestPhaseInference(FixtureBase):
         self._make_openspec_archive("arch-change")
         rc, out, _ = run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="arch-change",
         )
         self.assertEqual(rc, 0)
@@ -275,7 +292,7 @@ class TestPhaseInference(FixtureBase):
         self._make_task_file("done-change", completed=True)
         rc, out, _ = run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="done-change",
         )
         self.assertEqual(rc, 0)
@@ -303,7 +320,7 @@ class TestReadinessAndResolve(FixtureBase):
     def test_missing_required_input_blocks(self):
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="test-change",
             workflow="sdlc-main",
         )
@@ -325,7 +342,7 @@ class TestReadinessAndResolve(FixtureBase):
         self._make_openspec_change("resolved-change")
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="resolved-change",
             workflow="sdlc-main",
         )
@@ -338,7 +355,7 @@ class TestBlockAndUnblock(FixtureBase):
     def test_block_sets_blocked_state(self):
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="block-test",
         )
         rc, out, _ = run_workflow(
@@ -359,7 +376,7 @@ class TestRecordEvidence(FixtureBase):
     def test_record_evidence_does_not_complete_phase(self):
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="ev-test",
         )
         rc, out, _ = run_workflow(
@@ -378,7 +395,7 @@ class TestAdvanceGuarded(FixtureBase):
     def test_advance_blocked_when_phase_not_complete(self):
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="adv-test",
         )
         rc, out, _ = run_workflow(self.tmp, "advance")
@@ -388,7 +405,7 @@ class TestAdvanceGuarded(FixtureBase):
     def test_advance_blocked_when_run_blocked(self):
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="adv-blocked",
         )
         run_workflow(self.tmp, "block", block_type="user_decision_required", message="x")
@@ -404,7 +421,7 @@ class TestAdvanceGuarded(FixtureBase):
             "workflow": "sdlc-main",
             "status": "running",
             "current_phase": "post_archive_actions",
-            "primary_subject": {"type": "openspec_change", "id": "advance-done"},
+            "primary_subject": {"type": "spec_change", "id": "advance-done"},
             "context": {"change_id": "advance-done"},
             "phase_readiness": {
                 "phase": "post_archive_actions",
@@ -448,7 +465,7 @@ class TestBranchPhase(FixtureBase):
     def test_branch_with_unknown_decision_blocks(self):
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="branch-test",
         )
         state = self._read_current_state()
@@ -471,7 +488,7 @@ class TestPostArchiveHooks(FixtureBase):
                 self._make_roadmap_item(**item)
         rc, out, _ = run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id=change_id,
         )
         return json.loads(out)
@@ -782,7 +799,7 @@ class TestPostArchiveHooks(FixtureBase):
 
                     run_workflow(
                         tmp, "start",
-                        subject_type="openspec_change",
+                        subject_type="spec_change",
                         subject_id=f"arch-{status}",
                     )
                     # Register hook manually
@@ -812,7 +829,7 @@ class TestMemorySyncHook(FixtureBase):
         self._make_openspec_archive(change_id)
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id=change_id,
         )
         state = self._read_current_state()
@@ -868,12 +885,12 @@ class TestResume(FixtureBase):
     def test_same_subject_resume_reuses_run(self):
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="resume-test",
         )
         rc, out, _ = run_workflow(
             self.tmp, "resume",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="resume-test",
         )
         self.assertEqual(rc, 0)
@@ -883,12 +900,12 @@ class TestResume(FixtureBase):
     def test_resume_different_subject_not_found(self):
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="resume-1",
         )
         rc, out, _ = run_workflow(
             self.tmp, "resume",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="resume-2",
         )
         self.assertNotEqual(rc, 0)
@@ -898,7 +915,7 @@ class TestResume(FixtureBase):
     def test_resume_without_subject_args_lists_runs(self):
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="resume-nosub",
         )
         rc, out, _ = run_workflow(self.tmp, "resume")
@@ -913,7 +930,7 @@ class TestDone(FixtureBase):
         self._make_openspec_archive("done-test")
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="done-test",
         )
         run_workflow(
@@ -964,7 +981,7 @@ class TestDone(FixtureBase):
         self._make_openspec_archive("done-pending")
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="done-pending",
         )
         state = self._read_current_state()
@@ -983,7 +1000,7 @@ class TestRootArgument(FixtureBase):
         commands = [
             ("status", {}),
             ("validate", {}),
-            ("start", {"subject_type": "openspec_change", "subject_id": "rt-test"}),
+            ("start", {"subject_type": "spec_change", "subject_id": "rt-test"}),
             ("resume", {}),
             ("readiness", {}),
             ("resolve", {}),
@@ -1000,7 +1017,7 @@ class TestRootArgument(FixtureBase):
                 elif cmd not in ("start",):
                     run_workflow(
                         self.tmp, "start",
-                        subject_type="openspec_change",
+                        subject_type="spec_change",
                         subject_id="rt-test",
                     )
                 rc, _, _ = run_workflow(self.tmp, cmd, **extra)
@@ -1020,7 +1037,7 @@ class TestWriteBoundary(FixtureBase):
 
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="boundary-test",
         )
         run_workflow(
@@ -1055,7 +1072,7 @@ class TestGateLedger(FixtureBase):
         self._make_openspec_archive("gate-test")
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="gate-test",
         )
         for hook in ("roadmap_done_if_relevant", "memory_sync"):
@@ -1084,7 +1101,7 @@ class TestGateLedger(FixtureBase):
         self._make_openspec_archive("gate-pass-test")
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="gate-pass-test",
         )
         for hook in ("roadmap_done_if_relevant", "memory_sync"):
@@ -1115,7 +1132,7 @@ class TestEvalTargetConditional(FixtureBase):
         self._make_openspec_archive("no-eval")
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="no-eval",
         )
         state = self._read_current_state()
@@ -1127,7 +1144,7 @@ class TestCompletePhase(FixtureBase):
     def test_complete_phase_registers_hooks(self):
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="cp-test",
         )
         state = self._read_current_state()
@@ -1240,7 +1257,7 @@ class TestGovernanceCheck(FixtureBase):
             "status": "running",
             "current_phase": "input",
             "primary_subject": {
-                "type": "openspec_change",
+                "type": "spec_change",
                 "id": change_id,
             },
             "context": {"change_id": change_id},
@@ -1270,7 +1287,7 @@ class TestGovernanceCheck(FixtureBase):
             "status": "done",
             "current_phase": "done",
             "primary_subject": {
-                "type": "openspec_change",
+                "type": "spec_change",
                 "id": change_id,
             },
             "context": {"change_id": change_id},
@@ -1527,7 +1544,7 @@ class TestPreflightAndEnsureRun(FixtureBase):
     def test_preflight_openspec_create_without_active_run_blocks(self):
         rc, data, _ = self._run_preflight(
             "openspec_create",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="new-change",
         )
         self.assertEqual(rc, 1)
@@ -1540,7 +1557,7 @@ class TestPreflightAndEnsureRun(FixtureBase):
     def test_preflight_openspec_apply_without_active_run_blocks(self):
         rc, data, _ = self._run_preflight(
             "openspec_apply",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="apply-me",
         )
         self.assertEqual(rc, 1)
@@ -1550,7 +1567,7 @@ class TestPreflightAndEnsureRun(FixtureBase):
     def test_preflight_openspec_archive_without_active_run_blocks(self):
         rc, data, _ = self._run_preflight(
             "openspec_archive",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="archive-me",
         )
         self.assertEqual(rc, 1)
@@ -1562,12 +1579,12 @@ class TestPreflightAndEnsureRun(FixtureBase):
     def test_preflight_openspec_create_with_matching_active_run_allows(self):
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="my-change",
         )
         rc, data, _ = self._run_preflight(
             "openspec_create",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="my-change",
         )
         self.assertEqual(rc, 0)
@@ -1579,12 +1596,12 @@ class TestPreflightAndEnsureRun(FixtureBase):
     def test_preflight_openspec_create_with_different_active_run_blocks(self):
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="existing-change",
         )
         rc, data, _ = self._run_preflight(
             "openspec_create",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="new-change",
         )
         self.assertEqual(rc, 1)
@@ -1603,7 +1620,7 @@ class TestPreflightAndEnsureRun(FixtureBase):
             "workflow": "sdlc-main",
             "status": "done",
             "current_phase": "done",
-            "primary_subject": {"type": "openspec_change", "id": "hist-change"},
+            "primary_subject": {"type": "spec_change", "id": "hist-change"},
             "context": {"change_id": "hist-change"},
             "phase_readiness": {"phase": "done", "ready": True, "missing_required_inputs": []},
             "pending_hooks": [], "completed_hooks": [],
@@ -1614,7 +1631,7 @@ class TestPreflightAndEnsureRun(FixtureBase):
             json.dump(state, f)
         rc, data, _ = self._run_preflight(
             "openspec_create",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="hist-change",
         )
         self.assertEqual(rc, 0)
@@ -1627,7 +1644,7 @@ class TestPreflightAndEnsureRun(FixtureBase):
         self._make_openspec_archive("orphan-arch", "2026-06-20")
         rc, data, _ = self._run_preflight(
             "dangling_archive_repair",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="orphan-arch",
         )
         self.assertEqual(rc, 1)
@@ -1639,12 +1656,12 @@ class TestPreflightAndEnsureRun(FixtureBase):
         self._make_openspec_archive("has-run-arch", "2026-06-20")
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="has-run-arch",
         )
         rc, data, _ = self._run_preflight(
             "dangling_archive_repair",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="has-run-arch",
         )
         self.assertEqual(rc, 0)
@@ -1661,7 +1678,7 @@ class TestPreflightAndEnsureRun(FixtureBase):
             "workflow": "sdlc-main",
             "status": "done",
             "current_phase": "done",
-            "primary_subject": {"type": "openspec_change", "id": "done-arch"},
+            "primary_subject": {"type": "spec_change", "id": "done-arch"},
             "context": {"change_id": "done-arch"},
             "phase_readiness": {"phase": "done", "ready": True, "missing_required_inputs": []},
             "pending_hooks": [], "completed_hooks": [],
@@ -1672,7 +1689,7 @@ class TestPreflightAndEnsureRun(FixtureBase):
             json.dump(state, f)
         rc, data, _ = self._run_preflight(
             "dangling_archive_repair",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="done-arch",
         )
         self.assertEqual(rc, 0)
@@ -1684,7 +1701,7 @@ class TestPreflightAndEnsureRun(FixtureBase):
         self._make_openspec_archive("orphan-ens", "2026-06-20")
         rc, data, _ = self._run_ensure_run(
             "dangling_archive_repair",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="orphan-ens",
         )
         self.assertEqual(rc, 0)
@@ -1703,7 +1720,7 @@ class TestPreflightAndEnsureRun(FixtureBase):
         self.assertEqual(current["current_phase"], "post_archive_actions")
         self.assertEqual(
             current["primary_subject"],
-            {"type": "openspec_change", "id": "orphan-ens"},
+            {"type": "spec_change", "id": "orphan-ens"},
         )
 
     # --- ensure-run skips when active run exists ---
@@ -1712,12 +1729,12 @@ class TestPreflightAndEnsureRun(FixtureBase):
         self._make_openspec_archive("has-ens", "2026-06-20")
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="has-ens",
         )
         rc, data, _ = self._run_ensure_run(
             "dangling_archive_repair",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="has-ens",
         )
         self.assertEqual(rc, 0)
@@ -1729,13 +1746,13 @@ class TestPreflightAndEnsureRun(FixtureBase):
     def test_ensure_run_allows_concurrent_for_different_subject(self):
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="other-change",
         )
         self._make_openspec_archive("block-me", "2026-06-20")
         rc, data, _ = self._run_ensure_run(
             "dangling_archive_repair",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="block-me",
         )
         self.assertEqual(rc, 0)
@@ -1755,7 +1772,7 @@ class TestPreflightAndEnsureRun(FixtureBase):
             "workflow": "sdlc-main",
             "status": "done",
             "current_phase": "done",
-            "primary_subject": {"type": "openspec_change", "id": "done-ens"},
+            "primary_subject": {"type": "spec_change", "id": "done-ens"},
             "context": {"change_id": "done-ens"},
             "phase_readiness": {"phase": "done", "ready": True, "missing_required_inputs": []},
             "pending_hooks": [], "completed_hooks": [],
@@ -1766,7 +1783,7 @@ class TestPreflightAndEnsureRun(FixtureBase):
             json.dump(state, f)
         rc, data, _ = self._run_ensure_run(
             "dangling_archive_repair",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="done-ens",
         )
         self.assertEqual(rc, 0)
@@ -1779,7 +1796,7 @@ class TestPreflightAndEnsureRun(FixtureBase):
         self._make_openspec_archive("hook-repair", "2026-06-20")
         rc, data, _ = self._run_ensure_run(
             "dangling_archive_repair",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="hook-repair",
         )
         self.assertEqual(rc, 0)
@@ -1802,7 +1819,7 @@ class TestPreflightAndEnsureRun(FixtureBase):
         self._make_active_roadmap_run("RM-BLOCK-LINK", "block-linked", current_phase="apply_change")
         rc, data, _ = self._run_ensure_run(
             "dangling_archive_repair",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="block-linked",
         )
         self.assertEqual(rc, 1)
@@ -1824,13 +1841,13 @@ class TestPreflightAndEnsureRun(FixtureBase):
     def test_preflight_openspec_apply_in_create_phase_blocks(self):
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="phase-test",
         )
         # Run is in create_change phase (default for missing change)
         rc, data, _ = self._run_preflight(
             "openspec_apply",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="phase-test",
         )
         self.assertEqual(rc, 1)
@@ -1840,12 +1857,12 @@ class TestPreflightAndEnsureRun(FixtureBase):
     def test_preflight_openspec_archive_in_create_phase_blocks(self):
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="phase-test2",
         )
         rc, data, _ = self._run_preflight(
             "openspec_archive",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="phase-test2",
         )
         self.assertEqual(rc, 1)
@@ -1855,12 +1872,12 @@ class TestPreflightAndEnsureRun(FixtureBase):
     def test_preflight_openspec_create_in_create_phase_allows(self):
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="phase-ok",
         )
         rc, data, _ = self._run_preflight(
             "openspec_create",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="phase-ok",
         )
         self.assertEqual(rc, 0)
@@ -1872,12 +1889,12 @@ class TestPreflightAndEnsureRun(FixtureBase):
         self._make_task_file("apply-ok", completed=False)
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="apply-ok",
         )
         rc, data, _ = self._run_preflight(
             "openspec_apply",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="apply-ok",
         )
         self.assertEqual(rc, 0)
@@ -1888,12 +1905,12 @@ class TestPreflightAndEnsureRun(FixtureBase):
         self._make_task_file("archive-ok", completed=True)
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="archive-ok",
         )
         rc, data, _ = self._run_preflight(
             "openspec_archive",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="archive-ok",
         )
         self.assertEqual(rc, 0)
@@ -2038,7 +2055,7 @@ class TestPreflightAndEnsureRun(FixtureBase):
         # Now preflight openspec_create for the promoted change
         rc, data, _ = self._run_preflight(
             "openspec_create",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="promo-change",
         )
         self.assertEqual(rc, 0)
@@ -2065,7 +2082,7 @@ class TestPreflightAndEnsureRun(FixtureBase):
         # Preflight without context.change_id set (frontmatter-only link)
         rc, data, _ = self._run_preflight(
             "openspec_create",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="promo-change-2",
         )
         self.assertEqual(rc, 0)
@@ -2076,7 +2093,7 @@ class TestPreflightAndEnsureRun(FixtureBase):
         """Direct openspec change without linked roadmap_item run returns missing_active_run."""
         rc, data, _ = self._run_preflight(
             "openspec_create",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="direct-change",
         )
         self.assertEqual(rc, 1)
@@ -2266,7 +2283,7 @@ class TestGovernanceCheckExtended(FixtureBase):
         oc_state = {
             "version": 1, "run_id": oc_run_id, "workflow": "sdlc-main",
             "status": "running", "current_phase": "create_change",
-            "primary_subject": {"type": "openspec_change", "id": "dup-change"},
+            "primary_subject": {"type": "spec_change", "id": "dup-change"},
             "context": {"change_id": "dup-change"},
             "phase_readiness": {"phase": "create_change", "ready": False, "missing_required_inputs": []},
             "pending_hooks": [], "completed_hooks": [], "completed_phases": [],
@@ -2364,7 +2381,7 @@ class TestConcurrentRuns(FixtureBase):
     def test_two_independent_starts_create_separate_active_files(self):
         rc1, out1, _ = run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="change-a",
         )
         self.assertEqual(rc1, 0)
@@ -2373,7 +2390,7 @@ class TestConcurrentRuns(FixtureBase):
 
         rc2, out2, _ = run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="change-b",
         )
         self.assertEqual(rc2, 0)
@@ -2391,14 +2408,14 @@ class TestConcurrentRuns(FixtureBase):
     def test_start_duplicate_subject_reports_conflict(self):
         rc1, _, _ = run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="dup-change",
         )
         self.assertEqual(rc1, 0)
 
         rc2, out2, _ = run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="dup-change",
         )
         self.assertNotEqual(rc2, 0)
@@ -2409,18 +2426,18 @@ class TestConcurrentRuns(FixtureBase):
     def test_resume_with_subject_args_finds_correct_run(self):
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="change-a",
         )
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="change-b",
         )
         # Pointer now points to change-b
         rc, out, _ = run_workflow(
             self.tmp, "resume",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="change-a",
         )
         self.assertEqual(rc, 0)
@@ -2434,12 +2451,12 @@ class TestConcurrentRuns(FixtureBase):
     def test_status_without_subject_lists_all_active_runs(self):
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="change-x",
         )
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="change-y",
         )
         # Clear pointer to test listing
@@ -2460,7 +2477,7 @@ class TestConcurrentRuns(FixtureBase):
         self._make_openspec_archive("done-concurrent", "2026-06-20")
         rc, out, _ = run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="done-concurrent",
         )
         self.assertEqual(rc, 0)
@@ -2507,12 +2524,12 @@ class TestConcurrentRuns(FixtureBase):
         self._make_openspec_archive("gc-multi-b", "2026-06-20")
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="gc-multi-a",
         )
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="gc-multi-b",
         )
         # Add pending hook to the first run only
@@ -2535,19 +2552,19 @@ class TestConcurrentRuns(FixtureBase):
     def test_preflight_sets_pointer_by_subject(self):
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="preflight-a",
         )
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="preflight-b",
         )
         # Pointer points to preflight-b. Preflight for preflight-a should switch pointer.
         rc, out, _ = run_workflow(
             self.tmp, "preflight",
             action="openspec_create",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="preflight-a",
         )
         self.assertEqual(rc, 0)
@@ -2583,7 +2600,7 @@ class TestConcurrentRuns(FixtureBase):
         # Create an active run via start (creates active/<run_id>.json + updates pointer)
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="stale-other",
         )
 
@@ -2696,7 +2713,7 @@ class TestFlowType(FixtureBase):
     def test_start_without_flow_type_defaults_to_spec_flow(self):
         rc, out, _ = run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="ft-default",
         )
         self.assertEqual(rc, 0)
@@ -2753,7 +2770,7 @@ class TestFlowType(FixtureBase):
             "workflow": "sdlc-main",
             "status": "running",
             "current_phase": "input",
-            "primary_subject": {"type": "openspec_change", "id": "no-ft"},
+            "primary_subject": {"type": "spec_change", "id": "no-ft"},
             "context": {},
             "phase_readiness": {"phase": "input", "ready": True, "missing_required_inputs": []},
             "pending_hooks": [],
@@ -2786,7 +2803,7 @@ class TestFlowType(FixtureBase):
             "status": "running",
             "current_phase": "input",
             "flow_type": "bogus-flow",
-            "primary_subject": {"type": "openspec_change", "id": "bad-ft"},
+            "primary_subject": {"type": "spec_change", "id": "bad-ft"},
             "context": {},
             "phase_readiness": {"phase": "input", "ready": True, "missing_required_inputs": []},
             "pending_hooks": [],
@@ -2813,7 +2830,7 @@ class TestFlowType(FixtureBase):
         """--flow-type bogus-flow is rejected by argparse."""
         rc, _, stderr = run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="ft-bogus",
             flow_type="bogus-flow",
         )
@@ -2925,7 +2942,7 @@ class TestEvidenceKeyValidation(FixtureBase):
 
             run_workflow(
                 tc, "start",
-                subject_type="openspec_change",
+                subject_type="spec_change",
                 subject_id="evk-missing",
             )
             state = load_json(tc, ".ai/workflows/runs/current.json")
@@ -2961,7 +2978,7 @@ class TestEvidenceKeyValidation(FixtureBase):
 
             run_workflow(
                 tc, "start",
-                subject_type="openspec_change",
+                subject_type="spec_change",
                 subject_id="evk-empty",
             )
             state = load_json(tc, ".ai/workflows/runs/current.json")
@@ -3005,7 +3022,7 @@ class TestEvidenceKeyValidation(FixtureBase):
             # We'll set it to a phase with just the evidence_keys
             run_workflow(
                 tc, "start",
-                subject_type="openspec_change",
+                subject_type="spec_change",
                 subject_id="evk-ok",
             )
             state = load_json(tc, ".ai/workflows/runs/current.json")
@@ -3059,7 +3076,7 @@ class TestEvidenceKeyValidation(FixtureBase):
 
                     run_workflow(
                         tc, "start",
-                        subject_type="openspec_change",
+                        subject_type="spec_change",
                         subject_id=f"falsy-{key}",
                     )
                     state = load_json(tc, ".ai/workflows/runs/current.json")
@@ -3151,7 +3168,7 @@ class TestBlockedRunNoAutoProgress(FixtureBase):
         self._make_openspec_change("d-blk")
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="d-blk",
         )
         rc, out, _ = run_workflow(self.tmp, "done")
@@ -3170,7 +3187,7 @@ class TestBlockedRunNoAutoProgress(FixtureBase):
         self._make_openspec_change("adv-blk")
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="adv-blk",
         )
         state = self._read_current_state()
@@ -3197,7 +3214,7 @@ class TestBlockedRunNoAutoProgress(FixtureBase):
         self._make_openspec_change("res-blk")
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="res-blk",
         )
         state = self._read_current_state()
@@ -3412,7 +3429,7 @@ class TestDispatchHooks(FixtureBase):
     def test_before_dispatch_rejects_agent_not_allowed_for_phase(self):
         run_workflow(
             self.tmp, "start",
-            subject_type="openspec_change",
+            subject_type="spec_change",
             subject_id="dispatch-phase-test",
         )
         state = self._read_current_state()
@@ -3825,7 +3842,7 @@ class TestRunArtifactsUnify(FixtureBase):
         state = {
             "version": 1, "run_id": run_id, "workflow": "sdlc-main",
             "flow_type": "spec-flow", "status": "done", "current_phase": "done",
-            "primary_subject": {"type": "openspec_change", "id": "arch-gov"},
+            "primary_subject": {"type": "spec_change", "id": "arch-gov"},
             "context": {}, "phase_readiness": {"phase": "done", "ready": True, "missing_required_inputs": []},
             "pending_hooks": [], "completed_hooks": [], "completed_phases": ["done"],
             "gates": {}, "evidence": {}, "block": None, "updated_at": "2026-01-01T00:00:00"
@@ -3896,6 +3913,50 @@ class TestRunArtifactsUnify(FixtureBase):
         self.assertTrue(os.path.isfile(migrated))
         with open(migrated, "r") as f:
             self.assertEqual(f.read(), "content")
+
+    def test_split_run_dir_migration_moves_plans_handoffs_and_logs(self):
+        """Legacy runs/<run_id>/ artifacts are migrated into active/<run_id>/ directories."""
+        wf = _import_workflow()
+        run_id = "2026-06-30-test-split"
+        split_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", run_id)
+        os.makedirs(os.path.join(split_dir, "plans", "default"), exist_ok=True)
+        os.makedirs(os.path.join(split_dir, "handoffs", "default"), exist_ok=True)
+        os.makedirs(os.path.join(split_dir, "logs", "default", "plan-agent"), exist_ok=True)
+        with open(os.path.join(split_dir, "plans", "default", "plan.md"), "w") as f:
+            f.write("# Plan")
+        with open(os.path.join(split_dir, "handoffs", "default", "plan-agent.md"), "w") as f:
+            f.write("# Handoff")
+        with open(os.path.join(split_dir, "logs", "default", "plan-agent", "plan.log"), "w") as f:
+            f.write("log")
+
+        run_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "active", run_id)
+        os.makedirs(run_dir, exist_ok=True)
+
+        wf._migrate_legacy_artifacts(self.tmp, run_id)
+
+        self.assertTrue(os.path.isfile(os.path.join(run_dir, "plans", "default", "plan.md")))
+        self.assertTrue(os.path.isfile(os.path.join(run_dir, "handoffs", "default", "plan-agent.md")))
+        self.assertTrue(os.path.isfile(os.path.join(run_dir, "logs", "default", "plan-agent", "plan.log")))
+        self.assertFalse(os.path.exists(split_dir), "split run directory should be removed after migration")
+
+    def test_split_run_dir_migration_runs_even_with_existing_sentinel(self):
+        """Split-directory migration is not skipped just because .migrated already exists."""
+        wf = _import_workflow()
+        run_id = "2026-06-30-test-sentinel"
+        run_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "active", run_id)
+        os.makedirs(run_dir, exist_ok=True)
+        with open(os.path.join(run_dir, ".migrated"), "w") as f:
+            f.write("existing")
+
+        split_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", run_id)
+        os.makedirs(os.path.join(split_dir, "plans", "default"), exist_ok=True)
+        with open(os.path.join(split_dir, "plans", "default", "plan.md"), "w") as f:
+            f.write("# Plan")
+
+        wf._migrate_legacy_artifacts(self.tmp, run_id)
+
+        self.assertTrue(os.path.isfile(os.path.join(run_dir, "plans", "default", "plan.md")))
+        self.assertFalse(os.path.exists(split_dir), "split run directory should still migrate when sentinel exists")
 
 
 if __name__ == "__main__":

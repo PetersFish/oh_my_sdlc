@@ -90,7 +90,7 @@ From dev-orchestrator:
     "pending_hooks_empty": "true|false"
   },
   "artifacts": {
-    "handoff_path": ".ai/workflows/runs/<run_id>/handoffs/<slice_id>/finish-agent.md"
+    "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/<slice_id>/finish-agent.md"
   },
   "blockers": [],
   "recommended_next_action": "complete_phase"
@@ -113,7 +113,7 @@ Blocked example when preconditions or hooks are unresolved:
     ]
   },
   "artifacts": {
-    "handoff_path": ".ai/workflows/runs/<run_id>/handoffs/default/finish-agent.md",
+    "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/default/finish-agent.md",
     "raw_log_paths": []
   },
   "blockers": [
@@ -139,9 +139,9 @@ Failed example when archive/finish execution itself fails:
     ]
   },
   "artifacts": {
-    "handoff_path": ".ai/workflows/runs/<run_id>/handoffs/default/finish-agent.md",
+    "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/default/finish-agent.md",
     "raw_log_paths": [
-      {"path": ".ai/workflows/runs/<run_id>/logs/default/finish-agent/archive.log", "kind": "finish", "command": "finish flow", "result": "fail"}
+      {"path": ".ai/workflows/runs/active/<run_id>/logs/default/finish-agent/archive.log", "kind": "finish", "command": "finish flow", "result": "fail"}
     ]
   },
   "blockers": [
@@ -180,12 +180,12 @@ evidence before proceeding. If missing, return blocker.
 
 ## Handoff Artifact
 
-Write at `.ai/workflows/runs/<run_id>/handoffs/<slice_id>/finish-agent.md`.
+Write at `.ai/workflows/runs/active/<run_id>/handoffs/<slice_id>/finish-agent.md`.
 
 ## Raw Logs
 
 Retain for hook completion output. Store under
-`.ai/workflows/runs/<run_id>/logs/<slice_id>/finish-agent/...`.
+`.ai/workflows/runs/active/<run_id>/logs/<slice_id>/finish-agent/...`.
 
 ## Failure Modes
 

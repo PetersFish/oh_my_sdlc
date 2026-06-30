@@ -128,16 +128,18 @@ run already exists for this task.
 Use these runtime commands as the default entry toolkit:
 - `python3 .ai/workflows/scripts/workflow.py --root . verify-foundations`
 - `python3 .ai/workflows/scripts/workflow.py --root . status`
-- `python3 .ai/workflows/scripts/workflow.py --root . start --workflow sdlc-main --subject-type <subject-type> --subject-id <subject-id>`
+- `python3 .ai/workflows/scripts/workflow.py --root . start --workflow sdlc-main --subject-type <subject-type> --subject-id <subject-id> --flow-type <flow-type>`
 - `python3 .ai/workflows/scripts/workflow.py --root . resume --subject-type <subject-type> --subject-id <subject-id>`
 - `python3 .ai/workflows/scripts/workflow.py --root . ensure-run --action <action> --subject-type <subject-type> --subject-id <subject-id>`
 
 Follow this order:
 1. Run `verify-foundations` before attempting to start or resume any governed workflow.
-2. Inspect current run state with `status` and the subject identifiers already known from the user request.
-3. If no matching run exists for a new governed task, create one with `workflow.py start`.
-4. If the task is a repair flow that must recreate governance for an archived subject, use `workflow.py ensure-run` instead of `start`.
-5. If a matching run clearly exists for this exact task, `workflow.py resume` or continue the current phase.
+2. Infer `subject_type` from the user request. Use `spec_change` for spec-change work and `roadmap_item` for roadmap-governed work. If unclear, ask the user instead of guessing.
+3. Infer `flow_type` from the user request. If the user explicitly selected a flow, pass that exact value. If unclear, ask the user instead of letting runtime defaults decide.
+4. Inspect current run state with `status` and the subject identifiers already known from the user request.
+5. If no matching run exists for a new governed task, create one with `workflow.py start` and an explicit `--flow-type`.
+6. If the task is a repair flow that must recreate governance for an archived subject, use `workflow.py ensure-run` instead of `start`.
+7. If a matching run clearly exists for this exact task, `workflow.py resume` or continue the current phase.
 
 Active run handling is NOT automatic:
 - If the active run is unrelated or the match is unclear, ask the user to confirm whether to reuse it.
@@ -145,7 +147,7 @@ Active run handling is NOT automatic:
 - Never silently reuse an active run just because one exists.
 
 Canonical-run rules still apply:
-- If a linked roadmap item run is the canonical run for the change, reuse that run and do NOT create a second `openspec_change` run.
+- If a linked roadmap item run is the canonical run for the change, reuse that run and do NOT create a second `spec_change` run.
 - If `before-dispatch` or `after-dispatch` reports `no_active_run`, fall back to `call workflow.py start or ensure-run first`.
 
 Only after the run is confirmed usable may you call `before-dispatch`.
@@ -392,5 +394,5 @@ Blockers, Assumptions, Risks/Follow-Ups, Raw Logs.
 ## Raw Logs
 
 Optional debugging artifacts. When present, stored under
-`.ai/workflows/runs/<run_id>/logs/<slice_id>/<agent>/...` and referenced
+`.ai/workflows/runs/active/<run_id>/logs/<slice_id>/<agent>/...` and referenced
 via `artifacts.raw_log_paths[]`. Workflow gates MUST NOT parse raw logs.

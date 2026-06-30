@@ -73,6 +73,7 @@ RUN_STATE_KEYS = {
 }
 
 VALID_FLOW_TYPES = {"spec-flow", "lightweight-flow"}
+VALID_SUBJECT_TYPES = {"spec_change", "roadmap_item"}
 
 
 def _read_pointer(root):
@@ -151,46 +152,42 @@ def _find_active_run_by_subject(root, subject_type, subject_id):
 
 
 def _migrate_legacy_artifacts(root, run_id):
-    """Migrate legacy top-level handoffs/ and logs/ into the run directory."""
+    """Migrate legacy run artifacts into the active run directory."""
     active_dir = _resolve_path(root, f".ai/workflows/runs/active/{run_id}")
     runs_dir = _resolve_path(root, ".ai/workflows/runs")
 
-    # Sentinel to prevent re-migration
     sentinel = os.path.join(active_dir, ".migrated")
-    if os.path.exists(sentinel):
-        return
 
-    # Migrate handoffs
+    def move_children(src_dir, dst_dir):
+        if not os.path.isdir(src_dir):
+            return
+        _ensure_dir(dst_dir)
+        for item in os.listdir(src_dir):
+            src = os.path.join(src_dir, item)
+            dst = os.path.join(dst_dir, item)
+            if not os.path.exists(dst):
+                shutil.move(src, dst)
+        try:
+            os.rmdir(src_dir)
+        except OSError:
+            pass
+
     legacy_handoffs = os.path.join(runs_dir, "handoffs", run_id)
-    target_handoffs = os.path.join(active_dir, "handoffs")
-    if os.path.isdir(legacy_handoffs):
-        _ensure_dir(target_handoffs)
-        for item in os.listdir(legacy_handoffs):
-            src = os.path.join(legacy_handoffs, item)
-            dst = os.path.join(target_handoffs, item)
-            if not os.path.exists(dst):
-                shutil.move(src, dst)
-        try:
-            os.rmdir(legacy_handoffs)
-        except OSError:
-            pass
-
-    # Migrate logs
     legacy_logs = os.path.join(runs_dir, "logs", run_id)
-    target_logs = os.path.join(active_dir, "logs")
-    if os.path.isdir(legacy_logs):
-        _ensure_dir(target_logs)
-        for item in os.listdir(legacy_logs):
-            src = os.path.join(legacy_logs, item)
-            dst = os.path.join(target_logs, item)
-            if not os.path.exists(dst):
-                shutil.move(src, dst)
-        try:
-            os.rmdir(legacy_logs)
-        except OSError:
-            pass
+    move_children(legacy_handoffs, os.path.join(active_dir, "handoffs"))
+    move_children(legacy_logs, os.path.join(active_dir, "logs"))
 
-    # Create sentinel
+    split_dir = os.path.join(runs_dir, run_id)
+    for artifact_dir in ("plans", "handoffs", "logs"):
+        move_children(
+            os.path.join(split_dir, artifact_dir),
+            os.path.join(active_dir, artifact_dir),
+        )
+    try:
+        os.rmdir(split_dir)
+    except OSError:
+        pass
+
     with open(sentinel, "w") as f:
         f.write(_ts())
 
@@ -261,6 +258,9 @@ def validate_run_state(state):
         errors.append(f"invalid status: {state.get('status')}")
     if state.get("flow_type") not in VALID_FLOW_TYPES:
         errors.append(f"invalid flow_type: {state.get('flow_type')}")
+    ps = state.get("primary_subject", {})
+    if ps.get("type") not in VALID_SUBJECT_TYPES:
+        errors.append(f"invalid subject_type: {ps.get('type')}")
     if state.get("block") and isinstance(state["block"], dict):
         bt = state["block"].get("type", "")
         if bt not in VALID_BLOCK_TYPES:
@@ -934,7 +934,7 @@ def _create_workflow_run(root, subject_type, subject_id, pending_hooks):
         "status": "running",
         "current_phase": phase,
         "primary_subject": {"type": subject_type, "id": subject_id},
-        "context": {"change_id": subject_id} if subject_type == "openspec_change" else {},
+        "context": {"change_id": subject_id} if subject_type == "spec_change" else {},
         "phase_readiness": {"phase": phase, "ready": False, "missing_required_inputs": []},
         "pending_hooks": list(pending_hooks),
         "completed_hooks": [],
@@ -1013,7 +1013,7 @@ def cmd_ensure_run(root, args):
             print(json.dumps(decision, indent=2))
             sys.exit(1)
 
-        if subject_type == "openspec_change":
+        if subject_type == "spec_change":
             linked = _find_linked_roadmap_run(root, subject_id)
             if linked:
                 linked_ps = linked.get("primary_subject", {})
@@ -1035,8 +1035,8 @@ def cmd_ensure_run(root, args):
                 print(json.dumps(decision, indent=2))
                 sys.exit(1)
 
-        # For openspec_change subjects, verify subject is archived before creating a repair run
-        if subject_type == "openspec_change":
+        # For spec_change subjects, verify subject is archived before creating a repair run
+        if subject_type == "spec_change":
             status = loader_openspec_change_status(root, subject_id)
             if status.get("classification") != "archived":
                 decision = _make_preflight_decision(
@@ -1175,8 +1175,11 @@ def cmd_validate(root, args):
 
 def cmd_start(root, args):
     workflow_id = args.workflow or "sdlc-main"
-    subject_type = args.subject_type or "openspec_change"
+    subject_type = args.subject_type
     subject_id = args.subject_id
+    if not subject_type:
+        print(json.dumps({"error": "subject-type is required"}, indent=2), file=sys.stderr)
+        sys.exit(1)
     run_id = _make_run_id(subject_type, subject_id)
 
     # Check ALL active runs for same-subject duplicate
@@ -1195,8 +1198,8 @@ def cmd_start(root, args):
         )
         sys.exit(1)
 
-    # Prevent duplicate openspec_change run when a linked roadmap_item run exists
-    if subject_type == "openspec_change":
+    # Prevent duplicate spec_change run when a linked roadmap_item run exists
+    if subject_type == "spec_change":
         linked = _find_linked_roadmap_run(root, subject_id)
         if linked:
             print(
@@ -1228,7 +1231,7 @@ def cmd_start(root, args):
             "status": "blocked",
             "current_phase": phase,
             "primary_subject": {"type": subject_type, "id": subject_id},
-            "context": {"change_id": subject_id} if subject_type == "openspec_change" else {},
+            "context": {"change_id": subject_id} if subject_type == "spec_change" else {},
             "phase_readiness": {"phase": phase, "ready": False, "missing_required_inputs": []},
             "pending_hooks": [],
             "completed_hooks": [],
@@ -1258,7 +1261,7 @@ def cmd_start(root, args):
         "status": "running",
         "current_phase": phase,
         "primary_subject": {"type": subject_type, "id": subject_id},
-        "context": {"change_id": subject_id} if subject_type == "openspec_change" else {},
+        "context": {"change_id": subject_id} if subject_type == "spec_change" else {},
         "phase_readiness": {"phase": phase, "ready": False, "missing_required_inputs": []},
         "pending_hooks": [],
         "completed_hooks": [],
@@ -2300,7 +2303,7 @@ def cmd_governance_check(root, args):
     active_runs = _list_active_runs(root)
     for run_id, active_state in active_runs:
         ps = active_state.get("primary_subject", {})
-        if ps.get("type") == "openspec_change" and ps.get("id"):
+        if ps.get("type") == "spec_change" and ps.get("id"):
             governed_change_ids.add(ps["id"])
         if ps.get("type") == "roadmap_item" and ps.get("id"):
             governed_roadmap_ids.add(ps["id"])
@@ -2321,7 +2324,7 @@ def cmd_governance_check(root, args):
                 continue
             if hist.get("status") in ("done",):
                 ps = hist.get("primary_subject", {})
-                if ps.get("type") == "openspec_change" and ps.get("id"):
+                if ps.get("type") == "spec_change" and ps.get("id"):
                     governed_change_ids.add(ps["id"])
                 if ps.get("type") == "roadmap_item" and ps.get("id"):
                     governed_roadmap_ids.add(ps["id"])
@@ -2352,7 +2355,7 @@ def cmd_governance_check(root, args):
             ensure_cmd = (
                 f"python3 .ai/workflows/scripts/workflow.py --root . ensure-run"
                 f" --action dangling_archive_repair"
-                f" --subject-type openspec_change"
+                f" --subject-type spec_change"
                 f" --subject-id {change_id}"
             )
             remediation = (
@@ -2375,7 +2378,7 @@ def cmd_governance_check(root, args):
                 "hash": fh,
             })
 
-    # Detect duplicate promotion runs: roadmap_item + openspec_change for same change
+    # Detect duplicate promotion runs: roadmap_item + spec_change for same change
     roadmap_change_ids = {}
     openspec_run_ids = set()
     for run_id, active_state in active_runs:
@@ -2390,25 +2393,25 @@ def cmd_governance_check(root, args):
                     cid = _read_roadmap_item_openspec_change(root, item_id)
             if cid:
                 roadmap_change_ids[cid] = run_id
-        elif ps.get("type") == "openspec_change":
+        elif ps.get("type") == "spec_change":
             openspec_run_ids.add(run_id)
     for run_id, active_state in active_runs:
         ps = active_state.get("primary_subject", {})
-        if ps.get("type") != "openspec_change":
+        if ps.get("type") != "spec_change":
             continue
         oc_change_id = ps.get("id")
         if oc_change_id and oc_change_id in roadmap_change_ids:
             canonical_run_id = roadmap_change_ids[oc_change_id]
             message = (
                 f"Duplicate runs for change \"{oc_change_id}\":"
-                f" openspec_change run \"{run_id}\" and"
+                f" spec_change run \"{run_id}\" and"
                 f" roadmap_item run \"{canonical_run_id}\"."
                 f" The roadmap_item run is canonical."
             )
             remediation = (
-                f"Cancel the openspec_change run \"{run_id}\" with:"
+                f"Cancel the spec_change run \"{run_id}\" with:"
                 f" python3 .ai/workflows/scripts/workflow.py --root . cancel-run"
-                f" --subject-type openspec_change --subject-id {oc_change_id}"
+                f" --subject-type spec_change --subject-id {oc_change_id}"
                 f" --reason \"duplicate of canonical roadmap_item run {canonical_run_id}\"."
                 f" Re-run \"workflow.py governance-check\" until block=false."
             )
@@ -2688,7 +2691,7 @@ def _infer_phase(root, subject_type, subject_id):
                 return "apply_change"
             # done, cancelled, or unknown: start new lifecycle
         return "create_roadmap"
-    if subject_type != "openspec_change":
+    if subject_type != "spec_change":
         return "input"
     status = loader_openspec_change_status(root, subject_id)
     classification = status.get("classification", "missing")
@@ -2854,7 +2857,7 @@ def main():
         help="command to execute",
     )
     parser.add_argument("--workflow", default=None, help="workflow id")
-    parser.add_argument("--subject-type", default=None, help="subject type")
+    parser.add_argument("--subject-type", default=None, choices=sorted(VALID_SUBJECT_TYPES), help="subject type")
     parser.add_argument("--subject-id", default=None, help="subject id")
     parser.add_argument("--key", default=None, help="evidence key")
     parser.add_argument("--value", default=None, help="evidence value (JSON)")

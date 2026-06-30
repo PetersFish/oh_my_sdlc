@@ -112,8 +112,8 @@ Return JSON:
     ]
   },
   "artifacts": {
-    "plan_path": ".ai/workflows/runs/<run_id>/plans/<slice_id>/plan.md",
-    "handoff_path": ".ai/workflows/runs/<run_id>/handoffs/<slice_id>/plan-agent.md"
+    "plan_path": ".ai/workflows/runs/active/<run_id>/plans/<slice_id>/plan.md",
+    "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/<slice_id>/plan-agent.md"
   },
   "blockers": [],
   "recommended_next_action": "await_user_plan_approval"
@@ -145,7 +145,7 @@ Return JSON:
     ]
   },
   "artifacts": {
-    "handoff_path": ".ai/workflows/runs/<run_id>/handoffs/<slice_id>/plan-agent.md"
+    "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/<slice_id>/plan-agent.md"
   },
   "blockers": [
     {
@@ -218,7 +218,7 @@ ask the user.
 
 Write the user-reviewable plan at:
 
-`.ai/workflows/runs/<run_id>/plans/<slice_id>/plan.md`
+`.ai/workflows/runs/active/<run_id>/plans/<slice_id>/plan.md`
 
 Expose that path as:
 
@@ -226,7 +226,7 @@ Expose that path as:
 
 ## Handoff Artifact
 
-Write handoff at `.ai/workflows/runs/<run_id>/handoffs/<slice_id>/plan-agent.md`
+Write handoff at `.ai/workflows/runs/active/<run_id>/handoffs/<slice_id>/plan-agent.md`
 with sections: Metadata, Objective, Work Completed, Files/Artifacts Changed,
 Commands Run (none), Evidence Summary, Blockers, Assumptions, Risks/Follow-Ups,
 Raw Logs (none).

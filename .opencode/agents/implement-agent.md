@@ -87,7 +87,7 @@ Return JSON:
     ]
   },
   "artifacts": {
-    "handoff_path": ".ai/workflows/runs/<run_id>/handoffs/<slice_id>/implement-agent.md",
+    "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/<slice_id>/implement-agent.md",
     "raw_log_paths": [
       {"path": "...", "kind": "pytest", "command": "...", "result": "pass"}
     ]
@@ -111,7 +111,7 @@ Blocked example when workflow context prevents safe execution:
     "focused_tests": []
   },
   "artifacts": {
-    "handoff_path": ".ai/workflows/runs/<run_id>/handoffs/default/implement-agent.md",
+    "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/default/implement-agent.md",
     "raw_log_paths": []
   },
   "blockers": [
@@ -137,9 +137,9 @@ Failed example when OpenSpec apply cannot produce the requested artifact:
     ]
   },
   "artifacts": {
-    "handoff_path": ".ai/workflows/runs/<run_id>/handoffs/default/implement-agent.md",
+    "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/default/implement-agent.md",
     "raw_log_paths": [
-      {"path": ".ai/workflows/runs/<run_id>/logs/default/implement-agent/apply.log", "kind": "wrapper", "command": "openspec apply", "result": "fail"}
+      {"path": ".ai/workflows/runs/active/<run_id>/logs/default/implement-agent/apply.log", "kind": "wrapper", "command": "openspec apply", "result": "fail"}
     ]
   },
   "blockers": [
@@ -177,14 +177,14 @@ NEVER skip the red phase. Every behavior change starts with a failing test.
 
 ## Handoff Artifact
 
-Write at `.ai/workflows/runs/<run_id>/handoffs/<slice_id>/implement-agent.md`
+Write at `.ai/workflows/runs/active/<run_id>/handoffs/<slice_id>/implement-agent.md`
 with sections: Metadata, Objective, Work Completed, Files/Artifacts Changed,
 Commands Run, Evidence Summary, Blockers, Assumptions, Risks/Follow-Ups, Raw Logs.
 
 ## Raw Logs
 
 Retain for test output, build errors, long commands.
-Store under `.ai/workflows/runs/<run_id>/logs/<slice_id>/implement-agent/...`.
+Store under `.ai/workflows/runs/active/<run_id>/logs/<slice_id>/implement-agent/...`.
 Reference in artifacts.raw_log_paths[] with {path, kind, command, result}.
 
 ## Failure Modes

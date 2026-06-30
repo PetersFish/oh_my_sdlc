@@ -724,6 +724,14 @@ class TestAgentPromptBody(unittest.TestCase):
             self.assertIn("raw log", body.lower(),
                          f"{name}: missing raw log reference")
 
+    def test_worker_agents_write_active_run_artifacts(self):
+        for name in ("plan-agent", "implement-agent", "test-agent", "review-agent", "finish-agent"):
+            body = self._read_agent_body(name)
+            self.assertIn(".ai/workflows/runs/active/<run_id>/", body,
+                          f"{name}: missing active run artifact path")
+            self.assertNotIn(".ai/workflows/runs/<run_id>/", body,
+                             f"{name}: stale split run artifact path")
+
     def test_dev_orchestrator_mentions_dispatch_hooks(self):
         body = self._read_agent_body("dev-orchestrator")
         self.assertIn("before_dispatch", body)
@@ -741,6 +749,16 @@ class TestAgentPromptBody(unittest.TestCase):
         self.assertIn("workflow.py start", body)
         self.assertIn("workflow.py resume", body)
         self.assertIn("workflow.py ensure-run", body)
+
+    def test_dev_orchestrator_requires_explicit_flow_type_on_start(self):
+        body = self._read_agent_body("dev-orchestrator")
+        self.assertIn("--flow-type <flow-type>", body)
+        self.assertIn("pass that exact value", body)
+
+    def test_dev_orchestrator_uses_spec_change_public_subject_type(self):
+        body = self._read_agent_body("dev-orchestrator")
+        self.assertIn("spec_change", body)
+        self.assertNotIn("openspec_change run", body)
 
     def test_dev_orchestrator_requires_run_confirmation_for_ambiguous_active_runs(self):
         body = self._read_agent_body("dev-orchestrator")

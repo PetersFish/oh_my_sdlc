@@ -102,7 +102,7 @@ Stop at first failure. Produce diagnostic evidence. Use `systematic-debugging` b
     "focused_tests": [{"command": "...", "result": "pass"}]
   },
   "artifacts": {
-    "handoff_path": ".ai/workflows/runs/<run_id>/handoffs/<slice_id>/test-agent.md",
+    "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/<slice_id>/test-agent.md",
     "raw_log_paths": [{"path": "...", "kind": "pytest", "command": "pytest tests/", "result": "pass"}]
   },
   "blockers": [],
@@ -161,12 +161,12 @@ Stop at first failure. Produce diagnostic evidence. Use `systematic-debugging` b
 
 ## Handoff Artifact
 
-Write at `.ai/workflows/runs/<run_id>/handoffs/<slice_id>/test-agent.md`.
+Write at `.ai/workflows/runs/active/<run_id>/handoffs/<slice_id>/test-agent.md`.
 
 ## Raw Logs
 
 ALWAYS retain for verification runs. Store under
-`.ai/workflows/runs/<run_id>/logs/<slice_id>/test-agent/...`.
+`.ai/workflows/runs/active/<run_id>/logs/<slice_id>/test-agent/...`.
 Reference in artifacts.raw_log_paths[].
 
 ## EvalOps Capture
