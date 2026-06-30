@@ -15,7 +15,7 @@ permission:
     "git status*": allow
     "git diff*": allow
     "git log*": allow
-    "*": ask
+    "*": deny
   skill:
     "sdlc-repository-memory-load": allow
     "brainstorming": allow

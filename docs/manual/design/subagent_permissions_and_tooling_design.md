@@ -1,5 +1,8 @@
 # 背景
 
+> 本次迭代只落地目标 1-3：减少无意义授权打断、保持最小必要权限、把 MUST-first 工具策略写成可执行契约。
+> gate 强化与历史兼容清理仅保留为后续提案，不属于本轮实施范围。
+
 当前 SDLC 子代理体系已经拆分为 `dev-orchestrator`、`plan-agent`、`implement-agent`、`test-agent`、`review-agent`、`finish-agent` 等角色，并且每个角色在 prompt 中都定义了明确职责、输入输出契约和 handoff 产物要求。这套拆分方向是对的，但实际运行中出现了两个明显问题：
 
 1. 多个 subagent 的职责与权限不一致。
@@ -9,7 +12,7 @@
 
 第二个问题是：即使仓库已经提供了 `codegraph`、`tavily-search`、`context7`、`headroom`、`sdlc-repository-memory-load` 等高价值能力，模型也不一定会主动调用。结果是 agent 常常退回到低效的 bash 探索路径，例如依赖 `grep/find/ls/cat/head` 组合做代码理解，或者在需要最新文档和外部实践时不去主动联网调研。这样不仅效果差，也更容易误判问题。
 
-此外，用户补充指出一个更核心的痛点：
+此外，用户补充指出一个更核心的痛点；该项在本轮只作为后续方向记录，不进入当前实施：
 
 - 当前系统最需要优化的不是历史 run 的修复，而是“实现偏离 spec / 预期时，test / review / finish gate 没有及时拦住”。
 
@@ -17,13 +20,13 @@
 
 # 设计目标
 
-本设计希望同时解决以下几类问题：
+本设计本轮只解决以下问题：
 
 1. 降低 subagent 因权限不足而触发的无意义授权打断。
 2. 保持最小必要权限原则，避免把危险能力一次性全部放开。
 3. 明确各 subagent 在何种场景下必须优先调用 skill、MCP 和高阶工具。
-4. 提高 `test-agent`、`review-agent`、`finish-agent` 对 spec 偏离、预期偏离、验证缺口的拦截能力。
-5. 清理已经不再重要的历史兼容包袱，避免旧逻辑长期拖累新工作流。
+4. （后续提案）提高 `test-agent`、`review-agent`、`finish-agent` 对 spec 偏离、预期偏离、验证缺口的拦截能力。
+5. （后续提案）清理已经不再重要的历史兼容包袱，避免旧逻辑长期拖累新工作流。
 
 # 非目标
 
@@ -76,7 +79,9 @@
 因此本设计不建议简单地把传统 bash 探索命令大量加白，而是要明确：
 
 - 优先使用平台已有的高阶工具。
-- 只在高阶工具不够时，才退回受限 bash。
+- 当高阶工具不够时，停止并返回 blocker / remediation，而不是退回受限 bash。
+
+本轮进一步收紧为：不保留任何通用 bash 探索降级路径。高阶工具不可用、未索引或能力不足时，agent 必须返回 blocker / remediation，而不是退回 shell 探索。
 
 ## 3. 模型没有被强约束去主动使用关键能力
 
@@ -309,16 +314,17 @@
 
 当需要理解当前代码库结构、模块关系、调用链、符号定义时：
 
-- 必须先调用 `sdlc-repository-memory-load` 获取仓库记忆上下文。
+- 当任务依赖历史决策、模块关系或代码结构时，必须先调用 `sdlc-repository-memory-load` 获取仓库记忆上下文。
+- 如果只是 doc-only 或 single-known-file workflow artifact 工作，可跳过 memory/codegraph 前置要求。
 - 必须优先使用 `codegraph_*` 进行结构化理解。
-- 不应先使用 bash `grep/find/ls/cat/head` 作为主路径。
+- 观察性 git 不是代码探索主路径。
 
 #### 2. 文件与文本搜索
 
 - 查文件优先 `Glob`
 - 查文本优先 `Grep`
 - 读文件优先 `Read`
-- 仅当高阶工具不足时，才使用受限 bash
+- 禁止退化为 bash 探索；工具不可用时必须返回 blocker / remediation
 
 #### 3. 最新技术调研
 
@@ -343,6 +349,11 @@
 
 - 只要任务命中已有 skill 的触发条件，就必须先调用 skill 再行动。
 - 不得以“事情很小”为理由跳过 skill。
+
+#### 7. 失败处理
+
+- 若首选工具 unavailable、unindexed 或 demonstrably insufficient，必须 stop 并返回 blocker / remediation。
+- 不允许把 `git` 或其他 shell 命令重新当成通用探索兜底。
 
 ## 三、对不同 agent 增加角色特定工具约束
 
@@ -379,9 +390,9 @@
 - 不应重新发散到实现细节探索
 - 只在收尾必要场景使用联网或上下文压缩能力
 
-## 四、强化 gate，明确谁负责拦截偏离预期的实现
+## 四、后续提案：强化 gate，明确谁负责拦截偏离预期的实现
 
-这是本设计最重要的补强点之一。
+以下内容保留为后续提案，不纳入本轮 goals 1-3 实施。
 
 ### 1. `test-agent` 的职责补强
 
@@ -422,9 +433,9 @@
 
 换句话说，`finish-agent` 要对“只有验证充分的变更才能收尾”负责。
 
-## 五、清理历史兼容逻辑
+## 五、后续提案：清理历史兼容逻辑
 
-本轮不优先考虑历史 run 修复，因此应明确以下方向：
+以下内容保留为后续提案，不纳入本轮 goals 1-3 实施：
 
 1. 若 `_migrate_legacy_artifacts` 已不再是当前主路径所需，且删除不会破坏现有核心流程，应考虑移除。
 2. 即使暂时保留，也应把它视为待删除兼容层，而不是继续扩展其职责。
@@ -437,11 +448,11 @@
 | Agent | edit | bash 核心策略 | 核心限制 |
 | --- | --- | --- | --- |
 | `dev-orchestrator` | deny | 仅 workflow 控制 + 只读 git | 不做技术实现、不写文件 |
-| `plan-agent` | allow | workflow.py + 只读 git | 仅写 plan/handoff，不改源码 |
-| `implement-agent` | allow | pytest + workflow.py + 扩展只读 git | 禁止 destructive git / shell |
-| `test-agent` | allow | pytest + workflow.py + 只读 git | 不改实现，仅写验证产物 |
-| `review-agent` | allow | pytest + workflow.py + 只读 git | 不改实现，仅写 review 产物 |
-| `finish-agent` | allow | workflow.py + sync + 扩展只读 git | 仅做收尾，不重新实现 |
+| `plan-agent` | allow | workflow.py + 观察性只读 git | 仅写 workflow artifacts，不改源码 |
+| `implement-agent` | allow | pytest + workflow.py + 扩展观察性只读 git | 禁止 destructive git / shell；无 bash 降级 |
+| `test-agent` | allow | pytest + workflow.py + 观察性只读 git | 不改实现，仅写 workflow artifacts / 验证产物 |
+| `review-agent` | allow | pytest + workflow.py + 观察性只读 git | 不改实现，仅写 workflow artifacts / review 产物 |
+| `finish-agent` | allow | workflow.py + sync + 扩展观察性只读 git | 仅做收尾与 workflow artifacts，不重新实现 |
 
 # 关键 Trade-offs
 
@@ -497,7 +508,7 @@
 - `deepseek-v4-pro` 这类主动性偏弱的模型更容易稳定命中正确工具。
 - “推荐使用”升级为“必须使用”的契约之后，行为更可控。
 
-## Trade-off 4：加强 gate 会增加通过门槛，也可能增加回退次数
+## Trade-off 4：（后续提案）加强 gate 会增加通过门槛，也可能增加回退次数
 
 一旦 `test-agent`、`review-agent` 更积极地拦截“测试虽绿但行为未闭环”的情况，短期内 workflow 可能会出现更多 blocker 和回退。
 
@@ -521,7 +532,7 @@
 1. frontmatter `permission`
 2. 统一 Tool Usage Policy
 3. 各角色专项约束
-4. `test/review/finish` 的 gate 责任补强文案
+4. goals 1-3 范围内的边界与工具策略文案
 
 ## 第二阶段：补契约测试
 
@@ -529,7 +540,7 @@
 
 1. frontmatter 权限测试
 2. prompt 工具使用策略测试
-3. `test/review/finish` 是否包含 spec/plan/预期偏离拦截要求的文案测试
+3. 非实现型 agent 是否包含 workflow artifact-only 写入边界文案测试
 4. 危险 git 命令未被误放开的测试
 
 ## 第三阶段：分发到多 CLI 目标
@@ -549,8 +560,7 @@
 1. `plan-agent` 能生成 plan/handoff，不再因写入被拦。
 2. `implement-agent` 能进行只读 git 探索，不再因 `branch/worktree/check-ignore/log` 被拦。
 3. `test-agent` 能写验证日志和 handoff，但不会被设计成修改实现代码。
-4. `review-agent` 能以 spec/plan 对齐为中心输出 blocker。
-5. `finish-agent` 在前序 gate 证据不足时会拒绝 finalize。
+4. 工具不可用时 agent 会返回 blocker / remediation，而不是降级为 bash 探索。
 
 # 风险与缓解
 
@@ -570,7 +580,7 @@
 - 在关键角色中重复出现相同策略
 - 对工具调用约束增加静态 prompt 契约测试
 
-## 风险 3：兼容逻辑移除判断不充分
+## 风险 3：（后续提案）兼容逻辑移除判断不充分
 
 缓解：
 
@@ -610,14 +620,13 @@
 
 # 最终建议
 
-本轮应采用“权限收敛 + prompt/tool policy 收敛 + gate 职责补强”的组合方案。
+本轮应采用“权限收敛 + prompt/tool policy 收敛”的组合方案。
 
 具体来说：
 
 1. 为 `plan-agent`、`test-agent`、`review-agent`、`finish-agent` 开启完成职责所需的写入能力。
 2. 为 `implement-agent` 和 `finish-agent` 补足安全只读 git 能力。
 3. 不把传统 bash 探索命令作为主要增量，而是统一要求优先使用 `sdlc-repository-memory-load`、`codegraph`、`Glob/Grep/Read`、`context7`、`tavily-search`、`headroom`。
-4. 明确 `test-agent`、`review-agent`、`finish-agent` 必须对“偏离 spec / 预期”的情况负责，而不是仅仅完成形式上的流程动作。
-5. 若 `_migrate_legacy_artifacts` 已对当前核心路径不再必要，应优先考虑移除，减少兼容负担。
+4. 将 gate 补强与 `_migrate_legacy_artifacts` 清理明确标记为后续提案，避免本轮范围漂移。
 
 这样做的结果不是“让所有权限都更大”，而是让每个角色获得足够但可控的能力，并且把真正重要的质量约束重新压实到对应 gate 上。

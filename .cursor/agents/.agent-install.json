@@ -1,14 +1,14 @@
 {
   "source_repo": "/Users/yuping/Documents/workspace/oh_my_skills",
-  "source_ref": "1a56363210e089ec348eb6cb1b0ad178947c1572",
-  "installed_at": "2026-06-30T04:36:48.593841+00:00",
+  "source_ref": "fcde3d35ae7902a253771a7d9e8ef8f8ed3c8bed",
+  "installed_at": "2026-06-30T05:12:25.969103+00:00",
   "status": "stable",
   "files": {
-    "dev-orchestrator.md": "5447e6a8add5487cec6ec3a5746be1db320fc4e9a0209ad1fd4729093a52698c",
-    "finish-agent.md": "e8493e07f65e7c9b1f7d3cffc73a69b4eefdd3266c42ea00b32e660c959de58d",
-    "implement-agent.md": "2035fe46a98ccb4616b3ad60ad879868667f6070e11d2567525e0544ecbfb5b4",
-    "plan-agent.md": "ff9ea1a0979d8dd6d3bfe29d5fe8b2177377a360921cec7ffc3afdc11f2258de",
-    "review-agent.md": "b68b05e5e9d1699daddf354526cb7eb1e8a45ccc6096dade91ffb80721597a19",
-    "test-agent.md": "bc7744efa2ad949693bf516c809e9a6652a992ab3059047a3aaa35fe606944fb"
+    "dev-orchestrator.md": "4d171ffee22d54af8d186165fcf7dc50c7f407d5c690e030512b6ac7354216e0",
+    "finish-agent.md": "a6d4f2f1e31f40877edb22afccc900f7c3773921c769574001ff7d386d072fdb",
+    "implement-agent.md": "5361d4c94a4a247f6a37b49b64d5d6ab473669613e7d73a3b2ab7e2d1979af8e",
+    "plan-agent.md": "5885d11fb71f86c1565343a80e5fd860e634efd29ea75d337114737c0cceb41e",
+    "review-agent.md": "b64d76a84864ded498307a952db4ec4af818b2114d2ecc9ae1c5de8559c976fc",
+    "test-agent.md": "a846d3d434e9a1bc345c472ba0b8c1c25385bb63c543cc43dbd1a8817a3766c9"
   }
 }

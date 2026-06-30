@@ -1,0 +1,225 @@
+{
+  "version": 1,
+  "run_id": "2026-06-30-subagent-permissions-and-tooling-design-optimization",
+  "workflow": "sdlc-main",
+  "flow_type": "lightweight-flow",
+  "status": "done",
+  "current_phase": "done",
+  "primary_subject": {
+    "type": "openspec_change",
+    "id": "subagent-permissions-and-tooling-design-optimization"
+  },
+  "context": {
+    "change_id": "subagent-permissions-and-tooling-design-optimization"
+  },
+  "phase_readiness": {
+    "phase": "done",
+    "ready": true,
+    "missing_required_inputs": []
+  },
+  "pending_hooks": [],
+  "completed_hooks": [
+    "roadmap_status_ready_if_linked",
+    "roadmap_apply_start_if_ready",
+    "roadmap_done_if_relevant",
+    "memory_sync"
+  ],
+  "completed_phases": [
+    "create_change",
+    "apply_change",
+    "archive_change",
+    "post_archive_actions"
+  ],
+  "gates": {},
+  "evidence": {
+    "openspec_status": {
+      "classification": "missing",
+      "source": null
+    },
+    "roadmap_link": {
+      "count": 0,
+      "items": []
+    },
+    "lightweight_flow_confirmed": true,
+    "agent_phase": {
+      "agent_phase": "archive_change",
+      "agent": "finish-agent",
+      "flow_type": "lightweight-flow",
+      "dispatched_at": "2026-06-30T14:12:01.934583",
+      "slice_id": "default"
+    },
+    "agent_result": {
+      "agent": "review-agent",
+      "status": "success",
+      "phase": "apply_change",
+      "slice_id": "default",
+      "flow_type": "lightweight-flow",
+      "evidence": {
+        "review_complete": true,
+        "verification_passed": true,
+        "focused_tests": [
+          {
+            "command": "python3 -m pytest tests/ -q --tb=short",
+            "result": "pass"
+          }
+        ]
+      },
+      "blockers": [],
+      "recorded_at": "2026-06-30T14:11:40.187014"
+    },
+    "agent_results": {
+      "default": {
+        "plan-agent": {
+          "agent": "plan-agent",
+          "status": "success",
+          "phase": "create_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "spec_artifacts_done": true,
+            "plan_produced": true,
+            "user_confirmation_required": false,
+            "plan_summary": {
+              "objective": "Refine the existing subagent permission/tooling proposal into an executable direction for goals 1-3 only: fewer meaningless authorization interruptions, preserved least privilege, and enforceable tool-preference rules with no bash exploration fallback.",
+              "recommended_approach": "Proceed with the proposal after four refinements: explicitly split goals 1-3 from later gate/legacy work, formalize `edit: allow` for non-implementation agents as artifact-only via prompt/test constraints, rewrite Tool Usage Policy into MUST-first rules with explicit exceptions/remediation and no bash fallback, and normalize remaining git permissions as observational only rather than an exploration path.",
+              "major_implementation_steps": [
+                "Trim or clearly defer sections related to gate strengthening and legacy cleanup so this change stays bounded to goals 1-3.",
+                "Update the permission matrix so non-implementation agents use `edit: allow` with explicit artifact-only write boundaries and no general repo editing authority.",
+                "Add a unified Tool Usage Policy with executable MUST-first rules for memory/codegraph, Glob/Grep/Read, context7, tavily, headroom, and mandatory skill invocation.",
+                "Add explicit exception/remediation language so doc-only work and known-file artifact work do not force unnecessary tool use, and unavailable/insufficient preferred tools produce blockers instead of bash degradation.",
+                "Define role-specific read-only git allowances strictly as observational workflow/repository inspection, not as codebase exploration fallback.",
+                "Back the prompt/frontmatter changes with contract tests and scenario-level review criteria."
+              ],
+              "focused_verification_strategy": [
+                "Assert frontmatter permissions and allowed observational git patterns per agent in `tests/test_wrapper_contracts.py`.",
+                "Assert prompt language for artifact-only write boundaries, MUST-first tool rules, explicit no-bash-degradation semantics, and remediation/blocker behavior.",
+                "Assert destructive git/shell commands remain blocked.",
+                "Review typical agent paths to confirm plan/test/review/finish can write required artifacts without meaningless auth interruptions and without reverting to bash exploration."
+              ],
+              "unresolved_decisions": []
+            },
+            "review_summary": {
+              "conclusion": "The design is now specific enough to proceed without another approval turn.",
+              "strengths": [
+                "Correctly identifies the contract-vs-permission mismatch for artifact-writing agents.",
+                "Uses the accepted least-privilege compromise: `edit: allow` plus prompt/test constraints instead of broader runtime changes.",
+                "Upgrades tooling policy from soft recommendations to enforceable behavior.",
+                "Removes bash exploration fallback entirely, which keeps policy aligned with high-level tools rather than shell habits."
+              ],
+              "recommended_design_refinements": [
+                "State near the top that this iteration implements only goals 1-3.",
+                "Explicitly define non-implementation-agent write authority as workflow-artifact-only despite `edit: allow`.",
+                "Rewrite Tool Usage Policy as decision rules with MUST/PREFER/ONLY-WHEN plus explicit exception and remediation behavior.",
+                "Define unavailable or insufficient preferred tools as blocker/remediation cases rather than justification for bash fallback.",
+                "Keep per-role git allowances specific and observational only."
+              ],
+              "non_blocking_risks": [
+                "Prompt-only boundaries can drift if prompt-contract tests are weak.",
+                "No-bash-degradation may expose more blockers when high-level tools are unavailable or misconfigured.",
+                "Too many MUST rules can bloat prompts unless exception language is concise and reused."
+              ],
+              "assumptions": [
+                "Canonical edits will be made in `agents/*.md` and then distributed to CLI-specific copies.",
+                "Static prompt/frontmatter contract tests are the primary enforcement mechanism for this iteration.",
+                "Gate-quality strengthening and legacy cleanup remain out of scope for this execution cycle."
+              ]
+            },
+            "focused_tests": [
+              {
+                "command": "tests/test_wrapper_contracts.py (frontmatter + prompt contract assertions)",
+                "result": "N/A - planning only"
+              },
+              {
+                "command": "Manual scenario review of typical agent paths for permission interruption regressions and no-bash-degradation behavior",
+                "result": "N/A - planning only"
+              }
+            ]
+          },
+          "blockers": [],
+          "recorded_at": "2026-06-30T13:03:15.096276"
+        },
+        "implement-agent": {
+          "agent": "implement-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "tasks_complete": true,
+            "tdd_passed": true,
+            "focused_tests": [
+              {
+                "command": "python3 -m pytest tests/test_wrapper_contracts.py -k \"plan_agent_edit_is_allow or test_agent_edit_is_allow or review_agent_edit_is_allow or finish_agent_edit_is_allow or all_agents_deny_generic_bash_fallback or implement_agent_allows_observational_git_only or finish_agent_allows_observational_git_completion_commands or non_implementation_agents_limit_writes_to_workflow_artifacts or subagents_define_must_first_tool_policy_without_bash_degradation\" -v",
+                "result": "fail"
+              },
+              {
+                "command": "python3 -m pytest tests/test_wrapper_contracts.py -k \"plan_agent_edit_is_allow or test_agent_edit_is_allow or review_agent_edit_is_allow or finish_agent_edit_is_allow or all_agents_deny_generic_bash_fallback or implement_agent_allows_observational_git_only or finish_agent_allows_observational_git_completion_commands or non_implementation_agents_limit_writes_to_workflow_artifacts or subagents_define_must_first_tool_policy_without_bash_degradation\" -v",
+                "result": "pass"
+              }
+            ]
+          },
+          "blockers": [],
+          "recorded_at": "2026-06-30T13:31:41.637685"
+        },
+        "test-agent": {
+          "agent": "test-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "verification_passed": true,
+            "overfit_check_passed": true,
+            "regression_passed": true,
+            "tdd_passed": true,
+            "focused_tests": [
+              {
+                "command": "python3 -m pytest tests/test_wrapper_contracts.py -k \"plan_agent_edit_is_allow or test_agent_edit_is_allow or review_agent_edit_is_allow or finish_agent_edit_is_allow or all_agents_deny_generic_bash_fallback or implement_agent_allows_observational_git_only or finish_agent_allows_observational_git_completion_commands or non_implementation_agents_limit_writes_to_workflow_artifacts or subagents_define_must_first_tool_policy_without_bash_degradation\" -v",
+                "result": "pass"
+              }
+            ]
+          },
+          "blockers": [],
+          "recorded_at": "2026-06-30T13:35:30.880187"
+        },
+        "review-agent": {
+          "agent": "review-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "review_complete": true,
+            "verification_passed": true,
+            "focused_tests": [
+              {
+                "command": "python3 -m pytest tests/ -q --tb=short",
+                "result": "pass"
+              }
+            ]
+          },
+          "blockers": [],
+          "recorded_at": "2026-06-30T14:11:40.187014"
+        }
+      }
+    },
+    "create_change_plan_approved": {
+      "agent": "plan-agent",
+      "slice_id": "default",
+      "plan_path": ".ai/workflows/runs/2026-06-30-subagent-permissions-and-tooling-design-optimization/plans/default/plan.md",
+      "handoff_path": ".ai/workflows/runs/2026-06-30-subagent-permissions-and-tooling-design-optimization/handoffs/default/plan-agent.md",
+      "bash_fallback_removed": true
+    },
+    "openspec_artifacts_done": true,
+    "tasks_complete": true,
+    "tdd_passed": true,
+    "eval_passed_or_human_decision_recorded": true,
+    "archive_path_exists": true,
+    "roadmap_hook_resolution": "no_linked_item",
+    "memory_sync_resolution": "not_needed",
+    "memory_sync_reason": "Lightweight-flow prompt-contract refinement only; durable repository facts are already expressed in canonical agent prompts, distributed copies, tests, and the design doc, so no additional repository-memory write is required before preserving the branch as-is.",
+    "pending_hooks_empty": true
+  },
+  "block": null,
+  "updated_at": "2026-06-30T14:23:37.612954"
+}

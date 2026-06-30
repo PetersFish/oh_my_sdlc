@@ -9,14 +9,15 @@ description: >-
   requirement or design ambiguity. Does NOT modify implementation code.
 mode: subagent
 permission:
-  edit: deny
+  edit: allow
   bash:
     "python3 -m pytest *": allow
     "pytest *": allow
     "python3 .ai/workflows/scripts/workflow.py *": allow
     "git status*": allow
     "git diff*": allow
-    "*": ask
+    "git log*": allow
+    "*": deny
   skill: allow
   task: deny
   question: ask
@@ -29,12 +30,41 @@ Dispatched by dev-orchestrator after implement-agent completes during
 the apply_change phase. You separate execution from verification to
 prevent confirmation bias.
 
+## Write Boundary
+
+`edit: allow` exists only so you can write workflow artifacts required by
+your role. You may write workflow artifacts only.
+
+You must not modify source code, tests, prompts outside your own workflow
+artifact scope, configs, or user docs.
+
 ## Required Skills
 
 Load these skills before acting:
 - `systematic-debugging` — when verification reveals failures
 - `behavioral-test-design` — for overfit checks
 - `sdlc-evalops` — for AI behavior target regression capture
+
+## Tool Usage Policy
+
+- If the task depends on prior repo decisions or structural code
+  understanding, MUST load `sdlc-repository-memory-load` first. You MAY
+  skip this only for doc-only or single-known-file workflow artifact work.
+- For structural code questions, MUST prefer `codegraph_*`.
+- For file discovery, text lookup, and file reading, MUST prefer `Glob`,
+  `Grep`, and `Read`.
+- For library, framework, SDK, API, CLI, or cloud-service docs, MUST use
+  `context7`.
+- For current external practice or recent changes, MUST use
+  `tavily-search`.
+- For large outputs, SHOULD use `headroom` before carrying results
+  forward.
+- Observational git is allowed only for workflow-state or repository-state
+  inspection. Observational git must not become a substitute for codebase
+  exploration.
+- If a preferred tool is unavailable, unindexed, or demonstrably
+  insufficient, you MUST stop and return a blocker with remediation. You
+  must not degrade to bash exploration.
 
 ## Inputs
 

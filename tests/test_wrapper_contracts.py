@@ -591,25 +591,63 @@ class TestAgentFrontmatter(unittest.TestCase):
             self.assertEqual(unknown, set(),
                            f"{name}: unknown frontmatter fields: {unknown}")
 
-    def test_plan_agent_edit_is_deny(self):
+    def test_plan_agent_edit_is_allow(self):
         fm = _read_agent_frontmatter(".opencode", "plan-agent")
-        self.assertEqual(fm["permission"]["edit"], "deny")
+        self.assertEqual(fm["permission"]["edit"], "allow")
 
     def test_implement_agent_edit_is_allow(self):
         fm = _read_agent_frontmatter(".opencode", "implement-agent")
         self.assertEqual(fm["permission"]["edit"], "allow")
 
-    def test_test_agent_edit_is_deny(self):
+    def test_test_agent_edit_is_allow(self):
         fm = _read_agent_frontmatter(".opencode", "test-agent")
-        self.assertEqual(fm["permission"]["edit"], "deny")
+        self.assertEqual(fm["permission"]["edit"], "allow")
 
-    def test_review_agent_edit_is_deny(self):
+    def test_review_agent_edit_is_allow(self):
         fm = _read_agent_frontmatter(".opencode", "review-agent")
-        self.assertEqual(fm["permission"]["edit"], "deny")
+        self.assertEqual(fm["permission"]["edit"], "allow")
 
-    def test_finish_agent_edit_is_ask(self):
+    def test_finish_agent_edit_is_allow(self):
         fm = _read_agent_frontmatter(".opencode", "finish-agent")
-        self.assertEqual(fm["permission"]["edit"], "ask")
+        self.assertEqual(fm["permission"]["edit"], "allow")
+
+    def test_all_agents_deny_generic_bash_fallback(self):
+        for name in AGENT_NAMES:
+            fm = _read_agent_frontmatter(".opencode", name)
+            bash_rules = fm["permission"].get("bash", {})
+            if isinstance(bash_rules, dict):
+                self.assertEqual(
+                    bash_rules.get("*"),
+                    "deny",
+                    f"{name}: generic bash fallback must be denied",
+                )
+
+    def test_implement_agent_allows_observational_git_only(self):
+        fm = _read_agent_frontmatter(".opencode", "implement-agent")
+        bash_rules = fm["permission"].get("bash", {})
+        for command in (
+            "git status*",
+            "git diff*",
+            "git log*",
+            "git branch*",
+            "git worktree*",
+            "git check-ignore*",
+        ):
+            self.assertEqual(
+                bash_rules.get(command),
+                "allow",
+                f"implement-agent missing observational git allow for {command}",
+            )
+
+    def test_finish_agent_allows_observational_git_completion_commands(self):
+        fm = _read_agent_frontmatter(".opencode", "finish-agent")
+        bash_rules = fm["permission"].get("bash", {})
+        for command in ("git status*", "git diff*", "git log*", "git branch*", "git worktree*"):
+            self.assertEqual(
+                bash_rules.get(command),
+                "allow",
+                f"finish-agent missing observational git allow for {command}",
+            )
 
     def test_all_agents_have_workflow_py_bash_allow(self):
         for name in AGENT_NAMES:
@@ -768,6 +806,31 @@ class TestAgentPromptBody(unittest.TestCase):
     def test_review_agent_waits_for_test_evidence(self):
         body = self._read_agent_body("review-agent")
         self.assertIn("verification_passed", body)
+
+    def test_non_implementation_agents_limit_writes_to_workflow_artifacts(self):
+        for name in ("plan-agent", "test-agent", "review-agent", "finish-agent"):
+            body = self._read_agent_body(name).lower()
+            self.assertIn("workflow artifact", body, f"{name}: missing workflow artifact boundary")
+            self.assertIn("must not modify source", body, f"{name}: missing source-edit prohibition")
+
+    def test_subagents_define_must_first_tool_policy_without_bash_degradation(self):
+        required_markers = (
+            "sdlc-repository-memory-load",
+            "codegraph",
+            "glob",
+            "grep",
+            "read",
+            "context7",
+            "tavily-search",
+            "headroom",
+            "must stop and return a blocker",
+            "must not degrade to bash exploration",
+            "observational git",
+        )
+        for name in AGENT_SUBAGENTS:
+            body = self._read_agent_body(name).lower()
+            for marker in required_markers:
+                self.assertIn(marker, body, f"{name}: missing tool-policy marker {marker!r}")
 
 
 class TestExecutableRoutingTests(unittest.TestCase):
