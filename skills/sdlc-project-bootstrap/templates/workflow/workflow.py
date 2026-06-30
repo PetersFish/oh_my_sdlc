@@ -11,6 +11,7 @@ import datetime
 import hashlib
 import json
 import os
+import shutil
 import sys
 import time
 import yaml
@@ -97,7 +98,7 @@ def _clear_pointer(root):
 
 
 def _active_path(root, run_id):
-    return _resolve_path(root, f".ai/workflows/runs/active/{run_id}.json")
+    return _resolve_path(root, f".ai/workflows/runs/active/{run_id}/run.json")
 
 
 def load_run_state(root, run_id=None):
@@ -105,6 +106,7 @@ def load_run_state(root, run_id=None):
         path = _active_path(root, run_id)
         if not os.path.exists(path):
             return None
+        _migrate_legacy_artifacts(root, run_id)
         with open(path, "r") as f:
             return json.load(f)
     pointer = _read_pointer(root)
@@ -113,6 +115,7 @@ def load_run_state(root, run_id=None):
     path = _active_path(root, pointer["run_id"])
     if not os.path.exists(path):
         return None
+    _migrate_legacy_artifacts(root, pointer["run_id"])
     with open(path, "r") as f:
         return json.load(f)
 
@@ -122,14 +125,17 @@ def _list_active_runs(root):
     if not os.path.isdir(active_dir):
         return []
     results = []
-    for fname in _list_dirs(active_dir):
-        if not fname.endswith(".json"):
+    for entry in _list_dirs(active_dir):
+        entry_path = os.path.join(active_dir, entry)
+        if not os.path.isdir(entry_path):
             continue
-        active_path_file = os.path.join(active_dir, fname)
+        run_json_path = os.path.join(entry_path, "run.json")
+        if not os.path.isfile(run_json_path):
+            continue
         try:
-            with open(active_path_file, "r") as f:
+            with open(run_json_path, "r") as f:
                 state = json.load(f)
-            results.append((state.get("run_id", fname.replace(".json", "")), state))
+            results.append((state.get("run_id", entry), state))
         except Exception:
             continue
     return results
@@ -144,6 +150,51 @@ def _find_active_run_by_subject(root, subject_type, subject_id):
     return None
 
 
+def _migrate_legacy_artifacts(root, run_id):
+    """Migrate legacy top-level handoffs/ and logs/ into the run directory."""
+    active_dir = _resolve_path(root, f".ai/workflows/runs/active/{run_id}")
+    runs_dir = _resolve_path(root, ".ai/workflows/runs")
+
+    # Sentinel to prevent re-migration
+    sentinel = os.path.join(active_dir, ".migrated")
+    if os.path.exists(sentinel):
+        return
+
+    # Migrate handoffs
+    legacy_handoffs = os.path.join(runs_dir, "handoffs", run_id)
+    target_handoffs = os.path.join(active_dir, "handoffs")
+    if os.path.isdir(legacy_handoffs):
+        _ensure_dir(target_handoffs)
+        for item in os.listdir(legacy_handoffs):
+            src = os.path.join(legacy_handoffs, item)
+            dst = os.path.join(target_handoffs, item)
+            if not os.path.exists(dst):
+                shutil.move(src, dst)
+        try:
+            os.rmdir(legacy_handoffs)
+        except OSError:
+            pass
+
+    # Migrate logs
+    legacy_logs = os.path.join(runs_dir, "logs", run_id)
+    target_logs = os.path.join(active_dir, "logs")
+    if os.path.isdir(legacy_logs):
+        _ensure_dir(target_logs)
+        for item in os.listdir(legacy_logs):
+            src = os.path.join(legacy_logs, item)
+            dst = os.path.join(target_logs, item)
+            if not os.path.exists(dst):
+                shutil.move(src, dst)
+        try:
+            os.rmdir(legacy_logs)
+        except OSError:
+            pass
+
+    # Create sentinel
+    with open(sentinel, "w") as f:
+        f.write(_ts())
+
+
 def _json_default(obj):
     if isinstance(obj, (datetime.date, datetime.datetime)):
         return obj.isoformat()
@@ -154,6 +205,7 @@ def save_run_state(root, state):
     run_id = state["run_id"]
     path = _active_path(root, run_id)
     _ensure_dir(os.path.dirname(path))
+    _migrate_legacy_artifacts(root, run_id)
     state["updated_at"] = _ts()
     with open(path, "w") as f:
         json.dump(state, f, indent=2, default=_json_default)
@@ -161,7 +213,7 @@ def save_run_state(root, state):
 
 
 def _finalize_run_to_history(root, state):
-    """Mark an active run done, move it to history, and remove the active file."""
+    """Mark an active run done, move it to history, and remove the active directory."""
     state = dict(state)
     state["status"] = "done"
     state["current_phase"] = "done"
@@ -174,15 +226,22 @@ def _finalize_run_to_history(root, state):
     state["block"] = None
     state["updated_at"] = _ts()
 
-    history_dir = _resolve_path(root, ".ai/workflows/runs/history/")
-    _ensure_dir(history_dir)
-    history_path = os.path.join(history_dir, f"{state['run_id']}.json")
-    with open(history_path, "w") as f:
+    run_id = state["run_id"]
+    active_dir = _resolve_path(root, f".ai/workflows/runs/active/{run_id}")
+    history_dir = _resolve_path(root, f".ai/workflows/runs/history/{run_id}")
+
+    # Write updated state to run.json inside active directory
+    _ensure_dir(active_dir)
+    with open(os.path.join(active_dir, "run.json"), "w") as f:
         json.dump(state, f, indent=2)
 
-    active_path = _active_path(root, state["run_id"])
-    if os.path.exists(active_path):
-        os.remove(active_path)
+    # Ensure history parent exists
+    _ensure_dir(os.path.dirname(history_dir))
+
+    # Move entire directory
+    if os.path.exists(history_dir):
+        shutil.rmtree(history_dir)
+    shutil.move(active_dir, history_dir)
 
     pointer = _read_pointer(root)
     if pointer and pointer.get("run_id") == state["run_id"]:
@@ -465,12 +524,15 @@ def _load_done_history_run_ids(root):
     history_dir = _resolve_path(root, ".ai/workflows/runs/history")
     if not os.path.isdir(history_dir):
         return governed
-    for fname in _list_dirs(history_dir):
-        if not fname.endswith(".json"):
+    for entry in _list_dirs(history_dir):
+        entry_path = os.path.join(history_dir, entry)
+        if not os.path.isdir(entry_path):
             continue
-        hpath = os.path.join(history_dir, fname)
+        run_json_path = os.path.join(entry_path, "run.json")
+        if not os.path.isfile(run_json_path):
+            continue
         try:
-            with open(hpath, "r") as f:
+            with open(run_json_path, "r") as f:
                 hist = json.load(f)
         except Exception:
             continue
@@ -1970,9 +2032,9 @@ def cmd_cancel_run(root, args):
     if pointer and pointer.get("run_id") == run_id:
         _clear_pointer(root)
 
-    active_path = _active_path(root, run_id)
-    if os.path.exists(active_path):
-        os.remove(active_path)
+    active_dir = _resolve_path(root, f".ai/workflows/runs/active/{run_id}")
+    if os.path.exists(active_dir):
+        shutil.rmtree(active_dir)
 
     print(json.dumps({"status": "cancelled", "run_id": run_id, "reason": reason}))
 
@@ -2106,16 +2168,19 @@ def cmd_advance(root, args):
                 sys.exit(1)
 
         state["status"] = "done"
-        history_dir = _resolve_path(root, ".ai/workflows/runs/history/")
-        _ensure_dir(history_dir)
-        history_path = os.path.join(history_dir, f"{state['run_id']}.json")
-        with open(history_path, "w") as f:
+        run_id = state["run_id"]
+        active_dir = _resolve_path(root, f".ai/workflows/runs/active/{run_id}")
+        history_dir = _resolve_path(root, f".ai/workflows/runs/history/{run_id}")
+
+        # Write final state to run.json
+        _ensure_dir(active_dir)
+        with open(os.path.join(active_dir, "run.json"), "w") as f:
             json.dump(state, f, indent=2)
 
-        run_id = state["run_id"]
-        active_path = _active_path(root, run_id)
-        if os.path.exists(active_path):
-            os.remove(active_path)
+        _ensure_dir(os.path.dirname(history_dir))
+        if os.path.exists(history_dir):
+            shutil.rmtree(history_dir)
+        shutil.move(active_dir, history_dir)
         _clear_pointer(root)
 
         print(json.dumps(state, indent=2))
@@ -2204,16 +2269,19 @@ def cmd_done(root, args):
     state["status"] = "done"
     state["updated_at"] = _ts()
 
-    history_dir = _resolve_path(root, ".ai/workflows/runs/history/")
-    _ensure_dir(history_dir)
-    history_path = os.path.join(history_dir, f"{state['run_id']}.json")
-    with open(history_path, "w") as f:
+    run_id = state["run_id"]
+    active_dir = _resolve_path(root, f".ai/workflows/runs/active/{run_id}")
+    history_dir = _resolve_path(root, f".ai/workflows/runs/history/{run_id}")
+
+    # Write final state to run.json
+    _ensure_dir(active_dir)
+    with open(os.path.join(active_dir, "run.json"), "w") as f:
         json.dump(state, f, indent=2)
 
-    run_id = state["run_id"]
-    active_path = _active_path(root, run_id)
-    if os.path.exists(active_path):
-        os.remove(active_path)
+    _ensure_dir(os.path.dirname(history_dir))
+    if os.path.exists(history_dir):
+        shutil.rmtree(history_dir)
+    shutil.move(active_dir, history_dir)
     _clear_pointer(root)
 
     print(json.dumps(state, indent=2))
@@ -2238,12 +2306,16 @@ def cmd_governance_check(root, args):
             governed_roadmap_ids.add(ps["id"])
 
     if os.path.isdir(history_dir):
-        for fname in _list_dirs(history_dir):
-            if not fname.endswith(".json"):
+        for entry in _list_dirs(history_dir):
+            entry_path = os.path.join(history_dir, entry)
+            if not os.path.isdir(entry_path):
                 continue
-            hpath = os.path.join(history_dir, fname)
+            # New-style: history/<run_id>/run.json
+            run_json_path = os.path.join(entry_path, "run.json")
+            if not os.path.isfile(run_json_path):
+                continue
             try:
-                with open(hpath, "r") as f:
+                with open(run_json_path, "r") as f:
                     hist = json.load(f)
             except Exception:
                 continue
@@ -2470,12 +2542,15 @@ def cmd_governance_check(root, args):
             if cid:
                 governed_roadmap_change_ids.add(cid)
     if os.path.isdir(history_dir):
-        for fname in _list_dirs(history_dir):
-            if not fname.endswith(".json"):
+        for entry in _list_dirs(history_dir):
+            entry_path = os.path.join(history_dir, entry)
+            if not os.path.isdir(entry_path):
                 continue
-            hpath = os.path.join(history_dir, fname)
+            run_json_path = os.path.join(entry_path, "run.json")
+            if not os.path.isfile(run_json_path):
+                continue
             try:
-                with open(hpath, "r") as f:
+                with open(run_json_path, "r") as f:
                     hist = json.load(f)
             except Exception:
                 continue

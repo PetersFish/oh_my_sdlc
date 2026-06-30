@@ -111,29 +111,29 @@ class FixtureBase(unittest.TestCase):
         pointer = load_json(self.tmp, ".ai/workflows/runs/current.json")
         if not pointer or not pointer.get("run_id"):
             return None
-        return load_json(self.tmp, f".ai/workflows/runs/active/{pointer['run_id']}.json")
+        return load_json(self.tmp, f".ai/workflows/runs/active/{pointer['run_id']}/run.json")
 
     def _write_current_state(self, state):
         run_id = state["run_id"]
-        active_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "active")
+        active_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "active", run_id)
         os.makedirs(active_dir, exist_ok=True)
-        with open(os.path.join(active_dir, f"{run_id}.json"), "w") as f:
+        with open(os.path.join(active_dir, "run.json"), "w") as f:
             json.dump(state, f)
         pointer_path = os.path.join(self.tmp, ".ai", "workflows", "runs", "current.json")
         with open(pointer_path, "w") as f:
             json.dump({"run_id": run_id}, f)
 
     def _read_active_file(self, run_id):
-        return load_json(self.tmp, f".ai/workflows/runs/active/{run_id}.json")
+        return load_json(self.tmp, f".ai/workflows/runs/active/{run_id}/run.json")
 
     def _read_history(self, run_id):
-        return load_json(self.tmp, f".ai/workflows/runs/history/{run_id}.json")
+        return load_json(self.tmp, f".ai/workflows/runs/history/{run_id}/run.json")
 
     def _make_active_roadmap_run(self, item_id, change_id, current_phase="apply_change"):
         runs_dir = os.path.join(self.tmp, ".ai", "workflows", "runs")
         active_dir = os.path.join(runs_dir, "active")
-        os.makedirs(active_dir, exist_ok=True)
         run_id = f"2026-06-20-{item_id}"
+        os.makedirs(os.path.join(active_dir, run_id), exist_ok=True)
         state = {
             "version": 1,
             "run_id": run_id,
@@ -151,7 +151,7 @@ class FixtureBase(unittest.TestCase):
             "block": None,
             "updated_at": "2026-06-20T00:00:00",
         }
-        with open(os.path.join(active_dir, f"{run_id}.json"), "w") as f:
+        with open(os.path.join(active_dir, run_id, "run.json"), "w") as f:
             json.dump(state, f)
         return run_id
 
@@ -520,7 +520,7 @@ class TestPostArchiveHooks(FixtureBase):
         data = json.loads(out)
         self.assertEqual(data["evidence"]["roadmap_hook_resolution"], "done")
         self.assertEqual(data["evidence"]["roadmap_item_run_finalized"], roadmap_run_id)
-        self.assertFalse(os.path.exists(os.path.join(self.tmp, ".ai", "workflows", "runs", "active", f"{roadmap_run_id}.json")))
+        self.assertFalse(os.path.exists(os.path.join(self.tmp, ".ai", "workflows", "runs", "active", roadmap_run_id)))
         self.assertIsNotNone(self._read_history(roadmap_run_id))
 
     def test_roadmap_done_hook_does_not_recreate_current_run_after_finalizing_itself(self):
@@ -789,7 +789,7 @@ class TestPostArchiveHooks(FixtureBase):
                     pointer_path = os.path.join(tmp, ".ai/workflows/runs/current.json")
                     with open(pointer_path, "r") as f:
                         pointer = json.load(f)
-                    active_path = os.path.join(tmp, ".ai/workflows/runs/active", f"{pointer['run_id']}.json")
+                    active_path = os.path.join(tmp, ".ai/workflows/runs/active", pointer["run_id"], "run.json")
                     with open(active_path, "r") as f:
                         s = json.load(f)
                     s.setdefault("pending_hooks", []).append("roadmap_done_if_relevant")
@@ -943,8 +943,8 @@ class TestDone(FixtureBase):
         self.assertEqual(rc, 0)
         data = json.loads(out)
         self.assertEqual(data["status"], "done")
-        # Active file should be removed
-        active_path = os.path.join(self.tmp, ".ai", "workflows", "runs", "active", f"{run_id}.json")
+        # Active directory should be removed
+        active_path = os.path.join(self.tmp, ".ai", "workflows", "runs", "active", run_id)
         self.assertFalse(os.path.exists(active_path))
         # Pointer should be cleared
         pointer = self._read_current_state()
@@ -1254,8 +1254,8 @@ class TestGovernanceCheck(FixtureBase):
             "updated_at": "2026-06-20T00:00:00",
         }
         active_dir = os.path.join(runs_dir, "active")
-        os.makedirs(active_dir, exist_ok=True)
-        with open(os.path.join(active_dir, f"{run_id}.json"), "w") as f:
+        os.makedirs(os.path.join(active_dir, run_id), exist_ok=True)
+        with open(os.path.join(active_dir, run_id, "run.json"), "w") as f:
             json.dump(state, f)
         pointer_path = os.path.join(runs_dir, "current.json")
         with open(pointer_path, "w") as f:
@@ -1263,7 +1263,6 @@ class TestGovernanceCheck(FixtureBase):
 
     def _make_done_history_run(self, change_id):
         hist_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "history")
-        os.makedirs(hist_dir, exist_ok=True)
         state = {
             "version": 1,
             "run_id": f"2026-06-20-{change_id}",
@@ -1284,12 +1283,13 @@ class TestGovernanceCheck(FixtureBase):
             "block": None,
             "updated_at": "2026-06-20T00:00:00",
         }
-        with open(os.path.join(hist_dir, f"{state['run_id']}.json"), "w") as f:
+        run_dir = os.path.join(hist_dir, state["run_id"])
+        os.makedirs(run_dir, exist_ok=True)
+        with open(os.path.join(run_dir, "run.json"), "w") as f:
             json.dump(state, f)
 
     def _make_done_roadmap_history_run(self, item_id, change_id):
         hist_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "history")
-        os.makedirs(hist_dir, exist_ok=True)
         state = {
             "version": 1,
             "run_id": f"2026-06-20-{item_id}",
@@ -1310,7 +1310,9 @@ class TestGovernanceCheck(FixtureBase):
             "block": None,
             "updated_at": "2026-06-20T00:00:00",
         }
-        with open(os.path.join(hist_dir, f"{state['run_id']}.json"), "w") as f:
+        run_dir = os.path.join(hist_dir, state["run_id"])
+        os.makedirs(run_dir, exist_ok=True)
+        with open(os.path.join(run_dir, "run.json"), "w") as f:
             json.dump(state, f)
 
     # 3.2: clean state returns block=false
@@ -1451,8 +1453,8 @@ class TestGovernanceCheck(FixtureBase):
             "updated_at": "2026-06-20T00:00:00",
         }
         active_dir = os.path.join(runs_dir, "active")
-        os.makedirs(active_dir, exist_ok=True)
-        with open(os.path.join(active_dir, f"{run_id}.json"), "w") as f:
+        os.makedirs(os.path.join(active_dir, run_id), exist_ok=True)
+        with open(os.path.join(active_dir, run_id, "run.json"), "w") as f:
             json.dump(state, f)
         with open(os.path.join(runs_dir, "current.json"), "w") as f:
             json.dump({"run_id": run_id}, f)
@@ -1593,7 +1595,8 @@ class TestPreflightAndEnsureRun(FixtureBase):
 
     def test_preflight_openspec_create_with_done_history_allows(self):
         hist_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "history")
-        os.makedirs(hist_dir, exist_ok=True)
+        run_dir = os.path.join(hist_dir, "2026-06-20-hist-change")
+        os.makedirs(run_dir, exist_ok=True)
         state = {
             "version": 1,
             "run_id": "2026-06-20-hist-change",
@@ -1607,7 +1610,7 @@ class TestPreflightAndEnsureRun(FixtureBase):
             "completed_phases": [], "gates": {}, "evidence": {},
             "block": None, "updated_at": "2026-06-20T00:00:00",
         }
-        with open(os.path.join(hist_dir, "2026-06-20-hist-change.json"), "w") as f:
+        with open(os.path.join(run_dir, "run.json"), "w") as f:
             json.dump(state, f)
         rc, data, _ = self._run_preflight(
             "openspec_create",
@@ -1650,7 +1653,8 @@ class TestPreflightAndEnsureRun(FixtureBase):
     def test_preflight_dangling_archive_repair_with_done_history_allows(self):
         self._make_openspec_archive("done-arch", "2026-06-20")
         hist_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "history")
-        os.makedirs(hist_dir, exist_ok=True)
+        run_dir = os.path.join(hist_dir, "2026-06-20-done-arch")
+        os.makedirs(run_dir, exist_ok=True)
         state = {
             "version": 1,
             "run_id": "2026-06-20-done-arch",
@@ -1664,7 +1668,7 @@ class TestPreflightAndEnsureRun(FixtureBase):
             "completed_phases": [], "gates": {}, "evidence": {},
             "block": None, "updated_at": "2026-06-20T00:00:00",
         }
-        with open(os.path.join(hist_dir, "2026-06-20-done-arch.json"), "w") as f:
+        with open(os.path.join(run_dir, "run.json"), "w") as f:
             json.dump(state, f)
         rc, data, _ = self._run_preflight(
             "dangling_archive_repair",
@@ -1743,7 +1747,8 @@ class TestPreflightAndEnsureRun(FixtureBase):
     def test_ensure_run_skips_when_done_history_exists(self):
         self._make_openspec_archive("done-ens", "2026-06-20")
         hist_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "history")
-        os.makedirs(hist_dir, exist_ok=True)
+        run_dir = os.path.join(hist_dir, "2026-06-20-done-ens")
+        os.makedirs(run_dir, exist_ok=True)
         state = {
             "version": 1,
             "run_id": "2026-06-20-done-ens",
@@ -1757,7 +1762,7 @@ class TestPreflightAndEnsureRun(FixtureBase):
             "completed_phases": [], "gates": {}, "evidence": {},
             "block": None, "updated_at": "2026-06-20T00:00:00",
         }
-        with open(os.path.join(hist_dir, "2026-06-20-done-ens.json"), "w") as f:
+        with open(os.path.join(run_dir, "run.json"), "w") as f:
             json.dump(state, f)
         rc, data, _ = self._run_ensure_run(
             "dangling_archive_repair",
@@ -1999,11 +2004,15 @@ class TestPreflightAndEnsureRun(FixtureBase):
             return []
         results = []
         for fname in sorted(os.listdir(active_dir)):
-            if not fname.endswith(".json"):
+            entry_path = os.path.join(active_dir, fname)
+            if not os.path.isdir(entry_path):
                 continue
-            with open(os.path.join(active_dir, fname), "r") as f:
+            run_json = os.path.join(entry_path, "run.json")
+            if not os.path.isfile(run_json):
+                continue
+            with open(run_json, "r") as f:
                 state = json.load(f)
-            results.append((state.get("run_id", fname.replace(".json", "")), state))
+            results.append((state.get("run_id", fname), state))
         return results
 
     # --- canonical-run promotion: openspec_create finds linked roadmap_item run ---
@@ -2021,8 +2030,9 @@ class TestPreflightAndEnsureRun(FixtureBase):
             if "RM-PROMO-001" in _run_id:
                 state["context"]["change_id"] = "promo-change"
                 state["current_phase"] = "create_change"
-                active_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "active")
-                with open(os.path.join(active_dir, f"{_run_id}.json"), "w") as f:
+                active_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "active", _run_id)
+                os.makedirs(active_dir, exist_ok=True)
+                with open(os.path.join(active_dir, "run.json"), "w") as f:
                     json.dump(state, f)
                 break
         # Now preflight openspec_create for the promoted change
@@ -2047,8 +2057,9 @@ class TestPreflightAndEnsureRun(FixtureBase):
         for _run_id, state in active_runs:
             if "RM-PROMO-002" in _run_id:
                 state["current_phase"] = "create_change"
-                active_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "active")
-                with open(os.path.join(active_dir, f"{_run_id}.json"), "w") as f:
+                active_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "active", _run_id)
+                os.makedirs(active_dir, exist_ok=True)
+                with open(os.path.join(active_dir, "run.json"), "w") as f:
                     json.dump(state, f)
                 break
         # Preflight without context.change_id set (frontmatter-only link)
@@ -2136,9 +2147,9 @@ class TestCancelRun(FixtureBase):
         )
         self.assertEqual(rc, 0)
 
-        # No history file should be written
+        # No history directory should exist for the cancelled run
         hist_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "history")
-        hist_file = os.path.join(hist_dir, f"{run_id}.json")
+        hist_file = os.path.join(hist_dir, run_id, "run.json")
         self.assertFalse(os.path.exists(hist_file))
 
     def test_cancel_run_missing_run_reports_not_found(self):
@@ -2155,12 +2166,17 @@ class TestCancelRun(FixtureBase):
     def _find_active_file(self, subject_id):
         active_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "active")
         for fname in sorted(os.listdir(active_dir)):
-            fpath = os.path.join(active_dir, fname)
-            with open(fpath) as f:
+            entry_path = os.path.join(active_dir, fname)
+            if not os.path.isdir(entry_path):
+                continue
+            run_json = os.path.join(entry_path, "run.json")
+            if not os.path.isfile(run_json):
+                continue
+            with open(run_json) as f:
                 state = json.load(f)
             ps = state.get("primary_subject", {})
             if ps.get("id") == subject_id:
-                return fpath
+                return entry_path
         return None
 
 
@@ -2241,8 +2257,8 @@ class TestGovernanceCheckExtended(FixtureBase):
             "gates": {}, "evidence": {}, "block": None, "updated_at": "",
         }
         active_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "active")
-        os.makedirs(active_dir, exist_ok=True)
-        with open(os.path.join(active_dir, f"{rm_run_id}.json"), "w") as f:
+        os.makedirs(os.path.join(active_dir, rm_run_id), exist_ok=True)
+        with open(os.path.join(active_dir, rm_run_id, "run.json"), "w") as f:
             json.dump(rm_state, f)
 
         # Manually create an openspec_change run for the same change
@@ -2256,7 +2272,8 @@ class TestGovernanceCheckExtended(FixtureBase):
             "pending_hooks": [], "completed_hooks": [], "completed_phases": [],
             "gates": {}, "evidence": {}, "block": None, "updated_at": "",
         }
-        with open(os.path.join(active_dir, f"{oc_run_id}.json"), "w") as f:
+        os.makedirs(os.path.join(active_dir, oc_run_id), exist_ok=True)
+        with open(os.path.join(active_dir, oc_run_id, "run.json"), "w") as f:
             json.dump(oc_state, f)
 
         rc, out, _ = run_workflow(self.tmp, "governance-check")
@@ -2272,11 +2289,15 @@ class TestGovernanceCheckExtended(FixtureBase):
             return []
         results = []
         for fname in sorted(os.listdir(active_dir)):
-            if not fname.endswith(".json"):
+            entry_path = os.path.join(active_dir, fname)
+            if not os.path.isdir(entry_path):
                 continue
-            with open(os.path.join(active_dir, fname), "r") as f:
+            run_json = os.path.join(entry_path, "run.json")
+            if not os.path.isfile(run_json):
+                continue
+            with open(run_json, "r") as f:
                 state = json.load(f)
-            results.append((state.get("run_id", fname.replace(".json", "")), state))
+            results.append((state.get("run_id", fname), state))
         return results
 
 
@@ -2467,8 +2488,8 @@ class TestConcurrentRuns(FixtureBase):
         data = json.loads(out)
         self.assertEqual(data["status"], "done")
 
-        # Active file should be removed
-        active_path = os.path.join(self.tmp, ".ai", "workflows", "runs", "active", f"{run_id}.json")
+        # Active directory should be removed
+        active_path = os.path.join(self.tmp, ".ai", "workflows", "runs", "active", run_id)
         self.assertFalse(os.path.exists(active_path))
 
         # Pointer should be cleared
@@ -2499,8 +2520,8 @@ class TestConcurrentRuns(FixtureBase):
         for run_id, state in active_runs:
             if "gc-multi-a" in run_id:
                 state["pending_hooks"] = ["memory_sync"]
-                active_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "active")
-                with open(os.path.join(active_dir, f"{run_id}.json"), "w") as f:
+                active_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "active", run_id)
+                with open(os.path.join(active_dir, "run.json"), "w") as f:
                     json.dump(state, f)
 
         rc, out, _ = run_workflow(self.tmp, "governance-check")
@@ -2584,11 +2605,15 @@ class TestConcurrentRuns(FixtureBase):
             return []
         results = []
         for fname in sorted(os.listdir(active_dir)):
-            if not fname.endswith(".json"):
+            entry_path = os.path.join(active_dir, fname)
+            if not os.path.isdir(entry_path):
                 continue
-            with open(os.path.join(active_dir, fname), "r") as f:
+            run_json = os.path.join(entry_path, "run.json")
+            if not os.path.isfile(run_json):
+                continue
+            with open(run_json, "r") as f:
                 state = json.load(f)
-            results.append((state.get("run_id", fname.replace(".json", "")), state))
+            results.append((state.get("run_id", fname), state))
         return results
 
 
@@ -2739,7 +2764,9 @@ class TestFlowType(FixtureBase):
             "block": None,
             "updated_at": "",
         }
-        with open(os.path.join(active_dir, "2026-06-26-no-ft.json"), "w") as f:
+        run_dir = os.path.join(active_dir, "2026-06-26-no-ft")
+        os.makedirs(run_dir, exist_ok=True)
+        with open(os.path.join(run_dir, "run.json"), "w") as f:
             json.dump(state, f)
         pointer_path = os.path.join(rdir, "current.json")
         with open(pointer_path, "w") as f:
@@ -2752,7 +2779,6 @@ class TestFlowType(FixtureBase):
     def test_validate_rejects_unsupported_flow_type(self):
         rdir = os.path.join(self.tmp, ".ai", "workflows", "runs")
         active_dir = os.path.join(rdir, "active")
-        os.makedirs(active_dir, exist_ok=True)
         state = {
             "version": 1,
             "run_id": "2026-06-26-bad-ft",
@@ -2771,7 +2797,9 @@ class TestFlowType(FixtureBase):
             "block": None,
             "updated_at": "",
         }
-        with open(os.path.join(active_dir, "2026-06-26-bad-ft.json"), "w") as f:
+        run_dir = os.path.join(active_dir, "2026-06-26-bad-ft")
+        os.makedirs(run_dir, exist_ok=True)
+        with open(os.path.join(run_dir, "run.json"), "w") as f:
             json.dump(state, f)
         pointer_path = os.path.join(rdir, "current.json")
         with open(pointer_path, "w") as f:
@@ -2901,7 +2929,7 @@ class TestEvidenceKeyValidation(FixtureBase):
                 subject_id="evk-missing",
             )
             state = load_json(tc, ".ai/workflows/runs/current.json")
-            active = load_json(tc, f".ai/workflows/runs/active/{state['run_id']}.json")
+            active = load_json(tc, f".ai/workflows/runs/active/{state['run_id']}/run.json")
 
             # Add evidence_keys to the current phase definition and clear exit criteria
             wf_path = os.path.join(tc, ".ai", "workflows", "definitions", "sdlc-main.yaml")
@@ -2937,10 +2965,10 @@ class TestEvidenceKeyValidation(FixtureBase):
                 subject_id="evk-empty",
             )
             state = load_json(tc, ".ai/workflows/runs/current.json")
-            active = load_json(tc, f".ai/workflows/runs/active/{state['run_id']}.json")
+            active = load_json(tc, f".ai/workflows/runs/active/{state['run_id']}/run.json")
 
             # Record evidence with empty value
-            active_path = os.path.join(tc, ".ai", "workflows", "runs", "active", f"{state['run_id']}.json")
+            active_path = os.path.join(tc, ".ai", "workflows", "runs", "active", f"{state['run_id']}/run.json")
             active["evidence"]["required_key"] = ""
             with open(active_path, "w") as f:
                 json.dump(active, f)
@@ -2981,8 +3009,8 @@ class TestEvidenceKeyValidation(FixtureBase):
                 subject_id="evk-ok",
             )
             state = load_json(tc, ".ai/workflows/runs/current.json")
-            active = load_json(tc, f".ai/workflows/runs/active/{state['run_id']}.json")
-            active_path = os.path.join(tc, ".ai", "workflows", "runs", "active", f"{state['run_id']}.json")
+            active = load_json(tc, f".ai/workflows/runs/active/{state['run_id']}/run.json")
+            active_path = os.path.join(tc, ".ai", "workflows", "runs", "active", f"{state['run_id']}/run.json")
 
             # Use a phase with no exit_criteria (or just evidence_keys) so we can test evidence gate alone
             current = active["current_phase"]
@@ -3035,8 +3063,8 @@ class TestEvidenceKeyValidation(FixtureBase):
                         subject_id=f"falsy-{key}",
                     )
                     state = load_json(tc, ".ai/workflows/runs/current.json")
-                    active = load_json(tc, f".ai/workflows/runs/active/{state['run_id']}.json")
-                    active_path = os.path.join(tc, ".ai", "workflows", "runs", "active", f"{state['run_id']}.json")
+                    active = load_json(tc, f".ai/workflows/runs/active/{state['run_id']}/run.json")
+                    active_path = os.path.join(tc, ".ai", "workflows", "runs", "active", f"{state['run_id']}/run.json")
                     active["evidence"]["required_key"] = value
                     with open(active_path, "w") as f:
                         json.dump(active, f)
@@ -3644,6 +3672,230 @@ class TestDispatchHooks(FixtureBase):
         self.assertEqual(rc, 0)
         data = json.loads(out)
         self.assertIsNotNone(data)
+
+
+def _import_workflow():
+    """Import the workflow module for direct function testing."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("workflow", WORKFLOW_PY)
+    wf = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(wf)
+    return wf
+
+
+class TestRunArtifactsUnify(FixtureBase):
+    """Tests for directory-based run artifacts (run-artifacts-unify change)."""
+
+    def test_active_path_returns_run_json_in_directory(self):
+        """_active_path returns active/<run_id>/run.json"""
+        wf = _import_workflow()
+        result = wf._active_path(self.tmp, "test-run-123")
+        expected = os.path.join(self.tmp, ".ai/workflows/runs/active/test-run-123/run.json")
+        self.assertEqual(result, os.path.normpath(expected))
+
+    def test_save_run_state_creates_directory_with_run_json(self):
+        """save_run_state creates active/<run_id>/ directory and run.json inside"""
+        wf = _import_workflow()
+        run_id = "2026-06-29-test-save"
+        state = {
+            "version": 1, "run_id": run_id, "workflow": "sdlc-main",
+            "flow_type": "spec-flow", "status": "running", "current_phase": "create_change",
+            "primary_subject": {"type": "feature", "id": "test"},
+            "context": {}, "phase_readiness": {"phase": "create_change", "ready": True, "missing_required_inputs": []},
+            "pending_hooks": [], "completed_hooks": [], "completed_phases": [],
+            "gates": {}, "evidence": {}, "block": None, "updated_at": "2026-01-01T00:00:00"
+        }
+        wf.save_run_state(self.tmp, state)
+        run_dir = os.path.join(self.tmp, ".ai/workflows/runs/active", run_id)
+        run_json = os.path.join(run_dir, "run.json")
+        self.assertTrue(os.path.isdir(run_dir), f"Expected directory {run_dir} to exist")
+        self.assertTrue(os.path.isfile(run_json), f"Expected {run_json} to exist")
+        old_path = os.path.join(self.tmp, ".ai/workflows/runs/active", f"{run_id}.json")
+        self.assertFalse(os.path.isfile(old_path), f"Old flat file {old_path} should not exist")
+
+    def test_finalize_run_to_history_moves_entire_directory(self):
+        """_finalize_run_to_history moves entire active/<run_id>/ to history/<run_id>/"""
+        wf = _import_workflow()
+        run_id = "2026-06-29-test-move"
+        run_dir = os.path.join(self.tmp, ".ai/workflows/runs/active", run_id)
+        os.makedirs(run_dir, exist_ok=True)
+        state = {
+            "version": 1, "run_id": run_id, "workflow": "sdlc-main",
+            "flow_type": "spec-flow", "status": "running", "current_phase": "done",
+            "primary_subject": {"type": "feature", "id": "test"},
+            "context": {}, "phase_readiness": {"phase": "done", "ready": True, "missing_required_inputs": []},
+            "pending_hooks": [], "completed_hooks": [], "completed_phases": ["done"],
+            "gates": {}, "evidence": {}, "block": None, "updated_at": "2026-01-01T00:00:00"
+        }
+        with open(os.path.join(run_dir, "run.json"), "w") as f:
+            json.dump(state, f)
+        os.makedirs(os.path.join(run_dir, "handoffs", "default"), exist_ok=True)
+        with open(os.path.join(run_dir, "handoffs", "default", "plan-agent.md"), "w") as f:
+            f.write("# Test handoff")
+        with open(os.path.join(self.tmp, ".ai/workflows/runs/current.json"), "w") as f:
+            json.dump({"run_id": run_id}, f)
+
+        wf._finalize_run_to_history(self.tmp, state)
+
+        self.assertFalse(os.path.exists(run_dir), "active directory should be removed")
+        hist_dir = os.path.join(self.tmp, ".ai/workflows/runs/history", run_id)
+        self.assertTrue(os.path.isdir(hist_dir), "history directory should exist")
+        self.assertTrue(os.path.isfile(os.path.join(hist_dir, "run.json")), "history run.json should exist")
+        self.assertTrue(os.path.isfile(os.path.join(hist_dir, "handoffs", "default", "plan-agent.md")), "handoff should be moved")
+        with open(os.path.join(self.tmp, ".ai/workflows/runs/current.json"), "r") as f:
+            ptr = json.load(f)
+        self.assertEqual(ptr, {}, "pointer should be cleared")
+
+    def test_cmd_done_moves_entire_directory(self):
+        """cmd_done moves entire active/<run_id>/ to history/<run_id>/ with artifacts"""
+        run_id = "2026-06-29-test-done-dir"
+        run_dir = os.path.join(self.tmp, ".ai/workflows/runs/active", run_id)
+        os.makedirs(run_dir, exist_ok=True)
+        state = {
+            "version": 1, "run_id": run_id, "workflow": "sdlc-main",
+            "flow_type": "spec-flow", "status": "running", "current_phase": "done",
+            "primary_subject": {"type": "feature", "id": "test"},
+            "context": {}, "phase_readiness": {"phase": "done", "ready": True, "missing_required_inputs": []},
+            "pending_hooks": [], "completed_hooks": [], "completed_phases": ["done"],
+            "gates": {}, "evidence": {}, "block": None, "updated_at": "2026-01-01T00:00:00"
+        }
+        with open(os.path.join(run_dir, "run.json"), "w") as f:
+            json.dump(state, f)
+        with open(os.path.join(self.tmp, ".ai/workflows/runs/current.json"), "w") as f:
+            json.dump({"run_id": run_id}, f)
+
+        rc, out, _ = run_workflow(self.tmp, "done")
+        self.assertEqual(rc, 0)
+
+        self.assertFalse(os.path.exists(run_dir))
+        hist_dir = os.path.join(self.tmp, ".ai/workflows/runs/history", run_id)
+        self.assertTrue(os.path.isdir(hist_dir))
+        self.assertTrue(os.path.isfile(os.path.join(hist_dir, "run.json")))
+
+    def test_cancel_run_removes_entire_directory(self):
+        """cmd_cancel_run removes entire active/<run_id>/ directory"""
+        run_id = "2026-06-29-test-cancel"
+        run_dir = os.path.join(self.tmp, ".ai/workflows/runs/active", run_id)
+        os.makedirs(run_dir, exist_ok=True)
+        state = {
+            "version": 1, "run_id": run_id, "workflow": "sdlc-main",
+            "flow_type": "spec-flow", "status": "running", "current_phase": "create_change",
+            "primary_subject": {"type": "roadmap_item", "id": "RM-CANCEL"},
+            "context": {}, "phase_readiness": {"phase": "create_change", "ready": True, "missing_required_inputs": []},
+            "pending_hooks": [], "completed_hooks": [], "completed_phases": [],
+            "gates": {}, "evidence": {}, "block": None, "updated_at": "2026-01-01T00:00:00"
+        }
+        with open(os.path.join(run_dir, "run.json"), "w") as f:
+            json.dump(state, f)
+        os.makedirs(os.path.join(run_dir, "handoffs", "default"), exist_ok=True)
+        with open(os.path.join(run_dir, "handoffs", "default", "test.md"), "w") as f:
+            f.write("test")
+
+        rc, out, _ = run_workflow(self.tmp, "cancel-run", subject_type="roadmap_item", subject_id="RM-CANCEL")
+        data = json.loads(out)
+        self.assertEqual(data["status"], "cancelled")
+        self.assertFalse(os.path.exists(run_dir), "entire run directory should be removed")
+
+    def test_list_active_runs_from_directories(self):
+        """_list_active_runs discovers runs from subdirectories under active/"""
+        wf = _import_workflow()
+        run_id = "2026-06-29-test-list"
+        run_dir = os.path.join(self.tmp, ".ai/workflows/runs/active", run_id)
+        os.makedirs(run_dir, exist_ok=True)
+        state = {
+            "version": 1, "run_id": run_id, "workflow": "sdlc-main",
+            "flow_type": "spec-flow", "status": "running", "current_phase": "create_change",
+            "primary_subject": {"type": "feature", "id": "test-list"},
+            "context": {}, "phase_readiness": {"phase": "create_change", "ready": True, "missing_required_inputs": []},
+            "pending_hooks": [], "completed_hooks": [], "completed_phases": [],
+            "gates": {}, "evidence": {}, "block": None, "updated_at": "2026-01-01T00:00:00"
+        }
+        with open(os.path.join(run_dir, "run.json"), "w") as f:
+            json.dump(state, f)
+
+        active_runs = wf._list_active_runs(self.tmp)
+        self.assertEqual(len(active_runs), 1)
+        self.assertEqual(active_runs[0][0], run_id)
+
+    def test_governance_check_reads_history_dir(self):
+        """governance-check reads history/<run_id>/run.json (new-style only)"""
+        run_id = "2026-06-29-test-gov"
+        hist_dir = os.path.join(self.tmp, ".ai/workflows/runs/history", run_id)
+        os.makedirs(hist_dir, exist_ok=True)
+        state = {
+            "version": 1, "run_id": run_id, "workflow": "sdlc-main",
+            "flow_type": "spec-flow", "status": "done", "current_phase": "done",
+            "primary_subject": {"type": "openspec_change", "id": "arch-gov"},
+            "context": {}, "phase_readiness": {"phase": "done", "ready": True, "missing_required_inputs": []},
+            "pending_hooks": [], "completed_hooks": [], "completed_phases": ["done"],
+            "gates": {}, "evidence": {}, "block": None, "updated_at": "2026-01-01T00:00:00"
+        }
+        with open(os.path.join(hist_dir, "run.json"), "w") as f:
+            json.dump(state, f)
+
+        rc, out, _ = run_workflow(self.tmp, "governance-check")
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        # Governance check returns {"block": bool, "findings": [...]}
+        self.assertIsInstance(data, dict)
+        self.assertIn("block", data)
+        self.assertIn("findings", data)
+
+    def test_legacy_migration_handoffs(self):
+        """Legacy handoffs/<run_id>/ is migrated to active/<run_id>/handoffs/"""
+        wf = _import_workflow()
+        run_id = "2026-06-29-test-legacy"
+        legacy_dir = os.path.join(self.tmp, ".ai/workflows/runs/handoffs", run_id, "default")
+        os.makedirs(legacy_dir, exist_ok=True)
+        with open(os.path.join(legacy_dir, "plan-agent.md"), "w") as f:
+            f.write("# Legacy handoff")
+
+        run_dir = os.path.join(self.tmp, ".ai/workflows/runs/active", run_id)
+        os.makedirs(run_dir, exist_ok=True)
+
+        wf._migrate_legacy_artifacts(self.tmp, run_id)
+
+        migrated = os.path.join(run_dir, "handoffs", "default", "plan-agent.md")
+        self.assertTrue(os.path.isfile(migrated), f"Expected {migrated} to exist")
+        self.assertFalse(os.path.exists(legacy_dir), "Legacy directory should be removed")
+
+    def test_legacy_migration_logs(self):
+        """Legacy logs/<run_id>/ is migrated to active/<run_id>/logs/"""
+        wf = _import_workflow()
+        run_id = "2026-06-29-test-legacy-logs"
+        legacy_dir = os.path.join(self.tmp, ".ai/workflows/runs/logs", run_id, "default")
+        os.makedirs(legacy_dir, exist_ok=True)
+        with open(os.path.join(legacy_dir, "pytest.log"), "w") as f:
+            f.write("test output")
+
+        run_dir = os.path.join(self.tmp, ".ai/workflows/runs/active", run_id)
+        os.makedirs(run_dir, exist_ok=True)
+
+        wf._migrate_legacy_artifacts(self.tmp, run_id)
+
+        migrated = os.path.join(run_dir, "logs", "default", "pytest.log")
+        self.assertTrue(os.path.isfile(migrated), f"Expected {migrated} to exist")
+        self.assertFalse(os.path.exists(legacy_dir), "Legacy logs directory should be removed")
+
+    def test_legacy_migration_idempotent(self):
+        """Migration is safe to run twice without data loss"""
+        wf = _import_workflow()
+        run_id = "2026-06-29-test-idem"
+        legacy_dir = os.path.join(self.tmp, ".ai/workflows/runs/handoffs", run_id, "default")
+        os.makedirs(legacy_dir, exist_ok=True)
+        with open(os.path.join(legacy_dir, "test.md"), "w") as f:
+            f.write("content")
+
+        run_dir = os.path.join(self.tmp, ".ai/workflows/runs/active", run_id)
+        os.makedirs(run_dir, exist_ok=True)
+
+        wf._migrate_legacy_artifacts(self.tmp, run_id)
+        wf._migrate_legacy_artifacts(self.tmp, run_id)
+
+        migrated = os.path.join(run_dir, "handoffs", "default", "test.md")
+        self.assertTrue(os.path.isfile(migrated))
+        with open(migrated, "r") as f:
+            self.assertEqual(f.read(), "content")
 
 
 if __name__ == "__main__":

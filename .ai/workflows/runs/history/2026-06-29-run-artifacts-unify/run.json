@@ -1,0 +1,242 @@
+{
+  "version": 1,
+  "run_id": "2026-06-29-run-artifacts-unify",
+  "workflow": "sdlc-main",
+  "flow_type": "spec-flow",
+  "status": "done",
+  "current_phase": "done",
+  "primary_subject": {
+    "type": "feature",
+    "id": "run-artifacts-unify"
+  },
+  "context": {
+    "review_decision": "create_change",
+    "change_id": "run-artifacts-unify"
+  },
+  "phase_readiness": {
+    "phase": "done",
+    "ready": true,
+    "missing_required_inputs": []
+  },
+  "pending_hooks": [],
+  "completed_hooks": [
+    "roadmap_status_ready_if_linked",
+    "roadmap_apply_start_if_ready",
+    "roadmap_done_if_relevant",
+    "memory_sync"
+  ],
+  "completed_phases": [
+    "input",
+    "load_memory",
+    "brainstorm",
+    "decide_intent",
+    "create_change",
+    "apply_change",
+    "archive_change",
+    "post_archive_actions"
+  ],
+  "gates": {},
+  "evidence": {
+    "branch_selected": {
+      "branch": "create_change"
+    },
+    "openspec_status": {
+      "classification": "in-progress",
+      "source": "active"
+    },
+    "roadmap_link": {
+      "count": 0,
+      "items": []
+    },
+    "agent_phase": {
+      "agent_phase": "archive_change",
+      "agent": "finish-agent",
+      "flow_type": "spec-flow",
+      "dispatched_at": "2026-06-29T22:38:10.473447"
+    },
+    "agent_result": {
+      "agent": "review-agent",
+      "status": "success",
+      "phase": "apply_change",
+      "slice_id": "default",
+      "flow_type": "spec-flow",
+      "evidence": {
+        "review_passed": true,
+        "verification_rerun": "310 passed, 15 subtests passed, 0 failures",
+        "focused_tests": [
+          {
+            "result": "11/11 passed"
+          }
+        ],
+        "template_sync": "OK",
+        "findings": [
+          {
+            "severity": "minor",
+            "id": "F1",
+            "desc": "Duplicate return state"
+          },
+          {
+            "severity": "cosmetic",
+            "id": "F2",
+            "desc": "Outdated comment"
+          },
+          {
+            "severity": "follow-up",
+            "id": "F3",
+            "desc": "Spec D4 rejection not reflected"
+          }
+        ]
+      },
+      "blockers": [],
+      "recorded_at": "2026-06-29T22:37:03.205516"
+    },
+    "agent_results": {
+      "default": {
+        "plan-agent": {
+          "agent": "plan-agent",
+          "status": "success",
+          "phase": "create_change",
+          "slice_id": "default",
+          "flow_type": "spec-flow",
+          "evidence": {
+            "spec_artifacts_done": true,
+            "plan_produced": true,
+            "user_confirmation_required": true,
+            "plan_summary": {
+              "objective": "Unify all run artifacts under a single <run_id>/ directory with run.json as canonical state. No backward-compatible reading (product is pre-release).",
+              "approach": "Change all path helpers in workflow.py to use directory-based structure. Use shutil.move() for archiving entire directories. Auto-migrate legacy handoffs/logs via sentinel. D4 (backward-compatible reading) rejected per user request.",
+              "key_steps": [
+                "_active_path \u2192 active/<run_id>/run.json",
+                "save_run_state \u2192 create directory + write run.json",
+                "_finalize_run_to_history/cmd_done/cmd_advance \u2192 shutil.move entire directory",
+                "cmd_cancel_run \u2192 shutil.rmtree entire directory",
+                "_list_active_runs \u2192 iterate subdirectories",
+                "cmd_governance_check \u2192 new-style only (no backward compat)",
+                "_migrate_legacy_artifacts \u2192 move handoffs/logs into run directory with .migrated sentinel",
+                "Update test helpers and inline paths",
+                "Full test suite + template sync"
+              ]
+            }
+          },
+          "blockers": [],
+          "recorded_at": "2026-06-29T21:52:28.526228"
+        },
+        "implement-agent": {
+          "agent": "implement-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "spec-flow",
+          "evidence": {
+            "tasks_complete": "true",
+            "tdd_passed": "true",
+            "focused_tests": [
+              {
+                "command": "python3 -m pytest tests/test_workflow.py -v -k \"test_active_path_returns_run_json_in_directory or test_save_run_state_creates or test_finalize_run_to_history_moves or test_cmd_done_moves or test_cancel_run_removes or test_list_active_runs_from or test_governance_check_reads_history_dir or test_legacy_migration\"",
+                "result": "11 passed, 0 failed"
+              },
+              {
+                "command": "python3 -m pytest tests/test_workflow.py -v",
+                "result": "174 passed, 0 failed"
+              },
+              {
+                "command": "python3 -m pytest tests/test_wrapper_contracts.py tests/test_init_foundations.py -v",
+                "result": "136 passed, 0 failed"
+              },
+              {
+                "command": "python3 -m pytest tests/ -v",
+                "result": "310 passed, 0 failed, 15 subtests passed"
+              }
+            ]
+          },
+          "blockers": [],
+          "recorded_at": "2026-06-29T22:20:36.246029"
+        },
+        "test-agent": {
+          "agent": "test-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "spec-flow",
+          "evidence": {
+            "verification_passed": true,
+            "overfit_check_passed": true,
+            "regression_passed": true,
+            "tdd_passed": true,
+            "focused_tests": [
+              {
+                "command": "python3 -m pytest tests/test_workflow.py -v -k test_active_path or test_save_run_state or test_finalize or test_cmd_done or test_cancel or test_list_active or test_governance or test_legacy",
+                "result": "11 passed, 0 failed"
+              },
+              {
+                "command": "python3 -m pytest tests/test_workflow.py tests/test_wrapper_contracts.py tests/test_init_foundations.py -v",
+                "result": "310 passed, 0 failed"
+              }
+            ],
+            "edge_case_analysis": {
+              "legacy_migration": "passed",
+              "empty_active_directory": "passed",
+              "advance_through_phases": "passed",
+              "dangling_flat_json_refs": "none found"
+            }
+          },
+          "blockers": [],
+          "recorded_at": "2026-06-29T22:30:57.352608"
+        },
+        "review-agent": {
+          "agent": "review-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "spec-flow",
+          "evidence": {
+            "review_passed": true,
+            "verification_rerun": "310 passed, 15 subtests passed, 0 failures",
+            "focused_tests": [
+              {
+                "result": "11/11 passed"
+              }
+            ],
+            "template_sync": "OK",
+            "findings": [
+              {
+                "severity": "minor",
+                "id": "F1",
+                "desc": "Duplicate return state"
+              },
+              {
+                "severity": "cosmetic",
+                "id": "F2",
+                "desc": "Outdated comment"
+              },
+              {
+                "severity": "follow-up",
+                "id": "F3",
+                "desc": "Spec D4 rejection not reflected"
+              }
+            ]
+          },
+          "blockers": [],
+          "recorded_at": "2026-06-29T22:37:03.205516"
+        }
+      }
+    },
+    "openspec_artifacts_done": {
+      "spec_artifacts_done": true,
+      "plan_path": ".ai/workflows/runs/2026-06-29-run-artifacts-unify/plans/default/plan.md"
+    },
+    "tasks_complete": "true",
+    "tdd_passed": "true",
+    "eval_passed_or_human_decision_recorded": {
+      "status": "not_applicable",
+      "reason": "deterministic code structure change, no AI behavior target"
+    },
+    "archive_path_exists": true,
+    "roadmap_hook_resolution": "no_linked_item",
+    "memory_sync_resolution": "not_needed",
+    "memory_sync_reason": "Deterministic structural refactoring: unified run artifacts directory layout. All design decisions (D1-D4) captured in archived OpenSpec design doc. Changes uncommitted (dirty working tree) \u2014 no stable commit range for evolution. No durable facts beyond archived design doc.",
+    "archive_path": "openspec/changes/archive/2026-06-29-run-artifacts-unify"
+  },
+  "block": null,
+  "updated_at": "2026-06-29T22:46:15.171802"
+}
