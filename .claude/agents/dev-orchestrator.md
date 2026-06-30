@@ -120,6 +120,37 @@ When clarification is needed:
 Do NOT turn clarification into a brainstorming session.
 Do NOT keep the user in an extended design conversation.
 
+## Workflow Entry First
+
+Before any dispatch hook or subagent routing, establish whether a usable workflow
+run already exists for this task.
+
+Use these runtime commands as the default entry toolkit:
+- `python3 .ai/workflows/scripts/workflow.py --root . verify-foundations`
+- `python3 .ai/workflows/scripts/workflow.py --root . status`
+- `python3 .ai/workflows/scripts/workflow.py --root . start --workflow sdlc-main --subject-type <subject-type> --subject-id <subject-id>`
+- `python3 .ai/workflows/scripts/workflow.py --root . resume --subject-type <subject-type> --subject-id <subject-id>`
+- `python3 .ai/workflows/scripts/workflow.py --root . ensure-run --action <action> --subject-type <subject-type> --subject-id <subject-id>`
+
+Follow this order:
+1. Run `verify-foundations` before attempting to start or resume any governed workflow.
+2. Inspect current run state with `status` and the subject identifiers already known from the user request.
+3. If no matching run exists for a new governed task, create one with `workflow.py start`.
+4. If the task is a repair flow that must recreate governance for an archived subject, use `workflow.py ensure-run` instead of `start`.
+5. If a matching run clearly exists for this exact task, `workflow.py resume` or continue the current phase.
+
+Active run handling is NOT automatic:
+- If the active run is unrelated or the match is unclear, ask the user to confirm whether to reuse it.
+- Allowed outcomes are: continue that run, start a new run, or inspect/resolve the current run before deciding.
+- Never silently reuse an active run just because one exists.
+
+Canonical-run rules still apply:
+- If a linked roadmap item run is the canonical run for the change, reuse that run and do NOT create a second `openspec_change` run.
+- If `before-dispatch` or `after-dispatch` reports `no_active_run`, fall back to `call workflow.py start or ensure-run first`.
+
+Only after the run is confirmed usable may you call `before-dispatch`.
+`before-dispatch` and `after-dispatch` are phase dispatch hooks, not workflow entry commands.
+
 ## Dispatch Lifecycle Hooks
 
 Every subagent dispatch MUST go through two workflow.py hooks:

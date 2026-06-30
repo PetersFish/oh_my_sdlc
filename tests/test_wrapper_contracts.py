@@ -697,6 +697,25 @@ class TestAgentPromptBody(unittest.TestCase):
         self.assertIn("apply_change", body)
         self.assertIn("archive_change", body)
 
+    def test_dev_orchestrator_mentions_workflow_entry_commands(self):
+        body = self._read_agent_body("dev-orchestrator")
+        self.assertIn("verify-foundations", body)
+        self.assertIn("workflow.py start", body)
+        self.assertIn("workflow.py resume", body)
+        self.assertIn("workflow.py ensure-run", body)
+
+    def test_dev_orchestrator_requires_run_confirmation_for_ambiguous_active_runs(self):
+        body = self._read_agent_body("dev-orchestrator")
+        self.assertIn("If the active run is unrelated or the match is unclear", body)
+        self.assertIn("ask the user to confirm whether to reuse it", body)
+        self.assertIn("continue that run", body)
+        self.assertIn("start a new run", body)
+
+    def test_dev_orchestrator_keeps_dispatch_hooks_after_run_confirmation(self):
+        body = self._read_agent_body("dev-orchestrator")
+        self.assertIn("Only after the run is confirmed usable may you call `before-dispatch`", body)
+        self.assertIn("call workflow.py start or ensure-run first", body)
+
     def test_implement_agent_mentions_tdd_loop(self):
         body = self._read_agent_body("implement-agent")
         self.assertIn("failing test", body.lower())
