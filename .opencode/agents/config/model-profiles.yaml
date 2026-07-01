@@ -1,33 +1,41 @@
-# Canonical per-agent model profile configuration.
-# Target-side effective configs are kept under <target>/config/model-profiles.yaml
-# and are NOT overwritten by template sync if they already exist.
-#
-# Resolution precedence:
-#   model:   agents.<agent>.model > profiles.<profile>.model
-#   variant: agents.<agent>.variant > profiles.<profile>.variant > defaults.variant > medium
+# Canonical model profile template for SDLC agent subagents.
+# Each CLI target owns its own effective copy under <target>/agents/config/model-profiles.yaml.
+# Edit the target copy to override model choices per CLI environment.
 schema_version: 1
+
 defaults:
   variant: medium
+
 profiles:
   orchestrator:
-    model: openai/gpt-5.5
-    variant: medium
-  deep-implement:
-    model: opencode-go/deepseek-v4-pro
-    variant: high
-  standard:
     model: openai/gpt-5.4
     variant: medium
+  planning:
+    model: openai/gpt-5.5
+    variant: medium
+  implementation:
+    model: opencode-go/deepseek-v4-pro
+    variant: high
+  testing:
+    model: openai/gpt-5.4
+    variant: medium
+  review:
+    model: openai/gpt-5.5
+    variant: medium
+  finish:
+    model: opencode-go/deepseek-v4-pro
+    variant: medium
+
 agents:
   dev-orchestrator:
     profile: orchestrator
   plan-agent:
-    profile: orchestrator
+    profile: planning
   implement-agent:
-    profile: deep-implement
+    profile: implementation
   test-agent:
-    profile: standard
+    profile: testing
   review-agent:
-    profile: standard
+    profile: review
   finish-agent:
-    profile: deep-implement
+    profile: finish
