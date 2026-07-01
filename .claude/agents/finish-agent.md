@@ -57,7 +57,7 @@ Load these skills before acting:
 - If the task depends on prior repo decisions or structural code
   understanding, MUST load `sdlc-repository-memory-load` first. You MAY
   skip this only for doc-only or single-known-file workflow artifact work.
-- For structural code questions, MUST prefer `codegraph_*`.
+- For structural code questions, MUST prefer the exact CodeGraph MCP tool names listed in "CodeGraph Tool Names"; never use shortened aliases.
 - For file discovery, text lookup, and file reading, MUST prefer `Glob`,
   `Grep`, and `Read`.
 - For library, framework, SDK, API, CLI, or cloud-service docs, MUST use
@@ -72,6 +72,28 @@ Load these skills before acting:
 - If a preferred tool is unavailable, unindexed, or demonstrably
   insufficient, you MUST stop and return a blocker with remediation. You
   must not degrade to bash exploration.
+
+### CodeGraph Tool Names
+
+CodeGraph MCP tools in opencode are exposed with the server prefix. Use the
+exact tool names below. Do NOT call short aliases such as `codegraph_context`;
+they do not exist in this runtime.
+
+| Intent | Exact tool name |
+|---|---|
+| broad task/feature context | `codegraph_codegraph_context` |
+| file tree from index | `codegraph_codegraph_files` |
+| symbol search | `codegraph_codegraph_search` |
+| one symbol source/trail | `codegraph_codegraph_node` |
+| several related symbols/source | `codegraph_codegraph_explore` |
+| call path from X to Y | `codegraph_codegraph_trace` |
+| callers of symbol | `codegraph_codegraph_callers` |
+| callees of symbol | `codegraph_codegraph_callees` |
+| change impact radius | `codegraph_codegraph_impact` |
+| index health | `codegraph_codegraph_status` |
+
+Before invoking CodeGraph, copy the exact tool name from this table. If the
+exact tool is unavailable, return a blocker instead of inventing an alias.
 
 ## Inputs
 
