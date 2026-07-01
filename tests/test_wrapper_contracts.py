@@ -899,10 +899,24 @@ class TestAgentPromptBody(unittest.TestCase):
             self.assertIn("criteria_satisfied", body, f"{target} plan-agent missing criteria_satisfied contract")
             self.assertNotIn("openspec_artifacts_done", body, f"{target} plan-agent leaked provider-specific gate")
 
+    def test_implement_agent_requires_resolved_dispatch_for_spec_flow(self):
+        body = self._read_agent_body("implement-agent")
+        self.assertIn("resolved wrapper dispatch", body.lower())
+        self.assertIn("missing_resolved_dispatch", body)
+        self.assertIn("provider verifier", body.lower())
+        self.assertIn("spec wrapper via resolved provider dispatch", body.lower())
+
     def test_finish_agent_mentions_hooks(self):
         body = self._read_agent_body("finish-agent")
         self.assertIn("memory_sync", body)
         self.assertIn("roadmap_done_if_relevant", body)
+
+    def test_finish_agent_requires_resolved_dispatch_for_spec_flow(self):
+        body = self._read_agent_body("finish-agent")
+        self.assertIn("resolved wrapper dispatch", body.lower())
+        self.assertIn("missing_resolved_dispatch", body)
+        self.assertIn("provider verifier", body.lower())
+        self.assertIn("spec wrapper via resolved provider dispatch", body.lower())
 
     def test_finish_agent_includes_blocked_and_failed_examples(self):
         body = self._read_agent_body("finish-agent")
@@ -1088,6 +1102,48 @@ class TestWrapperDispatchResolution(unittest.TestCase):
         self.assertEqual(resolved.dispatch["kind"], "skill")
         self.assertEqual(resolved.dispatch["target"], "openspec-propose")
         self.assertEqual(resolved.verifier["target"], "openspec.create")
+        self.assertEqual(resolved.result_contract, "spec_change")
+
+    def test_resolve_wrapper_dispatch_supports_spec_apply(self):
+        repo_root = pathlib.Path(__file__).resolve().parent.parent
+
+        resolved = resolve_wrapper_dispatch(
+            module="spec",
+            capability="apply",
+            workflow_run_id="run-1",
+            phase="apply_change",
+            action="apply",
+            flow_type="spec-flow",
+            repo_root=repo_root,
+        )
+
+        self.assertEqual(resolved.module, "spec")
+        self.assertEqual(resolved.capability, "apply")
+        self.assertEqual(resolved.provider, "openspec")
+        self.assertEqual(resolved.dispatch["kind"], "skill")
+        self.assertEqual(resolved.dispatch["target"], "openspec-apply-change")
+        self.assertEqual(resolved.verifier["target"], "openspec.apply")
+        self.assertEqual(resolved.result_contract, "spec_change")
+
+    def test_resolve_wrapper_dispatch_supports_spec_archive(self):
+        repo_root = pathlib.Path(__file__).resolve().parent.parent
+
+        resolved = resolve_wrapper_dispatch(
+            module="spec",
+            capability="archive",
+            workflow_run_id="run-1",
+            phase="archive_change",
+            action="archive",
+            flow_type="spec-flow",
+            repo_root=repo_root,
+        )
+
+        self.assertEqual(resolved.module, "spec")
+        self.assertEqual(resolved.capability, "archive")
+        self.assertEqual(resolved.provider, "openspec")
+        self.assertEqual(resolved.dispatch["kind"], "skill")
+        self.assertEqual(resolved.dispatch["target"], "openspec-archive-change")
+        self.assertEqual(resolved.verifier["target"], "openspec.archive")
         self.assertEqual(resolved.result_contract, "spec_change")
 
     def test_resolve_wrapper_dispatch_propagates_registry_native_result_contract(self):
@@ -1280,6 +1336,71 @@ class TestProviderVerifiers(unittest.TestCase):
 
         self.assertEqual(blockers[0]["reason"], "missing_required_artifact")
         self.assertIn("tasks.md", blockers[0]["message"])
+
+    def test_openspec_apply_verifier_succeeds_when_tasks_artifact_observable(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo_root = pathlib.Path(tmp_dir)
+            change_dir = self._make_openspec_change(repo_root, "demo-change")
+            (change_dir / "tasks.md").write_text(
+                "# Tasks\n\n- [x] Implement wrapper apply\n",
+                encoding="utf-8",
+            )
+
+            blockers = verify_provider_artifacts(
+                "openspec.apply",
+                repo_root=repo_root,
+                change_id="demo-change",
+            )
+
+        self.assertEqual(blockers, [])
+
+    def test_openspec_apply_verifier_blocks_when_tasks_are_not_observable(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo_root = pathlib.Path(tmp_dir)
+            change_dir = self._make_openspec_change(repo_root, "demo-change")
+            (change_dir / "tasks.md").write_text("# Tasks\n", encoding="utf-8")
+
+            blockers = verify_provider_artifacts(
+                "openspec.apply",
+                repo_root=repo_root,
+                change_id="demo-change",
+            )
+
+        self.assertEqual(blockers[0]["reason"], "tasks_state_not_observed")
+        self.assertIn("tasks.md", blockers[0]["message"])
+
+    def test_openspec_archive_verifier_succeeds_when_archive_artifacts_exist(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo_root = pathlib.Path(tmp_dir)
+            archive_dir = repo_root / "openspec" / "changes" / "archive" / "2026-07-01-demo-change"
+            (archive_dir / "specs").mkdir(parents=True)
+            (archive_dir / "proposal.md").write_text("# Proposal\n", encoding="utf-8")
+            (archive_dir / "design.md").write_text("# Design\n", encoding="utf-8")
+            (archive_dir / "tasks.md").write_text("# Tasks\n", encoding="utf-8")
+            (archive_dir / "specs" / "feature.md").write_text("# Spec\n", encoding="utf-8")
+
+            blockers = verify_provider_artifacts(
+                "openspec.archive",
+                repo_root=repo_root,
+                change_id="demo-change",
+            )
+
+        self.assertEqual(blockers, [])
+
+    def test_openspec_archive_verifier_blocks_when_archive_artifacts_missing(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo_root = pathlib.Path(tmp_dir)
+            archive_dir = repo_root / "openspec" / "changes" / "archive" / "2026-07-01-demo-change"
+            archive_dir.mkdir(parents=True)
+
+            blockers = verify_provider_artifacts(
+                "openspec.archive",
+                repo_root=repo_root,
+                change_id="demo-change",
+            )
+
+        self.assertEqual(blockers[0]["reason"], "missing_required_artifact")
+        self.assertIn("proposal.md", blockers[0]["message"])
 
     def test_local_repository_sync_verifier_reports_success_from_memory_artifacts(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -1544,7 +1665,7 @@ class TestProviderRegistryDefinition(unittest.TestCase):
         spec_caps = {name for name, supported in registry["modules"]["spec"]["providers"]["openspec"]["capabilities"].items() if supported}
         memory_caps = {name for name, supported in registry["modules"]["memory"]["providers"]["local"]["capabilities"].items() if supported}
 
-        self.assertEqual(spec_caps, {"create"})
+        self.assertEqual(spec_caps, {"create", "apply", "archive"})
         self.assertEqual(memory_caps, {"repository_sync"})
 
 
@@ -1629,6 +1750,22 @@ class TestDevOrchestratorWrapperDispatch(unittest.TestCase):
                        "dev-orchestrator must reference normalization of verification results")
         self.assertIn("result_contract", body,
                        "dev-orchestrator must reference result_contract for normalization")
+
+    def test_dev_orchestrator_mentions_spec_lifecycle_phase_capability_mapping(self):
+        body = self._read_agent_body("dev-orchestrator").lower()
+        self.assertIn("create_change", body)
+        self.assertIn("spec create", body)
+        self.assertIn("apply_change", body)
+        self.assertIn("spec apply", body)
+        self.assertIn("archive_change", body)
+        self.assertIn("spec archive", body)
+
+    def test_dev_orchestrator_requires_user_confirmation_before_block_remediation(self):
+        body = self._read_agent_body("dev-orchestrator").lower()
+        self.assertIn("before any automatic blocker remediation", body)
+        self.assertIn("ask the user", body)
+        self.assertIn("recommended option", body)
+        self.assertIn("other options", body)
 
     def test_dev_orchestrator_prompt_models_nested_dispatch_spec(self):
         body = self._read_agent_body("dev-orchestrator")

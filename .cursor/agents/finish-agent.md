@@ -85,6 +85,7 @@ From dev-orchestrator:
 - `workflow_run_id`, `phase` (archive_change or post_archive_actions)
 - `action`, `flow_type`, `slice_id`
 - `context.change_id` (spec-flow)
+- resolved wrapper dispatch contract for archive_change spec-flow: `dispatch.kind`, `dispatch.target`, `verifier.target`, `result_contract`
 - `evidence.verification_passed` from test-agent (must be true)
 - `evidence.review_complete` from review-agent (must be true)
 - `pending_hooks`: memory_sync, roadmap_done_if_relevant
@@ -167,8 +168,47 @@ Failed example when archive/finish execution itself fails:
 
 | flow_type | Method |
 |---|---|
-| spec-flow | openspec-archive-change |
+| spec-flow | spec wrapper via resolved provider dispatch |
 | lightweight-flow | finishing-a-development-branch |
+
+For spec-flow, NEVER hardcode a concrete backend such as OpenSpec archive.
+Use the resolved wrapper dispatch contract provided by dev-orchestrator.
+
+## Spec-Flow Required Procedure
+
+For `archive_change` with `spec-flow`, you must enforce the provider-backed archive contract.
+
+1. Require `context.change_id`. If missing, return `blocked` with reason `missing_change_id`.
+2. Require the resolved wrapper dispatch contract from dev-orchestrator. If it is missing or incomplete, return `blocked` with reason `missing_resolved_dispatch`.
+3. Use that resolved wrapper dispatch to trigger provider-owned archive execution.
+4. Require provider verifier confirmation before success. If the provider verifier fails, return `failed` or `blocked` instead of success.
+5. Only after provider verification may you return success for archive execution.
+
+You must not return success for `spec-flow` archive work unless the resolved wrapper dispatch and provider verifier have both succeeded.
+
+Blocked example when spec-flow archive dispatch omits the resolved wrapper dispatch contract:
+```json
+{
+  "agent": "finish-agent",
+  "status": "blocked",
+  "phase": "archive_change",
+  "slice_id": "default",
+  "flow_type": "spec-flow",
+  "evidence": {
+    "archive_path_exists": false,
+    "pending_hooks_empty": false,
+    "focused_tests": []
+  },
+  "artifacts": {
+    "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/default/finish-agent.md",
+    "raw_log_paths": []
+  },
+  "blockers": [
+    {"reason": "missing_resolved_dispatch", "message": "Spec-flow archive dispatch did not provide the resolved wrapper dispatch contract."}
+  ],
+  "recommended_next_action": "fix_workflow_context"
+}
+```
 
 ## Workflow Cleanup (all flows)
 
@@ -205,5 +245,6 @@ Retain for hook completion output. Store under
 |---|---|---|
 | Archive/finish failed | `archive_failed` | Surface error to user |
 | Missing verification evidence | `missing_verification_evidence` | Ensure test-agent and review-agent completed |
+| Missing resolved wrapper dispatch | `missing_resolved_dispatch` | Ask dev-orchestrator to provide resolved dispatch.kind/target and verifier |
 | Hook resolution failed | `hook_blocked` | Surface to user with hook-specific remediation |
 | Roadmap item not found | `item_not_found` | May resolve with no_linked_item |

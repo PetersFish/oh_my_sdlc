@@ -79,6 +79,7 @@ From dev-orchestrator:
 - `workflow_run_id`, `phase` (apply_change), `action`, `flow_type`
 - `slice_id` — your work package identifier
 - `context.change_id` (spec-flow)
+- resolved wrapper dispatch contract for spec-flow: `dispatch.kind`, `dispatch.target`, `verifier.target`, `result_contract`
 - Tasks to implement, handoff from plan-agent
 - Blocker evidence from test-agent (if retrying)
 
@@ -134,6 +135,30 @@ Blocked example when workflow context prevents safe execution:
 }
 ```
 
+Blocked example when spec-flow dispatch omits the resolved wrapper dispatch contract:
+```json
+{
+  "agent": "implement-agent",
+  "status": "blocked",
+  "phase": "apply_change",
+  "slice_id": "default",
+  "flow_type": "spec-flow",
+  "evidence": {
+    "tasks_complete": false,
+    "tdd_passed": false,
+    "focused_tests": []
+  },
+  "artifacts": {
+    "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/default/implement-agent.md",
+    "raw_log_paths": []
+  },
+  "blockers": [
+    {"reason": "missing_resolved_dispatch", "message": "Spec-flow dispatch did not provide the resolved wrapper dispatch contract."}
+  ],
+  "recommended_next_action": "fix_workflow_context"
+}
+```
+
 Failed example when OpenSpec apply cannot produce the requested artifact:
 ```json
 {
@@ -166,8 +191,23 @@ Read flow_type from dev-orchestrator input. NEVER infer from context.
 
 | flow_type | Method |
 |---|---|
-| spec-flow | openspec-apply-change |
+| spec-flow | spec wrapper via resolved provider dispatch |
 | lightweight-flow | executing-plans + using-git-worktrees |
+
+For spec-flow, NEVER hardcode a concrete backend such as OpenSpec apply.
+Use the resolved wrapper dispatch contract provided by dev-orchestrator.
+
+## Spec-Flow Required Procedure
+
+For `spec-flow`, you must enforce the provider-backed apply_change contract.
+
+1. Require `context.change_id`. If missing, return `blocked` with reason `missing_change_id`.
+2. Require the resolved wrapper dispatch contract from dev-orchestrator. If it is missing or incomplete, return `blocked` with reason `missing_resolved_dispatch`.
+3. Use that resolved wrapper dispatch to trigger provider-owned apply execution.
+4. Require provider verifier confirmation before success. If the provider verifier fails, return `failed` or `blocked` instead of success.
+5. Only after provider verification may you return success for spec-flow work.
+
+You must not return success for `spec-flow` unless the resolved wrapper dispatch and provider verifier have both succeeded.
 
 ## TDD Red/Green Loop
 
@@ -209,4 +249,5 @@ Reference in artifacts.raw_log_paths[] with {path, kind, command, result}.
 | TDD not green | `tdd_failure` | Retry with systematic-debugging |
 | Focused test fail | `focused_test_failure` | Fix implementation, retry |
 | Missing change_id | `missing_change_id` | Ensure context.change_id set |
+| Missing resolved wrapper dispatch | `missing_resolved_dispatch` | Ask dev-orchestrator to provide resolved dispatch.kind/target and verifier |
 | OpenSpec apply fail | `artifact_generation_failed` | Surface error to user |

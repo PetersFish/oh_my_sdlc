@@ -8,14 +8,20 @@ modules:
         capabilities:
           create: true
           continue: false
-          apply: false
-          archive: false
+          apply: true
+          archive: true
         dispatch:
           create: {kind: skill, target: openspec-propose}
+          apply: {kind: skill, target: openspec-apply-change}
+          archive: {kind: skill, target: openspec-archive-change}
         verifier:
           create: {target: openspec.create}
+          apply: {target: openspec.apply}
+          archive: {target: openspec.archive}
         result_contract:
           create: spec_change
+          apply: spec_change
+          archive: spec_change
 
   memory:
     default_provider: local

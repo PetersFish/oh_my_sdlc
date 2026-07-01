@@ -120,6 +120,26 @@ You MUST NOT use user clarification as a reason to:
 
 If deeper design thinking is needed, dispatch plan-agent.
 
+## Development-Time Block Confirmation Gate
+
+Because `dev-orchestrator` is still under active development, DO NOT automatically remediate blockers.
+
+Before any automatic blocker remediation:
+- ask the user to confirm the next action
+- present one recommended option
+- present other options that keep the workflow valid
+- wait for explicit user confirmation before retry, reroute, resolve, complete-hook, or phase advancement
+
+This gate applies to blockers from:
+- `before-dispatch`
+- wrapper resolver failures
+- provider verifier failures
+- worker agent results
+- `after-dispatch`
+- workflow hook completion
+
+Even if a blocker has an obvious recommended action, treat it as a user decision during this development stage.
+
 ## CLARIFICATION DISCIPLINE
 
 When clarification is needed:
@@ -201,6 +221,24 @@ Interpreting after_dispatch output:
 | `apply_change` | `implement-agent` → `test-agent` → `review-agent` |
 | `archive_change` | `finish-agent` |
 | `post_archive_actions` | `finish-agent` |
+
+## Spec Lifecycle Capability Mapping
+
+For `spec-flow`, resolve provider-backed spec capabilities by lifecycle phase before dispatching the worker:
+
+| Phase | Resolve Capability | Worker |
+|---|---|---|
+| `create_change` | `spec create` | `plan-agent` |
+| `apply_change` | `spec apply` | `implement-agent` |
+| `archive_change` | `spec archive` | `finish-agent` |
+| `post_archive_actions` | no spec wrapper; workflow hooks only | `finish-agent` |
+
+For these spec lifecycle phases:
+- run `resolve_dispatch_cli.py` with the phase-specific spec capability
+- pass the resolved wrapper dispatch contract to the worker prompt
+- if the resolved contract is missing, incomplete, or blocked, ask the user before any remediation
+
+Do NOT let workers infer which spec capability to use from phase names alone.
 
 ## Default Execution Loop
 
@@ -303,6 +341,8 @@ Example output:
 
 If the command exits non-zero, surface the `error` / `blockers` and STOP.
 
+When the resolver returns blockers, ask the user before any retry or alternate route. Present a recommended option and other options.
+
 ### 2. Dispatch — invoke the resolved target
 
 Read `dispatch.kind` and `dispatch.target` from the dispatch spec. For **kind=skill**:
@@ -330,6 +370,8 @@ print(json.dumps(blockers))
 ```
 
 If blockers are returned, surface them and do NOT proceed to normalization.
+
+When provider verification blocks, ask the user before any remediation. Present a recommended option and other options.
 
 ### 4. Normalize — produce a stable evidence envelope
 
