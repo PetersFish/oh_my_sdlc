@@ -188,6 +188,50 @@ class TestSetupScript(unittest.TestCase):
         rc = result.returncode
         self.assertEqual(rc, 0)
 
+    def test_setup_preserves_activation_after_reinstall(self):
+        """setup_agents.py preserves model/variant after template reinstall."""
+        self._setup_minimal_config()
+        os.makedirs(self.target, exist_ok=True)
+        write_file(self.tmp, "target/test-agent.md",
+                   "---\nname: test-agent\nmode: subagent\n---\n# Body\n")
+
+        activate_script = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "..", "scripts", "activate_agents_config.py",
+        )
+
+        # Activate first
+        result = subprocess.run(
+            [sys.executable, activate_script, "--target", self.target],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(result.returncode, 0, f"activation failed: {result.stdout}")
+
+        # Verify model/variant present
+        content = open(os.path.join(self.target, "test-agent.md"), encoding="utf-8").read()
+        self.assertIn("model: openai/gpt-4", content)
+        self.assertIn("variant: medium", content)
+
+        # Re-activate (simulates reinstall then activate)
+        result = subprocess.run(
+            [sys.executable, activate_script, "--target", self.target],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("already activated", result.stdout.lower())
+
+        # Verify model/variant still present and correct
+        content = open(os.path.join(self.target, "test-agent.md"), encoding="utf-8").read()
+        self.assertIn("model: openai/gpt-4", content)
+        self.assertIn("variant: medium", content)
+
+        # Check passes
+        result = subprocess.run(
+            [sys.executable, activate_script, "--target", self.target, "--check"],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(result.returncode, 0, f"check should pass: {result.stdout}")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

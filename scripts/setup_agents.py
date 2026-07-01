@@ -137,7 +137,10 @@ def do_setup(target: Path, force: bool = False, dry_run: bool = False) -> int:
         return _preview_dry_run(target, force=force)
 
     # Step 1: Template sync (install)
-    install_args = []
+    # Always pass --install-only: setup_agents handles activation in step 2,
+    # so the install_agents guardrail against bare CLI-target installs is
+    # intentionally bypassed here.
+    install_args = ["--install-only"]
     if force:
         install_args.append("--force")
     rc_install, stdout_install, stderr_install = _run_script(

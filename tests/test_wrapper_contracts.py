@@ -612,6 +612,12 @@ class TestAgentFrontmatter(unittest.TestCase):
         fm = _read_agent_frontmatter(".opencode", "review-agent")
         self.assertEqual(fm["permission"]["edit"], "allow")
 
+    def test_review_agent_does_not_allow_pytest_commands(self):
+        fm = _read_agent_frontmatter(".opencode", "review-agent")
+        bash_rules = fm["permission"].get("bash", {})
+        self.assertNotIn("python3 -m pytest *", bash_rules)
+        self.assertNotIn("pytest *", bash_rules)
+
     def test_finish_agent_edit_is_allow(self):
         fm = _read_agent_frontmatter(".opencode", "finish-agent")
         self.assertEqual(fm["permission"]["edit"], "allow")
@@ -949,6 +955,11 @@ class TestAgentPromptBody(unittest.TestCase):
     def test_review_agent_waits_for_test_evidence(self):
         body = self._read_agent_body("review-agent")
         self.assertIn("verification_passed", body)
+
+    def test_review_agent_does_not_describe_local_test_execution(self):
+        body = self._read_agent_body("review-agent").lower()
+        self.assertNotIn("verification commands", body)
+        self.assertNotIn("confirms green", body)
 
     def test_non_implementation_agents_limit_writes_to_workflow_artifacts(self):
         for name in ("plan-agent", "test-agent", "review-agent", "finish-agent"):

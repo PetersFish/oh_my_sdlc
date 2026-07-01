@@ -91,6 +91,33 @@ def _global_target() -> Path:
     return Path.home() / ".config" / "opencode" / "agents"
 
 
+# ---- guardrail for known CLI targets ----
+
+_KNOWN_CLI_TARGET_SUFFIXES = (
+    ".opencode/agents",
+    ".opencode/agent",
+    ".claude/agents",
+    ".claude/agent",
+    ".cursor/agents",
+    ".cursor/agent",
+)
+
+
+def _is_known_cli_target(target: Path) -> bool:
+    """Detect whether a target path looks like a real CLI agent directory.
+
+    These targets require activation (model/variant rendering) after template
+    sync.  Direct install without activation would silently wipe model config."""
+    target_str = str(target)
+    global_dir = str(Path.home() / ".config" / "opencode" / "agents")
+    if target_str == global_dir:
+        return True
+    for suffix in _KNOWN_CLI_TARGET_SUFFIXES:
+        if target_str.endswith(suffix) or target_str.endswith(suffix + "/"):
+            return True
+    return False
+
+
 # ---- check mode (normalized) ----
 
 def _check_target_config(target: Path) -> tuple[bool, list[str]]:
@@ -263,6 +290,8 @@ def main() -> int:
                         help="overwrite existing agent files")
     parser.add_argument("--check", action="store_true",
                         help="compare canonical vs target (normalized), exit 1 on drift (no copy)")
+    parser.add_argument("--install-only", action="store_true",
+                        help="allow install to known CLI targets without activation (use setup_agents.py instead)")
     parser.add_argument("--source-ref", default=None,
                         help="git ref for metadata (default: auto-detect from HEAD)")
     parser.add_argument("--source-repo", default=None,
@@ -290,6 +319,14 @@ def main() -> int:
 
     if args.check:
         return do_check(source, target)
+
+    if not args.install_only and _is_known_cli_target(target):
+        print(f"ERROR: target looks like a real CLI agent directory: {target}", file=sys.stderr)
+        print("Direct install would wipe activated model/variant config.", file=sys.stderr)
+        print("Use setup_agents.py instead (install + activation):", file=sys.stderr)
+        print(f"  python3 scripts/setup_agents.py --target {args.target or '--global'} --force", file=sys.stderr)
+        print("Or pass --install-only to skip activation (template sync only).", file=sys.stderr)
+        return 1
 
     return do_install(source, target, source_repo, source_ref, args.status, args.force)
 

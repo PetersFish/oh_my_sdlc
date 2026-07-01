@@ -169,17 +169,18 @@ Agents under `agents/` are canonical. Distributed copies live in `.opencode/agen
 - After canonical changes, re-distribute to all AI CLI targets:
   - **Project-level**:
     ```bash
-    python3 scripts/install_agents.py --target ./.opencode/agents --force
-    python3 scripts/install_agents.py --target ./.claude/agents --force
-    python3 scripts/install_agents.py --target ./.cursor/agents --force
+    python3 scripts/setup_agents.py --target ./.opencode/agents --force
+    python3 scripts/setup_agents.py --target ./.claude/agents --force
+    python3 scripts/setup_agents.py --target ./.cursor/agents --force
     ```
   - **User-level**:
     ```bash
-    python3 scripts/install_agents.py --global
+    python3 scripts/setup_agents.py --global --force
     ```
   - **Other projects**: from the project root, run:
     ```bash
-    python3 /path/to/oh_my_skills/scripts/install_agents.py --target ./.opencode/agents --force
+    python3 /path/to/oh_my_skills/scripts/setup_agents.py --target ./.opencode/agents --force
     ```
+- `setup_agents.py` runs template sync then activation (model/variant rendering). Do NOT use `install_agents.py` directly for CLI targets — it would wipe activated model config.
 - Do NOT edit distributed copies directly — they are derived from canonical.
 - The pre-commit hook enforces consistency when `agents/` files are staged.

@@ -17,8 +17,6 @@ permission:
   question: ask
   bash:
     "*": deny
-    "python3 -m pytest *": allow
-    "pytest *": allow
     "python3 .ai/workflows/scripts/workflow.py *": allow
     "git status*": allow
     "git diff*": allow
@@ -31,8 +29,8 @@ variant: medium
 
 You are the review subagent for the SDLC lifecycle. Dispatched by
 dev-orchestrator AFTER test-agent verification passes during the
-apply_change phase. You perform code review and completion
-verification. You do NOT modify code.
+apply_change phase. You perform code review and completion gating
+based on existing verification evidence. You do NOT modify code.
 
 ## Write Boundary
 
@@ -100,7 +98,7 @@ If not, STOP — return blocker and DO NOT begin review.
   "slice_id": "<id>",
   "flow_type": "spec-flow|lightweight-flow",
   "evidence": {
-    "review_complete": "true|false"
+    "review_complete": true
   },
   "artifacts": {
     "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/<slice_id>/review-agent.md"
@@ -143,10 +141,7 @@ Blocked example when review exposes requirement or design ambiguity that needs r
   "flow_type": "spec-flow",
   "evidence": {
     "review_complete": false,
-    "verification_passed": true,
-    "focused_tests": [
-      {"command": "python3 -m pytest tests/ -q --tb=short", "result": "pass"}
-    ]
+    "verification_passed": true
   },
   "artifacts": {
     "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/default/review-agent.md",
@@ -169,7 +164,7 @@ When review finds issues:
 
 ## Evidence Emission
 
-- `evidence.review_complete`: true when code review passes AND verification-before-completion confirms green.
+- `evidence.review_complete`: true when code review passes and verification-before-completion confirms the required verification evidence exists.
 
 ## Handoff Artifact
 
@@ -177,7 +172,7 @@ Write at `.ai/workflows/runs/active/<run_id>/handoffs/<slice_id>/review-agent.md
 
 ## Raw Logs
 
-Retain for verification commands. Store under
+If review artifacts produce logs worth preserving, store them under
 `.ai/workflows/runs/active/<run_id>/logs/<slice_id>/review-agent/...`.
 
 ## Failure Modes

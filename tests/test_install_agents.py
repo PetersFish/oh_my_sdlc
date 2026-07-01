@@ -291,5 +291,74 @@ class TestInstallDoesNotInjectModelVariant(unittest.TestCase):
         self.assertNotIn("variant:", content)
 
 
+class TestInstallGuardrailForCliTargets(unittest.TestCase):
+    """install_agents.py refuses known CLI agent targets by default,
+    requiring --install-only to bypass the guardrail."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.source_root = os.path.join(self.tmp, "repo")
+        self.source_agents = os.path.join(self.source_root, "agents")
+        os.makedirs(self.source_agents, exist_ok=True)
+
+        write_file(self.source_root, "agents/test-agent.md",
+                   "---\nname: test\nmode: subagent\n---\n# Body\n")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp)
+
+    def test_refuses_opencode_agents_target_by_default(self):
+        """install_agents refuses .opencode/agents target without --install-only."""
+        target = os.path.join(self.tmp, "project", ".opencode", "agents")
+        rc, stdout, stderr = run_install(self.source_agents, target)
+        self.assertNotEqual(rc, 0, "should refuse known CLI target by default")
+        combined = f"{stdout}\n{stderr}"
+        self.assertIn("setup_agents.py", combined)
+        self.assertIn("--install-only", combined)
+
+    def test_refuses_claude_agents_target_by_default(self):
+        """install_agents refuses .claude/agents target without --install-only."""
+        target = os.path.join(self.tmp, "project", ".claude", "agents")
+        rc, stdout, stderr = run_install(self.source_agents, target)
+        self.assertNotEqual(rc, 0, "should refuse known CLI target by default")
+
+    def test_refuses_cursor_agents_target_by_default(self):
+        """install_agents refuses .cursor/agents target without --install-only."""
+        target = os.path.join(self.tmp, "project", ".cursor", "agents")
+        rc, stdout, stderr = run_install(self.source_agents, target)
+        self.assertNotEqual(rc, 0, "should refuse known CLI target by default")
+
+    def test_allows_opencode_agents_target_with_install_only(self):
+        """install_agents allows .opencode/agents target with --install-only."""
+        target = os.path.join(self.tmp, "project", ".opencode", "agents")
+        rc, stdout, stderr = run_install(self.source_agents, target, "--install-only")
+        self.assertEqual(rc, 0, f"should allow with --install-only, stderr={stderr!r}")
+        self.assertTrue(os.path.exists(os.path.join(target, "test-agent.md")))
+
+    def test_allows_unknown_target_by_default(self):
+        """install_agents allows arbitrary non-CLI targets without flag."""
+        target = os.path.join(self.tmp, "my-custom-target")
+        rc, stdout, stderr = run_install(self.source_agents, target)
+        self.assertEqual(rc, 0, f"should allow unknown target, stderr={stderr!r}")
+        self.assertTrue(os.path.exists(os.path.join(target, "test-agent.md")))
+
+    def test_guardrail_message_suggests_setup_agents(self):
+        """Guardrail error message points user to setup_agents.py."""
+        target = os.path.join(self.tmp, "project", ".opencode", "agents")
+        rc, stdout, stderr = run_install(self.source_agents, target)
+        combined = f"{stdout}\n{stderr}"
+        self.assertIn("setup_agents.py", combined)
+
+    def test_check_mode_bypasses_guardrail(self):
+        """--check mode is read-only and bypasses the guardrail."""
+        target = os.path.join(self.tmp, "project", ".opencode", "agents")
+        # check mode should not be blocked by guardrail (it's read-only)
+        rc, stdout, stderr = run_install(self.source_agents, target, "--check")
+        # May fail for other reasons (missing files), but should NOT fail
+        # due to the guardrail
+        combined = f"{stdout}\n{stderr}"
+        self.assertNotIn("--install-only", combined)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
