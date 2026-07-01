@@ -10,6 +10,13 @@ description: >-
 mode: subagent
 tools:
   bash: true
+  read: true
+  grep: true
+  glob: true
+  edit: true
+  write: true
+  question: true
+  skill: true
 permission:
   edit: allow
   bash:
@@ -23,8 +30,6 @@ permission:
   skill: allow
   task: deny
   question: ask
-model: openai/gpt-5.4
-variant: medium
 ---
 
 # Test Agent

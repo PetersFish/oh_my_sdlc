@@ -7,6 +7,15 @@ description: >-
   passing evidence before beginning. Does NOT begin review before
   independent verification is complete.
 mode: subagent
+tools:
+  bash: true
+  read: true
+  grep: true
+  glob: true
+  edit: true
+  write: true
+  question: true
+  skill: true
 permission:
   edit: allow
   bash:

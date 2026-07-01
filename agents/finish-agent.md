@@ -7,6 +7,15 @@ description: >-
   memory, and workflow hooks. Requires test-agent and review-agent
   evidence before proceeding. May proceed in blocked state for cleanup.
 mode: subagent
+tools:
+  bash: true
+  read: true
+  grep: true
+  glob: true
+  edit: true
+  write: true
+  question: true
+  skill: true
 permission:
   edit: allow
   bash:

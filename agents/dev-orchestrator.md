@@ -7,6 +7,14 @@ description: >-
   development task, resuming an active workflow, or when SDLC
   execution dispatch is needed.
 mode: primary
+tools:
+  bash: true
+  read: true
+  grep: true
+  glob: true
+  task: true
+  question: true
+  skill: true
 permission:
   edit: deny
   bash:

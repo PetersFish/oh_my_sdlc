@@ -9,6 +9,15 @@ description: >-
   For lightweight-flow, uses writing-plans. Does NOT execute tests or
   modify code.
 mode: subagent
+tools:
+  bash: true
+  read: true
+  grep: true
+  glob: true
+  edit: true
+  write: true
+  question: true
+  skill: true
 permission:
   edit: allow
   bash:

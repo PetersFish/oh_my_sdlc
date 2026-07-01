@@ -676,8 +676,8 @@ class TestAgentFrontmatter(unittest.TestCase):
             self.assertEqual(fm["permission"]["skill"], "allow",
                            f"{name}: skill should be allow")
 
-    def test_executable_subagents_explicitly_enable_bash_tool(self):
-        for name in ("implement-agent", "test-agent"):
+    def test_all_agents_explicitly_enable_bash_tool(self):
+        for name in AGENT_NAMES:
             for target in ("", ".opencode", ".claude", ".cursor"):
                 fm = _read_agent_frontmatter(target, name)
                 label = target or "canonical"
@@ -707,8 +707,8 @@ class TestAgentFrontmatter(unittest.TestCase):
                     f"{name}: tools mismatch in {target}"
                 )
 
-    def test_canonical_executable_subagent_tools_match_opencode_copy(self):
-        for name in ("implement-agent", "test-agent"):
+    def test_canonical_agent_tools_match_opencode_copy(self):
+        for name in AGENT_NAMES:
             canonical_fm = _read_agent_frontmatter("", name)
             opencode_fm = _read_agent_frontmatter(".opencode", name)
             self.assertEqual(
