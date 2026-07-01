@@ -18,6 +18,7 @@ tools:
   question: true
   skill: true
 permission:
+  todowrite: allow
   edit: allow
   bash:
     "python3 -m pytest *": allow

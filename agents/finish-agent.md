@@ -19,6 +19,7 @@ tools:
   question: true
   skill: true
 permission:
+  todowrite: allow
   edit: allow
   bash:
     "python3 .ai/workflows/scripts/workflow.py *": allow
