@@ -7,30 +7,22 @@ description: >-
   passing evidence before beginning. Does NOT begin review before
   independent verification is complete.
 mode: subagent
-model: openai/gpt-5.5
-variant: medium
-tools:
-  bash: true
-  read: true
-  grep: true
-  glob: true
-  edit: true
-  write: true
-  question: true
-  skill: true
 permission:
+  read: allow
+  grep: allow
+  glob: allow
   edit: allow
+  skill: allow
+  task: deny
+  question: ask
   bash:
+    "*": deny
     "python3 -m pytest *": allow
     "pytest *": allow
     "python3 .ai/workflows/scripts/workflow.py *": allow
     "git status*": allow
     "git diff*": allow
     "git log*": allow
-    "*": deny
-  skill: allow
-  task: deny
-  question: ask
 ---
 
 # Review Agent

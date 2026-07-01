@@ -5,9 +5,9 @@
   "source_ref": "HEAD",
   "status": "stable",
   "target": ".cursor/skills/sdlc-project-bootstrap",
-  "installed_at": "2026-07-01T03:20:05.246307Z",
+  "installed_at": "2026-07-01T06:22:25.345979Z",
   "backport_policy": "review-required",
-  "payload_hash": "ff9464cae0ee75c6f3bae02d6d54adc8bd71e316bd4bd29964fda91da4f6890c",
+  "payload_hash": "f8a27a55264efe2220453398bcd59380e8182517b4d5cf94091655b09c7d1c40",
   "files": [
     "SKILL.md",
     "scripts/init_foundations.py",

@@ -208,6 +208,50 @@ class TestSdlcProjectBootstrapSkill(unittest.TestCase):
         self.assertGreater(step3_idx, -1)
         self.assertLess(step2_idx, step3_idx, "OpenSpec step must come before memory step")
 
+    def test_bootstrap_skill_mentions_agent_setup_step(self) -> None:
+        """Bootstrap documentation includes the agent setup step."""
+        content = (BOOTSTRAP_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("Step 5:", content)
+        self.assertIn("Agent", content)
+        self.assertIn("setup_agents.py", content)
+
+    def test_bootstrap_skill_routes_setup_through_setup_agents_script_only(self) -> None:
+        """Bootstrap does not parse YAML or edit frontmatter directly."""
+        content = (BOOTSTRAP_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("setup_agents.py", content)
+        # Must route through scripts, not manual editing
+        guardrails = content[content.find("## Guardrails"):]
+        self.assertIn("Do NOT parse agent config YAML", guardrails)
+        self.assertIn("edit agent frontmatter directly", guardrails)
+        self.assertIn("Do NOT create a new `sdlc-agent-config` skill", guardrails)
+
+    def test_bootstrap_skill_mentions_restart_after_agent_refresh(self) -> None:
+        """User guidance includes restart reminder after agent changes."""
+        content = (BOOTSTRAP_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("restart", content.lower())
+        self.assertIn("agent changes to take effect", content.lower())
+
+    def test_bootstrap_skill_does_not_introduce_sdlc_agent_config_skill(self) -> None:
+        """This change does NOT create a new sdlc-agent-config skill."""
+        content = (BOOTSTRAP_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        self.assertNotIn("name: sdlc-agent-config", content,
+                         "bootstrap must not define a new sdlc-agent-config skill")
+        self.assertNotIn("Use when initializing sdlc-agent-config", content,
+                         "bootstrap must not introduce a standalone sdlc-agent-config skill description")
+
+    def test_canonical_agents_do_not_hardcode_model_or_variant(self) -> None:
+        """Canonical agents/*.md no longer contain model or variant fields."""
+        agent_names = [
+            "dev-orchestrator", "plan-agent", "implement-agent",
+            "test-agent", "review-agent", "finish-agent",
+        ]
+        for name in agent_names:
+            path = REPO_ROOT / "agents" / f"{name}.md"
+            self.assertTrue(path.exists(), f"Canonical agent missing: {path}")
+            fm = read_frontmatter(path)
+            self.assertNotIn("model", fm, f"{name}: canonical agent must not hardcode model")
+            self.assertNotIn("variant", fm, f"{name}: canonical agent must not hardcode variant")
+
 
 class TestAgentsMdTemplate(unittest.TestCase):
     """Validate the bundled AGENTS.md template."""

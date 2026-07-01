@@ -9,28 +9,20 @@ description: >-
   For lightweight-flow, uses writing-plans. Does NOT execute tests or
   modify code.
 mode: subagent
-model: openai/gpt-5.5
-variant: medium
-tools:
-  bash: true
-  read: true
-  grep: true
-  glob: true
-  edit: true
-  write: true
-  question: true
-  skill: true
 permission:
+  read: allow
+  grep: allow
+  glob: allow
   edit: allow
+  skill: allow
+  task: deny
+  question: allow
   bash:
+    "*": deny
     "python3 .ai/workflows/scripts/workflow.py *": allow
     "git status*": allow
     "git diff*": allow
     "git log*": allow
-    "*": deny
-  skill: allow
-  task: deny
-  question: allow
 ---
 
 # Plan Agent

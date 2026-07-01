@@ -4,9 +4,14 @@
 Canonical source: agents/ (relative to this script)
 Target: --global => ~/.config/opencode/agents/ (default), --target <dir>
 
+This script handles TEMPLATE SYNC only — it copies canonical prompts and the
+config template but never renders activation-managed ``model`` / ``variant``
+frontmatter fields.  Activation is a separate step (activate_agents_config.py).
+
 Modes:
-  (default)   Install agents to target, writing .agent-install.json metadata.
-  --check     Compare canonical vs target: exit 0 if in sync, exit 1 on drift.
+  (default)   Install agent markdown + config template to target.
+  --check     Compare canonical vs target using normalized content (ignores
+              model/variant), exit 0 if in sync, exit 1 on drift.
 """
 
 from __future__ import annotations
@@ -20,12 +25,25 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-SKIP_NAMES = {".agent-install.json", ".DS_Store"}
-SKIP_SUFFIXES = (".pyc",)
+from agent_config_lib import (
+    MODEL_PROFILES_FILENAME,
+    CONFIG_SUBDIR,
+    SKIP_NAMES,
+    SKIP_SUFFIXES,
+    scan_agent_markdown_files,
+    normalized_prompt_compare,
+    get_target_config_path,
+)
 
 
 def _canonical_source(script_dir: Path) -> Path:
     return (script_dir / ".." / "agents").resolve()
+
+
+def _canonical_config_template(source: Path) -> Path:
+    """Return path to the canonical config template, or None if missing."""
+    path = source / CONFIG_SUBDIR / MODEL_PROFILES_FILENAME
+    return path if path.is_file() else None
 
 
 def _source_repo_root(source: Path) -> Path:
@@ -49,19 +67,9 @@ def _git_source_ref(repo_root: Path) -> str:
     return "unknown"
 
 
-def _scan_dir(directory: Path) -> dict[str, str]:
-    """Scan directory for *.md files, returning {filename: sha256}."""
-    files: dict[str, str] = {}
-    if not directory.is_dir():
-        return files
-    for entry in sorted(directory.iterdir()):
-        if entry.name in SKIP_NAMES:
-            continue
-        if entry.name.endswith(SKIP_SUFFIXES):
-            continue
-        if entry.is_file() and entry.suffix == ".md":
-            files[entry.name] = hashlib.sha256(entry.read_bytes()).hexdigest()
-    return files
+def _read_file(path: Path) -> str:
+    """Read file content as text."""
+    return path.read_text(encoding="utf-8")
 
 
 def _write_metadata(target: Path, source_repo: str, source_ref: str,
@@ -83,27 +91,75 @@ def _global_target() -> Path:
     return Path.home() / ".config" / "opencode" / "agents"
 
 
+# ---- check mode (normalized) ----
+
+def _check_target_config(target: Path) -> tuple[bool, list[str]]:
+    """Verify that the target has an effective config initialized.
+
+    Returns (ok, messages)."""
+    config_path = get_target_config_path(target)
+    if not config_path.is_file():
+        return False, [f"target config missing: {config_path}"]
+    return True, []
+
+
 def do_check(source: Path, target: Path) -> int:
-    src_files = _scan_dir(source)
-    tgt_files = _scan_dir(target)
+    """Compare canonical vs target using normalized content (ignore model/variant)."""
+    src_dir = source
+    tgt_dir = target
+
+    if not src_dir.is_dir():
+        print("ERROR: canonical source directory not found", file=sys.stderr)
+        return 1
+
+    # Read source files
+    src_files: dict[str, str] = {}
+    for name in sorted(src_dir.iterdir()):
+        if name.name in SKIP_NAMES:
+            continue
+        if name.name.endswith(SKIP_SUFFIXES):
+            continue
+        if name.is_file() and name.suffix == ".md":
+            src_files[name.name] = _read_file(name)
 
     if not src_files:
         print("WARNING: canonical source has no .md files", file=sys.stderr)
         return 0
 
+    # Read target files
+    tgt_files: dict[str, str] = {}
+    if tgt_dir.is_dir():
+        for entry in sorted(tgt_dir.iterdir()):
+            if entry.name in SKIP_NAMES:
+                continue
+            if entry.name.endswith(SKIP_SUFFIXES):
+                continue
+            if entry.is_file() and entry.suffix == ".md":
+                tgt_files[entry.name] = _read_file(entry)
+
     all_ok = True
-    for name, src_hash in src_files.items():
-        tgt_hash = tgt_files.get(name)
-        if tgt_hash is None:
+
+    # Check each source file against target using normalized comparison
+    for name, src_content in src_files.items():
+        tgt_content = tgt_files.get(name)
+        if tgt_content is None:
             print(f"DRIFT: {name} (missing)")
             all_ok = False
-        elif tgt_hash != src_hash:
+        elif not normalized_prompt_compare(src_content, tgt_content):
             print(f"DRIFT: {name} (changed)")
             all_ok = False
 
+    # Check for extra files in target not in source
     for name in tgt_files:
         if name not in src_files:
             print(f"DRIFT: {name} (extra — not in canonical)")
+            all_ok = False
+
+    # Check target config exists
+    config_ok, config_msgs = _check_target_config(target)
+    if not config_ok:
+        for msg in config_msgs:
+            print(f"DRIFT: {msg}")
             all_ok = False
 
     if all_ok:
@@ -112,39 +168,89 @@ def do_check(source: Path, target: Path) -> int:
     return 1
 
 
+# ---- install mode ----
+
+def _copy_config_template(source: Path, target: Path) -> tuple[bool, str]:
+    """Copy canonical config template to target config path if it does not exist.
+
+    Returns (copied, message)."""
+    config_template = _canonical_config_template(source)
+    if config_template is None:
+        return False, "no canonical config template found"
+
+    target_config = get_target_config_path(target)
+    if target_config.is_file():
+        return False, f"target config already exists, preserved: {target_config}"
+
+    target_config.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(str(config_template), str(target_config))
+    return True, f"config template initialized: {target_config}"
+
+
 def do_install(source: Path, target: Path, source_repo: str, source_ref: str,
                status: str, force: bool) -> int:
-    src_files = _scan_dir(source)
+    """Install canonical agent markdown files to target (template sync only).
+
+    Also initializes the target config template if missing.  Activation-managed
+    fields (model/variant) are never injected by this step."""
+    src_dir = source
+    tgt_dir = target
+
+    if not src_dir.is_dir():
+        print("ERROR: canonical source directory not found", file=sys.stderr)
+        print("Is this script inside the oh_my_skills repo?", file=sys.stderr)
+        return 1
+
+    # Collect source .md files (top-level only)
+    src_files: dict[str, Path] = {}
+    for entry in sorted(src_dir.iterdir()):
+        if entry.name in SKIP_NAMES:
+            continue
+        if entry.name.endswith(SKIP_SUFFIXES):
+            continue
+        if entry.is_file() and entry.suffix == ".md":
+            src_files[entry.name] = entry
 
     if not src_files:
         print("WARNING: no .md files found in canonical source", file=sys.stderr)
         return 0
 
-    target.mkdir(parents=True, exist_ok=True)
+    tgt_dir.mkdir(parents=True, exist_ok=True)
 
-    existing_conflicts = [name for name in src_files if (target / name).exists()]
+    # Check for pre-existing agent files
+    existing_conflicts = [
+        name for name in src_files if (tgt_dir / name).exists()
+    ]
     if existing_conflicts and not force:
         print("ERROR: target already contains agent files. Re-run with --force to overwrite:", file=sys.stderr)
         for name in existing_conflicts:
             print(f"  - {name}", file=sys.stderr)
         return 1
 
+    # Copy agent markdown files
     installed: dict[str, str] = {}
-    for name, src_hash in src_files.items():
-        src_path = source / name
-        tgt_path = target / name
+    for name, src_path in src_files.items():
+        tgt_path = tgt_dir / name
         action = "overwritten" if tgt_path.exists() else "installed"
         shutil.copy2(str(src_path), str(tgt_path))
-        installed[name] = src_hash
+        # Hash the installed file for metadata
+        installed[name] = hashlib.sha256(tgt_path.read_bytes()).hexdigest()
         print(f"INSTALLED: {name} ({action})")
 
-    _write_metadata(target, source_repo, source_ref, status, installed)
+    # Initialize target config template if missing (preserve existing)
+    copied, config_msg = _copy_config_template(src_dir, tgt_dir)
+    if copied:
+        print(config_msg)
+
+    _write_metadata(tgt_dir, source_repo, source_ref, status, installed)
     return 0
 
 
+# ---- main ----
+
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Install OpenCode agent files from canonical source to target."
+        description="Install OpenCode agent files from canonical source to target (template sync only)."
     )
     parser.add_argument("--source", default=None,
                         help="canonical agents/ directory (default: derived from script location)")
@@ -156,7 +262,7 @@ def main() -> int:
     parser.add_argument("--force", action="store_true",
                         help="overwrite existing agent files")
     parser.add_argument("--check", action="store_true",
-                        help="compare canonical vs target, exit 1 on drift (no copy)")
+                        help="compare canonical vs target (normalized), exit 1 on drift (no copy)")
     parser.add_argument("--source-ref", default=None,
                         help="git ref for metadata (default: auto-detect from HEAD)")
     parser.add_argument("--source-repo", default=None,
@@ -180,12 +286,12 @@ def main() -> int:
 
     repo_root = _source_repo_root(source)
     source_ref = args.source_ref or _git_source_ref(repo_root)
-    source_repo = Path(args.source_repo).resolve() if args.source_repo else repo_root
+    source_repo = str(Path(args.source_repo).resolve()) if args.source_repo else str(repo_root)
 
     if args.check:
         return do_check(source, target)
 
-    return do_install(source, target, str(source_repo), source_ref, args.status, args.force)
+    return do_install(source, target, source_repo, source_ref, args.status, args.force)
 
 
 if __name__ == "__main__":

@@ -6,21 +6,17 @@ description: >-
   lightweight-flow, uses executing-plans and git-worktrees. Returns
   focused verification evidence, changed artifacts, and handoff paths.
 mode: subagent
-model: opencode-go/deepseek-v4-pro
-variant: medium
-tools:
-  bash: true
-  read: true
-  grep: true
-  glob: true
-  edit: true
-  write: true
-  question: true
-  skill: true
 permission:
+  read: allow
+  grep: allow
+  glob: allow
   todowrite: allow
   edit: allow
+  skill: allow
+  task: deny
+  question: ask
   bash:
+    "*": deny
     "python3 -m pytest *": allow
     "pytest *": allow
     "python3 .ai/workflows/scripts/workflow.py *": allow
@@ -30,10 +26,6 @@ permission:
     "git branch*": allow
     "git worktree*": allow
     "git check-ignore*": allow
-    "*": deny
-  skill: allow
-  task: deny
-  question: ask
 ---
 
 # Implement Agent

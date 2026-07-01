@@ -8,31 +8,23 @@ description: >-
   implement-agent by default. Escalates to plan-agent only for
   requirement or design ambiguity. Does NOT modify implementation code.
 mode: subagent
-model: openai/gpt-5.4
-variant: medium
-tools:
-  bash: true
-  read: true
-  grep: true
-  glob: true
-  edit: true
-  write: true
-  question: true
-  skill: true
 permission:
+  read: allow
+  grep: allow
+  glob: allow
   todowrite: allow
   edit: allow
+  skill: allow
+  question: ask
+  task: deny
   bash:
+    "*": deny
     "python3 -m pytest *": allow
     "pytest *": allow
     "python3 .ai/workflows/scripts/workflow.py *": allow
     "git status*": allow
     "git diff*": allow
     "git log*": allow
-    "*": deny
-  skill: allow
-  task: deny
-  question: ask
 ---
 
 # Test Agent
@@ -49,6 +41,13 @@ your role. You may write workflow artifacts only.
 
 You must not modify source code, tests, prompts outside your own workflow
 artifact scope, configs, or user docs.
+
+Allowed write paths:
+- `.ai/workflows/runs/active/<run_id>/handoffs/<slice_id>/test-agent.md`
+- `.ai/workflows/runs/active/<run_id>/logs/<slice_id>/test-agent/**`
+
+All other writes are forbidden unless explicitly instructed by
+dev-orchestrator for workflow artifact repair.
 
 ## Required Skills
 
@@ -74,9 +73,12 @@ Load these skills before acting:
 - Observational git is allowed only for workflow-state or repository-state
   inspection. Observational git must not become a substitute for codebase
   exploration.
-- If a preferred tool is unavailable, unindexed, or demonstrably
-  insufficient, you MUST stop and return a blocker with remediation. You
-  must not degrade to bash exploration.
+- For codebase exploration, if a preferred read/search/structural tool is
+  unavailable, unindexed, or demonstrably insufficient, you MUST stop and return a blocker
+  with remediation. You must not degrade to bash exploration.
+- This restriction does not apply to required verification commands.
+  Pytest commands and explicitly allowlisted workflow commands MUST be
+  executed through Bash when Bash is available.
 
 ## Inputs
 

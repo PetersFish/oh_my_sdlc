@@ -556,7 +556,7 @@ class TestAgentFrontmatter(unittest.TestCase):
 
     VALID_FRONTMATTER_FIELDS = {
         "name", "model", "variant", "description", "mode", "hidden",
-        "color", "steps", "permission", "tools", "disable", "temperature", "top_p",
+        "color", "steps", "permission", "disable", "temperature", "top_p",
         "options", "license", "compatibility", "metadata",
     }
 
@@ -579,6 +579,11 @@ class TestAgentFrontmatter(unittest.TestCase):
         for name in AGENT_NAMES:
             fm = _read_agent_frontmatter(".opencode", name)
             self.assertIsNotNone(fm.get("permission"), f"{name} missing permission")
+
+    def test_all_agents_use_permission_only_not_legacy_tools(self):
+        for name in AGENT_NAMES:
+            fm = _read_agent_frontmatter(".opencode", name)
+            self.assertNotIn("tools", fm, f"{name}: legacy tools config should be removed")
 
     def test_dev_orchestrator_edit_is_deny(self):
         fm = _read_agent_frontmatter(".opencode", "dev-orchestrator")
@@ -621,6 +626,35 @@ class TestAgentFrontmatter(unittest.TestCase):
                     "deny",
                     f"{name}: generic bash fallback must be denied",
                 )
+
+    def test_bash_deny_rule_precedes_specific_allows(self):
+        for name in AGENT_NAMES:
+            fm = _read_agent_frontmatter(".opencode", name)
+            bash_rules = fm["permission"].get("bash", {})
+            if isinstance(bash_rules, dict):
+                self.assertEqual(
+                    next(iter(bash_rules)),
+                    "*",
+                    f"{name}: bash deny catch-all must come before specific allow rules",
+                )
+
+    def test_all_agents_explicitly_allow_read_search_permissions(self):
+        for name in AGENT_NAMES:
+            fm = _read_agent_frontmatter(".opencode", name)
+            permission = fm["permission"]
+            self.assertEqual(permission.get("read"), "allow", f"{name}: read should be allow")
+            self.assertEqual(permission.get("grep"), "allow", f"{name}: grep should be allow")
+            self.assertEqual(permission.get("glob"), "allow", f"{name}: glob should be allow")
+
+    def test_dev_orchestrator_skill_deny_rule_precedes_specific_allows(self):
+        fm = _read_agent_frontmatter(".opencode", "dev-orchestrator")
+        skill_rules = fm["permission"].get("skill", {})
+        self.assertIsInstance(skill_rules, dict)
+        self.assertEqual(
+            next(iter(skill_rules)),
+            "*",
+            "dev-orchestrator: skill deny catch-all must come before specific allow rules",
+        )
 
     def test_implement_agent_allows_observational_git_only(self):
         fm = _read_agent_frontmatter(".opencode", "implement-agent")
@@ -675,17 +709,6 @@ class TestAgentFrontmatter(unittest.TestCase):
             fm = _read_agent_frontmatter(".opencode", name)
             self.assertEqual(fm["permission"]["skill"], "allow",
                            f"{name}: skill should be allow")
-
-    def test_all_agents_explicitly_enable_bash_tool(self):
-        for name in AGENT_NAMES:
-            for target in ("", ".opencode", ".claude", ".cursor"):
-                fm = _read_agent_frontmatter(target, name)
-                label = target or "canonical"
-                self.assertEqual(
-                    fm.get("tools", {}).get("bash"),
-                    True,
-                    f"{name}: {label} must explicitly enable bash tool for command execution",
-                )
 
     def test_claude_cursor_copies_match_opencode(self):
         for name in AGENT_NAMES:

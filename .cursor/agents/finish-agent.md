@@ -7,21 +7,17 @@ description: >-
   memory, and workflow hooks. Requires test-agent and review-agent
   evidence before proceeding. May proceed in blocked state for cleanup.
 mode: subagent
-model: opencode-go/deepseek-v4-pro
-variant: medium
-tools:
-  bash: true
-  read: true
-  grep: true
-  glob: true
-  edit: true
-  write: true
-  question: true
-  skill: true
 permission:
+  read: allow
+  grep: allow
+  glob: allow
   todowrite: allow
   edit: allow
+  skill: allow
+  task: deny
+  question: ask
   bash:
+    "*": deny
     "python3 .ai/workflows/scripts/workflow.py *": allow
     "python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py *": allow
     "git status*": allow
@@ -29,10 +25,6 @@ permission:
     "git log*": allow
     "git branch*": allow
     "git worktree*": allow
-    "*": deny
-  skill: allow
-  task: deny
-  question: ask
 ---
 
 # Finish Agent

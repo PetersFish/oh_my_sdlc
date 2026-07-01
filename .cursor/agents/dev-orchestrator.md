@@ -7,32 +7,25 @@ description: >-
   development task, resuming an active workflow, or when SDLC
   execution dispatch is needed.
 mode: primary
-model: openai/gpt-5.4
-variant: medium
-tools:
-  bash: true
-  read: true
-  grep: true
-  glob: true
-  task: true
-  question: true
-  skill: true
 permission:
+  read: allow
+  grep: allow
+  glob: allow
   todowrite: allow
   edit: deny
+  task: allow
+  question: allow
   bash:
+    "*": deny
     "python3 .ai/workflows/scripts/workflow.py *": allow
     "python3 skills/_lib/resolve_dispatch_cli.py *": allow
     "git status*": allow
     "git diff*": allow
     "git log*": allow
-    "*": deny
   skill:
+    "*": deny
     "sdlc-repository-memory-load": allow
     "brainstorming": allow
-    "*": deny
-  task: allow
-  question: allow
 ---
 
 # SDLC Dev Orchestrator
