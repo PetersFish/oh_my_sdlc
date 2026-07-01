@@ -181,7 +181,7 @@ Only after the run is confirmed usable may you call `before-dispatch`.
 
 ## Dispatch Lifecycle Hooks
 
-Every subagent dispatch MUST go through two workflow.py hooks:
+Every **lifecycle** subagent dispatch (plan-agent, implement-agent, test-agent, review-agent, finish-agent) MUST go through two workflow.py hooks:
 
 ### before_dispatch — validates run state BEFORE dispatching
 
@@ -207,6 +207,15 @@ Interpreting after_dispatch output:
 | review-agent success | `complete_phase` | Call workflow.py complete-phase |
 | finish-agent success | `complete_phase` | Call workflow.py complete-phase, then advance |
 | Any agent failure | `block` / `dispatch_*_agent` | Follow recommended_next_action |
+
+### General Task Dispatch
+
+For general task agents not in the lifecycle mapping (arbitrary agents dispatched via the `task` tool), skip before-dispatch and after-dispatch hooks. These tasks do not affect workflow lifecycle state.
+
+General task dispatch flow:
+1. Dispatch subagent via `task` tool
+2. Receive agent result
+3. Forward result to user (no workflow hooks)
 
 ## User-Facing Dispatch Announcements
 

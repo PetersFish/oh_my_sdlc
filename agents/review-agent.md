@@ -83,14 +83,10 @@ If not, STOP — return blocker and DO NOT begin review.
 
 ## Review Sequence
 
-1. Verify test-agent evidence is complete.
+1. Verify test-agent evidence is complete and shows `verification_passed: true`.
 2. Load `requesting-code-review` — surface completed work for review.
 3. When feedback arrives, load `receiving-code-review` — evaluate technically.
-4. Load `verification-before-completion` — run verification commands:
-   ```
-   python3 -m pytest tests/ -q --tb=short
-   ```
-5. Only claim completion when all checks pass.
+4. Only claim completion when code review passes.
 
 ## Output
 
@@ -122,17 +118,14 @@ Blocked example when review finds an executable issue that implement-agent must 
   "flow_type": "lightweight-flow",
   "evidence": {
     "review_complete": false,
-    "verification_passed": false,
-    "focused_tests": [
-      {"command": "python3 -m pytest tests/ -q --tb=short", "result": "fail"}
-    ]
+    "verification_passed": true
   },
   "artifacts": {
     "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/default/review-agent.md",
     "raw_log_paths": []
   },
   "blockers": [
-    {"reason": "completion_verification_failed", "message": "Focused verification failed during review; implementation changes are required."}
+    {"reason": "review_blocked", "message": "Review found implementation issues that must be fixed."}
   ],
   "recommended_next_action": "dispatch_implement_agent"
 }
@@ -191,4 +184,3 @@ Retain for verification commands. Store under
 |---|---|---|
 | No test-agent evidence | `missing_verification_evidence` | Wait for test-agent |
 | Code review found issues | `review_blocked` | Route back to implement-agent |
-| Completion verification failed | `completion_verification_failed` | Route back to implement-agent |
