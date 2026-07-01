@@ -8,8 +8,8 @@ description: >-
   implement-agent by default. Escalates to plan-agent only for
   requirement or design ambiguity. Does NOT modify implementation code.
 mode: subagent
-model: openai/gpt-5.4
-variant: medium
+tools:
+  bash: true
 permission:
   edit: allow
   bash:
@@ -151,7 +151,7 @@ Stop at first failure. Produce diagnostic evidence. Use `systematic-debugging` b
 | Outcome | Route | blocker.reason |
 |---|---|---|
 | All passes | dispatch_review_agent | — |
-| Executable failure | back_to_implement | verification_failure, overfit_detected, regression_failure |
+| Executable failure | back_to_implement | verification_failure, overfit_detected |
 | Requirement/design ambiguity | back_to_plan | requirement_ambiguity, design_uncertainty |
 | Environment broken | surface to user | environment_failure |
 

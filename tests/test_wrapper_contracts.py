@@ -485,7 +485,7 @@ AGENT_SUBAGENTS = [n for n in AGENT_NAMES if n != "dev-orchestrator"]
 REQUIRED_SKILLS_MAP = {
     "dev-orchestrator": ["sdlc-repository-memory-load", "brainstorming"],
     "plan-agent": ["brainstorming", "writing-plans"],
-    "implement-agent": ["test-driven-development", "executing-plans", "using-git-worktrees", "implementation-contract-discipline"],
+    "implement-agent": ["test-driven-development", "systematic-debugging", "executing-plans", "using-git-worktrees", "implementation-contract-discipline"],
     "test-agent": ["systematic-debugging", "behavioral-test-design", "sdlc-evalops"],
     "review-agent": ["requesting-code-review", "receiving-code-review", "verification-before-completion"],
     "finish-agent": ["finishing-a-development-branch", "sdlc-openspec-memory-sync", "sdlc-repository-memory-sync", "sdlc-roadmap"],
@@ -556,7 +556,7 @@ class TestAgentFrontmatter(unittest.TestCase):
 
     VALID_FRONTMATTER_FIELDS = {
         "name", "model", "variant", "description", "mode", "hidden",
-        "color", "steps", "permission", "disable", "temperature", "top_p",
+        "color", "steps", "permission", "tools", "disable", "temperature", "top_p",
         "options", "license", "compatibility", "metadata",
     }
 
@@ -676,6 +676,17 @@ class TestAgentFrontmatter(unittest.TestCase):
             self.assertEqual(fm["permission"]["skill"], "allow",
                            f"{name}: skill should be allow")
 
+    def test_executable_subagents_explicitly_enable_bash_tool(self):
+        for name in ("implement-agent", "test-agent"):
+            for target in ("", ".opencode", ".claude", ".cursor"):
+                fm = _read_agent_frontmatter(target, name)
+                label = target or "canonical"
+                self.assertEqual(
+                    fm.get("tools", {}).get("bash"),
+                    True,
+                    f"{name}: {label} must explicitly enable bash tool for command execution",
+                )
+
     def test_claude_cursor_copies_match_opencode(self):
         for name in AGENT_NAMES:
             opencode_fm = _read_agent_frontmatter(".opencode", name)
@@ -690,6 +701,21 @@ class TestAgentFrontmatter(unittest.TestCase):
                     target_fm.get("permission", {}).get("edit"),
                     f"{name}: edit permission mismatch in {target}"
                 )
+                self.assertEqual(
+                    opencode_fm.get("tools"),
+                    target_fm.get("tools"),
+                    f"{name}: tools mismatch in {target}"
+                )
+
+    def test_canonical_executable_subagent_tools_match_opencode_copy(self):
+        for name in ("implement-agent", "test-agent"):
+            canonical_fm = _read_agent_frontmatter("", name)
+            opencode_fm = _read_agent_frontmatter(".opencode", name)
+            self.assertEqual(
+                canonical_fm.get("tools"),
+                opencode_fm.get("tools"),
+                f"{name}: canonical tools must match .opencode copy",
+            )
 
 
 class TestAgentPromptBody(unittest.TestCase):
@@ -777,10 +803,43 @@ class TestAgentPromptBody(unittest.TestCase):
         self.assertIn("failing test", body.lower())
         self.assertIn("focused_tests", body)
 
+    def test_implement_agent_success_example_uses_boolean_contract_fields(self):
+        body = self._read_agent_body("implement-agent")
+        self.assertIn('"tasks_complete": true', body)
+        self.assertIn('"tdd_passed": true', body)
+        self.assertNotIn('"tasks_complete": "true|false"', body)
+        self.assertNotIn('"tdd_passed": "true|false"', body)
+
     def test_implement_agent_includes_blocked_and_failed_examples(self):
         body = self._read_agent_body("implement-agent")
         self.assertIn('"status": "blocked"', body)
         self.assertIn('"status": "failed"', body)
+
+    def test_implement_agent_forbids_claiming_pass_when_commands_not_run(self):
+        for target in ("", ".opencode", ".claude", ".cursor"):
+            path = _agent_path(target, "implement-agent")
+            with open(path) as f:
+                content = f.read()
+            idx = content.find("\n---", 3)
+            body = content[idx + 4:] if idx != -1 else ""
+            label = target or "canonical"
+            self.assertIn("not_run", body, f"{label}: missing not_run guidance")
+            self.assertIn("requires_verification", body, f"{label}: missing requires_verification guidance")
+            self.assertIn("must not report `pass`", body.lower(), f"{label}: missing explicit no-fake-pass rule")
+
+    def test_implement_agent_honesty_guidance_matches_opencode_copy(self):
+        canonical_path = _agent_path("", "implement-agent")
+        opencode_path = _agent_path(".opencode", "implement-agent")
+        with open(canonical_path) as f:
+            canonical = f.read()
+        with open(opencode_path) as f:
+            opencode = f.read()
+        for marker in ("not_run", "requires_verification", "must not report `pass`"):
+            self.assertEqual(
+                marker in canonical,
+                marker in opencode,
+                f"implement-agent: marker {marker!r} drifted between canonical and .opencode copy",
+            )
 
     def test_review_agent_includes_blocked_routing_examples(self):
         body = self._read_agent_body("review-agent")
@@ -796,6 +855,11 @@ class TestAgentPromptBody(unittest.TestCase):
         body = self._read_agent_body("test-agent")
         self.assertIn("focused test", body.lower())
         self.assertIn("regression", body.lower())
+
+    def test_test_agent_routing_table_uses_documented_failure_reasons_only(self):
+        body = self._read_agent_body("test-agent")
+        self.assertIn("verification_failure, overfit_detected", body)
+        self.assertNotIn("regression_failure", body)
 
     def test_each_agent_mentions_required_skills(self):
         for name in AGENT_NAMES:

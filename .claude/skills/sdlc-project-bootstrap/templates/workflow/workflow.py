@@ -1330,7 +1330,10 @@ def cmd_resume(root, args):
 
     wf = load_workflow(root, state.get("workflow", "sdlc-main"))
     if wf:
-        phase = _infer_phase(root, subject_type, subject_id)
+        effective_subject_id = subject_id
+        if subject_type == "spec_change":
+            effective_subject_id = state.get("context", {}).get("change_id") or subject_id
+        phase = _infer_phase(root, subject_type, effective_subject_id)
         state["current_phase"] = phase
         _run_loaders(root, state, wf)
         _calc_readiness(state, wf)
@@ -1735,6 +1738,20 @@ def cmd_after_dispatch(root, args):
             for ek in phase_evidence_keys:
                 if ek in agent_evidence and ek not in evidence:
                     evidence[ek] = agent_evidence[ek]
+
+    # Synchronize canonical change_id from provider-created spec artifacts.
+    # When a provider (e.g., OpenSpec) normalizes the change_id during artifact
+    # creation, the agent result carries the canonical value.  Update context so
+    # that later phases (apply_change, archive_change) look up the correct id.
+    if agent_status == "success":
+        agent_change_id = (
+            agent_evidence.get("change_id")
+            or (agent_result.get("artifacts") or {}).get("change_id")
+        )
+        if agent_change_id:
+            current_change_id = state.get("context", {}).get("change_id", "")
+            if agent_change_id != current_change_id:
+                state.setdefault("context", {})["change_id"] = agent_change_id
 
     next_cmd = "complete-phase"
     recommended_next_action = agent_recommended or "complete_phase"

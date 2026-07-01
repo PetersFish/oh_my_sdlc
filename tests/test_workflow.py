@@ -912,6 +912,33 @@ class TestResume(FixtureBase):
         data = json.loads(out)
         self.assertIn("no active run found", data["error"])
 
+    def test_resume_spec_change_uses_context_change_id_for_phase_inference(self):
+        canonical_change_id = "canonical-change"
+        self._make_openspec_change(canonical_change_id)
+        self._make_task_file(canonical_change_id, completed=False)
+        run_workflow(
+            self.tmp, "start",
+            subject_type="spec_change",
+            subject_id="original-subject",
+        )
+        state = self._read_current_state()
+        state["context"]["change_id"] = canonical_change_id
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(
+            self.tmp, "resume",
+            subject_type="spec_change",
+            subject_id="original-subject",
+        )
+
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["current_phase"], "apply_change")
+        self.assertEqual(
+            data["evidence"]["openspec_status"]["classification"],
+            "in-progress",
+        )
+
     def test_resume_without_subject_args_lists_runs(self):
         run_workflow(
             self.tmp, "start",
@@ -3787,6 +3814,140 @@ class TestDispatchHooks(FixtureBase):
         self.assertEqual(data["workflow_args"]["exit_criteria_satisfied"], "spec_artifacts_done")
         self.assertEqual(data["recommended_next_action"], "complete_phase")
         self.assertEqual(data["blockers"], [])
+
+    # --- change_id synchronization from provider-created spec artifacts ---
+
+    def test_after_dispatch_syncs_change_id_from_agent_evidence(self):
+        """Successful agent result with evidence.change_id updates context.change_id."""
+        # Start a run with original subject_id as the change_id
+        run_workflow(
+            self.tmp, "start",
+            subject_type="spec_change",
+            subject_id="subagent-model-config",
+        )
+        state = self._read_current_state()
+        self.assertEqual(state["context"]["change_id"], "subagent-model-config")
+
+        # After-dispatch with agent result containing normalized change_id
+        agent_result = json.dumps({
+            "status": "success",
+            "evidence": {
+                "change_id": "centralize-subagent-model-config",
+                "criteria_satisfied": "spec_artifacts_done",
+                "spec_artifacts_done": True,
+            },
+            "blockers": [],
+        })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="plan-agent",
+            value=agent_result,
+        )
+        self.assertEqual(rc, 0)
+
+        # Verify context.change_id was synchronized to the canonical value
+        updated = self._read_current_state()
+        self.assertEqual(
+            updated["context"].get("change_id"),
+            "centralize-subagent-model-config",
+            "context.change_id should be synchronized from agent evidence",
+        )
+
+    def test_after_dispatch_does_not_overwrite_change_id_when_same(self):
+        """When agent returns same change_id, context remains unchanged."""
+        run_workflow(
+            self.tmp, "start",
+            subject_type="spec_change",
+            subject_id="same-change-id",
+        )
+        state = self._read_current_state()
+        self.assertEqual(state["context"]["change_id"], "same-change-id")
+        original_updated_at = state["updated_at"]
+
+        agent_result = json.dumps({
+            "status": "success",
+            "evidence": {
+                "change_id": "same-change-id",
+                "criteria_satisfied": "spec_artifacts_done",
+                "spec_artifacts_done": True,
+            },
+            "blockers": [],
+        })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="plan-agent",
+            value=agent_result,
+        )
+        self.assertEqual(rc, 0)
+
+        updated = self._read_current_state()
+        self.assertEqual(updated["context"]["change_id"], "same-change-id")
+
+    def test_after_dispatch_does_not_update_change_id_on_failed_result(self):
+        """Failed agent results should not update context.change_id."""
+        run_workflow(
+            self.tmp, "start",
+            subject_type="spec_change",
+            subject_id="fail-change-test",
+        )
+        state = self._read_current_state()
+        self.assertEqual(state["context"]["change_id"], "fail-change-test")
+
+        agent_result = json.dumps({
+            "status": "failed",
+            "evidence": {
+                "change_id": "should-not-update",
+            },
+            "blockers": [{"reason": "spec_creation_failed", "message": "error"}],
+        })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="plan-agent",
+            value=agent_result,
+        )
+        self.assertEqual(rc, 0)
+
+        updated = self._read_current_state()
+        self.assertEqual(
+            updated["context"]["change_id"],
+            "fail-change-test",
+            "context.change_id must not change on failed agent results",
+        )
+
+    def test_after_dispatch_syncs_change_id_from_artifacts(self):
+        """Successful agent result with artifacts.change_id updates context."""
+        run_workflow(
+            self.tmp, "start",
+            subject_type="spec_change",
+            subject_id="artifacts-change-id",
+        )
+        state = self._read_current_state()
+        self.assertEqual(state["context"]["change_id"], "artifacts-change-id")
+
+        agent_result = json.dumps({
+            "status": "success",
+            "evidence": {
+                "criteria_satisfied": "spec_artifacts_done",
+                "spec_artifacts_done": True,
+            },
+            "blockers": [],
+            "artifacts": {
+                "change_id": "canonical-artifacts-change-id",
+            },
+        })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="plan-agent",
+            value=agent_result,
+        )
+        self.assertEqual(rc, 0)
+
+        updated = self._read_current_state()
+        self.assertEqual(
+            updated["context"].get("change_id"),
+            "canonical-artifacts-change-id",
+            "context.change_id should sync from artifacts.change_id",
+        )
 
 
 def _import_workflow():

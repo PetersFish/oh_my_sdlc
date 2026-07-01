@@ -1,0 +1,33 @@
+# Canonical per-agent model profile configuration.
+# Target-side effective configs are kept under <target>/config/model-profiles.yaml
+# and are NOT overwritten by template sync if they already exist.
+#
+# Resolution precedence:
+#   model:   agents.<agent>.model > profiles.<profile>.model
+#   variant: agents.<agent>.variant > profiles.<profile>.variant > defaults.variant > medium
+schema_version: 1
+defaults:
+  variant: medium
+profiles:
+  orchestrator:
+    model: openai/gpt-5.5
+    variant: medium
+  deep-implement:
+    model: opencode-go/deepseek-v4-pro
+    variant: high
+  standard:
+    model: openai/gpt-5.4
+    variant: medium
+agents:
+  dev-orchestrator:
+    profile: orchestrator
+  plan-agent:
+    profile: orchestrator
+  implement-agent:
+    profile: deep-implement
+  test-agent:
+    profile: standard
+  review-agent:
+    profile: standard
+  finish-agent:
+    profile: deep-implement

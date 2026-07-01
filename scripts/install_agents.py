@@ -4,6 +4,13 @@
 Canonical source: agents/ (relative to this script)
 Target: --global => ~/.config/opencode/agents/ (default), --target <dir>
 
+Template-sync semantics:
+- Copies canonical *.md prompts verbatim (model-agnostic).
+- Copies canonical config template to <target>/config/model-profiles.yaml
+  only when the target config does not already exist (preserves user edits).
+- --check compares normalized content (ignoring activation-managed model/variant)
+  and also verifies the target config exists.
+
 Modes:
   (default)   Install agents to target, writing .agent-install.json metadata.
   --check     Compare canonical vs target: exit 0 if in sync, exit 1 on drift.
@@ -20,8 +27,13 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+# Shared helper from the same scripts/ directory
+import agent_config_lib
+
 SKIP_NAMES = {".agent-install.json", ".DS_Store"}
 SKIP_SUFFIXES = (".pyc",)
+CONFIG_TEMPLATE_NAME = "model-profiles.yaml"
+CONFIG_SUBDIR = "config"
 
 
 def _canonical_source(script_dir: Path) -> Path:
@@ -49,8 +61,12 @@ def _git_source_ref(repo_root: Path) -> str:
     return "unknown"
 
 
-def _scan_dir(directory: Path) -> dict[str, str]:
-    """Scan directory for *.md files, returning {filename: sha256}."""
+def _scan_dir(directory: Path, normalize: bool = False) -> dict[str, str]:
+    """Scan directory for *.md files, returning {filename: sha256}.
+
+    When normalize=True, hashes are computed on content with model/variant
+    stripped (activation-managed fields ignored).
+    """
     files: dict[str, str] = {}
     if not directory.is_dir():
         return files
@@ -60,7 +76,12 @@ def _scan_dir(directory: Path) -> dict[str, str]:
         if entry.name.endswith(SKIP_SUFFIXES):
             continue
         if entry.is_file() and entry.suffix == ".md":
-            files[entry.name] = hashlib.sha256(entry.read_bytes()).hexdigest()
+            raw = entry.read_bytes()
+            if normalize:
+                text = raw.decode("utf-8")
+                text = agent_config_lib.normalized_content(text)
+                raw = text.encode("utf-8")
+            files[entry.name] = hashlib.sha256(raw).hexdigest()
     return files
 
 
@@ -83,15 +104,54 @@ def _global_target() -> Path:
     return Path.home() / ".config" / "opencode" / "agents"
 
 
+# ---------------------------------------------------------------------------
+# Config template helpers
+# ---------------------------------------------------------------------------
+
+def _source_config_template(source: Path) -> Path:
+    """Path to the canonical config template under source/."""
+    return source / CONFIG_SUBDIR / CONFIG_TEMPLATE_NAME
+
+
+def _target_config_path(target: Path) -> Path:
+    """Path to the target effective config."""
+    return target / CONFIG_SUBDIR / CONFIG_TEMPLATE_NAME
+
+
+def _init_target_config(source: Path, target: Path) -> bool:
+    """Copy canonical config template to target if target config does not exist.
+
+    Returns True if config was copied, False if it already existed (preserved).
+    """
+    src_cfg = _source_config_template(source)
+    tgt_cfg = _target_config_path(target)
+
+    if tgt_cfg.exists():
+        return False  # preserve existing target config
+
+    if not src_cfg.is_file():
+        return False  # no canonical template to copy
+
+    tgt_cfg.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(str(src_cfg), str(tgt_cfg))
+    return True
+
+
 def do_check(source: Path, target: Path) -> int:
-    src_files = _scan_dir(source)
-    tgt_files = _scan_dir(target)
+    """Compare canonical vs target using normalized content (ignores model/variant).
+
+    Also verifies the target config exists.
+    """
+    src_files = _scan_dir(source, normalize=True)
+    tgt_files = _scan_dir(target, normalize=True)
 
     if not src_files:
         print("WARNING: canonical source has no .md files", file=sys.stderr)
         return 0
 
     all_ok = True
+
+    # Check prompt files
     for name, src_hash in src_files.items():
         tgt_hash = tgt_files.get(name)
         if tgt_hash is None:
@@ -105,6 +165,13 @@ def do_check(source: Path, target: Path) -> int:
         if name not in src_files:
             print(f"DRIFT: {name} (extra — not in canonical)")
             all_ok = False
+
+    # Check target config exists
+    tgt_cfg = _target_config_path(target)
+    src_cfg = _source_config_template(source)
+    if src_cfg.is_file() and not tgt_cfg.is_file():
+        print("DRIFT: config/model-profiles.yaml (missing — target config not initialized)")
+        all_ok = False
 
     if all_ok:
         print("OK: all agents in sync")
@@ -137,6 +204,11 @@ def do_install(source: Path, target: Path, source_repo: str, source_ref: str,
         shutil.copy2(str(src_path), str(tgt_path))
         installed[name] = src_hash
         print(f"INSTALLED: {name} ({action})")
+
+    # Initialize target config if missing
+    cfg_copied = _init_target_config(source, target)
+    if cfg_copied:
+        print("INSTALLED: config/model-profiles.yaml (initialized)")
 
     _write_metadata(target, source_repo, source_ref, status, installed)
     return 0

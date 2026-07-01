@@ -7,8 +7,6 @@ description: >-
   development task, resuming an active workflow, or when SDLC
   execution dispatch is needed.
 mode: primary
-model: openai/gpt-5.5
-variant: medium
 permission:
   edit: deny
   bash:

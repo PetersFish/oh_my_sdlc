@@ -9,8 +9,6 @@ description: >-
   For lightweight-flow, uses writing-plans. Does NOT execute tests or
   modify code.
 mode: subagent
-model: openai/gpt-5.5
-variant: medium
 permission:
   edit: allow
   bash:
@@ -22,6 +20,8 @@ permission:
   skill: allow
   task: deny
   question: allow
+model: openai/gpt-5.5
+variant: medium
 ---
 
 # Plan Agent

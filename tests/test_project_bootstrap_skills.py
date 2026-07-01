@@ -134,11 +134,13 @@ class TestSdlcProjectBootstrapSkill(unittest.TestCase):
 
     def test_skill_md_specifies_execution_order(self) -> None:
         content = (BOOTSTRAP_SKILL / "SKILL.md").read_text(encoding="utf-8")
-        # Verify the three steps are mentioned in order
-        agents_pos = content.lower().find("agents.md")
-        openspec_pos = content.lower().find("openspec", content.lower().find("step 2"))
-        memory_pos = content.lower().find("repository memory", content.lower().find("step 3"))
-        self.assertGreater(agents_pos, -1, "Must mention AGENTS.md")
+        # Verify the steps are mentioned in order
+        agents_md_pos = content.lower().find("agents.md")
+        agents_setup_pos = content.lower().find("setup_agents.py")
+        openspec_pos = content.lower().find("openspec", content.lower().find("step 3"))
+        memory_pos = content.lower().find("repository memory", content.lower().find("step 4"))
+        self.assertGreater(agents_md_pos, -1, "Must mention AGENTS.md")
+        self.assertGreater(agents_setup_pos, -1, "Must mention setup_agents.py")
         self.assertGreater(openspec_pos, -1, "Must mention OpenSpec step")
         self.assertGreater(memory_pos, -1, "Must mention repository memory step")
 
@@ -202,11 +204,31 @@ class TestSdlcProjectBootstrapSkill(unittest.TestCase):
 
     def test_bootstrap_memory_step_runs_last(self) -> None:
         content = (BOOTSTRAP_SKILL / "SKILL.md").read_text(encoding="utf-8")
-        step2_idx = content.find("Step 2:")
         step3_idx = content.find("Step 3:")
-        self.assertGreater(step2_idx, -1)
+        step4_idx = content.find("Step 4:")
         self.assertGreater(step3_idx, -1)
-        self.assertLess(step2_idx, step3_idx, "OpenSpec step must come before memory step")
+        self.assertGreater(step4_idx, -1)
+        self.assertLess(step3_idx, step4_idx, "OpenSpec step must come before memory step")
+
+    # ---- WP5: agent config bootstrap guidance ----
+
+    def test_bootstrap_skill_mentions_agent_setup_step(self) -> None:
+        content = (BOOTSTRAP_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("setup_agents.py", content,
+                      "bootstrap must mention agent setup via setup_agents.py")
+
+    def test_bootstrap_skill_routes_setup_through_setup_agents_script_only(self) -> None:
+        content = (BOOTSTRAP_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("setup_agents.py", content)
+        # Bootstrap must NOT claim to parse YAML or edit frontmatter directly
+        self.assertNotIn("edit agent frontmatter", content.lower(),
+                         "bootstrap must not instruct direct frontmatter editing")
+
+    def test_bootstrap_skill_mentions_restart_after_agent_refresh(self) -> None:
+        content = (BOOTSTRAP_SKILL / "SKILL.md").read_text(encoding="utf-8")
+        lower = content.lower()
+        self.assertIn("restart", lower, "bootstrap must mention restart reminder")
+        self.assertIn("activate-only", content, "bootstrap must mention activate-only refresh path")
 
 
 class TestAgentsMdTemplate(unittest.TestCase):
@@ -482,6 +504,30 @@ class TestSdlcOrchestratorSkill(unittest.TestCase):
     def test_skill_md_does_not_mention_sdd_plus_superpowers(self) -> None:
         content = (ORCHESTRATOR_SKILL / "SKILL.md").read_text(encoding="utf-8")
         self.assertNotIn("sdd-plus-superpowers", content.lower())
+
+
+CANONICAL_AGENTS_DIR = REPO_ROOT / "agents"
+
+
+class TestCanonicalAgentCleanup(unittest.TestCase):
+    """WP5: canonical agents/ must be model-agnostic — no hardcoded model/variant."""
+
+    def test_canonical_agents_do_not_hardcode_model_or_variant(self) -> None:
+        for agent_path in sorted(CANONICAL_AGENTS_DIR.glob("*.md")):
+            content = agent_path.read_text(encoding="utf-8")
+            self.assertNotIn(
+                "\nmodel:", content,
+                f"Canonical {agent_path.name} must not hardcode model"
+            )
+            self.assertNotIn(
+                "\nvariant:", content,
+                f"Canonical {agent_path.name} must not hardcode variant"
+            )
+
+    def test_canonical_config_template_exists(self) -> None:
+        cfg_path = CANONICAL_AGENTS_DIR / "config" / "model-profiles.yaml"
+        self.assertTrue(cfg_path.is_file(),
+                        "Canonical model-profiles.yaml template must exist")
 
 
 if __name__ == "__main__":

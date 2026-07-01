@@ -6,8 +6,8 @@ description: >-
   lightweight-flow, uses executing-plans and git-worktrees. Returns
   focused verification evidence, changed artifacts, and handoff paths.
 mode: subagent
-model: opencode-go/deepseek-v4-pro
-variant: high
+tools:
+  bash: true
 permission:
   edit: allow
   bash:
@@ -24,6 +24,8 @@ permission:
   skill: allow
   task: deny
   question: ask
+model: opencode-go/deepseek-v4-pro
+variant: high
 ---
 
 # Implement Agent
@@ -37,6 +39,7 @@ package per dispatch.
 
 Load these skills before acting:
 - `test-driven-development` — for the TDD red/green inner loop
+- `systematic-debugging` — when focused tests or TDD loop fail unexpectedly
 - `executing-plans` — for lightweight-flow implementation
 - `using-git-worktrees` — for isolated feature work
 - `implementation-contract-discipline` — when implementing from a spec/design/task list
@@ -82,10 +85,10 @@ Return JSON:
   "slice_id": "<id>",
   "flow_type": "spec-flow|lightweight-flow",
   "evidence": {
-    "tasks_complete": "true|false",
-    "tdd_passed": "true|false",
+    "tasks_complete": true,
+    "tdd_passed": true,
     "focused_tests": [
-      {"command": "pytest -k test_x", "result": "pass|fail"}
+      {"command": "pytest -k test_x", "result": "pass|fail|not_run|requires_verification"}
     ]
   },
   "artifacts": {
@@ -134,9 +137,7 @@ Failed example when OpenSpec apply cannot produce the requested artifact:
   "evidence": {
     "tasks_complete": false,
     "tdd_passed": false,
-    "focused_tests": [
-      {"command": "python3 -m pytest tests/ -k test_x -v", "result": "pass"}
-    ]
+    "focused_tests": []
   },
   "artifacts": {
     "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/default/implement-agent.md",
@@ -169,13 +170,17 @@ For every behavior-changing test-implement pair:
 4. Re-run the focused test — confirm it passes.
 5. Record command and result in evidence.focused_tests[].
 
+If command execution is unavailable or you could not actually run a test, you
+must not report `pass`. Use `not_run` or `requires_verification` instead and
+explain the environment limitation in your handoff and blockers.
+
 NEVER skip the red phase. Every behavior change starts with a failing test.
 
 ## Evidence Emission
 
 - `evidence.tasks_complete`: true when all tasks in your package are done.
-- `evidence.tdd_passed`: true when TDD loop completed with all focused tests green.
-- `evidence.focused_tests`: array of {command, result} for each test.
+- `evidence.tdd_passed`: true only when you actually ran the TDD loop and all focused tests are green.
+- `evidence.focused_tests`: array of {command, result} for each test. `result=pass` is allowed only for commands you actually executed.
 
 ## Handoff Artifact
 

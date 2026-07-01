@@ -7,8 +7,6 @@ description: >-
   memory, and workflow hooks. Requires test-agent and review-agent
   evidence before proceeding. May proceed in blocked state for cleanup.
 mode: subagent
-model: opencode-go/deepseek-v4-pro
-variant: medium
 permission:
   edit: allow
   bash:
@@ -23,6 +21,8 @@ permission:
   skill: allow
   task: deny
   question: ask
+model: opencode-go/deepseek-v4-pro
+variant: high
 ---
 
 # Finish Agent
