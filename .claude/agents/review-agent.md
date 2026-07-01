@@ -7,6 +7,8 @@ description: >-
   passing evidence before beginning. Does NOT begin review before
   independent verification is complete.
 mode: subagent
+model: openai/gpt-5.5
+variant: medium
 tools:
   bash: true
   read: true

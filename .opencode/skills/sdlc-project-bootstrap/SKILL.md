@@ -6,16 +6,13 @@ license: MIT
 
 # Project Bootstrap
 
-Orchestrates project foundation initialization by sequencing steps in fixed order:
+Orchestrates project foundation initialization by sequencing three steps in fixed order:
 
 1. `AGENTS.md` initialization
-2. Agent installation (via `setup_agents.py` script, only for selected AI tools)
-3. OpenSpec + schema initialization (delegates to `sdlc-openspec-init`)
-4. Repository memory initialization (delegates to `sdlc-repository-memory-init`)
+2. OpenSpec + schema initialization (delegates to `sdlc-openspec-init`)
+3. Repository memory initialization (delegates to `sdlc-repository-memory-init`)
 
 Each step is idempotent. Running bootstrap multiple times on the same project is safe and only adds what is missing.
-
-Agent model configuration is handled separately through the canonical `agents/config/model-profiles.yaml` template. Bootstrap does NOT parse YAML or edit agent frontmatter directly; it routes through the script entrypoint `scripts/setup_agents.py`.
 
 ## When to Use
 
@@ -53,29 +50,7 @@ Check whether `AGENTS.md` exists at the repository root.
 **Repository Memory reminder:**
 The bundled AGENTS.md template does NOT include the Repository Memory reminder. This block will be added by `sdlc-repository-memory-init` in step 3 if the user agrees to the memory-load reminder prompt.
 
-### Step 2: Install and Activate Agent Prompts
-
-After OpenSpec initialization has determined which AI tools are selected, install the canonical agent prompt files and activate per-agent model configuration for each selected target.
-
-**For each selected AI tool target** (e.g., opencode, claude, cursor):
-- Run the aggregate setup script:
-  ```bash
-  python3 scripts/setup_agents.py --target <.opencode|.claude|.cursor>/agents
-  ```
-- This performs template sync (copies canonical prompts + initializes target config) followed by activation (renders effective `model` and `variant` from the target config into markdown frontmatter).
-- Report: "Agents for <tool>: installed and activated".
-
-**Restart reminder:** After initial agent installation or after refreshing agent config, remind the user to restart their AI tool for the new agent prompts and model settings to take effect.
-
-**Do NOT** edit agent markdown frontmatter directly or parse the YAML config manually. Always route through `setup_agents.py`.
-
-**Refresh after config changes:** If the user later edits `<target>/config/model-profiles.yaml`, they can rerun activation without reinstalling prompts:
-```bash
-python3 scripts/setup_agents.py --target <.opencode|.claude|.cursor>/agents --activate-only
-```
-This is a non-destructive config refresh path. Bootstrap itself is initialization-only; ongoing config refreshes are script-routed operations, not a new durable skill contract.
-
-### Step 3: Initialize OpenSpec
+### Step 2: Initialize OpenSpec
 
 Delegate to `sdlc-openspec-init` for OpenSpec CLI initialization, schema discovery, asking the user to choose a default schema, and schema installation. The bootstrap skill does NOT perform OpenSpec initialization directly.
 
@@ -91,9 +66,9 @@ Report the result from `sdlc-openspec-init`:
 - AI tools: [selected by user]
 - Default schema: [selected by user]
 
-If `sdlc-openspec-init` fails, report the error and stop. Do NOT proceed to step 5.
+If `sdlc-openspec-init` fails, report the error and stop. Do NOT proceed to step 3.
 
-### Step 4: Initialize Repository Memory
+### Step 3: Initialize Repository Memory
 
 Check whether `.ai/memory/manifest.json` exists at the project root.
 
@@ -106,7 +81,7 @@ Check whether `.ai/memory/manifest.json` exists at the project root.
 - Report the result from `sdlc-repository-memory-init`.
 - Do NOT auto-run `sdlc-repository-memory-sync`. Only suggest it as a next step.
 
-### Step 5: Initialize SDLC Workflow Runtime
+### Step 4: Initialize SDLC Workflow Runtime
 
 Check whether `.ai/workflows/scripts/workflow.py` exists at the project root.
 
@@ -123,7 +98,7 @@ Check whether `.ai/workflows/scripts/workflow.py` exists at the project root.
 
 The workflow runtime is a project SDLC foundation asset alongside `.ai/roadmap/` and `.ai/memory/`. It is not OpenCode configuration and lives under `.ai/workflows/`, not `.opencode/`.
 
-### Step 6: Summary
+### Step 5: Summary
 
 After all steps complete, output a summary:
 
@@ -131,7 +106,6 @@ After all steps complete, output a summary:
 Project Foundation Bootstrap Complete
 
 AGENTS.md: [created | already present | appended missing blocks]
-Agents: [installed and activated for <tool>, ... | skipped (no AI tools selected)]
 OpenSpec: [initialized | already present]
   AI tools: [selected]
   Default schema: [selected]
@@ -139,9 +113,8 @@ Repository Memory: [initialized | already present]
 SDLC Workflow Runtime: [initialized | already present]
 
 Suggested next steps:
-  1. Restart your AI tools for new agent prompts to take effect.
-  2. Create your first change: openspec new change <name>
-  3. Populate repository memory: run sdlc-repository-memory-sync
+  1. Create your first change: openspec new change <name>
+  2. Populate repository memory: run sdlc-repository-memory-sync
 ```
 
 ## Dry-run Mode
@@ -152,7 +125,6 @@ When the user requests dry-run ("dry run", "preview", "what would this do", "--d
 Dry-run preview:
 
 AGENTS.md: [would create from template | would append missing blocks | already present]
-Agents: [would install and activate for <tool>, ... | skipped (no AI tools selected)]
 OpenSpec: [would initialize via openspec init | already present]
   AI tools: [would prompt for selection | already selected]
   Default schema: [would prompt for selection | already selected]
@@ -170,5 +142,4 @@ SDLC Workflow Runtime: [would initialize with sdlc-main workflow | already prese
 - Do NOT run `openspec init` directly in bootstrap; always delegate to `sdlc-openspec-init`.
 - Do NOT report "Project Foundation Bootstrap Complete" if the OpenSpec result does not include both `AI tools` and `Default schema`.
 - Do NOT skip steps when a step fails; stop and report the error.
-- Execute steps in order: AGENTS.md first, then agents, then OpenSpec, then memory.
-- Do NOT edit agent frontmatter or parse YAML directly — route agent setup through `scripts/setup_agents.py`.
+- Execute steps in order: AGENTS.md first, then OpenSpec, then memory.

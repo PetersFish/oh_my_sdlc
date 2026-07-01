@@ -6,6 +6,8 @@ description: >-
   lightweight-flow, uses executing-plans and git-worktrees. Returns
   focused verification evidence, changed artifacts, and handoff paths.
 mode: subagent
+model: opencode-go/deepseek-v4-pro
+variant: medium
 tools:
   bash: true
   read: true

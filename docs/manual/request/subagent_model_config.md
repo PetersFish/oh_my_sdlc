@@ -13,41 +13,25 @@ finish-agent也一样；
 调研，并设计一个可行方案，支持我的可配置化需求。必要时，可以参考omo这个项目：https://github.com/code-yeongyu/oh-my-openagent
 
 dev-orchestrator
-tools:
-  read: true
-  grep: true
-  glob: true
+	model: openai/gpt-5.4
+	variant: medium
 
 plan-agent
-tools:
-  read: true
-  grep: true
-  glob: true
-  edit: true
-  write: true
+	model: openai/gpt-5.5
+	variant: medium
 
 implement-agent
-tools:
-  bash: true
-  read: true
-  grep: true
-  glob: true
-  edit: true
-  write: true
+	model: opencode-go/deepseek-v4-pro
+	variant: medium
 
 test-agent
-tools:
-  bash: true
-  read: true
-  grep: true
-  glob: true
-  edit: true
-  write: true
+	model: openai/gpt-5.4
+	variant: medium
 
 review-agent
-tools:
-  read: true
-  grep: true
-  glob: true
-  edit: true
-  write: true
+	model: openai/gpt-5.5
+	variant: medium
+
+finish-agent
+	model: opencode-go/deepseek-v4-pro
+	variant: medium
