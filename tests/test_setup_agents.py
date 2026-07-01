@@ -111,29 +111,18 @@ class TestSetupScript(unittest.TestCase):
         rc, stdout, stderr = result.returncode, result.stdout, result.stderr
         self.assertEqual(rc, 0, f"activate --check should pass when in sync, got rc={rc}, stdout={stdout!r}")
 
-    def test_dry_run_reports_without_writing(self):
-        """--dry-run reports planned actions without modifying files."""
-        self._setup_minimal_config()
-        os.makedirs(self.target, exist_ok=True)
-        write_file(self.tmp, "target/test-agent.md",
-                   "# Test Agent\n\nNo frontmatter yet.\n")
+    def test_setup_dry_run_reports_fresh_target_preview_without_writing(self):
+        """Aggregate --dry-run previews template sync and activation for a fresh target."""
+        fresh_target = os.path.join(self.tmp, "fresh-target")
 
-        # Run activate --dry-run directly
-        activate_script = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)),
-            "..", "scripts", "activate_agents_config.py",
-        )
-        result = subprocess.run(
-            [sys.executable, activate_script, "--target", self.target, "--dry-run"],
-            capture_output=True, text=True,
-        )
-        rc, stdout, stderr = result.returncode, result.stdout, result.stderr
-        self.assertEqual(rc, 0)
-        self.assertIn("[DRY-RUN]", stdout)
+        rc, stdout, stderr = run_setup("", fresh_target, "--dry-run")
 
-        # File should be unchanged
-        content = open(os.path.join(self.target, "test-agent.md"), encoding="utf-8").read()
-        self.assertEqual(content, "# Test Agent\n\nNo frontmatter yet.\n")
+        self.assertEqual(rc, 0, f"aggregate dry-run should succeed, stdout={stdout!r} stderr={stderr!r}")
+        self.assertIn("[DRY-RUN] would install:", stdout)
+        self.assertIn("[DRY-RUN] would initialize config template:", stdout)
+        self.assertIn("[DRY-RUN] would activate:", stdout)
+        self.assertIn("dev-orchestrator.md", stdout)
+        self.assertFalse(os.path.exists(fresh_target), "aggregate dry-run must not create the fresh target")
 
     def test_setup_check_for_activation_drift(self):
         """Aggregate check surfaces activation drift."""

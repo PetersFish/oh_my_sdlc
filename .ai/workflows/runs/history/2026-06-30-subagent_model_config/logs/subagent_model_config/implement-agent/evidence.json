@@ -1,0 +1,27 @@
+{
+  "agent": "implement-agent",
+  "status": "success",
+  "phase": "apply_change",
+  "slice_id": "subagent_model_config",
+  "flow_type": "spec-flow",
+  "evidence": {
+    "tasks_complete": true,
+    "tdd_passed": false,
+    "focused_tests": [
+      {"command": "python3 -m pytest tests/test_agent_config_lib.py -v", "result": "requires_verification"},
+      {"command": "python3 -m pytest tests/test_install_agents.py -v", "result": "requires_verification"},
+      {"command": "python3 -m pytest tests/test_activate_agents_config.py -v", "result": "requires_verification"},
+      {"command": "python3 -m pytest tests/test_setup_agents.py -v", "result": "requires_verification"},
+      {"command": "python3 -m pytest tests/test_project_bootstrap_skills.py -v", "result": "requires_verification"},
+      {"command": "python3 -m pytest tests/test_wrapper_contracts.py -v", "result": "requires_verification"}
+    ]
+  },
+  "artifacts": {
+    "handoff_path": ".ai/workflows/runs/active/2026-06-30-subagent_model_config/handoffs/subagent_model_config/implement-agent.md",
+    "raw_log_paths": [
+      {"path": ".ai/workflows/runs/active/2026-06-30-subagent_model_config/logs/subagent_model_config/implement-agent/verification-plan.md", "kind": "verification_plan", "command": "none", "result": "requires_verification"}
+    ]
+  },
+  "blockers": [],
+  "recommended_next_action": "dispatch_test_agent"
+}

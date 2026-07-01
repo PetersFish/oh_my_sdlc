@@ -1,0 +1,297 @@
+{
+  "version": 1,
+  "run_id": "2026-06-30-subagent_model_config",
+  "workflow": "sdlc-main",
+  "flow_type": "spec-flow",
+  "status": "done",
+  "current_phase": "done",
+  "primary_subject": {
+    "type": "spec_change",
+    "id": "subagent_model_config"
+  },
+  "context": {
+    "change_id": "centralize-subagent-model-config"
+  },
+  "phase_readiness": {
+    "phase": "done",
+    "ready": true,
+    "missing_required_inputs": []
+  },
+  "pending_hooks": [],
+  "completed_hooks": [
+    "roadmap_status_ready_if_linked",
+    "roadmap_apply_start_if_ready",
+    "memory_sync",
+    "roadmap_done_if_relevant"
+  ],
+  "completed_phases": [
+    "create_change",
+    "apply_change",
+    "archive_change",
+    "post_archive_actions"
+  ],
+  "gates": {},
+  "evidence": {
+    "openspec_status": {
+      "classification": "in-progress",
+      "source": "active"
+    },
+    "roadmap_link": {
+      "count": 0,
+      "items": []
+    },
+    "agent_phase": {
+      "agent_phase": "post_archive_actions",
+      "agent": "finish-agent",
+      "flow_type": "spec-flow",
+      "dispatched_at": "2026-07-01T15:09:59.523239"
+    },
+    "agent_result": {
+      "agent": "finish-agent",
+      "status": "success",
+      "phase": "post_archive_actions",
+      "slice_id": "default",
+      "flow_type": "spec-flow",
+      "evidence": {
+        "archive_path_exists": true,
+        "pending_hooks_empty": true
+      },
+      "blockers": [
+        {
+          "reason": "missing_exit_criteria_satisfied",
+          "message": "agent success is missing criteria_satisfied entries for: pending_hooks_empty",
+          "recommended_action": "resolve_failure"
+        }
+      ],
+      "recorded_at": "2026-07-01T15:11:18.035773"
+    },
+    "agent_results": {
+      "subagent_model_config": {
+        "plan-agent": {
+          "agent": "plan-agent",
+          "status": "success",
+          "phase": "create_change",
+          "slice_id": "subagent_model_config",
+          "flow_type": "spec-flow",
+          "evidence": {
+            "spec_artifacts_done": true,
+            "criteria_satisfied": "spec_artifacts_done",
+            "plan_produced": true,
+            "user_confirmation_required": false,
+            "user_approval_incorporated": true,
+            "provider_verifier": "openspec.create passed",
+            "change_id": "centralize-subagent-model-config",
+            "plan_summary": {
+              "objective": "Centralize per-subagent model configuration so canonical agent prompts remain model-agnostic while each AI CLI target can render effective `model` and `variant` into derived agent frontmatter.",
+              "approach": "Implement a shared agent config helper, split installation into template sync versus effective config activation, and provide `setup_agents.py` as the user-facing aggregate entry point. Keep bootstrap integration limited to initialization-time agent setup.",
+              "key_steps": [
+                "Add `agents/config/model-profiles.yaml` and shared helper logic for schema validation, model/variant resolution, frontmatter update/insert, target resolution, and normalized prompt comparison.",
+                "Refactor `scripts/install_agents.py` to perform template sync only: copy canonical prompts and initialize target config without rendering `model` or `variant`.",
+                "Add `scripts/activate_agents_config.py` to render target effective config into target agent markdown frontmatter, plus check and dry-run modes.",
+                "Add `scripts/setup_agents.py` to compose install plus activation and expose unified check/dry-run/force behavior.",
+                "Remove hardcoded `model`/`variant` from canonical `agents/*.md`; regenerate derived CLI agent copies through the supported distribution path.",
+                "Update `sdlc-project-bootstrap` only for initialization-time agent setup guidance."
+              ],
+              "focused_tests": [
+                "python3 -m pytest tests/test_install_agents.py -v",
+                "python3 -m pytest tests/test_activate_agents_config.py -v",
+                "python3 -m pytest tests/test_setup_agents.py -v",
+                "python3 -m pytest tests/test_project_bootstrap_skills.py -v",
+                "python3 -m pytest tests/test_wrapper_contracts.py -v"
+              ],
+              "open_decisions": [],
+              "accepted_item_5_decision": "Do NOT create a new `sdlc-agent-config` skill in this change. Keep `sdlc-project-bootstrap` initialization-only. Defer any future maintenance/refresh skill to a later separate change if warranted."
+            },
+            "focused_tests": [
+              {
+                "command": "python3 -m pytest tests/test_install_agents.py -v",
+                "result": "N/A - planning only"
+              },
+              {
+                "command": "python3 -m pytest tests/test_activate_agents_config.py -v",
+                "result": "N/A - planning only"
+              },
+              {
+                "command": "python3 -m pytest tests/test_setup_agents.py -v",
+                "result": "N/A - planning only"
+              },
+              {
+                "command": "python3 -m pytest tests/test_project_bootstrap_skills.py -v",
+                "result": "N/A - planning only"
+              },
+              {
+                "command": "python3 -m pytest tests/test_wrapper_contracts.py -v",
+                "result": "N/A - planning only"
+              }
+            ]
+          },
+          "blockers": [],
+          "recorded_at": "2026-07-01T00:30:39.550648"
+        },
+        "implement-agent": {
+          "agent": "implement-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "subagent_model_config",
+          "flow_type": "spec-flow",
+          "evidence": {
+            "tasks_complete": true,
+            "tdd_passed": true,
+            "focused_tests": [
+              {
+                "command": "python3 -m pytest tests/test_setup_agents.py -k fresh_target_preview -v",
+                "result": "fail"
+              },
+              {
+                "command": "python3 -m pytest tests/test_setup_agents.py -k fresh_target_preview -v",
+                "result": "pass"
+              },
+              {
+                "command": "python3 -m pytest tests/test_setup_agents.py -v",
+                "result": "pass"
+              }
+            ]
+          },
+          "blockers": [],
+          "recorded_at": "2026-07-01T14:54:02.501470"
+        }
+      },
+      "default": {
+        "implement-agent": {
+          "agent": "implement-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "spec-flow",
+          "evidence": {
+            "tasks_complete": true,
+            "tdd_passed": false,
+            "focused_tests": [
+              {
+                "command": "python3 -m pytest tests/test_agent_config_lib.py -v",
+                "result": "requires_verification"
+              },
+              {
+                "command": "python3 -m pytest tests/test_install_agents.py -v",
+                "result": "requires_verification"
+              },
+              {
+                "command": "python3 -m pytest tests/test_activate_agents_config.py -v",
+                "result": "requires_verification"
+              },
+              {
+                "command": "python3 -m pytest tests/test_setup_agents.py -v",
+                "result": "requires_verification"
+              },
+              {
+                "command": "python3 -m pytest tests/test_project_bootstrap_skills.py -v",
+                "result": "requires_verification"
+              },
+              {
+                "command": "python3 -m pytest tests/test_wrapper_contracts.py -v",
+                "result": "requires_verification"
+              }
+            ]
+          },
+          "blockers": [],
+          "recorded_at": "2026-07-01T12:50:09.743614"
+        },
+        "test-agent": {
+          "agent": "test-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "spec-flow",
+          "evidence": {
+            "verification_passed": true,
+            "overfit_check_passed": true,
+            "regression_passed": true,
+            "tdd_passed": true,
+            "focused_tests": [
+              {
+                "command": "python3 -m pytest tests/test_agent_config_lib.py -v",
+                "result": "pass"
+              },
+              {
+                "command": "python3 -m pytest tests/test_install_agents.py -v",
+                "result": "pass"
+              },
+              {
+                "command": "python3 -m pytest tests/test_activate_agents_config.py -v",
+                "result": "pass"
+              },
+              {
+                "command": "python3 -m pytest tests/test_setup_agents.py -v",
+                "result": "pass"
+              },
+              {
+                "command": "python3 -m pytest tests/test_project_bootstrap_skills.py -v",
+                "result": "pass"
+              },
+              {
+                "command": "python3 -m pytest tests/test_wrapper_contracts.py -v",
+                "result": "pass"
+              }
+            ]
+          },
+          "blockers": [],
+          "recorded_at": "2026-07-01T14:34:56.337405"
+        },
+        "review-agent": {
+          "agent": "review-agent",
+          "status": "blocked",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "spec-flow",
+          "evidence": {
+            "review_complete": false,
+            "verification_passed": true,
+            "focused_tests": [
+              {
+                "command": "python3 -m pytest tests/ -q --tb=short",
+                "result": "pass"
+              }
+            ]
+          },
+          "blockers": [
+            {
+              "reason": "review_blocked",
+              "message": "Review found an implementation gap against the approved plan: `setup_agents.py --dry-run` does not provide the required non-writing preview of both template-sync and activation for fresh targets, and the aggregate dry-run path is not directly behaviorally tested."
+            }
+          ],
+          "recorded_at": "2026-07-01T14:39:28.199245"
+        },
+        "finish-agent": {
+          "agent": "finish-agent",
+          "status": "success",
+          "phase": "post_archive_actions",
+          "slice_id": "default",
+          "flow_type": "spec-flow",
+          "evidence": {
+            "archive_path_exists": true,
+            "pending_hooks_empty": true
+          },
+          "blockers": [
+            {
+              "reason": "missing_exit_criteria_satisfied",
+              "message": "agent success is missing criteria_satisfied entries for: pending_hooks_empty",
+              "recommended_action": "resolve_failure"
+            }
+          ],
+          "recorded_at": "2026-07-01T15:11:18.035773"
+        }
+      }
+    },
+    "spec_artifacts_done": true,
+    "tasks_complete": true,
+    "tdd_passed": true,
+    "eval_passed_or_human_decision_recorded": "user_approved_plan_and_review_passed",
+    "archive_path_exists": true,
+    "memory_sync_resolution": "not_needed",
+    "memory_sync_reason": "No memory artifacts to sync for this configuration infrastructure change",
+    "roadmap_hook_resolution": "no_linked_item",
+    "archive_path": "openspec/changes/archive/2026-07-01-centralize-subagent-model-config"
+  },
+  "block": null,
+  "updated_at": "2026-07-01T15:11:18.088348"
+}

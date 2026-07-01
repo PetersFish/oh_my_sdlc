@@ -192,32 +192,16 @@ def update_frontmatter(markdown_content: str, model: str, variant: str) -> str:
     set/updated.  All other frontmatter fields and the markdown body are preserved.
     If the content has no YAML frontmatter, one is inserted at the top."""
     if markdown_content.startswith("---"):
-        # Has existing frontmatter — parse, update, and rebuild
+        # Has existing frontmatter. Only replace/insert activation-managed lines
+        # so template-sync comparisons do not see unrelated YAML reformatting.
         end = markdown_content.find("\n---", 3)
         if end == -1:
             # Malformed: starts with --- but no closing ---; treat as no frontmatter
             return _insert_frontmatter(markdown_content, model, variant)
 
-        fm_text = markdown_content[3:end].rstrip()
+        fm_text = markdown_content[4:end].rstrip()
         body = markdown_content[end + 4:]  # after the closing ---
-
-        # Parse existing frontmatter
-        try:
-            fm_data = yaml.safe_load(fm_text)
-        except yaml.YAMLError:
-            # Can't parse — fall back to line-by-line replacement
-            return _rebuild_frontmatter_line_by_line(fm_text, body, model, variant)
-
-        if not isinstance(fm_data, dict):
-            fm_data = {}
-
-        # Update activation-managed fields
-        fm_data["model"] = model
-        fm_data["variant"] = variant
-
-        # Rebuild frontmatter preserving all other fields
-        new_fm = yaml.dump(fm_data, default_flow_style=False, allow_unicode=True).rstrip()
-        return f"---\n{new_fm}\n---{body}"
+        return _rebuild_frontmatter_line_by_line(fm_text, body, model, variant)
 
     # No frontmatter — insert one
     return _insert_frontmatter(markdown_content, model, variant)
@@ -284,7 +268,7 @@ def _strip_activation_fields(text: str) -> str:
     if end == -1:
         return text
 
-    fm_lines = text[3:end].split("\n")
+    fm_lines = text[4:end].split("\n")
     body = text[end + 4:]
 
     filtered_fm: list[str] = []

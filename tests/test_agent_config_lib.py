@@ -174,6 +174,32 @@ class TestModelResolution(unittest.TestCase):
 class TestFrontmatterMutation(unittest.TestCase):
     """Tests for frontmatter update/insert behavior."""
 
+    def test_update_frontmatter_preserves_raw_frontmatter_shape_for_normalized_compare(self):
+        """Verifies activation only changes model/variant and keeps other frontmatter text stable."""
+        markdown = """---
+description: >-
+  Top-level SDLC development orchestrator. Routes phase actions to
+  specialized subagents.
+mode: primary
+permission:
+  read: allow
+  bash:
+    "*": deny
+    "python3 .ai/workflows/scripts/workflow.py *": allow
+---
+
+# Body
+"""
+
+        result = update_frontmatter(markdown, "openai/gpt-5.5", "medium")
+
+        self.assertTrue(
+            normalized_prompt_compare(markdown, result),
+            "activation should not introduce drift beyond model/variant fields",
+        )
+        self.assertIn("description: >-", result)
+        self.assertIn('    "*": deny', result)
+
     def test_update_frontmatter_preserves_existing_fields_and_body(self):
         """Verifies model/variant insertion does not alter other fields or body."""
         markdown = """---
