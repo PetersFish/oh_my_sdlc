@@ -26,6 +26,11 @@ permission:
     "git branch*": allow
     "git worktree*": allow
     "git check-ignore*": allow
+    "openspec new change*": allow
+    "openspec status*": allow
+    "openspec instructions*": allow
+    "openspec list*": allow
+    "openspec apply*": allow
 ---
 
 # Implement Agent

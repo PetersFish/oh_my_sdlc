@@ -25,6 +25,9 @@ permission:
     "git log*": allow
     "git branch*": allow
     "git worktree*": allow
+    "openspec status*": allow
+    "openspec list*": allow
+    "openspec archive*": allow
 ---
 
 # Finish Agent

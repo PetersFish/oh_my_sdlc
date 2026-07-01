@@ -23,6 +23,10 @@ permission:
     "git status*": allow
     "git diff*": allow
     "git log*": allow
+    "openspec new change*": allow
+    "openspec status*": allow
+    "openspec instructions*": allow
+    "openspec list*": allow
 ---
 
 # Plan Agent

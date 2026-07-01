@@ -689,6 +689,69 @@ class TestAgentFrontmatter(unittest.TestCase):
                 f"finish-agent missing observational git allow for {command}",
             )
 
+    def test_plan_agent_allows_openspec_create_commands(self):
+        """plan-agent needs openspec new/status/instructions/list for spec-flow create_change phase."""
+        fm = _read_agent_frontmatter(".opencode", "plan-agent")
+        bash_rules = fm["permission"].get("bash", {})
+        for command in (
+            "openspec new change*",
+            "openspec status*",
+            "openspec instructions*",
+            "openspec list*",
+        ):
+            self.assertEqual(
+                bash_rules.get(command),
+                "allow",
+                f"plan-agent missing openspec create-phase allow for {command}",
+            )
+
+    def test_implement_agent_allows_openspec_apply_commands(self):
+        """implement-agent needs openspec apply/status/instructions/list for spec-flow apply_change phase."""
+        fm = _read_agent_frontmatter(".opencode", "implement-agent")
+        bash_rules = fm["permission"].get("bash", {})
+        for command in (
+            "openspec new change*",
+            "openspec status*",
+            "openspec instructions*",
+            "openspec list*",
+            "openspec apply*",
+        ):
+            self.assertEqual(
+                bash_rules.get(command),
+                "allow",
+                f"implement-agent missing openspec apply-phase allow for {command}",
+            )
+
+    def test_finish_agent_allows_openspec_archive_commands(self):
+        """finish-agent needs openspec archive/status/list for spec-flow archive_change phase."""
+        fm = _read_agent_frontmatter(".opencode", "finish-agent")
+        bash_rules = fm["permission"].get("bash", {})
+        for command in (
+            "openspec status*",
+            "openspec list*",
+            "openspec archive*",
+        ):
+            self.assertEqual(
+                bash_rules.get(command),
+                "allow",
+                f"finish-agent missing openspec archive-phase allow for {command}",
+            )
+
+    def test_review_agent_denies_openspec_mutation_commands(self):
+        """review-agent must NOT allow openspec mutation commands (create/apply/archive)."""
+        fm = _read_agent_frontmatter(".opencode", "review-agent")
+        bash_rules = fm["permission"].get("bash", {})
+        for command in (
+            "openspec new change*",
+            "openspec apply*",
+            "openspec archive*",
+        ):
+            self.assertNotEqual(
+                bash_rules.get(command),
+                "allow",
+                f"review-agent should not allow openspec mutation command: {command}",
+            )
+
     def test_all_agents_have_workflow_py_bash_allow(self):
         for name in AGENT_NAMES:
             fm = _read_agent_frontmatter(".opencode", name)
