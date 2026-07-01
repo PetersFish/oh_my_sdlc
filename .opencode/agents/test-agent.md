@@ -25,6 +25,8 @@ permission:
     "git status*": allow
     "git diff*": allow
     "git log*": allow
+model: openai/gpt-5.4
+variant: medium
 ---
 
 # Test Agent

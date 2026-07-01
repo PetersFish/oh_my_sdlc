@@ -26,6 +26,8 @@ permission:
     "*": deny
     "sdlc-repository-memory-load": allow
     "brainstorming": allow
+model: openai/gpt-5.5
+variant: medium
 ---
 
 # SDLC Dev Orchestrator

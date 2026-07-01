@@ -25,6 +25,8 @@ permission:
     "git log*": allow
     "git branch*": allow
     "git worktree*": allow
+model: opencode-go/deepseek-v4-pro
+variant: high
 ---
 
 # Finish Agent

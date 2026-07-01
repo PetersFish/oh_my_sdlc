@@ -26,6 +26,8 @@ permission:
     "git branch*": allow
     "git worktree*": allow
     "git check-ignore*": allow
+model: opencode-go/deepseek-v4-pro
+variant: high
 ---
 
 # Implement Agent

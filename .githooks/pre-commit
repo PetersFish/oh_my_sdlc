@@ -94,7 +94,9 @@ fi
 
 # Rule 4: canonical agents/ == project-level distributed copies
 # Canonical edits require distributed copies to be refreshed and staged.
-# Direct edits to distributed copies are blocked unless canonical agents/ are also staged.
+# Distributed-only changes are allowed when both install_agents.py --check
+# and activate_agents_config.py --check pass on all three targets.
+# Otherwise, distributed-only edits are blocked.
 STAGED_CANONICAL_AGENTS=""
 STAGED_DISTRIBUTED_AGENTS=""
 for f in $STAGED_FILES; do
@@ -109,19 +111,45 @@ for f in $STAGED_FILES; do
 done
 
 if [ -n "$STAGED_DISTRIBUTED_AGENTS" ] && [ -z "$STAGED_CANONICAL_AGENTS" ]; then
-    echo ""
-    echo "============================================"
-    echo "  COMMIT BLOCKED: Direct distributed agent edit"
-    echo "============================================"
-    echo ""
-    echo "Do NOT edit .opencode/.claude/.cursor agent copies directly."
-    echo "Edit canonical files under agents/ first, then re-distribute:"
-    echo ""
-    echo "  python3 scripts/install_agents.py --target ./.opencode/agents --force"
-    echo "  python3 scripts/install_agents.py --target ./.claude/agents --force"
-    echo "  python3 scripts/install_agents.py --target ./.cursor/agents --force"
-    echo ""
-    BLOCKED=1
+    # Distributed-only changes: require both install and activation
+    # checks to pass on all three targets before allowing commit.
+    AGENT_TOOL="$REPO_ROOT/scripts/install_agents.py"
+    ACTIVATE_TOOL="$REPO_ROOT/scripts/activate_agents_config.py"
+    DIST_BLOCKED=0
+    for target in ".opencode/agents" ".claude/agents" ".cursor/agents"; do
+        python3 "$AGENT_TOOL" --target "$REPO_ROOT/$target" --check
+        if [ $? -ne 0 ]; then
+            DIST_BLOCKED=1
+        fi
+        python3 "$ACTIVATE_TOOL" --target "$REPO_ROOT/$target" --check
+        if [ $? -ne 0 ]; then
+            DIST_BLOCKED=1
+        fi
+    done
+    if [ $DIST_BLOCKED -ne 0 ]; then
+        echo ""
+        echo "============================================"
+        echo "  COMMIT BLOCKED: Distributed agent drift"
+        echo "============================================"
+        echo ""
+        echo "Distributed agent copies under .opencode/, .claude/, .cursor/"
+        echo "have been modified but canonical agents/ were not staged."
+        echo "If these are legitimate activation-managed changes, ensure both"
+        echo "checks pass for all three targets:"
+        echo ""
+        echo "  python3 scripts/install_agents.py --target ./.opencode/agents --check"
+        echo "  python3 scripts/activate_agents_config.py --target ./.opencode/agents --check"
+        echo "  (repeat for .claude/agents and .cursor/agents)"
+        echo ""
+        echo "If the canonical agent prompt has changed, edit agents/ first,"
+        echo "then re-distribute:"
+        echo ""
+        echo "  python3 scripts/install_agents.py --target ./.opencode/agents --force"
+        echo "  python3 scripts/install_agents.py --target ./.claude/agents --force"
+        echo "  python3 scripts/install_agents.py --target ./.cursor/agents --force"
+        echo ""
+        BLOCKED=1
+    fi
 fi
 
 if [ -n "$STAGED_CANONICAL_AGENTS" ] && [ -z "$STAGED_DISTRIBUTED_AGENTS" ]; then
@@ -143,11 +171,18 @@ fi
 
 if [ -n "$STAGED_CANONICAL_AGENTS" ] || [ -n "$STAGED_DISTRIBUTED_AGENTS" ]; then
     AGENT_TOOL="$REPO_ROOT/scripts/install_agents.py"
+    ACTIVATE_TOOL="$REPO_ROOT/scripts/activate_agents_config.py"
     AGENT_BLOCKED=0
     for target in ".opencode/agents" ".claude/agents" ".cursor/agents"; do
         python3 "$AGENT_TOOL" --target "$REPO_ROOT/$target" --check
         if [ $? -ne 0 ]; then
             AGENT_BLOCKED=1
+        fi
+        if [ -n "$STAGED_DISTRIBUTED_AGENTS" ]; then
+            python3 "$ACTIVATE_TOOL" --target "$REPO_ROOT/$target" --check
+            if [ $? -ne 0 ]; then
+                AGENT_BLOCKED=1
+            fi
         fi
     done
     if [ $AGENT_BLOCKED -ne 0 ]; then
