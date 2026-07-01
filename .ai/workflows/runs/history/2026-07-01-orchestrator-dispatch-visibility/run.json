@@ -1,0 +1,194 @@
+{
+  "version": 1,
+  "run_id": "2026-07-01-orchestrator-dispatch-visibility",
+  "workflow": "sdlc-main",
+  "flow_type": "lightweight-flow",
+  "status": "done",
+  "current_phase": "done",
+  "primary_subject": {
+    "type": "spec_change",
+    "id": "orchestrator-dispatch-visibility"
+  },
+  "context": {
+    "change_id": "orchestrator-dispatch-visibility"
+  },
+  "phase_readiness": {
+    "phase": "done",
+    "ready": true,
+    "missing_required_inputs": []
+  },
+  "pending_hooks": [],
+  "completed_hooks": [
+    "roadmap_status_ready_if_linked",
+    "roadmap_apply_start_if_ready",
+    "memory_sync",
+    "roadmap_done_if_relevant"
+  ],
+  "completed_phases": [
+    "create_change",
+    "apply_change",
+    "archive_change",
+    "post_archive_actions"
+  ],
+  "gates": {},
+  "evidence": {
+    "openspec_status": {
+      "classification": "missing",
+      "source": null
+    },
+    "roadmap_link": {
+      "count": 0,
+      "items": []
+    },
+    "lightweight_flow_confirmed": true,
+    "agent_phase": {
+      "agent_phase": "apply_change",
+      "agent": "review-agent",
+      "flow_type": "lightweight-flow",
+      "dispatched_at": "2026-07-01T16:30:12.697673"
+    },
+    "agent_result": {
+      "agent": "review-agent",
+      "status": "success",
+      "phase": "apply_change",
+      "slice_id": "default",
+      "flow_type": "lightweight-flow",
+      "evidence": {
+        "review_complete": true,
+        "review_decision": "approved",
+        "findings": [],
+        "verification_passed": true
+      },
+      "blockers": [
+        {
+          "reason": "missing_phase_evidence_keys",
+          "message": "agent success is missing required phase evidence keys: tasks_complete, tdd_passed, eval_passed_or_human_decision_recorded",
+          "recommended_action": "resolve_failure"
+        }
+      ],
+      "recorded_at": "2026-07-01T16:36:14.672068"
+    },
+    "agent_results": {
+      "default": {
+        "plan-agent": {
+          "agent": "plan-agent",
+          "status": "success",
+          "phase": "create_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "plan_produced": true,
+            "criteria_satisfied": "plan_produced",
+            "plan_summary": {
+              "objective": "Add dispatch announcements chapter to dev-orchestrator.md",
+              "approach": "Single markdown chapter insertion between Dispatch Lifecycle Hooks and Phase-Agent Mapping",
+              "key_steps": [
+                "Insert Pre-Dispatch Announcement section",
+                "Insert Post-Dispatch Announcement section",
+                "Insert Agent Task Descriptions table",
+                "Insert Result Summary Extraction rules",
+                "Insert Complete Lifecycle Example",
+                "Verify insertion integrity"
+              ]
+            }
+          },
+          "blockers": [
+            {
+              "reason": "missing_phase_evidence_keys",
+              "message": "agent success is missing required phase evidence keys: spec_artifacts_done",
+              "recommended_action": "resolve_failure"
+            }
+          ],
+          "recorded_at": "2026-07-01T16:21:40.469356"
+        },
+        "implement-agent": {
+          "agent": "implement-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "tasks_complete": true,
+            "tdd_passed": true,
+            "focused_tests": [
+              {
+                "command": "grep -n \"^## \" agents/dev-orchestrator.md",
+                "result": "pass"
+              },
+              {
+                "command": "wc -l agents/dev-orchestrator.md",
+                "result": "pass"
+              }
+            ]
+          },
+          "blockers": [],
+          "recorded_at": "2026-07-01T16:28:00.296415"
+        },
+        "test-agent": {
+          "agent": "test-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "verification_passed": true,
+            "overfit_check_passed": true,
+            "regression_passed": true,
+            "tdd_passed": true,
+            "focused_tests": [
+              {
+                "command": "grep -n \"^## \" agents/dev-orchestrator.md",
+                "result": "pass"
+              },
+              {
+                "command": "Content completeness check",
+                "result": "pass"
+              },
+              {
+                "command": "Format verification",
+                "result": "pass"
+              },
+              {
+                "command": "wc -l agents/dev-orchestrator.md",
+                "result": "pass"
+              }
+            ]
+          },
+          "blockers": [],
+          "recorded_at": "2026-07-01T16:30:08.233622"
+        },
+        "review-agent": {
+          "agent": "review-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "review_complete": true,
+            "review_decision": "approved",
+            "findings": [],
+            "verification_passed": true
+          },
+          "blockers": [
+            {
+              "reason": "missing_phase_evidence_keys",
+              "message": "agent success is missing required phase evidence keys: tasks_complete, tdd_passed, eval_passed_or_human_decision_recorded",
+              "recommended_action": "resolve_failure"
+            }
+          ],
+          "recorded_at": "2026-07-01T16:36:14.672068"
+        }
+      }
+    },
+    "spec_artifacts_done": true,
+    "tasks_complete": true,
+    "tdd_passed": true,
+    "eval_passed_or_human_decision_recorded": true,
+    "archive_path_exists": true,
+    "memory_sync_resolution": "not_needed",
+    "memory_sync_reason": "lightweight-flow, no memory sync needed for prompt-only change",
+    "roadmap_hook_resolution": "no_linked_item"
+  },
+  "block": null,
+  "updated_at": "2026-07-01T16:37:30.424974"
+}

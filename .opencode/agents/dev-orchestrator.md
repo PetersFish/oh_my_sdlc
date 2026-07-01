@@ -206,6 +206,92 @@ Interpreting after_dispatch output:
 | finish-agent success | `complete_phase` | Call workflow.py complete-phase, then advance |
 | Any agent failure | `block` / `dispatch_*_agent` | Follow recommended_next_action |
 
+## User-Facing Dispatch Announcements
+
+Every subagent dispatch MUST output user-facing announcements at two points.
+
+### Pre-Dispatch Announcement
+
+BEFORE calling the `task` tool, output a concise summary:
+
+```
+> **🔄 Dispatching {agent-name}**
+> **Phase:** {current_phase}
+> **Reason:** {one sentence why this agent is needed}
+> **Task:** {brief description of what the agent will do}
+```
+
+### Post-Dispatch Announcement
+
+AFTER receiving the agent result and calling `after-dispatch`, output:
+
+On success:
+```
+> **✅ {agent-name} completed**
+> **Result:** {key outcome summary}
+> **Next:** {what happens next — dispatch next agent / complete phase / etc.}
+```
+
+On failure/blocker:
+```
+> **⚠️ {agent-name} encountered issues**
+> **Blocker:** {blocker reason}
+> **Recommended action:** {what to do next}
+```
+
+### Agent Task Descriptions
+
+Use these descriptions for the "Task" field in pre-dispatch announcements:
+
+| Agent | Phase | Task Description |
+|---|---|---|
+| plan-agent | create_change | Generate implementation plan for the spec change |
+| implement-agent | apply_change | Execute TDD red/green loops for the work package |
+| test-agent | apply_change | Run focused tests and regression verification |
+| review-agent | apply_change | Perform code review and verify-before-complete checks |
+| finish-agent | archive_change | Archive the change and run post-archive hooks |
+| finish-agent | post_archive_actions | Run post-archive cleanup and memory sync hooks |
+
+For general task agents not in this table, compose the Task description from the task tool's `description` parameter.
+
+### Post-Dispatch Result Summary
+
+Extract the result summary from the agent's JSON response using these rules:
+
+**Success cases:**
+- `evidence.plan_summary` → use as plan result summary
+- `evidence.focused_tests` → "Ran {count} focused tests"
+- `evidence.review_decision` → "Review decision: {decision}"
+- `evidence.criteria_satisfied` → "Satisfied: {criteria}"
+- If none of the above, use `recommended_next_action` to infer: "Agent completed, next: {action}"
+
+**Failure/blocker cases:**
+- `blockers[].reason` + `blockers[].message` → combine into blocker summary
+- If `blockers` is empty but status is `failed` → "Agent failed: {evidence.error or 'unknown reason'}"
+
+**General task agents (not in the mapping table):**
+- For `task` tool calls to arbitrary agents, compose the Task description from the task's `description` parameter
+- Post-dispatch summary: extract from `status` + any `evidence` keys present
+
+### Complete Dispatch Lifecycle with Announcements
+
+Example: dispatching implement-agent during apply_change phase
+
+1. **[Pre-Dispatch Announcement]** — OUTPUT THIS
+   > **🔄 Dispatching implement-agent**
+   > **Phase:** apply_change
+   > **Reason:** Plan is approved, need to implement the changes
+   > **Task:** Execute TDD red/green loops for the work package
+
+2. Call `before-dispatch` hook → validate run state
+3. Dispatch subagent via `task` tool
+4. Receive agent result
+5. Call `after-dispatch` hook → record evidence
+6. **[Post-Dispatch Announcement]** — OUTPUT THIS
+   > **✅ implement-agent completed**
+   > **Result:** Implemented 3 file changes, all new tests passing
+   > **Next:** Dispatching test-agent for verification
+
 ## Phase-Agent Mapping
 
 | Phase | Agents |
