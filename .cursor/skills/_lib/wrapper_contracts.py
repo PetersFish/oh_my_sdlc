@@ -44,6 +44,14 @@ HANDOFF_METADATA_KEYS: List[str] = [
 
 RAW_LOG_META_KEYS: List[str] = ["path", "kind", "command", "result"]
 
+DESIGN_ARTIFACT_KEYS: List[str] = ["kind", "path", "source"]
+
+DESIGN_ARTIFACT_KINDS: Set[str] = {
+    "plan", "spec", "proposal", "design", "tasks", "notes",
+}
+
+DESIGN_ARTIFACT_SOURCES: Set[str] = {"superpowers", "openspec", "other"}
+
 # Phase-to-agent mapping (canonical dash-form agent names)
 PHASE_AGENT_MAP: Dict[str, Set[str]] = {
     "create_change": {"plan-agent", "roadmap-agent"},
@@ -165,6 +173,84 @@ class EvidenceEnvelope:
 # ---------------------------------------------------------------------------
 
 
+def make_design_artifact_entry(kind: str, path: str, source: str) -> Dict[str, str]:
+    """Create a normalized design artifact path entry."""
+    return {"kind": kind, "path": path, "source": source}
+
+
+def validate_design_artifact_entry(entry: Dict[str, Any], index: int = 0) -> List[str]:
+    """Validate one design artifact entry."""
+    errors: List[str] = []
+    missing = [k for k in DESIGN_ARTIFACT_KEYS if k not in entry]
+    if missing:
+        errors.append(f"design_artifact_paths[{index}] missing keys: {missing}")
+        return errors
+
+    kind = entry.get("kind")
+    if kind not in DESIGN_ARTIFACT_KINDS:
+        errors.append(
+            f"design_artifact_paths[{index}].kind invalid: {kind!r}, "
+            f"expected one of {sorted(DESIGN_ARTIFACT_KINDS)}"
+        )
+
+    path = entry.get("path")
+    if not isinstance(path, str) or not path.strip():
+        errors.append(f"design_artifact_paths[{index}].path must be a non-empty string")
+
+    source = entry.get("source")
+    if source not in DESIGN_ARTIFACT_SOURCES:
+        errors.append(
+            f"design_artifact_paths[{index}].source invalid: {source!r}, "
+            f"expected one of {sorted(DESIGN_ARTIFACT_SOURCES)}"
+        )
+
+    return errors
+
+
+def validate_design_artifacts(
+    artifacts: Dict[str, Any],
+    flow_type: Optional[str] = None,
+) -> List[str]:
+    """Validate plan-agent design artifact references in an envelope artifacts object."""
+    errors: List[str] = []
+
+    primary = artifacts.get("primary_design_path")
+    if not isinstance(primary, str) or not primary.strip():
+        errors.append("artifacts.primary_design_path is required for plan-agent success")
+
+    entries = artifacts.get("design_artifact_paths")
+    if not isinstance(entries, list) or not entries:
+        errors.append("artifacts.design_artifact_paths must be a non-empty array")
+        return errors
+
+    paths: Set[str] = set()
+    kinds: Set[str] = set()
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            errors.append(f"design_artifact_paths[{index}] must be an object")
+            continue
+        errors.extend(validate_design_artifact_entry(entry, index=index))
+        path = entry.get("path")
+        kind = entry.get("kind")
+        if isinstance(path, str):
+            paths.add(path)
+        if isinstance(kind, str):
+            kinds.add(kind)
+
+    if isinstance(primary, str) and primary.strip() and primary not in paths:
+        errors.append("artifacts.primary_design_path must match one design_artifact_paths[].path")
+
+    if flow_type == "spec-flow":
+        for required_kind in ("proposal", "tasks", "spec"):
+            if required_kind not in kinds:
+                errors.append(f"spec-flow design_artifact_paths requires kind={required_kind}")
+
+    if flow_type == "lightweight-flow" and "plan" not in kinds:
+        errors.append("lightweight-flow design_artifact_paths requires kind=plan")
+
+    return errors
+
+
 def validate_evidence_envelope(data: Dict[str, Any]) -> List[str]:
     """Validate that a dict conforms to the shared evidence envelope shape."""
     errors: List[str] = []
@@ -184,6 +270,16 @@ def validate_evidence_envelope(data: Dict[str, Any]) -> List[str]:
         focused = data["evidence"].get("focused_tests")
         if focused is not None and not isinstance(focused, list):
             errors.append("evidence.focused_tests must be an array when present")
+    canonical_agent = canonical_agent_name(data.get("agent", ""))
+    if canonical_agent == "plan-agent" and data.get("status") == "success":
+        flow_type = data.get("flow_type")
+        if flow_type not in VALID_FLOW_TYPES:
+            errors.append("plan-agent success requires valid flow_type")
+        artifacts = data.get("artifacts")
+        if not isinstance(artifacts, dict):
+            errors.append("plan-agent success requires artifacts object")
+        else:
+            errors.extend(validate_design_artifacts(artifacts, flow_type))
     return errors
 
 

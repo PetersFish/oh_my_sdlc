@@ -5,12 +5,15 @@
   "source_ref": "HEAD",
   "status": "stable",
   "target": ".claude/skills/_lib",
-  "installed_at": "2026-06-27T15:52:06.409450Z",
+  "installed_at": "2026-07-02T12:22:46.214523Z",
   "backport_policy": "review-required",
-  "payload_hash": "640eb5d92a1bfda94cd344dbe81e8942f068ba5220fdcb70921b53f93c13fde0",
+  "payload_hash": "3405e0473c0235185f81183c0b8163acf6f30a7774902867402d21bfa78fea45",
   "files": [
     "provider_registry.yaml",
     "provider_registry_loader.py",
+    "provider_verifiers.py",
+    "resolve_dispatch_cli.py",
+    "result_contracts.py",
     "sdlc_runtime_paths.py",
     "wrapper_contracts.py",
     "wrapper_resolution.py"

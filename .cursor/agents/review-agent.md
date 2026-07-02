@@ -97,6 +97,23 @@ From dev-orchestrator:
 - `slice_id`
 - `evidence.verification_passed` from test-agent (MUST be true)
 - Handoff artifacts from implement-agent and test-agent
+- `artifacts.primary_design_path` and `artifacts.design_artifact_paths[]` from plan-agent
+
+## Design Artifact Reading Priority
+
+For review requirements, prefer structured design artifacts over handoff prose.
+
+Reading priority:
+- `spec`
+- `tasks`
+- test-agent evidence
+- `design`
+- `proposal`
+- `plan`
+- `notes`
+
+Use handoff artifacts for narrative context. Do not treat handoff prose as the
+gate input for review completion.
 
 ## Pre-Check
 
@@ -191,6 +208,11 @@ When review finds issues:
 ## Handoff Artifact
 
 Write at `.ai/workflows/runs/active/<run_id>/handoffs/<slice_id>/review-agent.md`.
+
+Your handoff artifact MUST include these additional sections after Evidence Summary:
+- Issues: review blockers or evidence gaps encountered.
+- Learnings: how those blockers or gaps were resolved or diagnosed.
+- Suggestions: workflow improvements that could prevent similar issues later.
 
 ## Raw Logs
 

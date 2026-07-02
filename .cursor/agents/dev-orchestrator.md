@@ -367,7 +367,7 @@ For `create_change`, plan-agent success does NOT automatically mean phase comple
 
 If plan-agent returns:
 - `recommended_next_action: "ask_user"` — ask the user the returned `questions_for_user`, then redispatch plan-agent
-- `recommended_next_action: "await_user_plan_approval"` — present `evidence.plan_summary` and `artifacts.plan_path` to the user, then wait for approval or revision request
+- `recommended_next_action: "await_user_plan_approval"` — present `evidence.plan_summary`, `artifacts.primary_design_path`, and the summarized `artifacts.design_artifact_paths[]` list to the user, then wait for approval or revision request
 
 Only after explicit user approval may dev-orchestrator:
 - record evidence for completed planning
@@ -551,6 +551,13 @@ When an agent produces `artifacts.handoff_path`, forward it to the next agent
 so it can read prior context. Handoff files use sections: Metadata, Objective,
 Work Completed, Files/Artifacts Changed, Commands Run, Evidence Summary,
 Blockers, Assumptions, Risks/Follow-Ups, Raw Logs.
+
+For plan-agent results, forward both:
+- `artifacts.primary_design_path` as the single user-approved design entry point.
+- `artifacts.design_artifact_paths[]` as the complete structured list of design artifacts.
+
+Downstream agents MUST receive these structured artifact fields directly. Do not
+make them recover design paths by parsing the handoff Markdown.
 
 ## Raw Logs
 

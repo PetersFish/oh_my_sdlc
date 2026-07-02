@@ -12,6 +12,9 @@ from unittest import mock
 
 import yaml
 
+REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
+AGENTS_DIR = REPO_ROOT / "agents"
+
 SKILLS_LIB = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     "..", "skills", "_lib",
@@ -29,6 +32,11 @@ from _lib.wrapper_contracts import (
     HANDOFF_SECTIONS,
     HANDOFF_METADATA_KEYS,
     RAW_LOG_META_KEYS,
+    DESIGN_ARTIFACT_KINDS,
+    DESIGN_ARTIFACT_SOURCES,
+    DESIGN_ARTIFACT_KEYS,
+    validate_design_artifacts,
+    make_design_artifact_entry,
     PHASE_AGENT_MAP,
     CANONICAL_AGENT_NAMES,
     VALID_AGENT_NAMES,
@@ -95,9 +103,9 @@ class TestEvidenceEnvelope(unittest.TestCase):
 
     def test_envelope_validates_minimal_success(self):
         errors = validate_evidence_envelope({
-            "agent": "plan-agent",
+            "agent": "implement-agent",
             "status": "success",
-            "phase": "create_change",
+            "phase": "apply_change",
             "evidence": {},
         })
         self.assertEqual(errors, [])
@@ -134,12 +142,89 @@ class TestEvidenceEnvelope(unittest.TestCase):
     def test_envelope_validate_detects_allowed_statuses(self):
         for status in VALID_AGENT_STATUSES:
             errors = validate_evidence_envelope({
-                "agent": "plan-agent",
+                "agent": "implement-agent",
                 "status": status,
-                "phase": "create_change",
+                "phase": "apply_change",
                 "evidence": {},
             })
             self.assertEqual(errors, [], f"Status {status!r} should be valid")
+
+    def test_plan_agent_success_requires_artifacts_object(self):
+        errors = validate_evidence_envelope({
+            "agent": "plan-agent",
+            "status": "success",
+            "phase": "create_change",
+            "flow_type": "lightweight-flow",
+            "evidence": {},
+        })
+
+        self.assertTrue(any("artifacts object" in e for e in errors))
+
+    def test_plan_agent_success_requires_primary_design_path(self):
+        errors = validate_evidence_envelope({
+            "agent": "plan-agent",
+            "status": "success",
+            "phase": "create_change",
+            "flow_type": "lightweight-flow",
+            "evidence": {},
+            "artifacts": {
+                "design_artifact_paths": [
+                    make_design_artifact_entry(
+                        kind="plan",
+                        path="docs/superpowers/plans/2026-07-02-demo.md",
+                        source="superpowers",
+                    ),
+                ],
+            },
+        })
+
+        self.assertTrue(any("primary_design_path" in e for e in errors))
+
+    def test_plan_agent_success_requires_non_empty_design_artifacts(self):
+        errors = validate_evidence_envelope({
+            "agent": "plan-agent",
+            "status": "success",
+            "phase": "create_change",
+            "flow_type": "lightweight-flow",
+            "evidence": {},
+            "artifacts": {
+                "primary_design_path": "docs/superpowers/plans/2026-07-02-demo.md",
+                "design_artifact_paths": [],
+            },
+        })
+
+        self.assertTrue(any("non-empty array" in e for e in errors))
+
+    def test_plan_agent_success_requires_valid_flow_type_for_artifact_rules(self):
+        errors = validate_evidence_envelope({
+            "agent": "plan-agent",
+            "status": "success",
+            "phase": "create_change",
+            "evidence": {},
+            "artifacts": {
+                "primary_design_path": "openspec/changes/demo-change/proposal.md",
+                "design_artifact_paths": [
+                    make_design_artifact_entry(
+                        kind="proposal",
+                        path="openspec/changes/demo-change/proposal.md",
+                        source="openspec",
+                    ),
+                ],
+            },
+        })
+
+        self.assertTrue(any("valid flow_type" in e for e in errors))
+
+    def test_plan_agent_success_validation_accepts_canonical_alias(self):
+        errors = validate_evidence_envelope({
+            "agent": "plan_agent",
+            "status": "success",
+            "phase": "create_change",
+            "evidence": {},
+        })
+
+        self.assertTrue(any("valid flow_type" in e for e in errors))
+        self.assertTrue(any("artifacts object" in e for e in errors))
 
 
 class TestHandoffArtifacts(unittest.TestCase):
@@ -164,6 +249,210 @@ class TestHandoffArtifacts(unittest.TestCase):
         self.assertIn("Flow Type", HANDOFF_METADATA_KEYS)
         self.assertIn("Status", HANDOFF_METADATA_KEYS)
         self.assertIn("Recommended Next Agent", HANDOFF_METADATA_KEYS)
+
+
+class TestDesignArtifactPaths(unittest.TestCase):
+    """Design artifacts expose plan/spec sources through structured evidence."""
+
+    def test_lightweight_flow_accepts_plan_and_spec_artifacts(self):
+        artifacts = {
+            "primary_design_path": "docs/superpowers/plans/2026-07-02-demo.md",
+            "design_artifact_paths": [
+                make_design_artifact_entry(
+                    kind="plan",
+                    path="docs/superpowers/plans/2026-07-02-demo.md",
+                    source="superpowers",
+                ),
+                make_design_artifact_entry(
+                    kind="spec",
+                    path="docs/superpowers/specs/2026-07-02-demo-design.md",
+                    source="superpowers",
+                ),
+            ],
+        }
+
+        errors = validate_design_artifacts(artifacts, flow_type="lightweight-flow")
+
+        self.assertEqual(errors, [])
+
+    def test_spec_flow_accepts_multiple_spec_artifacts(self):
+        artifacts = {
+            "primary_design_path": "openspec/changes/demo-change/proposal.md",
+            "design_artifact_paths": [
+                make_design_artifact_entry(
+                    kind="proposal",
+                    path="openspec/changes/demo-change/proposal.md",
+                    source="openspec",
+                ),
+                make_design_artifact_entry(
+                    kind="tasks",
+                    path="openspec/changes/demo-change/tasks.md",
+                    source="openspec",
+                ),
+                make_design_artifact_entry(
+                    kind="spec",
+                    path="openspec/changes/demo-change/specs/agent-contracts/spec.md",
+                    source="openspec",
+                ),
+                make_design_artifact_entry(
+                    kind="spec",
+                    path="openspec/changes/demo-change/specs/dev-orchestrator-agent-routing/spec.md",
+                    source="openspec",
+                ),
+            ],
+        }
+
+        errors = validate_design_artifacts(artifacts, flow_type="spec-flow")
+
+        self.assertEqual(errors, [])
+
+    def test_primary_design_path_is_required(self):
+        artifacts = {
+            "design_artifact_paths": [
+                make_design_artifact_entry(
+                    kind="plan",
+                    path="docs/superpowers/plans/2026-07-02-demo.md",
+                    source="superpowers",
+                ),
+            ],
+        }
+
+        errors = validate_design_artifacts(artifacts, flow_type="lightweight-flow")
+
+        self.assertTrue(any("primary_design_path" in e for e in errors))
+
+    def test_primary_design_path_must_match_list_entry(self):
+        artifacts = {
+            "primary_design_path": "docs/superpowers/plans/missing.md",
+            "design_artifact_paths": [
+                make_design_artifact_entry(
+                    kind="plan",
+                    path="docs/superpowers/plans/2026-07-02-demo.md",
+                    source="superpowers",
+                ),
+            ],
+        }
+
+        errors = validate_design_artifacts(artifacts, flow_type="lightweight-flow")
+
+        self.assertTrue(any("must match" in e for e in errors))
+
+    def test_design_artifact_paths_must_be_non_empty_array(self):
+        artifacts = {
+            "primary_design_path": "docs/superpowers/plans/2026-07-02-demo.md",
+            "design_artifact_paths": [],
+        }
+
+        errors = validate_design_artifacts(artifacts, flow_type="lightweight-flow")
+
+        self.assertTrue(any("non-empty array" in e for e in errors))
+
+    def test_artifact_entry_requires_kind_path_and_source(self):
+        artifacts = {
+            "primary_design_path": "docs/superpowers/plans/2026-07-02-demo.md",
+            "design_artifact_paths": [{"kind": "plan"}],
+        }
+
+        errors = validate_design_artifacts(artifacts, flow_type="lightweight-flow")
+
+        self.assertTrue(any("missing keys" in e for e in errors))
+
+    def test_spec_flow_requires_proposal_tasks_and_spec(self):
+        artifacts = {
+            "primary_design_path": "openspec/changes/demo-change/proposal.md",
+            "design_artifact_paths": [
+                make_design_artifact_entry(
+                    kind="proposal",
+                    path="openspec/changes/demo-change/proposal.md",
+                    source="openspec",
+                ),
+            ],
+        }
+
+        errors = validate_design_artifacts(artifacts, flow_type="spec-flow")
+
+        self.assertTrue(any("tasks" in e for e in errors))
+        self.assertTrue(any("spec" in e for e in errors))
+
+    def test_lightweight_flow_requires_plan(self):
+        artifacts = {
+            "primary_design_path": "docs/superpowers/specs/2026-07-02-demo-design.md",
+            "design_artifact_paths": [
+                make_design_artifact_entry(
+                    kind="spec",
+                    path="docs/superpowers/specs/2026-07-02-demo-design.md",
+                    source="superpowers",
+                ),
+            ],
+        }
+
+        errors = validate_design_artifacts(artifacts, flow_type="lightweight-flow")
+
+        self.assertTrue(any("plan" in e for e in errors))
+
+
+class TestDesignArtifactPromptContracts(unittest.TestCase):
+    """Agent prompts document the structured design artifact contract."""
+
+    def test_plan_agent_uses_design_artifact_paths_not_plan_path(self):
+        content = (AGENTS_DIR / "plan-agent.md").read_text(encoding="utf-8")
+        self.assertIn("primary_design_path", content)
+        self.assertIn("design_artifact_paths", content)
+        self.assertNotIn('"plan_path"', content)
+        # Verify the JSON success example uses primary_design_path, not plan_path.
+        # The deprecation notice may mention artifacts.plan_path — that is acceptable.
+        import re
+        json_artifacts_blocks = re.findall(
+            r'"artifacts"\s*:\s*\{[^}]*\}', content
+        )
+        for block in json_artifacts_blocks:
+            self.assertNotIn("plan_path", block)
+
+    def test_dev_orchestrator_forwards_structured_design_artifacts(self):
+        content = (AGENTS_DIR / "dev-orchestrator.md").read_text(encoding="utf-8")
+        self.assertIn("artifacts.primary_design_path", content)
+        self.assertIn("artifacts.design_artifact_paths[]", content)
+        self.assertIn("Do not", content)
+        self.assertIn("handoff Markdown", content)
+
+    def test_apply_agents_include_learning_sections(self):
+        for filename in ("implement-agent.md", "test-agent.md", "review-agent.md"):
+            content = (AGENTS_DIR / filename).read_text(encoding="utf-8")
+            with self.subTest(filename=filename):
+                self.assertIn("Issues", content)
+                self.assertIn("Learnings", content)
+                self.assertIn("Suggestions", content)
+
+
+class TestSpecChangeResultContract(unittest.TestCase):
+    """Spec provider results normalize artifact paths for plan-agent handoff."""
+
+    def test_normalize_spec_change_derives_design_artifact_paths(self):
+        from _lib.result_contracts import normalize_result
+
+        result = normalize_result("spec_change", {
+            "change_id": "demo-change",
+            "status": "created",
+            "artifact_paths": [
+                "openspec/changes/demo-change/proposal.md",
+                "openspec/changes/demo-change/design.md",
+                "openspec/changes/demo-change/tasks.md",
+                "openspec/changes/demo-change/specs/agent-contracts/spec.md",
+                "openspec/changes/demo-change/specs/dev-orchestrator-agent-routing/spec.md",
+            ],
+            "handoff_path": ".ai/workflows/runs/active/demo/handoffs/default/plan-agent.md",
+        })
+
+        self.assertEqual(result["primary_design_path"], "openspec/changes/demo-change/proposal.md")
+        self.assertEqual(result["design_artifact_paths"][0], {
+            "kind": "proposal",
+            "path": "openspec/changes/demo-change/proposal.md",
+            "source": "openspec",
+        })
+        self.assertEqual(
+            [entry["kind"] for entry in result["design_artifact_paths"]].count("spec"),
+            2,
+        )
 
 
 class TestRawLogs(unittest.TestCase):

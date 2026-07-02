@@ -7,9 +7,9 @@ missing contract returns a structured blocker dict.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, List
 
-from .wrapper_contracts import make_blocker
+from .wrapper_contracts import make_blocker, make_design_artifact_entry
 
 
 Normalizer = Callable[[Dict[str, Any]], Dict[str, Any]]
@@ -17,6 +17,36 @@ Normalizer = Callable[[Dict[str, Any]], Dict[str, Any]]
 # ---------------------------------------------------------------------------
 # spec_change normalizer
 # ---------------------------------------------------------------------------
+
+
+def _spec_artifact_kind(path: str) -> str:
+    """Infer the design artifact kind for a spec provider artifact path."""
+    name = path.rsplit("/", 1)[-1]
+    if name == "proposal.md":
+        return "proposal"
+    if name == "design.md":
+        return "design"
+    if name == "tasks.md":
+        return "tasks"
+    if name == "spec.md":
+        return "spec"
+    return "notes"
+
+
+def _normalize_spec_artifact_paths(paths: Any) -> List[Dict[str, str]]:
+    """Convert provider artifact path strings into design artifact entries."""
+    if not isinstance(paths, list):
+        return []
+    entries: List[Dict[str, str]] = []
+    for path in paths:
+        if not isinstance(path, str) or not path.strip():
+            continue
+        entries.append(make_design_artifact_entry(
+            kind=_spec_artifact_kind(path),
+            path=path,
+            source="openspec",
+        ))
+    return entries
 
 
 def normalize_spec_change(raw: Dict[str, Any]) -> Dict[str, Any]:
@@ -41,10 +71,22 @@ def normalize_spec_change(raw: Dict[str, Any]) -> Dict[str, Any]:
             recommended_action="Ensure the provider emits a status in its result",
         )
 
+    artifact_paths = raw.get("artifact_paths", [])
+    design_artifact_paths = _normalize_spec_artifact_paths(artifact_paths)
+    primary_design_path = None
+    for entry in design_artifact_paths:
+        if entry["kind"] == "proposal":
+            primary_design_path = entry["path"]
+            break
+    if primary_design_path is None and design_artifact_paths:
+        primary_design_path = design_artifact_paths[0]["path"]
+
     return {
         "change_id": change_id,
         "status": status,
-        "artifact_paths": raw.get("artifact_paths", []),
+        "artifact_paths": artifact_paths,
+        "design_artifact_paths": design_artifact_paths,
+        "primary_design_path": primary_design_path,
         "handoff_path": raw.get("handoff_path"),
     }
 

@@ -112,6 +112,22 @@ From dev-orchestrator:
 - `evidence.focused_tests` from implement-agent (commands and claimed results)
 - Changed test files (for overfit check)
 - Handoff artifact from implement-agent
+- `artifacts.primary_design_path` and `artifacts.design_artifact_paths[]` from plan-agent
+
+## Design Artifact Reading Priority
+
+For requirement context, prefer structured design artifacts over handoff prose.
+
+Reading priority:
+- `spec`
+- `tasks`
+- `design`
+- `proposal`
+- `plan`
+- `notes`
+
+Use implement-agent handoff for execution context and diagnostics, not as the
+source of truth for requirements.
 
 ## Verification Sequence
 
@@ -200,6 +216,11 @@ Stop at first failure. Produce diagnostic evidence. Use `systematic-debugging` b
 ## Handoff Artifact
 
 Write at `.ai/workflows/runs/active/<run_id>/handoffs/<slice_id>/test-agent.md`.
+
+Your handoff artifact MUST include these additional sections after Evidence Summary:
+- Issues: verification problems or environment problems encountered.
+- Learnings: how those problems were resolved or diagnosed.
+- Suggestions: workflow improvements that could prevent similar issues later.
 
 ## Raw Logs
 

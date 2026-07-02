@@ -99,8 +99,26 @@ From dev-orchestrator:
 - `slice_id` — your work package identifier
 - `context.change_id` (spec-flow)
 - resolved wrapper dispatch contract for spec-flow: `dispatch.kind`, `dispatch.target`, `verifier.target`, `result_contract`
-- Tasks to implement, handoff from plan-agent
+- `artifacts.primary_design_path` and `artifacts.design_artifact_paths[]` from plan-agent
+- Handoff artifact from plan-agent for readable context only
 - Blocker evidence from test-agent (if retrying)
+
+## Design Artifact Reading Priority
+
+Before implementation, read structured design artifacts from
+`artifacts.design_artifact_paths[]` rather than discovering paths from handoff
+prose.
+
+Reading priority:
+- `tasks`
+- `spec`
+- `design`
+- `proposal`
+- `plan`
+- `notes`
+
+Use `artifacts.primary_design_path` as the approved review entry, not as the
+only source of implementation requirements.
 
 ## Output — Structured Evidence Envelope
 
@@ -299,6 +317,11 @@ NEVER skip the red phase. Every behavior change starts with a failing test.
 Write at `.ai/workflows/runs/active/<run_id>/handoffs/<slice_id>/implement-agent.md`
 with sections: Metadata, Objective, Work Completed, Files/Artifacts Changed,
 Commands Run, Evidence Summary, Blockers, Assumptions, Risks/Follow-Ups, Raw Logs.
+
+Your handoff artifact MUST include these additional sections after Evidence Summary:
+- Issues: execution problems encountered during implementation.
+- Learnings: how those problems were resolved or diagnosed.
+- Suggestions: workflow improvements that could prevent similar issues later.
 
 ## Raw Logs
 

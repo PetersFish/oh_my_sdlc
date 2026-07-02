@@ -147,13 +147,28 @@ Return JSON:
     ]
   },
   "artifacts": {
-    "plan_path": ".ai/workflows/runs/active/<run_id>/plans/<slice_id>/plan.md",
+    "primary_design_path": "docs/superpowers/plans/<plan-file>.md | openspec/changes/<change-id>/proposal.md",
+    "design_artifact_paths": [
+      {
+        "kind": "plan|spec|proposal|design|tasks|notes",
+        "path": "<repo-relative artifact path>",
+        "source": "superpowers|openspec|other"
+      }
+    ],
     "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/<slice_id>/plan-agent.md"
   },
   "blockers": [],
   "recommended_next_action": "await_user_plan_approval"
 }
 ```
+
+`plan-agent` success MUST include:
+- `artifacts.primary_design_path` as the single user-review entry point.
+- `artifacts.design_artifact_paths[]` as a non-empty array of all relevant design artifacts.
+- `artifacts.primary_design_path` matching one `design_artifact_paths[].path` value.
+- `artifacts.handoff_path` for cross-agent context.
+
+`artifacts.plan_path` is deprecated and MUST NOT be the only design artifact reference.
 
 ### B. Blocked — deeper user input required
 
@@ -270,25 +285,36 @@ If additional user input is needed, do NOT start an extended user-facing
 dialogue yourself. Return `questions_for_user` and let dev-orchestrator
 ask the user.
 
-## Durable Plan Artifact
+## Design Artifact References
 
-Write the user-reviewable plan at:
+Do not assume there is exactly one plan file.
 
-`.ai/workflows/runs/active/<run_id>/plans/<slice_id>/plan.md`
+For `lightweight-flow`, use the original superpowers workflow outputs:
+- include the superpowers plan as `kind: "plan"`, `source: "superpowers"`
+- include a superpowers spec/design document as `kind: "spec"` when one exists
+- set `primary_design_path` to the user-reviewable superpowers plan path
 
-Expose that path as:
+For `spec-flow`, use provider-owned spec artifacts:
+- include `proposal.md` as `kind: "proposal"`, `source: "openspec"`
+- include `tasks.md` as `kind: "tasks"`, `source: "openspec"`
+- include every delta spec file as `kind: "spec"`, `source: "openspec"`
+- include `design.md` as `kind: "design"` when the provider creates it
+- set `primary_design_path` to `openspec/changes/<change-id>/proposal.md` unless the provider contract returns a different primary review entry
 
-- `artifacts.plan_path`
+Expose all of these through `artifacts.design_artifact_paths[]`.
+Expose the single review entry through `artifacts.primary_design_path`.
 
 ## Handoff Artifact
 
 Write handoff at `.ai/workflows/runs/active/<run_id>/handoffs/<slice_id>/plan-agent.md`
-with sections: Metadata, Objective, Work Completed, Files/Artifacts Changed,
-Commands Run (none), Evidence Summary, Blockers, Assumptions, Risks/Follow-Ups,
-Raw Logs (none).
+with sections: Metadata, Objective, Work Completed, Files / Artifacts Changed,
+Design Artifacts, Key Decisions, Open Questions, Commands Run (none), Evidence
+Summary, Blockers, Assumptions, Risks / Follow-Ups, Raw Logs (none).
 
-The handoff artifact is for agent-to-agent context transfer.
-The durable plan artifact is for user review and approval.
+The handoff artifact is for agent-to-agent context transfer. It may repeat
+`primary_design_path` and `design_artifact_paths[]` for readability, but
+dev-orchestrator and downstream agents MUST consume the structured `artifacts`
+fields rather than parsing handoff prose for paths.
 
 ## Raw Logs
 
