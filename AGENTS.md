@@ -182,5 +182,18 @@ Agents under `agents/` are canonical. Distributed copies live in `.opencode/agen
     python3 /path/to/oh_my_skills/scripts/setup_agents.py --target ./.opencode/agents --force
     ```
 - `setup_agents.py` runs template sync then activation (model/variant rendering). Do NOT use `install_agents.py` directly for CLI targets — it would wipe activated model config.
+- **Distribution is NOT complete until activation succeeds.** A distributed copy must have valid `model` and `variant` frontmatter written by `setup_agents.py`. Template sync alone (prompt text only) does not count as a finished distribution.
 - Do NOT edit distributed copies directly — they are derived from canonical.
 - The pre-commit hook enforces consistency when `agents/` files are staged.
+
+**Verification (agent updates):**
+
+```bash
+# Full sync (install + activate) all project-level targets
+python3 scripts/setup_agents.py --target ./.opencode/agents --force
+python3 scripts/setup_agents.py --target ./.claude/agents --force
+python3 scripts/setup_agents.py --target ./.cursor/agents --force
+
+# Verify template + activation consistency (exit 1 on drift)
+python3 scripts/setup_agents.py --target ./.opencode/agents --check
+```
