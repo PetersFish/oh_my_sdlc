@@ -28,7 +28,7 @@ permission:
     "openspec status*": allow
     "openspec list*": allow
     "openspec archive*": allow
-model: opencode-go/deepseek-v4-pro
+model: opencode-go/mimo-v2.5-pro
 variant: medium
 ---
 

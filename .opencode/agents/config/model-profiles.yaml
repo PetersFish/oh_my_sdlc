@@ -14,8 +14,8 @@ profiles:
     model: openai/gpt-5.5
     variant: medium
   implementation:
-    model: opencode-go/deepseek-v4-pro
-    variant: high
+    model: opencode-go/mimo-v2.5-pro
+    variant: medium
   testing:
     model: openai/gpt-5.4
     variant: medium
@@ -23,7 +23,7 @@ profiles:
     model: openai/gpt-5.5
     variant: medium
   finish:
-    model: opencode-go/deepseek-v4-pro
+    model: opencode-go/mimo-v2.5-pro
     variant: medium
 
 agents:
