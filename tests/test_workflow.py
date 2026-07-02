@@ -91,6 +91,14 @@ class FixtureBase(unittest.TestCase):
         with open(os.path.join(tasks_dir, "tasks.md"), "w") as f:
             f.write(content)
 
+    def _make_superpowers_plan(self, filename, content="# Plan\n"):
+        plans_dir = os.path.join(self.tmp, "docs", "superpowers", "plans")
+        os.makedirs(plans_dir, exist_ok=True)
+        path = os.path.join(plans_dir, filename)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(content)
+        return path
+
     def _make_roadmap_item(self, item_id, status, openspec_change=None, area="area1", completed_at=None, started_at=None, slug=None):
         items_dir = os.path.join(
             self.tmp, ".ai", "roadmap", "areas", area, "items"
@@ -300,6 +308,53 @@ class TestPhaseInference(FixtureBase):
         self.assertEqual(rc, 0)
         data = json.loads(out)
         self.assertEqual(data["current_phase"], "archive_change")
+
+    def test_lightweight_flow_with_matching_superpowers_plan_starts_at_apply_change(self):
+        self._make_superpowers_plan("2026-07-02-start-with-plan-handoff.md")
+
+        rc, out, _ = run_workflow(
+            self.tmp,
+            "start",
+            subject_type="spec_change",
+            subject_id="start-with-plan-handoff",
+            flow_type="lightweight-flow",
+        )
+
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["flow_type"], "lightweight-flow")
+        self.assertEqual(data["current_phase"], "apply_change")
+
+    def test_lightweight_flow_without_matching_superpowers_plan_starts_at_create_change(self):
+        rc, out, _ = run_workflow(
+            self.tmp,
+            "start",
+            subject_type="spec_change",
+            subject_id="missing-plan",
+            flow_type="lightweight-flow",
+        )
+
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["flow_type"], "lightweight-flow")
+        self.assertEqual(data["current_phase"], "create_change")
+
+    def test_lightweight_flow_with_multiple_matching_superpowers_plans_does_not_guess(self):
+        self._make_superpowers_plan("2026-07-02-start-with-plan-handoff.md")
+        self._make_superpowers_plan("2026-07-03-start-with-plan-handoff-revision.md")
+
+        rc, out, _ = run_workflow(
+            self.tmp,
+            "start",
+            subject_type="spec_change",
+            subject_id="start-with-plan-handoff",
+            flow_type="lightweight-flow",
+        )
+
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["flow_type"], "lightweight-flow")
+        self.assertEqual(data["current_phase"], "create_change")
 
 
 class TestValidate(FixtureBase):

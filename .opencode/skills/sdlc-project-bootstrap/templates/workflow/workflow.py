@@ -1221,8 +1221,8 @@ def cmd_start(root, args):
             )
             sys.exit(1)
 
-    phase = _infer_phase(root, subject_type, subject_id)
     flow_type = args.flow_type or "spec-flow"
+    phase = _infer_phase(root, subject_type, subject_id, flow_type)
 
     # Confirmation-gated lightweight-flow: LLM decides externally, runtime blocks until user confirms
     if args.flow_type == "lightweight-flow":
@@ -1336,7 +1336,7 @@ def cmd_resume(root, args):
         effective_subject_id = subject_id
         if subject_type == "spec_change":
             effective_subject_id = state.get("context", {}).get("change_id") or subject_id
-        phase = _infer_phase(root, subject_type, effective_subject_id)
+        phase = _infer_phase(root, subject_type, effective_subject_id, state.get("flow_type", "spec-flow"))
         state["current_phase"] = phase
         _run_loaders(root, state, wf)
         _calc_readiness(state, wf)
@@ -2834,7 +2834,30 @@ def cmd_governance_check(root, args):
 # ---------------------------------------------------------------------------
 
 
-def _infer_phase(root, subject_type, subject_id):
+def _strip_leading_date_slug(stem):
+    parts = stem.split("-", 3)
+    if len(parts) == 4 and all(part.isdigit() for part in parts[:3]):
+        return parts[3]
+    return stem
+
+
+def _matching_superpowers_plans(root, subject_id):
+    plans_dir = os.path.join(root, "docs", "superpowers", "plans")
+    if not os.path.isdir(plans_dir):
+        return []
+
+    matches = []
+    for filename in sorted(os.listdir(plans_dir)):
+        if not filename.endswith(".md"):
+            continue
+        stem = os.path.splitext(filename)[0]
+        normalized = _strip_leading_date_slug(stem)
+        if normalized == subject_id or subject_id in normalized:
+            matches.append(os.path.join(plans_dir, filename))
+    return matches
+
+
+def _infer_phase(root, subject_type, subject_id, flow_type="spec-flow"):
     if subject_type == "roadmap_item":
         item_status = loader_roadmap_item_status(root, subject_id)
         if item_status:
@@ -2852,6 +2875,11 @@ def _infer_phase(root, subject_type, subject_id):
         return "create_roadmap"
     if subject_type != "spec_change":
         return "input"
+    if flow_type == "lightweight-flow":
+        matches = _matching_superpowers_plans(root, subject_id)
+        if len(matches) == 1:
+            return "apply_change"
+        return "create_change"
     status = loader_openspec_change_status(root, subject_id)
     classification = status.get("classification", "missing")
     if classification == "archived":

@@ -38,6 +38,7 @@ Your job is LIMITED to:
 - reading workflow state
 - validating dispatch eligibility through workflow.py hooks
 - asking the user minimal clarification questions when required routing inputs are missing
+- collecting `flow_type` and `primary_design_path` for start-with-plan handoff requests
 - dispatching the correct specialized subagent
 - forwarding structured evidence and handoff artifacts
 - calling workflow runtime commands that are explicitly allowed by this prompt
@@ -178,6 +179,65 @@ Canonical-run rules still apply:
 
 Only after the run is confirmed usable may you call `before-dispatch`.
 `before-dispatch` and `after-dispatch` are phase dispatch hooks, not workflow entry commands.
+
+## Start-With-Plan Handoff
+
+Use this branch when the user asks to implement an existing design, plan, or OpenSpec change instead of creating a new plan.
+
+This branch is governed workflow execution, not `superpowers-direct`. It MUST still use workflow start/resume, `before-dispatch`, `implement-agent`, `test-agent`, and `review-agent`. It only needs to skip `plan-agent` after existing design artifacts are selected.
+
+Required routing inputs:
+- `flow_type`: `spec-flow` or `lightweight-flow`
+- `primary_design_path`: the selected main design artifact
+
+Forward related artifacts through `design_artifact_paths[]`.
+
+Input cases:
+
+| User input | Action |
+|---|---|
+| Provides both `flow_type` and `primary_design_path` | Validate that the path belongs to the flow, derive `subject_id`, then start/resume and dispatch implementation. |
+| Provides only `flow_type` | List apply-ready candidates for that flow and ask the user to select `primary_design_path`. |
+| Provides only `primary_design_path` | Infer `flow_type` by path rules; ask if ambiguous. |
+| Provides neither | Ask for `flow_type` first, then list candidates for that flow. |
+
+Path rules:
+- `openspec/changes/<change-id>/...` -> `spec-flow`
+- `docs/superpowers/plans/...` -> `lightweight-flow`
+- `docs/superpowers/specs/...` -> `lightweight-flow`, but a related `kind=plan` artifact must be found or selected before implementation
+
+### Workflow Run Initialization
+
+After `flow_type` and `primary_design_path` are resolved, derive the workflow subject from the selected artifact:
+
+| Flow | Path | subject_type | subject_id |
+|---|---|---|---|
+| `spec-flow` | `openspec/changes/<change-id>/...` | `spec_change` | `<change-id>` |
+| `lightweight-flow` | `docs/superpowers/plans/YYYY-MM-DD-<slug>.md` | `spec_change` | `<slug>` |
+
+For dated Superpowers plan filenames, strip the leading `YYYY-MM-DD-` prefix when deriving `<slug>`.
+
+Run workflow entry commands in this order:
+
+1. `python3 .ai/workflows/scripts/workflow.py --root . verify-foundations`
+2. `python3 .ai/workflows/scripts/workflow.py --root . status --subject-type <subject_type> --subject-id <subject_id>`
+3. If no matching active run exists: `python3 .ai/workflows/scripts/workflow.py --root . start --workflow sdlc-main --subject-type <subject_type> --subject-id <subject_id> --flow-type <flow_type>`
+4. If a matching active run exists: `python3 .ai/workflows/scripts/workflow.py --root . resume --subject-type <subject_type> --subject-id <subject_id>`
+5. Continue only if the active phase is `apply_change`; otherwise surface the missing or ambiguous artifact selection.
+
+Candidate rules:
+- `spec-flow`: list OpenSpec changes with apply-ready `tasks.md` artifacts.
+- `lightweight-flow`: list `docs/superpowers/plans/*.md` candidates.
+
+After inputs are resolved:
+1. Run `verify-foundations`.
+2. Run `status` for the derived subject.
+3. Start or resume the workflow with the selected `flow_type`.
+4. Confirm the active phase is `apply_change`.
+5. Call `before-dispatch --agent implement-agent`.
+6. Dispatch `implement-agent` with `primary_design_path` and `design_artifact_paths[]` in the task prompt.
+
+If the active phase is `create_change`, do not force implementation. Surface the missing or ambiguous artifact selection and ask the user to choose a valid existing plan, or route to `plan-agent` only if the user wants new planning.
 
 ## Dispatch Lifecycle Hooks
 

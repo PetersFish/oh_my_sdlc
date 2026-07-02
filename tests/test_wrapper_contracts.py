@@ -397,6 +397,31 @@ class TestDesignArtifactPromptContracts(unittest.TestCase):
     def test_plan_agent_uses_design_artifact_paths_not_plan_path(self):
         content = (AGENTS_DIR / "plan-agent.md").read_text(encoding="utf-8")
         self.assertIn("primary_design_path", content)
+
+
+class TestDevOrchestratorStartWithPlanHandoff(unittest.TestCase):
+    """dev-orchestrator documents governed implementation from existing design artifacts."""
+
+    def test_documents_start_with_plan_handoff_inputs(self):
+        content = (AGENTS_DIR / "dev-orchestrator.md").read_text(encoding="utf-8")
+        self.assertIn("start-with-plan", content)
+        self.assertIn("flow_type", content)
+        self.assertIn("primary_design_path", content)
+        self.assertIn("design_artifact_paths", content)
+
+    def test_documents_four_handoff_input_cases(self):
+        content = (AGENTS_DIR / "dev-orchestrator.md").read_text(encoding="utf-8")
+        self.assertIn("Provides both `flow_type` and `primary_design_path`", content)
+        self.assertIn("Provides only `flow_type`", content)
+        self.assertIn("Provides only `primary_design_path`", content)
+        self.assertIn("Provides neither", content)
+
+    def test_start_with_plan_is_governed_not_direct_execution(self):
+        content = (AGENTS_DIR / "dev-orchestrator.md").read_text(encoding="utf-8")
+        self.assertIn("not `superpowers-direct`", content)
+        self.assertIn("before-dispatch", content)
+        self.assertIn("implement-agent", content)
+        self.assertIn("skip `plan-agent`", content)
         self.assertIn("design_artifact_paths", content)
         self.assertNotIn('"plan_path"', content)
         # Verify the JSON success example uses primary_design_path, not plan_path.
