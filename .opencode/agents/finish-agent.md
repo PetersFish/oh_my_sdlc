@@ -233,7 +233,7 @@ Blocked example when spec-flow archive dispatch omits the resolved wrapper dispa
 
 After finalization, resolve pending hooks:
 1. `memory_sync`: dispatch sdlc-openspec-memory-sync (spec-flow) or sdlc-repository-memory-sync (lightweight-flow).
-2. `roadmap_done_if_relevant`: dispatch sdlc-roadmap done <item-id>.
+2. `roadmap_done_if_relevant`: hand off to `roadmap-agent` (which loads `sdlc-roadmap`) via the orchestrator's lifecycle dispatch hooks. Do NOT call `sdlc-roadmap` directly from finish-agent.
 3. After each hook completes, call:
    ```
    python3 .ai/workflows/scripts/workflow.py --root . complete-hook --hook <hook-name>

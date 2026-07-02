@@ -130,6 +130,16 @@ Return JSON:
 }
 ```
 
+Return `success` only when ALL of the following are true:
+- Implementation tasks are complete.
+- TDD loop passed (all focused tests green).
+- Provider verification succeeded (for spec-flow).
+- No downstream steps (verification, sync, distribution) are pending.
+- No blockers remain.
+
+If implementation is done but verification/sync/distribution are still
+pending, return `blocked` with appropriate blockers (see examples below).
+
 Blocked example when workflow context prevents safe execution:
 ```json
 {
@@ -177,6 +187,41 @@ Blocked example when spec-flow dispatch omits the resolved wrapper dispatch cont
   "recommended_next_action": "fix_workflow_context"
 }
 ```
+
+Blocked example when implementation is complete but verification/sync/distribution are still pending:
+```json
+{
+  "agent": "implement-agent",
+  "status": "blocked",
+  "phase": "apply_change",
+  "slice_id": "default",
+  "flow_type": "spec-flow",
+  "evidence": {
+    "tasks_complete": true,
+    "tdd_passed": true,
+    "focused_tests": [
+      {"command": "pytest -k test_x", "result": "pass"}
+    ]
+  },
+  "artifacts": {
+    "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/default/implement-agent.md",
+    "raw_log_paths": [
+      {"path": "...", "kind": "pytest", "command": "pytest -k test_x", "result": "pass"}
+    ]
+  },
+  "blockers": [
+    {"reason": "verification_pending", "message": "Test verification has not been executed by test-agent yet."},
+    {"reason": "sync_pending", "message": "Memory sync and distribution have not been completed."}
+  ],
+  "recommended_next_action": "dispatch_test_agent"
+}
+```
+
+When implementation is done but verification, sync, or distribution steps are
+still pending, you MUST return `blocked` — not `success`.  The presence of
+blockers and a `recommended_next_action` tells the workflow dispatcher to
+continue to the next agent in the pipeline.  Do NOT return `success` with
+blockers; `success` means all downstream tasks are complete and verified.
 
 Failed example when OpenSpec apply cannot produce the requested artifact:
 ```json

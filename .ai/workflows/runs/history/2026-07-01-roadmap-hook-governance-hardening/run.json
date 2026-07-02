@@ -1,0 +1,256 @@
+{
+  "version": 1,
+  "run_id": "2026-07-01-roadmap-hook-governance-hardening",
+  "workflow": "sdlc-main",
+  "flow_type": "spec-flow",
+  "status": "done",
+  "current_phase": "done",
+  "primary_subject": {
+    "type": "spec_change",
+    "id": "roadmap-hook-governance-hardening"
+  },
+  "context": {
+    "change_id": "roadmap-hook-governance-hardening"
+  },
+  "phase_readiness": {
+    "phase": "done",
+    "ready": true,
+    "missing_required_inputs": []
+  },
+  "pending_hooks": [],
+  "completed_hooks": [
+    "roadmap_status_ready_if_linked",
+    "roadmap_apply_start_if_ready",
+    "memory_sync",
+    "roadmap_done_if_relevant"
+  ],
+  "completed_phases": [
+    "create_change",
+    "apply_change",
+    "archive_change",
+    "post_archive_actions"
+  ],
+  "gates": {},
+  "evidence": {
+    "openspec_status": {
+      "classification": "in-progress",
+      "source": "active"
+    },
+    "roadmap_link": {
+      "count": 0,
+      "items": []
+    },
+    "agent_phase": {
+      "agent_phase": "apply_change",
+      "agent": "implement-agent",
+      "flow_type": "spec-flow",
+      "dispatched_at": "2026-07-02T08:27:03.088254"
+    },
+    "agent_result": {
+      "agent": "review-agent",
+      "status": "success",
+      "phase": "apply_change",
+      "slice_id": "default",
+      "flow_type": "spec-flow",
+      "evidence": {
+        "criteria_satisfied": "tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded",
+        "tasks_complete": true,
+        "tdd_passed": true,
+        "eval_passed_or_human_decision_recorded": true,
+        "review_complete": true,
+        "verification_passed": true,
+        "template_drift_blocker_resolved": true,
+        "fresh_verification": [
+          {
+            "command": "python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py --root . --check",
+            "result": "pass"
+          },
+          {
+            "command": "python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py --root . --check-distributed",
+            "result": "pass"
+          },
+          {
+            "command": "prior test-agent full suite",
+            "result": "pass"
+          }
+        ],
+        "remaining_blocking_correctness_issues": []
+      },
+      "blockers": [],
+      "recorded_at": "2026-07-02T11:10:11.414366"
+    },
+    "agent_results": {
+      "default": {
+        "plan-agent": {
+          "agent": "plan-agent",
+          "status": "success",
+          "phase": "create_change",
+          "slice_id": "default",
+          "flow_type": "spec-flow",
+          "evidence": {
+            "spec_artifacts_done": true,
+            "criteria_satisfied": "spec_artifacts_done",
+            "plan_produced": true,
+            "user_confirmation_required": true,
+            "plan_summary": {
+              "objective": "Harden roadmap-governed SDLC runs so ready/apply-start/done roadmap transitions execute reliably and are validated before hooks complete.",
+              "approach": "Revise the architecture to introduce a thin dedicated `roadmap-agent` lifecycle subagent backed by the existing `sdlc-roadmap` skill. This is recommended because `dev-orchestrator` General Task dispatch skips `before-dispatch`/`after-dispatch` and explicitly does not affect workflow lifecycle state, making it unsuitable for governed roadmap hooks.",
+              "key_steps": [
+                "Add contract tests proving roadmap lifecycle hooks must not use General Task dispatch.",
+                "Create canonical `agents/roadmap-agent.md` as a thin lifecycle worker that loads `sdlc-roadmap` and returns structured evidence.",
+                "Register `roadmap-agent` in workflow dispatch validation for roadmap-hook phases only.",
+                "Add runtime validation for `roadmap_status_ready_if_linked` and `roadmap_apply_start_if_ready` by observing actual roadmap item state.",
+                "Update dev-orchestrator prompt routing so roadmap hooks dispatch `roadmap-agent` through lifecycle hooks, then sync templates and distribute agents."
+              ],
+              "focused_tests": [
+                "python3 -m pytest tests/test_wrapper_contracts.py tests/test_sdlc_orchestrator.py -v",
+                "python3 -m pytest tests/test_workflow.py::TestRoadmapLifecycleHooks -v",
+                "python3 -m pytest tests/test_workflow.py -v",
+                "python3 -m pytest tests/test_setup_agents.py tests/test_install_agents.py -v",
+                "python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py --root . --check",
+                "python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py --root . --check-distributed"
+              ],
+              "open_decisions": []
+            },
+            "architecture_decision": {
+              "recommended": "introduce_roadmap_agent",
+              "rationale": "Both approaches can reuse `sdlc-roadmap`, but only `roadmap-agent` can participate in lifecycle dispatch. General Task dispatch is explicitly non-lifecycle and cannot reliably satisfy governed hook execution.",
+              "implementation_impact": "Adds one canonical agent prompt and dispatch/config tests; keeps roadmap domain mutation in the existing `sdlc-roadmap` skill; updates workflow.py agent validation/phase mapping and prompt distribution."
+            },
+            "focused_tests": [
+              {
+                "command": "python3 -m pytest tests/test_wrapper_contracts.py tests/test_sdlc_orchestrator.py -v",
+                "result": "N/A - planning only"
+              },
+              {
+                "command": "python3 -m pytest tests/test_workflow.py::TestRoadmapLifecycleHooks -v",
+                "result": "N/A - planning only"
+              }
+            ]
+          },
+          "blockers": [],
+          "recorded_at": "2026-07-02T00:17:23.070488"
+        },
+        "implement-agent": {
+          "agent": "implement-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "spec-flow",
+          "evidence": {
+            "tasks_complete": true,
+            "tdd_passed": true,
+            "focused_tests": [
+              {
+                "command": "python3 -m pytest tests/test_workflow.py -v",
+                "result": "pass"
+              },
+              {
+                "command": "python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py --root . --check",
+                "result": "pass"
+              },
+              {
+                "command": "python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py --root . --check-distributed",
+                "result": "pass"
+              }
+            ],
+            "drift_summary": "All 4 template copies (canonical + 3 distributed) have identical SHA-256 hashes.",
+            "files_synced": 4,
+            "existing_tests_regression": "none"
+          },
+          "blockers": [],
+          "recorded_at": "2026-07-02T11:09:07.333523"
+        },
+        "test-agent": {
+          "agent": "test-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "spec-flow",
+          "evidence": {
+            "verification_passed": true,
+            "focused_tests": [
+              {
+                "command": "python3 -m pytest tests/test_workflow.py::TestDispatchHooks -v",
+                "result": "33 passed"
+              },
+              {
+                "command": "python3 -m pytest tests/test_workflow.py -k roadmap -v",
+                "result": "46 passed"
+              },
+              {
+                "command": "python3 -m pytest tests/test_wrapper_contracts.py::TestAgentFrontmatter -v",
+                "result": "29 passed"
+              },
+              {
+                "command": "python3 -m pytest tests/test_workflow.py::TestRoadmapAgentRouting -v",
+                "result": "4 passed"
+              },
+              {
+                "command": "python3 -m pytest tests/test_sdlc_roadmap.py -v",
+                "result": "54 passed"
+              },
+              {
+                "command": "python3 -m pytest tests/ -v",
+                "result": "939 passed, 37 subtests passed"
+              }
+            ],
+            "overfit_check": "no executable overfit detected"
+          },
+          "blockers": [],
+          "recorded_at": "2026-07-02T11:09:07.555234"
+        },
+        "review-agent": {
+          "agent": "review-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "spec-flow",
+          "evidence": {
+            "criteria_satisfied": "tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded",
+            "tasks_complete": true,
+            "tdd_passed": true,
+            "eval_passed_or_human_decision_recorded": true,
+            "review_complete": true,
+            "verification_passed": true,
+            "template_drift_blocker_resolved": true,
+            "fresh_verification": [
+              {
+                "command": "python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py --root . --check",
+                "result": "pass"
+              },
+              {
+                "command": "python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py --root . --check-distributed",
+                "result": "pass"
+              },
+              {
+                "command": "prior test-agent full suite",
+                "result": "pass"
+              }
+            ],
+            "remaining_blocking_correctness_issues": []
+          },
+          "blockers": [],
+          "recorded_at": "2026-07-02T11:10:11.414366"
+        }
+      }
+    },
+    "spec_artifacts_done": true,
+    "approved_plan_summary": {
+      "change_id": "roadmap-hook-governance-hardening",
+      "approved_at": "2026-07-02",
+      "decision": "approved",
+      "recommended_architecture": "introduce_roadmap_agent"
+    },
+    "tasks_complete": true,
+    "tdd_passed": true,
+    "eval_passed_or_human_decision_recorded": true,
+    "roadmap_hook_resolution": "no_linked_item",
+    "archive_path_exists": true,
+    "memory_sync_resolution": "synced",
+    "memory_sync_reason": "",
+    "archive_path": "openspec/changes/archive/2026-07-02-roadmap-hook-governance-hardening"
+  },
+  "block": null,
+  "updated_at": "2026-07-02T11:20:13.434669"
+}

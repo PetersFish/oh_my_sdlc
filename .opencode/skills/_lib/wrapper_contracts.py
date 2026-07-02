@@ -46,10 +46,10 @@ RAW_LOG_META_KEYS: List[str] = ["path", "kind", "command", "result"]
 
 # Phase-to-agent mapping (canonical dash-form agent names)
 PHASE_AGENT_MAP: Dict[str, Set[str]] = {
-    "create_change": {"plan-agent"},
-    "apply_change": {"implement-agent", "test-agent", "review-agent"},
-    "archive_change": {"finish-agent"},
-    "post_archive_actions": {"finish-agent"},
+    "create_change": {"plan-agent", "roadmap-agent"},
+    "apply_change": {"implement-agent", "test-agent", "review-agent", "roadmap-agent"},
+    "archive_change": {"finish-agent", "roadmap-agent"},
+    "post_archive_actions": {"finish-agent", "roadmap-agent"},
 }
 
 CHANGE_PHASES: Set[str] = set(PHASE_AGENT_MAP.keys())
@@ -66,6 +66,8 @@ CANONICAL_AGENT_NAMES: Dict[str, str] = {
     "review_agent": "review-agent",
     "finish-agent": "finish-agent",
     "finish_agent": "finish-agent",
+    "roadmap-agent": "roadmap-agent",
+    "roadmap_agent": "roadmap-agent",
 }
 
 VALID_AGENT_NAMES: Set[str] = set(CANONICAL_AGENT_NAMES.keys())

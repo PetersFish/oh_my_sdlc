@@ -106,14 +106,15 @@ open code 执行 `roadmap capture` 时应从对话上下文提取路线图规划
 
 ### Requirement: Roadmap promote 行为
 
-promote 是将 roadmap item 转为 OpenSpec change 编排入口，不复制 OpenSpec 逻辑。
+promote 是将 roadmap item 转为 OpenSpec change 编排入口，不复制 OpenSpec 逻辑。For governed SDLC workflow runs, promotion and subsequent OpenSpec artifact creation SHALL leave the linked item in `ready`; the item SHALL become `active` only when implementation starts through the apply-start transition.
 
 #### Scenario: promote 生成 promotion context
 - **WHEN** 用户执行 `roadmap promote RM-001`
 - **THEN** 读取 item 文件内容（Goal/Scope/Acceptance Criteria/Promotion Notes）
 - **THEN** 生成 promotion context（摘要 item 的目标和范围）
 - **THEN** 引导用户创建 OpenSpec change（调用 openspec-propose 或 openspec-new-change）
-- **THEN** 将 item status 更新为 active，记录 `started_at`
+- **THEN** 将 item status 更新为 ready when OpenSpec artifacts are created for the governed run
+- **THEN** 不设置 `started_at` until implementation starts
 - **THEN** 不直接创建 proposal.md / design.md / tasks.md / spec.md
 
 #### Scenario: promote 检查依赖
@@ -130,6 +131,26 @@ done 标记 item 完成并提示后续动作。
 - **THEN** 更新 item status 为 done，记录 `completed_at`
 - **THEN** 更新 `roadmap.md` 和 `index.json`
 - **THEN** 提示是否需要：创建 patch、触发 roadmap replan、执行 memory sync
+
+### Requirement: Governed Roadmap Lifecycle Transitions
+
+The `sdlc-roadmap` worker SHALL support the roadmap item state mutations required by governed SDLC hooks for linked OpenSpec changes.
+
+#### Scenario: Mark linked item ready after spec artifacts
+- **WHEN** a governed OpenSpec change has completed provider-owned spec artifacts for one linked roadmap item
+- **THEN** `sdlc-roadmap` SHALL be able to update the item status to `ready` without setting `started_at`
+
+#### Scenario: Mark ready item active at apply start
+- **WHEN** implementation starts for a linked roadmap item whose status is `ready`
+- **THEN** `sdlc-roadmap` SHALL be able to update the item status to `active` and set `started_at`
+
+#### Scenario: Mark active item done after archive
+- **WHEN** an archived linked OpenSpec change corresponds to a roadmap item whose status is `active`
+- **THEN** `sdlc-roadmap` SHALL be able to update the item status to `done` and set `completed_at`
+
+#### Scenario: Preserve domain ownership
+- **WHEN** workflow runtime or orchestrator code requires a roadmap item transition
+- **THEN** the roadmap mutation SHALL be performed by `sdlc-roadmap`, not by direct edits from workflow runtime or orchestrator code
 
 ### Requirement: Skill 分发
 

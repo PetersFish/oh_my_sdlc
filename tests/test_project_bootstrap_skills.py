@@ -243,7 +243,7 @@ class TestSdlcProjectBootstrapSkill(unittest.TestCase):
         """Canonical agents/*.md no longer contain model or variant fields."""
         agent_names = [
             "dev-orchestrator", "plan-agent", "implement-agent",
-            "test-agent", "review-agent", "finish-agent",
+            "test-agent", "review-agent", "finish-agent", "roadmap-agent",
         ]
         for name in agent_names:
             path = REPO_ROOT / "agents" / f"{name}.md"

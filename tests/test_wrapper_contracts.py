@@ -274,7 +274,8 @@ class TestPhaseAgentMapping(unittest.TestCase):
                            "implement-agent", "implement_agent",
                            "test-agent", "test_agent",
                            "review-agent", "review_agent",
-                           "finish-agent", "finish_agent"):
+                           "finish-agent", "finish_agent",
+                           "roadmap-agent", "roadmap_agent"):
             canonical = canonical_agent_name(input_name)
             self.assertIsNotNone(canonical, f"Should accept {input_name!r}")
             self.assertIn("-", canonical, f"Canonical form should use dashes: {canonical!r}")
@@ -475,7 +476,7 @@ class TestSdlcOrchestratorManualTrigger(unittest.TestCase):
 
 AGENT_NAMES = [
     "dev-orchestrator", "plan-agent", "implement-agent",
-    "test-agent", "review-agent", "finish-agent",
+    "test-agent", "review-agent", "finish-agent", "roadmap-agent",
 ]
 
 AGENT_DIRS = [".opencode", ".claude", ".cursor"]
@@ -489,6 +490,7 @@ REQUIRED_SKILLS_MAP = {
     "test-agent": ["systematic-debugging", "behavioral-test-design", "sdlc-evalops"],
     "review-agent": ["requesting-code-review", "receiving-code-review", "verification-before-completion"],
     "finish-agent": ["finishing-a-development-branch", "sdlc-openspec-memory-sync", "sdlc-repository-memory-sync", "sdlc-roadmap"],
+    "roadmap-agent": ["sdlc-roadmap", "sdlc-repository-memory-load"],
 }
 
 ENVELOPE_CONTRACT_MARKERS = [

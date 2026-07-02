@@ -91,7 +91,7 @@ class FixtureBase(unittest.TestCase):
         with open(os.path.join(tasks_dir, "tasks.md"), "w") as f:
             f.write(content)
 
-    def _make_roadmap_item(self, item_id, status, openspec_change=None, area="area1", completed_at=None, slug=None):
+    def _make_roadmap_item(self, item_id, status, openspec_change=None, area="area1", completed_at=None, started_at=None, slug=None):
         items_dir = os.path.join(
             self.tmp, ".ai", "roadmap", "areas", area, "items"
         )
@@ -101,6 +101,8 @@ class FixtureBase(unittest.TestCase):
             fm += f"openspec_change: {openspec_change}\n"
         if completed_at:
             fm += f"completed_at: {completed_at}\n"
+        if started_at:
+            fm += f"started_at: {started_at}\n"
         content = f"---\n{fm}---\n# {item_id}\n"
         fname = f"{item_id}-{slug}.md" if slug else f"{item_id}.md"
         fpath = os.path.join(items_dir, fname)
@@ -1092,6 +1094,287 @@ class TestWriteBoundary(FixtureBase):
         with open(rm_path) as f:
             content = f.read()
         self.assertIn("status: active", content)
+
+
+class TestRoadmapReadyHook(FixtureBase):
+    """Tests for roadmap_status_ready_if_linked hook validation (Tasks 1.1, 1.2, 1.5)."""
+
+    def _setup_create_change_run(self, change_id, item_id, item_status, openspec_change=None):
+        """Create a run in create_change phase with roadmap_link evidence."""
+        self._make_openspec_change(change_id)
+        if item_id:
+            self._make_roadmap_item(
+                item_id, item_status,
+                openspec_change=openspec_change or change_id,
+            )
+        run_id = f"2026-06-20-{change_id}"
+        state = {
+            "version": 1,
+            "run_id": run_id,
+            "workflow": "sdlc-main",
+            "status": "running",
+            "current_phase": "create_change",
+            "primary_subject": {"type": "spec_change", "id": change_id},
+            "context": {"change_id": change_id},
+            "phase_readiness": {
+                "phase": "create_change",
+                "ready": True,
+                "missing_required_inputs": [],
+            },
+            "pending_hooks": [],
+            "completed_hooks": [],
+            "completed_phases": ["create_change"],
+            "gates": {},
+            "evidence": {},
+            "block": None,
+            "updated_at": "2026-06-20T00:00:00",
+            "flow_type": "spec-flow",
+        }
+        if item_id:
+            state["evidence"]["roadmap_link"] = {
+                "count": 1,
+                "items": [{
+                    "item_id": item_id,
+                    "status": item_status,
+                    "file": f".ai/roadmap/areas/area1/items/{item_id}.md",
+                    "area": "area1",
+                }],
+            }
+            state["context"]["roadmap_item_id"] = item_id
+        self._write_current_state(state)
+
+    def _add_hook(self, hook_name):
+        state = self._read_current_state()
+        state.setdefault("pending_hooks", []).append(hook_name)
+        self._write_current_state(state)
+
+    def test_ready_hook_blocks_when_item_not_ready(self):
+        """1.1: roadmap_status_ready_if_linked remains pending and blocks with
+        domain_state_mismatch when a linked roadmap item is not ready."""
+        self._setup_create_change_run("ready-block", "RM-RDY-001", "planned")
+        self._add_hook("roadmap_status_ready_if_linked")
+
+        rc, out, _ = run_workflow(
+            self.tmp, "complete-hook",
+            hook="roadmap_status_ready_if_linked",
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "blocked")
+        self.assertEqual(data["block"]["type"], "domain_state_mismatch")
+        self.assertIn("roadmap_status_ready_if_linked", data["pending_hooks"])
+
+    def test_ready_hook_completes_when_item_is_ready(self):
+        """1.2: roadmap_status_ready_if_linked completes only after the linked
+        roadmap item is observed with status: ready."""
+        self._setup_create_change_run("ready-ok", "RM-RDY-002", "ready")
+        self._add_hook("roadmap_status_ready_if_linked")
+
+        rc, out, _ = run_workflow(
+            self.tmp, "complete-hook",
+            hook="roadmap_status_ready_if_linked",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertNotIn(
+            "roadmap_status_ready_if_linked", data["pending_hooks"]
+        )
+        self.assertIn(
+            "roadmap_status_ready_if_linked", data["completed_hooks"]
+        )
+        self.assertEqual(
+            data["evidence"]["roadmap_hook_resolution"], "ready"
+        )
+
+    def test_ready_hook_completes_no_linked_item(self):
+        """1.5: no-link case completes idempotently with no_linked_item evidence."""
+        self._setup_create_change_run("ready-no-link", None, None)
+        self._add_hook("roadmap_status_ready_if_linked")
+
+        rc, out, _ = run_workflow(
+            self.tmp, "complete-hook",
+            hook="roadmap_status_ready_if_linked",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertNotIn(
+            "roadmap_status_ready_if_linked", data["pending_hooks"]
+        )
+        self.assertEqual(
+            data["evidence"]["roadmap_hook_resolution"], "no_linked_item"
+        )
+
+    def test_ready_hook_blocks_multiple_linked_items(self):
+        """1.5: multiple-link case blocks with user_decision_required."""
+        self._make_roadmap_item("RM-RDY-A", "planned", openspec_change="ready-multi")
+        self._make_roadmap_item("RM-RDY-B", "planned", openspec_change="ready-multi")
+        self._setup_create_change_run("ready-multi", "RM-RDY-A", "planned")
+        state = self._read_current_state()
+        state["evidence"]["roadmap_link"] = {
+            "count": 2,
+            "items": [
+                {"item_id": "RM-RDY-A", "status": "planned",
+                 "file": ".ai/roadmap/areas/area1/items/RM-RDY-A.md", "area": "area1"},
+                {"item_id": "RM-RDY-B", "status": "planned",
+                 "file": ".ai/roadmap/areas/area1/items/RM-RDY-B.md", "area": "area1"},
+            ],
+        }
+        self._write_current_state(state)
+        self._add_hook("roadmap_status_ready_if_linked")
+
+        rc, out, _ = run_workflow(
+            self.tmp, "complete-hook",
+            hook="roadmap_status_ready_if_linked",
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "blocked")
+        self.assertEqual(data["block"]["type"], "user_decision_required")
+        self.assertIn("roadmap_status_ready_if_linked", data["pending_hooks"])
+
+
+class TestRoadmapApplyStartHook(FixtureBase):
+    """Tests for roadmap_apply_start_if_ready hook validation (Tasks 1.3, 1.4, 1.5)."""
+
+    def _setup_apply_change_run(self, change_id, item_id, item_status, started_at=None,
+                                 openspec_change=None):
+        """Create a run in apply_change phase with roadmap_link evidence."""
+        self._make_openspec_change(change_id)
+        if item_id:
+            self._make_roadmap_item(
+                item_id, item_status,
+                openspec_change=openspec_change or change_id,
+                started_at=started_at,
+            )
+        run_id = f"2026-06-20-{change_id}"
+        state = {
+            "version": 1,
+            "run_id": run_id,
+            "workflow": "sdlc-main",
+            "status": "running",
+            "current_phase": "apply_change",
+            "primary_subject": {"type": "spec_change", "id": change_id},
+            "context": {"change_id": change_id},
+            "phase_readiness": {
+                "phase": "apply_change",
+                "ready": True,
+                "missing_required_inputs": [],
+            },
+            "pending_hooks": [],
+            "completed_hooks": ["roadmap_status_ready_if_linked"],
+            "completed_phases": ["create_change", "apply_change"],
+            "gates": {},
+            "evidence": {},
+            "block": None,
+            "updated_at": "2026-06-20T00:00:00",
+            "flow_type": "spec-flow",
+        }
+        if item_id:
+            item_entry = {
+                "item_id": item_id,
+                "status": item_status,
+                "file": f".ai/roadmap/areas/area1/items/{item_id}.md",
+                "area": "area1",
+            }
+            if started_at:
+                item_entry["started_at"] = started_at
+            state["evidence"]["roadmap_link"] = {
+                "count": 1,
+                "items": [item_entry],
+            }
+            state["context"]["roadmap_item_id"] = item_id
+        self._write_current_state(state)
+
+    def _add_hook(self, hook_name):
+        state = self._read_current_state()
+        state.setdefault("pending_hooks", []).append(hook_name)
+        self._write_current_state(state)
+
+    def test_apply_start_hook_blocks_when_item_still_ready(self):
+        """1.3: roadmap_apply_start_if_ready remains pending and blocks with
+        domain_state_mismatch when a linked roadmap item is still ready."""
+        self._setup_apply_change_run("apply-block", "RM-APP-001", "ready")
+        self._add_hook("roadmap_apply_start_if_ready")
+
+        rc, out, _ = run_workflow(
+            self.tmp, "complete-hook",
+            hook="roadmap_apply_start_if_ready",
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "blocked")
+        self.assertEqual(data["block"]["type"], "domain_state_mismatch")
+        self.assertIn("roadmap_apply_start_if_ready", data["pending_hooks"])
+
+    def test_apply_start_hook_completes_when_item_is_active(self):
+        """1.4: roadmap_apply_start_if_ready completes only after the linked
+        roadmap item is observed with status: active and non-empty started_at."""
+        self._setup_apply_change_run(
+            "apply-ok", "RM-APP-002", "active", started_at="2026-06-20"
+        )
+        self._add_hook("roadmap_apply_start_if_ready")
+
+        rc, out, _ = run_workflow(
+            self.tmp, "complete-hook",
+            hook="roadmap_apply_start_if_ready",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertNotIn(
+            "roadmap_apply_start_if_ready", data["pending_hooks"]
+        )
+        self.assertIn(
+            "roadmap_apply_start_if_ready", data["completed_hooks"]
+        )
+        self.assertEqual(
+            data["evidence"]["roadmap_hook_resolution"], "active"
+        )
+
+    def test_apply_start_hook_completes_no_linked_item(self):
+        """1.5: no-link case completes idempotently with no_linked_item evidence."""
+        self._setup_apply_change_run("apply-no-link", None, None)
+        self._add_hook("roadmap_apply_start_if_ready")
+
+        rc, out, _ = run_workflow(
+            self.tmp, "complete-hook",
+            hook="roadmap_apply_start_if_ready",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertNotIn(
+            "roadmap_apply_start_if_ready", data["pending_hooks"]
+        )
+        self.assertEqual(
+            data["evidence"]["roadmap_hook_resolution"], "no_linked_item"
+        )
+
+    def test_apply_start_hook_blocks_multiple_linked_items(self):
+        """1.5: multiple-link case blocks with user_decision_required."""
+        self._make_roadmap_item("RM-APP-A", "ready", openspec_change="apply-multi")
+        self._make_roadmap_item("RM-APP-B", "ready", openspec_change="apply-multi")
+        self._setup_apply_change_run("apply-multi", "RM-APP-A", "ready")
+        state = self._read_current_state()
+        state["evidence"]["roadmap_link"] = {
+            "count": 2,
+            "items": [
+                {"item_id": "RM-APP-A", "status": "ready",
+                 "file": ".ai/roadmap/areas/area1/items/RM-APP-A.md", "area": "area1"},
+                {"item_id": "RM-APP-B", "status": "ready",
+                 "file": ".ai/roadmap/areas/area1/items/RM-APP-B.md", "area": "area1"},
+            ],
+        }
+        self._write_current_state(state)
+        self._add_hook("roadmap_apply_start_if_ready")
+
+        rc, out, _ = run_workflow(
+            self.tmp, "complete-hook",
+            hook="roadmap_apply_start_if_ready",
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "blocked")
+        self.assertEqual(data["block"]["type"], "user_decision_required")
+        self.assertIn("roadmap_apply_start_if_ready", data["pending_hooks"])
 
 
 class TestGateLedger(FixtureBase):
@@ -2406,6 +2689,104 @@ class TestVerifyFoundations(FixtureBase):
         missing = {k for k, v in data["foundations"].items() if not v}
         self.assertIn("workflow_yaml", present)     # FixtureBase sets up definitions/
         self.assertIn("agents_md", missing)         # Not created
+
+
+class TestRoadmapAgentRouting(FixtureBase):
+    """Task 4.1: Prove roadmap-agent works through lifecycle dispatch, not General Task."""
+
+    def _make_apply_run_with_roadmap(self, change_id, item_id, item_status):
+        """Create a run in apply_change phase with a linked roadmap item."""
+        self._make_openspec_change(change_id)
+        self._make_roadmap_item(
+            item_id, item_status,
+            openspec_change=change_id,
+        )
+        run_id = f"2026-06-20-{change_id}"
+        state = {
+            "version": 1,
+            "run_id": run_id,
+            "workflow": "sdlc-main",
+            "status": "running",
+            "current_phase": "apply_change",
+            "primary_subject": {"type": "spec_change", "id": change_id},
+            "context": {"change_id": change_id, "roadmap_item_id": item_id},
+            "phase_readiness": {
+                "phase": "apply_change",
+                "ready": True,
+                "missing_required_inputs": [],
+            },
+            "pending_hooks": ["roadmap_apply_start_if_ready"],
+            "completed_hooks": ["roadmap_status_ready_if_linked"],
+            "completed_phases": ["create_change", "apply_change"],
+            "gates": {},
+            "evidence": {
+                "roadmap_link": {
+                    "count": 1,
+                    "items": [{
+                        "item_id": item_id,
+                        "status": item_status,
+                        "file": f".ai/roadmap/areas/area1/items/{item_id}.md",
+                        "area": "area1",
+                    }],
+                },
+            },
+            "block": None,
+            "updated_at": "2026-06-20T00:00:00",
+            "flow_type": "spec-flow",
+        }
+        self._write_current_state(state)
+
+    def test_roadmap_agent_accepted_by_before_dispatch(self):
+        """roadmap-agent is accepted as a valid lifecycle agent by before-dispatch."""
+        self._make_apply_run_with_roadmap("route-test", "RM-RT-001", "ready")
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="roadmap-agent",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data.get("blockers"), [])
+        self.assertNotEqual(data.get("status"), "blocked")
+
+    def test_roadmap_agent_accepted_in_apply_change_phase(self):
+        """roadmap-agent is allowed in apply_change phase for roadmap hooks."""
+        self._make_apply_run_with_roadmap("route-apply", "RM-RT-002", "ready")
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="roadmap-agent",
+            phase="apply_change",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertNotEqual(data.get("status"), "blocked")
+
+    def test_roadmap_agent_blocked_when_no_active_run(self):
+        """roadmap-agent dispatch blocks when there is no active run."""
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="roadmap-agent",
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data.get("status"), "blocked")
+        blocker_reasons = [b.get("reason") for b in data.get("blockers", [])]
+        self.assertIn("no_active_run", blocker_reasons)
+
+    def test_roadmap_agent_not_blocked_by_done_run_with_history(self):
+        """roadmap-agent before-dispatch does not block when only done history exists.
+        The ensure-run flow should be followed, but before-dispatch should not fail
+        just because there's no active run — it should surface proper guidance."""
+        self._make_openspec_change("route-done")
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="roadmap-agent",
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data.get("status"), "blocked")
+        self.assertEqual(
+            data.get("recommended_next_action"), "start_run"
+        )
 
 
 class TestConcurrentRuns(FixtureBase):
@@ -3815,6 +4196,57 @@ class TestDispatchHooks(FixtureBase):
         self.assertEqual(data["recommended_next_action"], "complete_phase")
         self.assertEqual(data["blockers"], [])
 
+    # --- stale evidence overwrite on successful re-dispatch ---
+
+    def test_after_dispatch_overwrites_stale_evidence_from_prior_failed_dispatch(self):
+        """Phase evidence from a prior dispatch must be overwritten when a
+        subsequent successful dispatch provides a new value.
+
+        Regression: cmd_after_dispatch only copied evidence when the key was
+        absent (ek not in evidence). A prior agent result that set
+        spec_artifacts_done=false (simulating old-code stale evidence) was
+        never overwritten by a later successful dispatch."""
+        self._create_run()
+        state = self._read_current_state()
+        state["current_phase"] = "create_change"
+        # Simulate stale evidence left by a prior dispatch (as the old code did)
+        state.setdefault("evidence", {})["spec_artifacts_done"] = False
+        self._write_current_state(state)
+
+        # Verify stale evidence is present
+        state_before = self._read_current_state()
+        self.assertEqual(
+            state_before["evidence"].get("spec_artifacts_done"),
+            False,
+            "Stale evidence must be set to false before successful dispatch",
+        )
+
+        # Now a successful dispatch corrects it
+        success_result = json.dumps({
+            "status": "success",
+            "evidence": {
+                "spec_artifacts_done": True,
+                "criteria_satisfied": "spec_artifacts_done",
+            },
+            "blockers": [],
+        })
+        rc, _, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="plan-agent",
+            slice_id="success-slice",
+            value=success_result,
+        )
+        self.assertEqual(rc, 0)
+        state_after_success = self._read_current_state()
+        # The key assertion: stale false must be overwritten to true
+        self.assertEqual(
+            state_after_success["evidence"].get("spec_artifacts_done"),
+            True,
+            "Successful dispatch must overwrite stale phase evidence "
+            "(spec_artifacts_done was false from a prior dispatch but "
+            "the successful dispatch provides true)",
+        )
+
     # --- change_id synchronization from provider-created spec artifacts ---
 
     def test_after_dispatch_syncs_change_id_from_agent_evidence(self):
@@ -3947,6 +4379,138 @@ class TestDispatchHooks(FixtureBase):
             updated["context"].get("change_id"),
             "canonical-artifacts-change-id",
             "context.change_id should sync from artifacts.change_id",
+        )
+
+
+    # --- roadmap-agent after-dispatch (lifecycle hook worker) ---
+
+    def test_after_dispatch_roadmap_agent_does_not_complete_phase(self):
+        """roadmap-agent after-dispatch must NOT produce phase-completion blockers.
+
+        roadmap-agent is a lifecycle hook worker, not a phase-completing
+        phase worker. Its after-dispatch should point to hook completion
+        flow, never to phase-level evidence validation or complete-phase.
+        The critical bug: after-dispatch currently evaluates roadmap-agent
+        results against phase evidence_keys (e.g. spec_artifacts_done for
+        create_change) and blocks the agent — that validation must be
+        skipped for hook workers.
+        """
+        self._create_run()
+        state = self._read_current_state()
+        state["current_phase"] = "create_change"
+        self._write_current_state(state)
+
+        agent_result = json.dumps({
+            "status": "success",
+            "evidence": {
+                "roadmap_hook_resolution": "ready",
+            },
+            "blockers": [],
+            "recommended_next_action": "complete_hooks",
+        })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="roadmap-agent",
+            value=agent_result,
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        # Must NOT produce a blocker for missing phase evidence keys
+        blocker_reasons = [b.get("reason", "") for b in data.get("blockers", [])]
+        self.assertNotIn(
+            "missing_phase_evidence_keys", blocker_reasons,
+            "roadmap-agent after-dispatch must not check phase evidence_keys",
+        )
+        # Must NOT produce a blocker for missing exit criteria
+        self.assertNotIn(
+            "missing_exit_criteria_satisfied", blocker_reasons,
+            "roadmap-agent after-dispatch must not check phase exit_criteria",
+        )
+        # Recommended next action must be hook-related, not phase-completing
+        self.assertNotEqual(
+            data["recommended_next_action"], "complete_phase",
+            "roadmap-agent after-dispatch must not recommend complete_phase",
+        )
+
+    def test_after_dispatch_roadmap_agent_skips_evidence_key_validation(self):
+        """roadmap-agent success must NOT be validated against phase evidence_keys.
+
+        Phase evidence_keys (e.g. spec_artifacts_done for create_change,
+        tasks_complete for apply_change) are for phase-completing workers
+        like plan-agent and implement-agent. roadmap-agent is a hook worker
+        and does not produce phase-level evidence — missing those keys
+        must not cause a blocker.
+        """
+        self._create_run()
+        state = self._read_current_state()
+        state["current_phase"] = "create_change"
+        self._write_current_state(state)
+
+        # roadmap-agent success with NO phase-level evidence keys
+        agent_result = json.dumps({
+            "status": "success",
+            "evidence": {
+                "roadmap_hook_resolution": "ready",
+            },
+            "blockers": [],
+        })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="roadmap-agent",
+            value=agent_result,
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        # Must NOT block — roadmap-agent does not need to supply
+        # spec_artifacts_done or any phase evidence key
+        self.assertEqual(
+            data["blockers"], [],
+            "roadmap-agent success must not block on missing phase evidence keys",
+        )
+        self.assertEqual(data["status"], "success")
+
+    def test_after_dispatch_roadmap_agent_success_signals_hook_completion(self):
+        """roadmap-agent success after-dispatch returns clean hook-worker result.
+
+        After roadmap-agent transitions a roadmap item, after-dispatch
+        should return success without phase-related blockers and should
+        signal hook-worker completion rather than routing to another
+        lifecycle phase worker.
+        """
+        self._create_run()
+        state = self._read_current_state()
+        state["current_phase"] = "apply_change"
+        state.setdefault("pending_hooks", []).append("roadmap_apply_start_if_ready")
+        self._write_current_state(state)
+
+        agent_result = json.dumps({
+            "status": "success",
+            "evidence": {
+                "roadmap_hook_resolution": "active",
+            },
+            "blockers": [],
+        })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="roadmap-agent",
+            value=agent_result,
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "success")
+        # No blockers from phase evidence or exit criteria validation
+        self.assertEqual(
+            data["blockers"], [],
+            "roadmap-agent success must return empty blockers",
+        )
+        # Must not route to another lifecycle phase worker
+        self.assertNotEqual(
+            data["recommended_next_action"], "dispatch_test_agent",
+            "roadmap-agent success must not route to test-agent",
+        )
+        self.assertNotEqual(
+            data["recommended_next_action"], "dispatch_review_agent",
+            "roadmap-agent success must not route to review-agent",
         )
 
 

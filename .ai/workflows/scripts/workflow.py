@@ -384,10 +384,12 @@ def _find_roadmap_items(root, openspec_change_id):
                 )
                 status = fm.get("status", "")
                 completed_at = fm.get("completed_at")
+                started_at = fm.get("started_at")
                 items.append({
                     "item_id": item_id,
                     "status": status,
                     "completed_at": completed_at,
+                    "started_at": started_at,
                     "file": fpath,
                     "area": area,
                 })
@@ -510,6 +512,7 @@ def loader_roadmap_item_status(root, item_id):
                     "item_id": item_id,
                     "status": _read_frontmatter_field(fpath, "status"),
                     "completed_at": _read_frontmatter_field(fpath, "completed_at"),
+                    "started_at": _read_frontmatter_field(fpath, "started_at"),
                 }
     return None
 
@@ -1456,6 +1459,7 @@ VALID_AGENT_NAMES = {
     "test-agent", "test_agent",
     "review-agent", "review_agent",
     "finish-agent", "finish_agent",
+    "roadmap-agent", "roadmap_agent",
 }
 
 CANONICAL_AGENT_NAMES = {
@@ -1469,13 +1473,15 @@ CANONICAL_AGENT_NAMES = {
     "review_agent": "review-agent",
     "finish-agent": "finish-agent",
     "finish_agent": "finish-agent",
+    "roadmap-agent": "roadmap-agent",
+    "roadmap_agent": "roadmap-agent",
 }
 
 PHASE_AGENT_MAP = {
-    "create_change": {"plan-agent"},
-    "apply_change": {"implement-agent", "test-agent", "review-agent"},
-    "archive_change": {"finish-agent"},
-    "post_archive_actions": {"finish-agent"},
+    "create_change": {"plan-agent", "roadmap-agent"},
+    "apply_change": {"implement-agent", "test-agent", "review-agent", "roadmap-agent"},
+    "archive_change": {"finish-agent", "roadmap-agent"},
+    "post_archive_actions": {"finish-agent", "roadmap-agent"},
 }
 
 
@@ -1729,15 +1735,20 @@ def cmd_after_dispatch(root, args):
     evidence["agent_result"] = latest_result
     evidence.setdefault("agent_results", {}).setdefault(slice_id, {})[canonical_agent] = latest_result
 
-    # 3.8c: Map agent evidence to phase-level evidence_keys
+    # 3.8c: Map agent evidence to phase-level evidence_keys.
+    # Only promote evidence from agents that succeeded without blockers.
+    # When promoted, overwrite stale prior values (e.g., a prior
+    # failed/blocked dispatch may have left a false value that a
+    # subsequent successful dispatch must correct).
     wf = load_workflow(root, state.get("workflow", "sdlc-main"))
     if wf:
         phase_def = get_phase(wf, phase)
         if phase_def:
             phase_evidence_keys = phase_def.get("evidence_keys", [])
-            for ek in phase_evidence_keys:
-                if ek in agent_evidence and ek not in evidence:
-                    evidence[ek] = agent_evidence[ek]
+            if agent_status == "success" and not agent_blockers:
+                for ek in phase_evidence_keys:
+                    if ek in agent_evidence:
+                        evidence[ek] = agent_evidence[ek]
 
     # Synchronize canonical change_id from provider-created spec artifacts.
     # When a provider (e.g., OpenSpec) normalizes the change_id during artifact
@@ -1767,6 +1778,13 @@ def cmd_after_dispatch(root, args):
     elif canonical_agent == "test-agent":
         next_cmd = ""
         recommended_next_action = "dispatch_review_agent"
+    elif canonical_agent == "roadmap-agent":
+        # roadmap-agent is a lifecycle hook worker, not a phase worker.
+        # Its after-dispatch should lead to hook completion flow, not
+        # phase completion.  Do NOT validate against phase evidence_keys
+        # or exit_criteria — those are for phase-completing workers.
+        next_cmd = ""
+        recommended_next_action = agent_recommended or "complete_hooks"
 
     if wf and phase_def and agent_status == "success" and not agent_blockers and next_cmd == "complete-phase":
         missing_evidence_keys = _missing_phase_evidence_keys(agent_evidence, phase_def)
@@ -1924,6 +1942,38 @@ def cmd_complete_phase(root, args):
     print(json.dumps(state, indent=2))
 
 
+def _resolve_roadmap_hook_linked_items(state):
+    """Resolve linked roadmap items from evidence for hook validation.
+
+    Returns (items, link_count) where items is the list of linked items
+    and link_count is the number of items (0, 1, or 2+).
+    """
+    raw = state.get("evidence", {}).get("roadmap_link")
+    if not raw:
+        return [], 0
+    if isinstance(raw, dict):
+        items = raw.get("items", [])
+        count = raw.get("count", 0)
+        if count == 0 or not items:
+            return [], 0
+        return items, count
+    return [], 0
+
+
+def _apply_roadmap_hook_block(state, hook_name, block_type, message, next_allowed=None):
+    """Apply a block for a roadmap lifecycle hook and save state."""
+    if next_allowed is None:
+        next_allowed = ["resolve", "record-evidence", "block"]
+    state["status"] = "blocked"
+    state["block"] = {
+        "type": block_type,
+        "message": message,
+        "next_allowed": next_allowed,
+        "remediation": "Use 'roadmap-agent' (sdlc-roadmap skill) to update the roadmap item state, then re-run complete-hook.",
+    }
+    return state
+
+
 def cmd_complete_hook(root, args):
     state = load_run_state(root)
     if not state:
@@ -1970,95 +2020,150 @@ def cmd_complete_hook(root, args):
         state.setdefault("evidence", {})["memory_sync_resolution"] = resolution
         state.setdefault("evidence", {})["memory_sync_reason"] = args.reason or ""
 
-    elif hook_name == "roadmap_done_if_relevant":
-        raw = state.get("evidence", {}).get("roadmap_link")
-        if not raw:
+    elif hook_name == "roadmap_status_ready_if_linked":
+        items, count = _resolve_roadmap_hook_linked_items(state)
+        if count == 0:
             state.setdefault("evidence", {})["roadmap_hook_resolution"] = "no_linked_item"
-        elif isinstance(raw, dict):
-            items = raw.get("items", [])
-            if raw.get("count", 0) == 0 or not items:
-                state.setdefault("evidence", {})["roadmap_hook_resolution"] = "no_linked_item"
-            elif len(items) == 1:
-                item = items[0]
-                status = item.get("status", "")
-                if status == "done" and item.get("completed_at"):
+        elif count == 1:
+            item = items[0]
+            item_id = item.get("item_id")
+            current = loader_roadmap_item_status(root, item_id)
+            if current and current.get("status") == "ready":
+                state.setdefault("evidence", {})["roadmap_hook_resolution"] = "ready"
+            else:
+                observed_status = current.get("status") if current else item.get("status", "unknown")
+                _apply_roadmap_hook_block(
+                    state, hook_name, "domain_state_mismatch",
+                    f"roadmap item {item_id} has status {observed_status}, expected ready",
+                    ["resolve", "record-evidence", "block"],
+                )
+                save_run_state(root, state)
+                print(json.dumps(state, indent=2))
+                sys.exit(1)
+        else:
+            _apply_roadmap_hook_block(
+                state, hook_name, "user_decision_required",
+                "multiple roadmap items linked to this change",
+                ["choose one item to mark ready", "repair roadmap links manually"],
+            )
+            state["block"]["candidates"] = items
+            save_run_state(root, state)
+            print(json.dumps(state, indent=2))
+            sys.exit(1)
+
+    elif hook_name == "roadmap_apply_start_if_ready":
+        items, count = _resolve_roadmap_hook_linked_items(state)
+        if count == 0:
+            state.setdefault("evidence", {})["roadmap_hook_resolution"] = "no_linked_item"
+        elif count == 1:
+            item = items[0]
+            item_id = item.get("item_id")
+            current = loader_roadmap_item_status(root, item_id)
+            if current and current.get("status") == "active" and current.get("started_at"):
+                state.setdefault("evidence", {})["roadmap_hook_resolution"] = "active"
+            else:
+                observed_status = current.get("status") if current else item.get("status", "unknown")
+                _apply_roadmap_hook_block(
+                    state, hook_name, "domain_state_mismatch",
+                    f"roadmap item {item_id} has status {observed_status}, expected active with started_at",
+                    ["resolve", "record-evidence", "block"],
+                )
+                save_run_state(root, state)
+                print(json.dumps(state, indent=2))
+                sys.exit(1)
+        else:
+            _apply_roadmap_hook_block(
+                state, hook_name, "user_decision_required",
+                "multiple roadmap items linked to this change",
+                ["choose one item to mark active", "repair roadmap links manually"],
+            )
+            state["block"]["candidates"] = items
+            save_run_state(root, state)
+            print(json.dumps(state, indent=2))
+            sys.exit(1)
+
+    elif hook_name == "roadmap_done_if_relevant":
+        items, count = _resolve_roadmap_hook_linked_items(state)
+        if count == 0:
+            state.setdefault("evidence", {})["roadmap_hook_resolution"] = "no_linked_item"
+        elif count == 1:
+            item = items[0]
+            status = item.get("status", "")
+            if status == "done" and item.get("completed_at"):
+                linked_item_run = _find_active_run_by_subject(
+                    root, "roadmap_item", item.get("item_id")
+                )
+                if linked_item_run:
+                    linked_change = linked_item_run.get("context", {}).get("change_id") or _read_roadmap_item_openspec_change(root, item.get("item_id"))
+                    if linked_change == state.get("context", {}).get("change_id"):
+                        state.setdefault("evidence", {})["roadmap_hook_resolution"] = "done"
+                        state.setdefault("evidence", {})["roadmap_item_run_finalized"] = linked_item_run.get("run_id")
+                        if linked_item_run.get("run_id") == state.get("run_id"):
+                            pending.remove(hook_name)
+                            completed = state.setdefault("completed_hooks", [])
+                            if hook_name not in completed:
+                                completed.append(hook_name)
+                            finalized = _finalize_run_to_history(root, state)
+                            print(json.dumps(finalized, indent=2))
+                            return
+                        _finalize_run_to_history(root, linked_item_run)
+                    else:
+                        state.setdefault("evidence", {})["roadmap_hook_resolution"] = "idempotent_done"
+                else:
+                    state.setdefault("evidence", {})["roadmap_hook_resolution"] = "idempotent_done"
+            elif status == "active":
+                latest_status = loader_roadmap_item_status(root, item.get("item_id"))
+                if latest_status and latest_status.get("status") == "done" and latest_status.get("completed_at"):
                     linked_item_run = _find_active_run_by_subject(
                         root, "roadmap_item", item.get("item_id")
                     )
                     if linked_item_run:
-                        linked_change = linked_item_run.get("context", {}).get("change_id") or _read_roadmap_item_openspec_change(root, item.get("item_id"))
-                        if linked_change == state.get("context", {}).get("change_id"):
-                            state.setdefault("evidence", {})["roadmap_hook_resolution"] = "done"
-                            state.setdefault("evidence", {})["roadmap_item_run_finalized"] = linked_item_run.get("run_id")
-                            if linked_item_run.get("run_id") == state.get("run_id"):
-                                pending.remove(hook_name)
-                                completed = state.setdefault("completed_hooks", [])
-                                if hook_name not in completed:
-                                    completed.append(hook_name)
-                                finalized = _finalize_run_to_history(root, state)
-                                print(json.dumps(finalized, indent=2))
-                                return
-                            _finalize_run_to_history(root, linked_item_run)
-                        else:
-                            state.setdefault("evidence", {})["roadmap_hook_resolution"] = "idempotent_done"
+                        state.setdefault("evidence", {})["roadmap_hook_resolution"] = "done"
+                        state.setdefault("evidence", {})["roadmap_item_run_finalized"] = linked_item_run.get("run_id")
+                        if linked_item_run.get("run_id") == state.get("run_id"):
+                            pending.remove(hook_name)
+                            completed = state.setdefault("completed_hooks", [])
+                            if hook_name not in completed:
+                                completed.append(hook_name)
+                            finalized = _finalize_run_to_history(root, state)
+                            print(json.dumps(finalized, indent=2))
+                            return
+                        _finalize_run_to_history(root, linked_item_run)
                     else:
-                        state.setdefault("evidence", {})["roadmap_hook_resolution"] = "idempotent_done"
-                elif status == "active":
-                    latest_status = loader_roadmap_item_status(root, item.get("item_id"))
-                    if latest_status and latest_status.get("status") == "done" and latest_status.get("completed_at"):
-                        linked_item_run = _find_active_run_by_subject(
-                            root, "roadmap_item", item.get("item_id")
-                        )
-                        if linked_item_run:
-                            state.setdefault("evidence", {})["roadmap_hook_resolution"] = "done"
-                            state.setdefault("evidence", {})["roadmap_item_run_finalized"] = linked_item_run.get("run_id")
-                            if linked_item_run.get("run_id") == state.get("run_id"):
-                                pending.remove(hook_name)
-                                completed = state.setdefault("completed_hooks", [])
-                                if hook_name not in completed:
-                                    completed.append(hook_name)
-                                finalized = _finalize_run_to_history(root, state)
-                                print(json.dumps(finalized, indent=2))
-                                return
-                            _finalize_run_to_history(root, linked_item_run)
-                        else:
-                            state.setdefault("evidence", {})["roadmap_hook_resolution"] = "done"
-                    else:
-                        state["status"] = "blocked"
-                        state["block"] = {
-                            "type": "hook_blocked",
-                            "message": f"roadmap item {item.get('item_id')} still active",
-                            "next_allowed": ["resolve", "record-evidence", "block"],
-                        }
-                        save_run_state(root, state)
-                        print(json.dumps(state, indent=2))
-                        sys.exit(1)
-                elif status in ("idea", "ready", "cancelled"):
-                    state["status"] = "blocked"
-                    state["block"] = {
-                        "type": "domain_state_mismatch",
-                        "message": f"roadmap item {item.get('item_id')} has status {status}",
-                        "next_allowed": ["resolve", "block"],
-                    }
+                        state.setdefault("evidence", {})["roadmap_hook_resolution"] = "done"
+                else:
+                    _apply_roadmap_hook_block(
+                        state, hook_name, "hook_blocked",
+                        f"roadmap item {item.get('item_id')} still active",
+                        ["resolve", "record-evidence", "block"],
+                    )
                     save_run_state(root, state)
                     print(json.dumps(state, indent=2))
                     sys.exit(1)
-            else:
-                state["status"] = "blocked"
-                state["block"] = {
-                    "type": "user_decision_required",
-                    "message": "multiple roadmap items linked to this change",
-                    "candidates": items,
-                    "next_allowed": [
-                        "choose one item to mark done",
-                        "repair roadmap links manually",
-                        "mark all active matches done with reason",
-                        "skip roadmap done with reason",
-                    ],
-                }
+            elif status in ("idea", "ready", "cancelled"):
+                _apply_roadmap_hook_block(
+                    state, hook_name, "domain_state_mismatch",
+                    f"roadmap item {item.get('item_id')} has status {status}",
+                    ["resolve", "block"],
+                )
                 save_run_state(root, state)
                 print(json.dumps(state, indent=2))
                 sys.exit(1)
+        else:
+            _apply_roadmap_hook_block(
+                state, hook_name, "user_decision_required",
+                "multiple roadmap items linked to this change",
+                [
+                    "choose one item to mark done",
+                    "repair roadmap links manually",
+                    "mark all active matches done with reason",
+                    "skip roadmap done with reason",
+                ],
+            )
+            state["block"]["candidates"] = items
+            save_run_state(root, state)
+            print(json.dumps(state, indent=2))
+            sys.exit(1)
 
     pending.remove(hook_name)
     completed = state.setdefault("completed_hooks", [])

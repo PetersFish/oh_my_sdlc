@@ -179,7 +179,7 @@ Only after the run is confirmed usable may you call `before-dispatch`.
 
 ## Dispatch Lifecycle Hooks
 
-Every **lifecycle** subagent dispatch (plan-agent, implement-agent, test-agent, review-agent, finish-agent) MUST go through two workflow.py hooks:
+Every **lifecycle** subagent dispatch (plan-agent, implement-agent, test-agent, review-agent, finish-agent, roadmap-agent) MUST go through two workflow.py hooks:
 
 ### before_dispatch — validates run state BEFORE dispatching
 
@@ -214,6 +214,20 @@ General task dispatch flow:
 1. Dispatch subagent via `task` tool
 2. Receive agent result
 3. Forward result to user (no workflow hooks)
+
+### Roadmap-Governed Hook Dispatch
+
+Roadmap lifecycle hooks (`roadmap_status_ready_if_linked`, `roadmap_apply_start_if_ready`, `roadmap_done_if_relevant`) are lifecycle-affecting work. They MUST use the lifecycle dispatch pipeline (before-dispatch → roadmap-agent → after-dispatch) and MUST NEVER use General Task dispatch.
+
+Roadmap hook dispatch flow:
+1. Detect pending roadmap hook from workflow state (`pending_hooks` includes any of `roadmap_status_ready_if_linked`, `roadmap_apply_start_if_ready`, `roadmap_done_if_relevant`).
+2. Call `before-dispatch` with `--agent roadmap-agent`.
+3. Dispatch `roadmap-agent` via the `task` tool.
+4. Call `after-dispatch` with the roadmap-agent result.
+5. Call `workflow.py complete-hook --hook <hook-name>` to validate the roadmap item state change.
+6. If `complete-hook` blocks with `domain_state_mismatch`, surface the block to the user with the expected and observed statuses and direct remediation to `roadmap-agent` / `sdlc-roadmap`.
+
+Roadmap hooks are NOT General Tasks. The General Task dispatch path skips before-dispatch and after-dispatch, which means roadmap state transitions dispatched through it would bypass workflow governance and not be validated. Never use General Task dispatch for `roadmap_status_ready_if_linked`, `roadmap_apply_start_if_ready`, or `roadmap_done_if_relevant`.
 
 ## User-Facing Dispatch Announcements
 
@@ -260,6 +274,10 @@ Use these descriptions for the "Task" field in pre-dispatch announcements:
 | review-agent | apply_change | Perform code review and verify-before-complete checks |
 | finish-agent | archive_change | Archive the change and run post-archive hooks |
 | finish-agent | post_archive_actions | Run post-archive cleanup and memory sync hooks |
+| roadmap-agent | create_change | Execute roadmap_status_ready_if_linked transition |
+| roadmap-agent | apply_change | Execute roadmap_apply_start_if_ready transition |
+| roadmap-agent | archive_change | Execute roadmap_done_if_relevant transition |
+| roadmap-agent | post_archive_actions | Execute roadmap_done_if_relevant cleanup |
 
 For general task agents not in this table, compose the Task description from the task tool's `description` parameter.
 
@@ -305,10 +323,10 @@ Example: dispatching implement-agent during apply_change phase
 
 | Phase | Agents |
 |---|---|
-| `create_change` | `plan-agent` |
-| `apply_change` | `implement-agent` → `test-agent` → `review-agent` |
-| `archive_change` | `finish-agent` |
-| `post_archive_actions` | `finish-agent` |
+| `create_change` | `plan-agent`, `roadmap-agent` (for roadmap hooks) |
+| `apply_change` | `implement-agent` → `test-agent` → `review-agent`, `roadmap-agent` (for roadmap hooks) |
+| `archive_change` | `finish-agent`, `roadmap-agent` (for roadmap hooks) |
+| `post_archive_actions` | `finish-agent`, `roadmap-agent` (for roadmap hooks) |
 
 ## Spec Lifecycle Capability Mapping
 
