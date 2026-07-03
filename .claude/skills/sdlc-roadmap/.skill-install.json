@@ -5,9 +5,9 @@
   "source_ref": "HEAD",
   "status": "stable",
   "target": ".claude/skills/sdlc-roadmap",
-  "installed_at": "2026-06-23T06:52:59.077043Z",
+  "installed_at": "2026-07-03T14:25:17.822295Z",
   "backport_policy": "review-required",
-  "payload_hash": "87aac5b2ff638dc64ca8a80250df509106ac705ed9bd86d332e37df10496288d",
+  "payload_hash": "e503b9c1d477290e32f17bf14c361aac739c03fbf8505a5e5a216bb613aba48a",
   "files": [
     "SKILL.md",
     "scripts/list.py",

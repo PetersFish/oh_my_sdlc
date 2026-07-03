@@ -1,0 +1,5 @@
+# 背景
+在启用dev-orchestrator进行开发之前，我可能会用opencode默认的plan模式进行brainstorming，然后生成spec和plan文档，因为这样比较轻量。生成plan之后，我想丢给dev-orchestrator帮我完成具体实现，因为有test-agent和review-agent的把关，需求完成质量我比较满意。
+
+# 需求
+当我通过Plan模式生成superpowers的spec、plan文档，或openspec的change相关文档后，只要我告诉dev-orchestrator去实现该需求，dev-orchestrator此时应该跳过plan-agent，直接委派implement-agent进行后续的工作（当然，开始前需要start workflow，避免no-active-run）

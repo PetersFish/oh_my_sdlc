@@ -174,7 +174,7 @@ class TestRoadmapSkillFrontmatter(unittest.TestCase):
         self.assertIn("review passes", content_lower)
         self.assertIn("review does not pass", content_lower)
         self.assertIn("status: ready", content_lower)
-        self.assertIn("openspec_change:", content_lower)
+        self.assertIn("spec_change:", content_lower)
 
     def test_skill_md_documents_revision_commands(self) -> None:
         content = (ROADMAP_SKILL / "SKILL.md").read_text(encoding="utf-8")
@@ -247,7 +247,7 @@ class TestTemplates(unittest.TestCase):
 
     def test_item_template_has_required_frontmatter_fields(self) -> None:
         content = (ROADMAP_SKILL / "templates" / "item.md").read_text(encoding="utf-8")
-        for field in ["id:", "title:", "status:", "stage:", "priority:", "order:", "depends_on:", "openspec_change:"]:
+        for field in ["id:", "title:", "status:", "stage:", "priority:", "order:", "depends_on:", "spec_change:"]:
             self.assertIn(field, content, f"item template missing field: {field}")
 
     def test_item_template_has_design_sections(self) -> None:

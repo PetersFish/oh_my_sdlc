@@ -101,7 +101,7 @@ stage: mvp | v2 | v3 | v4 | later
 priority: p0 | p1 | p2 | p3
 order: 10             # Numeric ordering key for sequencing (scoped within area)
 depends_on: []        # List of prerequisite item IDs (may reference other areas)
-openspec_change: null | "change-id"
+spec_change: null | "change-id"
 created_at: YYYY-MM-DD
 started_at: null | YYYY-MM-DD
 completed_at: null | YYYY-MM-DD
@@ -137,7 +137,7 @@ idea ──→ ready ──→ active ──→ done
 | Status    | Meaning |
 |-----------|---------|
 | idea      | Rough idea, not yet reviewed |
-| ready     | Review passed, OpenSpec artifacts complete, ready to apply |
+| ready     | Review passed, eligible for spec creation |
 | active    | Implementation in progress (apply started) |
 | done      | Completed and verified |
 | cancelled | Explicitly cancelled, history preserved |
@@ -235,7 +235,7 @@ The table shows Priority (p0/p1/p2/p3 or ? if unset) and Order columns. Items ar
 
 ### roadmap review
 
-Guide review of roadmap ideas before they become ready OpenSpec-backed work. Combines `roadmap review RM-xxx` (specific) and `roadmap review` (prompt for selection).
+Guide review of roadmap ideas before they become ready work. Combines `roadmap review RM-xxx` (specific) and `roadmap review` (prompt for selection).
 
 **Trigger:** User says "review RM-xxx", "review roadmap", "roadmap review", "review <area-id> next roadmap item", "review <area-id> highest priority roadmap item", "review next <area-id>", or equivalent.
 
@@ -252,15 +252,13 @@ Guide review of roadmap ideas before they become ready OpenSpec-backed work. Com
    - **Priority**: Is `p0`/`p1`/`p2`/`p3` appropriate?
    - **Order**: Does the order reflect implementation sequencing?
 4. Surface any issues found. Ask the user for revisions or confirmation.
-5. **If review does NOT pass:** Item remains `idea`. No OpenSpec change created. Summarize what needs improvement.
-6. **If review passes:** Create complete OpenSpec artifacts (proposal, design, specs, tasks) for the item. Then:
+5. **If review does NOT pass:** Item remains `idea`. Summarize what needs improvement.
+6. **If review passes:** Mark the item ready without creating spec artifacts:
    - Set `status: ready`
-   - Set `openspec_change: <change-id>`
+   - Leave `spec_change` unchanged unless it already exists
    - Append a changelog entry to `revisions/changelog.md`
    - No snapshot needed (content not overwritten)
-7. After item becomes `ready`, check for remaining `idea` items:
-   - If more `idea` items exist: ask "Continue reviewing next idea, or start applying a ready change?"
-   - If no `idea` items remain: ask "Start applying a ready change?"
+7. After item becomes `ready`, ask whether to create spec artifacts or continue reviewing the next idea item.
 
 **Workflow for unspecified review (`roadmap review`):**
 1. List all `idea` items using `list.py --status idea`.
@@ -274,9 +272,8 @@ Guide review of roadmap ideas before they become ready OpenSpec-backed work. Com
 4. If no area specified, run `list.py --incomplete --top 1` for the global next item.
 
 **Rules:**
-- Only `idea` items can be reviewed. `ready` items already have complete OpenSpec artifacts.
-- Review-passed artifact creation uses `openspec-propose` or `openspec-new-change` with the item's Goal, Problem Context, Scope, Design Notes, Acceptance Criteria, and Promotion Notes as input.
-- Do NOT create OpenSpec artifacts manually; route through OpenSpec skills.
+- Only `idea` items can be reviewed. `ready` items have already passed review.
+- Review does not create spec artifacts. After review passes, ask the user whether to create spec artifacts or continue reviewing.
 
 ### roadmap revise RM-xxx
 

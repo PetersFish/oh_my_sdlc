@@ -58,7 +58,7 @@ phases:
     required_inputs: []
     context_loaders: []
     allowed_workers:
-      - sdlc-roadmap
+      - dev-orchestrator
     exit_criteria:
       - review_decision_recorded
     post_hooks: []
@@ -81,7 +81,7 @@ phases:
     required_inputs:
       - context.change_id
     context_loaders:
-      - openspec_change_status
+      - spec_change_status
       - roadmap_linked_item
     allowed_workers:
       - dev-orchestrator
@@ -90,14 +90,14 @@ phases:
     evidence_keys:
       - spec_artifacts_done
     post_hooks:
-      - roadmap_status_ready_if_linked
+      - roadmap_spec_link_if_ready
     next: apply_change
 
   apply_change:
     required_inputs:
       - context.change_id
     context_loaders:
-      - openspec_change_status
+      - spec_change_status
       - roadmap_item_status
     allowed_workers:
       - dev-orchestrator
@@ -117,7 +117,7 @@ phases:
     required_inputs:
       - context.change_id
     context_loaders:
-      - openspec_archive_path
+      - spec_archive_path
     allowed_workers:
       - dev-orchestrator
     exit_criteria:
@@ -132,7 +132,7 @@ phases:
   post_archive_actions:
     required_inputs: []
     context_loaders:
-      - openspec_archive_path
+      - spec_archive_path
       - roadmap_linked_item
       - roadmap_item_status
     allowed_workers:

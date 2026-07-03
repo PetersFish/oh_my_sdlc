@@ -99,12 +99,14 @@ class FixtureBase(unittest.TestCase):
             f.write(content)
         return path
 
-    def _make_roadmap_item(self, item_id, status, openspec_change=None, area="area1", completed_at=None, started_at=None, slug=None):
+    def _make_roadmap_item(self, item_id, status, openspec_change=None, spec_change=None, area="area1", completed_at=None, started_at=None, slug=None):
         items_dir = os.path.join(
             self.tmp, ".ai", "roadmap", "areas", area, "items"
         )
         os.makedirs(items_dir, exist_ok=True)
         fm = f"id: {item_id}\nstatus: {status}\n"
+        if spec_change:
+            fm += f"spec_change: {spec_change}\n"
         if openspec_change:
             fm += f"openspec_change: {openspec_change}\n"
         if completed_at:
@@ -992,7 +994,7 @@ class TestResume(FixtureBase):
         data = json.loads(out)
         self.assertEqual(data["current_phase"], "apply_change")
         self.assertEqual(
-            data["evidence"]["openspec_status"]["classification"],
+            data["evidence"]["spec_status"]["classification"],
             "in-progress",
         )
 
@@ -1286,6 +1288,96 @@ class TestRoadmapReadyHook(FixtureBase):
         self.assertEqual(data["status"], "blocked")
         self.assertEqual(data["block"]["type"], "user_decision_required")
         self.assertIn("roadmap_status_ready_if_linked", data["pending_hooks"])
+
+
+class TestRoadmapSpecLinkHook(FixtureBase):
+    """Tests for roadmap_spec_link_if_ready hook validation."""
+
+    def _setup_create_change_run(self, change_id, item_id, item_status, spec_change=None):
+        """Create a run in create_change phase with roadmap_link evidence."""
+        self._make_openspec_change(change_id)
+        if item_id:
+            self._make_roadmap_item(
+                item_id, item_status,
+                spec_change=spec_change or change_id,
+            )
+        run_id = f"2026-06-20-{change_id}"
+        state = {
+            "version": 1,
+            "run_id": run_id,
+            "workflow": "sdlc-main",
+            "status": "running",
+            "current_phase": "create_change",
+            "primary_subject": {"type": "spec_change", "id": change_id},
+            "context": {"change_id": change_id},
+            "phase_readiness": {
+                "phase": "create_change",
+                "ready": True,
+                "missing_required_inputs": [],
+            },
+            "pending_hooks": [],
+            "completed_hooks": [],
+            "completed_phases": ["create_change"],
+            "gates": {},
+            "evidence": {},
+            "block": None,
+            "updated_at": "2026-06-20T00:00:00",
+            "flow_type": "spec-flow",
+        }
+        if item_id:
+            state["evidence"]["roadmap_link"] = {
+                "count": 1,
+                "items": [{
+                    "item_id": item_id,
+                    "status": item_status,
+                    "file": f".ai/roadmap/areas/area1/items/{item_id}.md",
+                    "area": "area1",
+                }],
+            }
+            state["context"]["roadmap_item_id"] = item_id
+        self._write_current_state(state)
+
+    def _add_hook(self, hook_name):
+        state = self._read_current_state()
+        state.setdefault("pending_hooks", []).append(hook_name)
+        self._write_current_state(state)
+
+    def test_complete_hook_spec_link_blocks_when_item_not_ready(self):
+        self._make_roadmap_item("RM-LINK-IDEA", "idea", spec_change="link-change")
+        run_workflow(self.tmp, "start", subject_type="spec_change", subject_id="link-change")
+        state = self._read_current_state()
+        state["pending_hooks"] = ["roadmap_spec_link_if_ready"]
+        state["evidence"]["roadmap_link"] = {
+            "count": 1,
+            "items": [{"item_id": "RM-LINK-IDEA", "status": "idea"}],
+        }
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(self.tmp, "complete-hook", hook="roadmap_spec_link_if_ready")
+
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "blocked")
+        self.assertEqual(data["block"]["type"], "domain_state_mismatch")
+        self.assertIn("expected ready", data["block"]["message"])
+
+    def test_complete_hook_spec_link_succeeds_for_ready_item(self):
+        self._make_roadmap_item("RM-LINK-READY", "ready", spec_change="link-ready")
+        run_workflow(self.tmp, "start", subject_type="spec_change", subject_id="link-ready")
+        state = self._read_current_state()
+        state["pending_hooks"] = ["roadmap_spec_link_if_ready"]
+        state["evidence"]["roadmap_link"] = {
+            "count": 1,
+            "items": [{"item_id": "RM-LINK-READY", "status": "ready"}],
+        }
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(self.tmp, "complete-hook", hook="roadmap_spec_link_if_ready")
+
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertIn("roadmap_spec_link_if_ready", data.get("completed_hooks", []))
+        self.assertEqual(data["evidence"].get("roadmap_hook_resolution"), "spec_linked")
 
 
 class TestRoadmapApplyStartHook(FixtureBase):
@@ -1605,6 +1697,20 @@ class TestWorkflowDefinitionContracts(FixtureBase):
 
         self.assertEqual(create_change.get("exit_criteria"), ["spec_artifacts_done"])
         self.assertEqual(create_change.get("evidence_keys"), ["spec_artifacts_done"])
+
+    def test_review_roadmap_routes_through_dev_orchestrator(self):
+        wf = load_yaml(self.tmp, ".ai/workflows/definitions/sdlc-main.yaml")
+        review_roadmap = wf["phases"]["review_roadmap"]
+
+        self.assertEqual(review_roadmap.get("allowed_workers"), ["dev-orchestrator"])
+        self.assertEqual(review_roadmap.get("exit_criteria"), ["review_decision_recorded"])
+
+    def test_create_change_uses_spec_link_hook(self):
+        wf = load_yaml(self.tmp, ".ai/workflows/definitions/sdlc-main.yaml")
+        create_change = wf["phases"]["create_change"]
+
+        self.assertIn("roadmap_spec_link_if_ready", create_change.get("post_hooks", []))
+        self.assertNotIn("roadmap_status_ready_if_linked", create_change.get("post_hooks", []))
 
 
 class TestGovernanceCheck(FixtureBase):
@@ -2226,6 +2332,13 @@ class TestPreflightAndEnsureRun(FixtureBase):
         self.assertFalse(data["allowed"])
         self.assertEqual(data["reason"], "wrong_phase")
 
+    def test_preflight_spec_apply_in_create_phase_blocks(self):
+        run_workflow(self.tmp, "start", subject_type="spec_change", subject_id="phase-test")
+        rc, data, _ = self._run_preflight("spec_apply", subject_type="spec_change", subject_id="phase-test")
+        self.assertEqual(rc, 1)
+        self.assertFalse(data["allowed"])
+        self.assertEqual(data["reason"], "wrong_phase")
+
     def test_preflight_openspec_archive_in_create_phase_blocks(self):
         run_workflow(
             self.tmp, "start",
@@ -2472,6 +2585,62 @@ class TestPreflightAndEnsureRun(FixtureBase):
         self.assertFalse(data["allowed"])
         self.assertEqual(data["reason"], "missing_active_run")
 
+    def test_preflight_spec_create_finds_linked_roadmap_run_by_spec_change_frontmatter(self):
+        self._make_roadmap_item("RM-PROMO-SPEC", "ready", spec_change="promo-spec")
+        run_workflow(
+            self.tmp,
+            "start",
+            subject_type="roadmap_item",
+            subject_id="RM-PROMO-SPEC",
+        )
+        active_runs = self._list_active_runs_support()
+        for _run_id, state in active_runs:
+            if "RM-PROMO-SPEC" in _run_id:
+                state["current_phase"] = "create_change"
+                active_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "active", _run_id)
+                os.makedirs(active_dir, exist_ok=True)
+                with open(os.path.join(active_dir, "run.json"), "w") as f:
+                    json.dump(state, f)
+                break
+
+        rc, data, _ = self._run_preflight(
+            "spec_create",
+            subject_type="spec_change",
+            subject_id="promo-spec",
+        )
+
+        self.assertEqual(rc, 0)
+        self.assertTrue(data["allowed"])
+        self.assertEqual(data["reason"], "linked_roadmap_run_exists")
+
+    def test_start_ready_roadmap_without_spec_change_starts_review_phase(self):
+        self._make_roadmap_item("RM-READY-NOSPEC", "ready")
+
+        rc, out, _ = run_workflow(
+            self.tmp,
+            "start",
+            subject_type="roadmap_item",
+            subject_id="RM-READY-NOSPEC",
+        )
+
+        self.assertEqual(rc, 0)
+        state = json.loads(out)
+        self.assertEqual(state["current_phase"], "review_roadmap")
+
+    def test_start_ready_roadmap_with_spec_change_starts_create_change_phase(self):
+        self._make_roadmap_item("RM-READY-SPEC", "ready", spec_change="ready-spec-change")
+
+        rc, out, _ = run_workflow(
+            self.tmp,
+            "start",
+            subject_type="roadmap_item",
+            subject_id="RM-READY-SPEC",
+        )
+
+        self.assertEqual(rc, 0)
+        state = json.loads(out)
+        self.assertEqual(state["current_phase"], "create_change")
+
 
 class TestCancelRun(FixtureBase):
     """Tests for cancel-run runtime primitive."""
@@ -2671,6 +2840,62 @@ class TestGovernanceCheckExtended(FixtureBase):
         duplicate_findings = [f for f in data["findings"] if f["type"] == "duplicate_promotion_runs"]
         self.assertGreaterEqual(len(duplicate_findings), 1)
         self.assertIn("dup-change", duplicate_findings[0]["change_id"])
+
+    def test_governance_check_duplicate_promotion_runs_with_spec_change(self):
+        """Duplicate detection works when roadmap item uses spec_change (not openspec_change)."""
+        self._make_roadmap_item("RM-DUP-SPEC", "review", spec_change="dup-spec-change")
+
+        # roadmap_item run WITHOUT context.change_id -- forces fallback to
+        # frontmatter read (which currently misses spec_change)
+        rm_run_id = "2026-06-22-RM-DUP-SPEC"
+        rm_state = {
+            "version": 1, "run_id": rm_run_id, "workflow": "sdlc-main",
+            "status": "running", "current_phase": "create_change",
+            "primary_subject": {"type": "roadmap_item", "id": "RM-DUP-SPEC"},
+            "context": {"roadmap_item_id": "RM-DUP-SPEC"},
+            "phase_readiness": {"phase": "create_change", "ready": False, "missing_required_inputs": []},
+            "pending_hooks": [], "completed_hooks": [], "completed_phases": [],
+            "gates": {}, "evidence": {}, "block": None, "updated_at": "",
+        }
+        active_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "active")
+        os.makedirs(os.path.join(active_dir, rm_run_id), exist_ok=True)
+        with open(os.path.join(active_dir, rm_run_id, "run.json"), "w") as f:
+            json.dump(rm_state, f)
+
+        # Manually create a spec_change run for the same change
+        oc_run_id = "2026-06-22-dup-spec-change"
+        oc_state = {
+            "version": 1, "run_id": oc_run_id, "workflow": "sdlc-main",
+            "status": "running", "current_phase": "create_change",
+            "primary_subject": {"type": "spec_change", "id": "dup-spec-change"},
+            "context": {"change_id": "dup-spec-change"},
+            "phase_readiness": {"phase": "create_change", "ready": False, "missing_required_inputs": []},
+            "pending_hooks": [], "completed_hooks": [], "completed_phases": [],
+            "gates": {}, "evidence": {}, "block": None, "updated_at": "",
+        }
+        os.makedirs(os.path.join(active_dir, oc_run_id), exist_ok=True)
+        with open(os.path.join(active_dir, oc_run_id, "run.json"), "w") as f:
+            json.dump(oc_state, f)
+
+        rc, out, _ = run_workflow(self.tmp, "governance-check")
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        duplicate_findings = [f for f in data["findings"] if f["type"] == "duplicate_promotion_runs"]
+        self.assertGreaterEqual(len(duplicate_findings), 1,
+            "Duplicate promotion runs should be detected when roadmap item uses spec_change frontmatter")
+        self.assertIn("dup-spec-change", duplicate_findings[0]["change_id"])
+
+    def test_governance_check_linked_no_workflow_evidence_with_spec_change(self):
+        """linked_item_no_workflow_evidence is generated for items with spec_change frontmatter."""
+        self._make_roadmap_item("RM-LINK-SPEC", "ready", spec_change="link-spec-change")
+
+        rc, out, _ = run_workflow(self.tmp, "governance-check")
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        linked_findings = [f for f in data["findings"] if f["type"] == "linked_item_no_workflow_evidence"
+                          and f["item_id"] == "RM-LINK-SPEC"]
+        self.assertEqual(len(linked_findings), 1,
+            "linked_item_no_workflow_evidence should flag roadmap item with spec_change and no workflow evidence")
 
     def _list_active_runs_support(self):
         active_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "active")

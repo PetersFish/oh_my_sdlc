@@ -606,6 +606,10 @@ class TestPhaseAgentMapping(unittest.TestCase):
                     f"{agent!r} should not be allowed in bogus phase",
                 )
 
+    def test_roadmap_agent_allowed_in_review_roadmap(self):
+        self.assertTrue(is_agent_allowed_in_phase("roadmap-agent", "review_roadmap"))
+        self.assertFalse(is_agent_allowed_in_phase("plan-agent", "review_roadmap"))
+
 
 class TestWrapperContracts(unittest.TestCase):
     """Task 3.7: wrapper contracts exist for all lifecycle modules."""
@@ -633,6 +637,22 @@ class TestWrapperContracts(unittest.TestCase):
         for module, contract in WRAPPER_REGISTRY.items():
             self.assertIsInstance(contract.remediation, list,
                                   f"{module}: remediation should be a list")
+
+
+class TestRoadmapSkillSpecChangeVocabulary(unittest.TestCase):
+    def test_roadmap_skill_uses_review_passed_ready_semantics(self):
+        body = (REPO_ROOT / "skills" / "sdlc-roadmap" / "SKILL.md").read_text(encoding="utf-8")
+
+        self.assertIn("ready     | Review passed", body)
+        self.assertIn("spec_change", body)
+        self.assertNotIn("openspec_change:", body)
+        self.assertNotIn("Create complete OpenSpec artifacts", body)
+
+    def test_roadmap_item_template_uses_spec_change(self):
+        template = (REPO_ROOT / "skills" / "sdlc-roadmap" / "templates" / "item.md").read_text(encoding="utf-8")
+
+        self.assertIn("spec_change:", template)
+        self.assertNotIn("openspec_change:", template)
 
 
 class TestContractInputs(unittest.TestCase):
@@ -786,6 +806,25 @@ class TestSdlcOrchestratorManualTrigger(unittest.TestCase):
         self.assertIn("manual invocation only", content.lower())
         self.assertIn(
             'Do NOT auto-trigger on "new development task"', content)
+
+
+class TestRoadmapAgentReviewContract(unittest.TestCase):
+    def test_roadmap_agent_documents_review_contract(self):
+        body = (AGENTS_DIR / "roadmap-agent.md").read_text(encoding="utf-8")
+
+        self.assertIn("roadmap_review", body)
+        self.assertIn("review_roadmap", body)
+        self.assertIn("roadmap_review_decision", body)
+        self.assertIn("ask_user_next_step", body)
+        self.assertIn("ask_user_for_clarification", body)
+
+    def test_dev_orchestrator_maps_review_roadmap_to_roadmap_agent(self):
+        body = (AGENTS_DIR / "dev-orchestrator.md").read_text(encoding="utf-8")
+
+        self.assertIn("review_roadmap", body)
+        self.assertIn("Review roadmap item", body)
+        self.assertIn("roadmap_spec_link_if_ready", body)
+        self.assertNotIn("roadmap_status_ready_if_linked", body)
 
 
 AGENT_NAMES = [

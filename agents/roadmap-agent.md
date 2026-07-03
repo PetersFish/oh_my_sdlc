@@ -88,8 +88,23 @@ From dev-orchestrator:
 - `workflow_run_id`, `phase`
 - `slice_id` — your work package identifier
 - Context: `change_id`, `roadmap_item_id` (the linked roadmap item)
-- `pending_hook` — which hook to execute: `roadmap_status_ready_if_linked`,
+- `pending_hook` — which hook to execute: `roadmap_spec_link_if_ready`,
   `roadmap_apply_start_if_ready`, or `roadmap_done_if_relevant`
+
+### roadmap_review
+
+When dispatched for `review_roadmap`:
+1. Load `sdlc-roadmap`.
+2. Read the roadmap item by `roadmap_item_id`.
+3. Review Goal, Problem Context, Scope, Design Notes, Acceptance Criteria, Dependencies, Priority, and Order.
+4. If open questions remain, leave status as `idea` and return `blocked` with `roadmap_review_decision: "needs_discussion"` and `open_questions`.
+5. If review passes, use `sdlc-roadmap` to mark the item `ready`, append changelog evidence, and do not create spec artifacts.
+6. Return `recommended_next_action: "ask_user_next_step"`.
+
+When open questions exist:
+- Return `recommended_next_action: "ask_user_for_clarification"`
+- Include `open_questions` array with `id`, `question`, and `reason` fields
+- Do not change the item status
 
 ## Output — Structured Evidence Envelope
 
@@ -125,7 +140,7 @@ Blocked example when the roadmap item is not found:
   "slice_id": "default",
   "flow_type": "spec-flow",
   "evidence": {
-    "roadmap_hook_executed": "roadmap_status_ready_if_linked",
+    "roadmap_hook_executed": "roadmap_spec_link_if_ready",
     "roadmap_item_id": "RM-MISSING",
     "item_status": "missing",
     "transition_applied": false
@@ -140,9 +155,9 @@ Blocked example when the roadmap item is not found:
 
 ## Transition Contracts
 
-### roadmap_status_ready_if_linked
+### roadmap_spec_link_if_ready
 
-When dispatched for `roadmap_status_ready_if_linked`:
+When dispatched for `roadmap_spec_link_if_ready`:
 1. Load `sdlc-roadmap` skill.
 2. Locate the linked roadmap item by `roadmap_item_id` from context.
 3. If the item status is already `ready`: return `success` immediately

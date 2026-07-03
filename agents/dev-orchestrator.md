@@ -277,17 +277,28 @@ General task dispatch flow:
 
 ### Roadmap-Governed Hook Dispatch
 
-Roadmap lifecycle hooks (`roadmap_status_ready_if_linked`, `roadmap_apply_start_if_ready`, `roadmap_done_if_relevant`) are lifecycle-affecting work. They MUST use the lifecycle dispatch pipeline (before-dispatch → roadmap-agent → after-dispatch) and MUST NEVER use General Task dispatch.
+Roadmap lifecycle hooks (`roadmap_spec_link_if_ready`, `roadmap_apply_start_if_ready`, `roadmap_done_if_relevant`) are lifecycle-affecting work. They MUST use the lifecycle dispatch pipeline (before-dispatch → roadmap-agent → after-dispatch) and MUST NEVER use General Task dispatch.
 
 Roadmap hook dispatch flow:
-1. Detect pending roadmap hook from workflow state (`pending_hooks` includes any of `roadmap_status_ready_if_linked`, `roadmap_apply_start_if_ready`, `roadmap_done_if_relevant`).
+1. Detect pending roadmap hook from workflow state (`pending_hooks` includes any of `roadmap_spec_link_if_ready`, `roadmap_apply_start_if_ready`, `roadmap_done_if_relevant`).
 2. Call `before-dispatch` with `--agent roadmap-agent`.
 3. Dispatch `roadmap-agent` via the `task` tool.
 4. Call `after-dispatch` with the roadmap-agent result.
 5. Call `workflow.py complete-hook --hook <hook-name>` to validate the roadmap item state change.
 6. If `complete-hook` blocks with `domain_state_mismatch`, surface the block to the user with the expected and observed statuses and direct remediation to `roadmap-agent` / `sdlc-roadmap`.
 
-Roadmap hooks are NOT General Tasks. The General Task dispatch path skips before-dispatch and after-dispatch, which means roadmap state transitions dispatched through it would bypass workflow governance and not be validated. Never use General Task dispatch for `roadmap_status_ready_if_linked`, `roadmap_apply_start_if_ready`, or `roadmap_done_if_relevant`.
+Roadmap hooks are NOT General Tasks. The General Task dispatch path skips before-dispatch and after-dispatch, which means roadmap state transitions dispatched through it would bypass workflow governance and not be validated. Never use General Task dispatch for `roadmap_spec_link_if_ready`, `roadmap_apply_start_if_ready`, or `roadmap_done_if_relevant`.
+
+### Roadmap Review Dispatch
+
+For `review_roadmap`, dispatch `roadmap-agent` through the lifecycle dispatch pipeline.
+
+If roadmap-agent returns:
+- `roadmap_review_decision: "passed"` — ask the user whether to create spec artifacts or review the next roadmap item.
+- `roadmap_review_decision: "needs_discussion"` — ask the returned `open_questions`, then redispatch roadmap-agent with the user's answers.
+- `recommended_next_action: "review_next_item"` — dispatch roadmap-agent to select the next idea item using the roadmap list rules.
+
+Do not dispatch `plan-agent` until the user explicitly chooses to create spec artifacts.
 
 ## User-Facing Dispatch Announcements
 
@@ -334,7 +345,8 @@ Use these descriptions for the "Task" field in pre-dispatch announcements:
 | review-agent | apply_change | Perform code review and verify-before-complete checks |
 | finish-agent | archive_change | Archive the change and run post-archive hooks |
 | finish-agent | post_archive_actions | Run post-archive cleanup and memory sync hooks |
-| roadmap-agent | create_change | Execute roadmap_status_ready_if_linked transition |
+| roadmap-agent | review_roadmap | Review roadmap item and return review decision |
+| roadmap-agent | create_change | Execute roadmap_spec_link_if_ready transition |
 | roadmap-agent | apply_change | Execute roadmap_apply_start_if_ready transition |
 | roadmap-agent | archive_change | Execute roadmap_done_if_relevant transition |
 | roadmap-agent | post_archive_actions | Execute roadmap_done_if_relevant cleanup |
@@ -383,6 +395,7 @@ Example: dispatching implement-agent during apply_change phase
 
 | Phase | Agents |
 |---|---|
+| `review_roadmap` | `roadmap-agent` |
 | `create_change` | `plan-agent`, `roadmap-agent` (for roadmap hooks) |
 | `apply_change` | `implement-agent` → `test-agent` → `review-agent`, `roadmap-agent` (for roadmap hooks) |
 | `archive_change` | `finish-agent`, `roadmap-agent` (for roadmap hooks) |

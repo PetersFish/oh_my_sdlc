@@ -356,8 +356,8 @@ def _list_dirs(path):
         return []
 
 
-def _find_roadmap_items(root, openspec_change_id):
-    """Scan .ai/roadmap/areas/*/items/*.md for openspec_change match."""
+def _find_roadmap_items(root, change_id):
+    """Scan .ai/roadmap/areas/*/items/*.md for spec_change or openspec_change match."""
     items = []
     areas_dir = _resolve_path(root, ".ai/roadmap/areas")
     if not os.path.isdir(areas_dir):
@@ -376,7 +376,7 @@ def _find_roadmap_items(root, openspec_change_id):
             except Exception:
                 continue
             fm = _parse_yaml_frontmatter(content)
-            if fm and fm.get("openspec_change") == openspec_change_id:
+            if fm and (fm.get("spec_change") == change_id or fm.get("openspec_change") == change_id):
                 item_id = (
                     fm.get("id")
                     or fm.get("item_id")
@@ -482,6 +482,35 @@ def loader_openspec_archive_path(root, change_id):
     if len(matches) == 1:
         rel = os.path.relpath(matches[0], root) if root else matches[0]
         return rel
+    return None
+
+
+def loader_spec_change_status(root, change_id):
+    return loader_openspec_change_status(root, change_id)
+
+
+def loader_spec_archive_path(root, change_id):
+    return loader_openspec_archive_path(root, change_id)
+
+
+def _read_roadmap_item_spec_change(root, item_id):
+    """Read provider-agnostic spec_change from a roadmap item file.
+    Tries spec_change first, then falls back to openspec_change for legacy compatibility."""
+    areas_dir = _resolve_path(root, ".ai/roadmap/areas")
+    for area in _list_dirs(areas_dir):
+        items_dir = os.path.join(areas_dir, area, "items")
+        if not os.path.isdir(items_dir):
+            continue
+        for fname in _list_dirs(items_dir):
+            if not fname.endswith(".md"):
+                continue
+            fpath = os.path.join(items_dir, fname)
+            fm_id = _read_frontmatter_field(fpath, "id")
+            if fm_id == item_id:
+                spec = _read_frontmatter_field(fpath, "spec_change")
+                if spec:
+                    return spec
+                return _read_frontmatter_field(fpath, "openspec_change")
     return None
 
 
@@ -634,7 +663,7 @@ def _start_command(subject_type, subject_id):
 
 def _find_linked_roadmap_run(root, change_id):
     """Scan active roadmap_item runs for a context.change_id or
-    frontmatter openspec_change matching a given change_id."""
+    frontmatter spec_change/openspec_change matching a given change_id."""
     for _run_id, state in _list_active_runs(root):
         ps = state.get("primary_subject", {})
         if ps.get("type") != "roadmap_item":
@@ -644,7 +673,7 @@ def _find_linked_roadmap_run(root, change_id):
             return state
         roadmap_item_id = ctx.get("roadmap_item_id") or ps.get("id")
         if roadmap_item_id:
-            linked_change = _read_roadmap_item_openspec_change(root, roadmap_item_id)
+            linked_change = _read_roadmap_item_spec_change(root, roadmap_item_id)
             if linked_change == change_id:
                 return state
     return None
@@ -691,6 +720,18 @@ def _policy_no_workflow(root, action, subject_type, subject_id):
 
 
 @register_policy(
+    "spec_create", allowed_phases={"create_change", "input"},
+)
+@register_policy(
+    "spec_continue", allowed_phases={"create_change", "apply_change"},
+)
+@register_policy(
+    "spec_apply", allowed_phases={"apply_change"},
+)
+@register_policy(
+    "spec_archive", allowed_phases={"archive_change"},
+)
+@register_policy(
     "openspec_create", allowed_phases={"create_change", "input"},
 )
 @register_policy(
@@ -714,7 +755,7 @@ def _policy_openspec_change(root, action, subject_type, subject_id):
         return _make_preflight_decision(True, "ok", "done_history_exists")
 
     # No active run => check for canonical linked roadmap_item run (promotion)
-    if not active and action == "openspec_create":
+    if not active and action in ("openspec_create", "spec_create"):
         linked = _find_linked_roadmap_run(root, subject_id)
         if linked:
             _set_pointer(root, linked["run_id"])
@@ -1478,6 +1519,7 @@ CANONICAL_AGENT_NAMES = {
 }
 
 PHASE_AGENT_MAP = {
+    "review_roadmap": {"roadmap-agent"},
     "create_change": {"plan-agent", "roadmap-agent"},
     "apply_change": {"implement-agent", "test-agent", "review-agent", "roadmap-agent"},
     "archive_change": {"finish-agent", "roadmap-agent"},
@@ -2020,6 +2062,37 @@ def cmd_complete_hook(root, args):
         state.setdefault("evidence", {})["memory_sync_resolution"] = resolution
         state.setdefault("evidence", {})["memory_sync_reason"] = args.reason or ""
 
+    elif hook_name == "roadmap_spec_link_if_ready":
+        items, count = _resolve_roadmap_hook_linked_items(state)
+        if count == 0:
+            state.setdefault("evidence", {})["roadmap_hook_resolution"] = "no_linked_item"
+        elif count == 1:
+            item = items[0]
+            item_id = item.get("item_id")
+            current = loader_roadmap_item_status(root, item_id)
+            if current and current.get("status") == "ready":
+                state.setdefault("evidence", {})["roadmap_hook_resolution"] = "spec_linked"
+            else:
+                observed_status = current.get("status") if current else item.get("status", "unknown")
+                _apply_roadmap_hook_block(
+                    state, hook_name, "domain_state_mismatch",
+                    f"roadmap item {item_id} has status {observed_status}, expected ready before spec link",
+                    ["resolve", "record-evidence", "block"],
+                )
+                save_run_state(root, state)
+                print(json.dumps(state, indent=2))
+                sys.exit(1)
+        else:
+            _apply_roadmap_hook_block(
+                state, hook_name, "user_decision_required",
+                "multiple roadmap items linked to this change",
+                ["choose one item to link to spec", "repair roadmap links manually"],
+            )
+            state["block"]["candidates"] = items
+            save_run_state(root, state)
+            print(json.dumps(state, indent=2))
+            sys.exit(1)
+
     elif hook_name == "roadmap_status_ready_if_linked":
         items, count = _resolve_roadmap_hook_linked_items(state)
         if count == 0:
@@ -2094,7 +2167,7 @@ def cmd_complete_hook(root, args):
                     root, "roadmap_item", item.get("item_id")
                 )
                 if linked_item_run:
-                    linked_change = linked_item_run.get("context", {}).get("change_id") or _read_roadmap_item_openspec_change(root, item.get("item_id"))
+                    linked_change = linked_item_run.get("context", {}).get("change_id") or _read_roadmap_item_spec_change(root, item.get("item_id"))
                     if linked_change == state.get("context", {}).get("change_id"):
                         state.setdefault("evidence", {})["roadmap_hook_resolution"] = "done"
                         state.setdefault("evidence", {})["roadmap_item_run_finalized"] = linked_item_run.get("run_id")
@@ -2490,7 +2563,7 @@ def cmd_governance_check(root, args):
                     change_id = (
                         hist.get("context", {}).get("change_id")
                         or hist.get("evidence", {}).get("change_id")
-                        or _read_roadmap_item_openspec_change(root, ps["id"])
+                        or _read_roadmap_item_spec_change(root, ps["id"])
                     )
                     if change_id:
                         governed_change_ids.add(change_id)
@@ -2549,7 +2622,7 @@ def cmd_governance_check(root, args):
             if not cid:
                 item_id = ps.get("id")
                 if item_id:
-                    cid = _read_roadmap_item_openspec_change(root, item_id)
+                    cid = _read_roadmap_item_spec_change(root, item_id)
             if cid:
                 roadmap_change_ids[cid] = run_id
         elif ps.get("type") == "spec_change":
@@ -2700,7 +2773,7 @@ def cmd_governance_check(root, args):
             if not cid:
                 item_id = ps.get("id")
                 if item_id:
-                    cid = _read_roadmap_item_openspec_change(root, item_id)
+                    cid = _read_roadmap_item_spec_change(root, item_id)
             if cid:
                 governed_roadmap_change_ids.add(cid)
     if os.path.isdir(history_dir):
@@ -2725,7 +2798,7 @@ def cmd_governance_check(root, args):
                     if not cid:
                         item_id = ps.get("id")
                         if item_id:
-                            cid = _read_roadmap_item_openspec_change(root, item_id)
+                            cid = _read_roadmap_item_spec_change(root, item_id)
                     if cid:
                         governed_roadmap_change_ids.add(cid)
     if os.path.isdir(areas_dir):
@@ -2737,7 +2810,7 @@ def cmd_governance_check(root, args):
                 if not fname.endswith(".md"):
                     continue
                 fpath = os.path.join(items_dir, fname)
-                linked_change = _read_frontmatter_field(fpath, "openspec_change")
+                linked_change = _read_frontmatter_field(fpath, "spec_change") or _read_frontmatter_field(fpath, "openspec_change")
                 if not linked_change or linked_change == "None":
                     continue
                 fm_id = _read_frontmatter_field(fpath, "id")
@@ -2865,7 +2938,7 @@ def _infer_phase(root, subject_type, subject_id, flow_type="spec-flow"):
             if status == "idea":
                 return "review_roadmap"
             if status == "ready":
-                linked_change = _read_roadmap_item_openspec_change(root, subject_id)
+                linked_change = _read_roadmap_item_spec_change(root, subject_id)
                 if linked_change and linked_change != "None":
                     return "create_change"
                 return "review_roadmap"
@@ -2898,15 +2971,15 @@ def _run_loaders(root, state, wf):
     if not phase_def:
         return
     for loader_name in phase_def.get("context_loaders", []):
-        if loader_name == "openspec_change_status":
+        if loader_name in ("spec_change_status", "openspec_change_status"):
             change_id = state.get("context", {}).get("change_id", "")
             if change_id:
-                result = loader_openspec_change_status(root, change_id)
-                state.setdefault("evidence", {})["openspec_status"] = result
-        elif loader_name == "openspec_archive_path":
+                result = loader_spec_change_status(root, change_id)
+                state.setdefault("evidence", {})["spec_status"] = result
+        elif loader_name in ("spec_archive_path", "openspec_archive_path"):
             change_id = state.get("context", {}).get("change_id", "")
             if change_id:
-                ap = loader_openspec_archive_path(root, change_id)
+                ap = loader_spec_archive_path(root, change_id)
                 if ap:
                     state.setdefault("evidence", {})["archive_path"] = ap
         elif loader_name == "roadmap_linked_item":

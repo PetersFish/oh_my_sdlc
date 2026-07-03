@@ -6,7 +6,7 @@ stage: mvp
 priority: p0
 order: 10
 depends_on: []
-openspec_change: null
+spec_change: null
 created_at: YYYY-MM-DD
 started_at: null
 completed_at: null

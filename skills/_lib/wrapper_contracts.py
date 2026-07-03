@@ -54,6 +54,7 @@ DESIGN_ARTIFACT_SOURCES: Set[str] = {"superpowers", "openspec", "other"}
 
 # Phase-to-agent mapping (canonical dash-form agent names)
 PHASE_AGENT_MAP: Dict[str, Set[str]] = {
+    "review_roadmap": {"roadmap-agent"},
     "create_change": {"plan-agent", "roadmap-agent"},
     "apply_change": {"implement-agent", "test-agent", "review-agent", "roadmap-agent"},
     "archive_change": {"finish-agent", "roadmap-agent"},

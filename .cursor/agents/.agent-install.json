@@ -1,15 +1,15 @@
 {
   "source_repo": "/Users/yuping/Documents/workspace/oh_my_skills",
-  "source_ref": "5c79788885cdbe5ec519725632fc545584073e3d",
-  "installed_at": "2026-07-02T14:45:54.043162+00:00",
+  "source_ref": "9e5bd55a0ee4e8ba2cad83834968351941dfaeb4",
+  "installed_at": "2026-07-03T14:25:18.257409+00:00",
   "status": "stable",
   "files": {
-    "dev-orchestrator.md": "a2ccac4cf00219e0b9b0813f390fe66821bd25c088e86d85c119eff1dcdbbe26",
+    "dev-orchestrator.md": "fb817c19c1ce98407204785ca989b8c409d57580366caee7e130f0c3deefb703",
     "finish-agent.md": "8379c3581c6daf4ba812b1514d001b506d6defb9baef897d4ea1527a9560ca01",
     "implement-agent.md": "2e9dc0308b84d6d788cd9eef4fce41a1981d6e6e2cdf2312c46feabc123c6ef4",
     "plan-agent.md": "c54c00f707d586d5844a4c83602f62dc864db1daff97f1e1801a6bc415c7f600",
     "review-agent.md": "cc4342e9af9cbd5469bef03bdc38d40735c5fa956f8ee2a83dad0c7b249312b3",
-    "roadmap-agent.md": "c97ebb4aefb61355af7c12fa0f49e0308547ab53ca7fac4f1d93256034e23ff1",
+    "roadmap-agent.md": "a5d84ecb3ae4a85a67862481f59fa5f1d2a219dc19f44e33a2a394db0d26f982",
     "test-agent.md": "39c86f29da98566905c7137faeb16117740a25c1e3a94c208b1c35a576a1bd13"
   }
 }

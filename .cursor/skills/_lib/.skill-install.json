@@ -5,9 +5,9 @@
   "source_ref": "HEAD",
   "status": "stable",
   "target": ".cursor/skills/_lib",
-  "installed_at": "2026-07-02T12:22:47.583382Z",
+  "installed_at": "2026-07-03T14:25:17.625933Z",
   "backport_policy": "review-required",
-  "payload_hash": "3405e0473c0235185f81183c0b8163acf6f30a7774902867402d21bfa78fea45",
+  "payload_hash": "5416c87240eb5e76fcacdb5b49fe3d4334b4c1e7ec9f3e3f6b2807e7f51f7a65",
   "files": [
     "provider_registry.yaml",
     "provider_registry_loader.py",
