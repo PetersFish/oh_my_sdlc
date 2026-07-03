@@ -22,6 +22,8 @@ permission:
     "python3 -m pytest *": allow
     "pytest *": allow
     "python3 .ai/workflows/scripts/workflow.py *": allow
+    "python3 scripts/*": allow
+    "python3 skills/*": allow
     "git status*": allow
     "git diff*": allow
     "git log*": allow

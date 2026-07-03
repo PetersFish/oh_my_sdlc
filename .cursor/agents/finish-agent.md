@@ -18,7 +18,11 @@ permission:
   question: ask
   bash:
     "*": deny
+    "python3 -m pytest*": allow
+    "pytest*": allow
     "python3 .ai/workflows/scripts/workflow.py *": allow
+    "python3 scripts/*": allow
+    "python3 skills/*": allow
     "python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py *": allow
     "git status*": allow
     "git diff*": allow

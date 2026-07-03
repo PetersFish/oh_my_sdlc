@@ -17,7 +17,11 @@ permission:
   question: ask
   bash:
     "*": deny
+    "python3 -m pytest*": allow
+    "pytest*": allow
     "python3 .ai/workflows/scripts/workflow.py *": allow
+    "python3 scripts/*": allow
+    "python3 skills/*": allow
     "git status*": allow
     "git diff*": allow
     "git log*": allow
@@ -137,15 +141,25 @@ If not, STOP — return blocker and DO NOT begin review.
   "slice_id": "<id>",
   "flow_type": "spec-flow|lightweight-flow",
   "evidence": {
-    "review_complete": true
+    "tasks_complete": true,
+    "tdd_passed": true,
+    "eval_passed_or_human_decision_recorded": true,
+    "review_complete": true,
+    "verification_passed": true,
+    "review_decision": "accepted",
+    "criteria_satisfied": "tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded"
   },
   "artifacts": {
     "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/<slice_id>/review-agent.md"
   },
   "blockers": [],
-  "recommended_next_action": "dispatch_finish_agent"
+  "recommended_next_action": "complete_phase"
 }
 ```
+
+When `review-agent` is the final acceptance worker for `apply_change`, it must
+mirror the active phase contract in its success envelope rather than emitting
+review-only evidence.
 
 Blocked example when review finds an executable issue that implement-agent must fix:
 ```json
@@ -204,6 +218,13 @@ When review finds issues:
 ## Evidence Emission
 
 - `evidence.review_complete`: true when code review passes and verification-before-completion confirms the required verification evidence exists.
+- For `apply_change`, emit `eval_passed_or_human_decision_recorded: true` only when:
+  - test-agent evidence shows successful verification for the slice, and
+  - final review accepts the change.
+- For `apply_change` success, include `tasks_complete`, `tdd_passed`,
+  `eval_passed_or_human_decision_recorded`, `verification_passed`,
+  `review_decision`, and `criteria_satisfied` so the workflow phase can
+  complete deterministically.
 
 ## Handoff Artifact
 
