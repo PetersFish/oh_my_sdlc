@@ -1518,6 +1518,16 @@ CANONICAL_AGENT_NAMES = {
     "roadmap_agent": "roadmap-agent",
 }
 
+BLOCK_AGENT_ACTION_MAP = {
+    "dispatch_implement_agent": "implement-agent",
+    "back_to_implement": "implement-agent",
+    "dispatch_plan_agent": "plan-agent",
+    "back_to_plan": "plan-agent",
+    "dispatch_review_agent": "review-agent",
+    "dispatch_test_agent": "test-agent",
+    "dispatch_roadmap_agent": "roadmap-agent",
+}
+
 PHASE_AGENT_MAP = {
     "review_roadmap": {"roadmap-agent"},
     "create_change": {"plan-agent", "roadmap-agent"},
@@ -1559,6 +1569,71 @@ def _allows_replan_from_apply_change(state, agent):
         if blocker.get("recommended_action") == "dispatch_plan_agent":
             return True
     return "dispatch_plan_agent" in next_allowed
+
+
+def _normalized_block_actions(raw_actions):
+    if raw_actions is None:
+        return []
+    if isinstance(raw_actions, str):
+        raw_actions = raw_actions.split(",")
+    if not isinstance(raw_actions, list):
+        return []
+    return [str(action).strip() for action in raw_actions if str(action).strip()]
+
+
+def _action_routes_to_agent(action, canonical_agent):
+    if not action:
+        return False
+    normalized = str(action).strip()
+    if normalized in VALID_AGENT_NAMES:
+        return _canonical_agent_name(normalized) == canonical_agent
+    return BLOCK_AGENT_ACTION_MAP.get(normalized) == canonical_agent
+
+
+def _latest_blocker_routes_to_agent(state, canonical_agent):
+    latest = state.get("evidence", {}).get("agent_result", {})
+    if not isinstance(latest, dict):
+        return False
+    if _action_routes_to_agent(latest.get("recommended_next_action"), canonical_agent):
+        return True
+    blockers = latest.get("blockers", [])
+    for blocker in blockers:
+        if not isinstance(blocker, dict):
+            continue
+        if canonical_agent == "plan-agent" and blocker.get("reason") in {"requirement_ambiguity", "design_ambiguity"}:
+            return True
+        if _action_routes_to_agent(blocker.get("recommended_action"), canonical_agent):
+            return True
+        if _action_routes_to_agent(blocker.get("recommended_next_action"), canonical_agent):
+            return True
+    return False
+
+
+def _roadmap_block_routes_to_agent(block, canonical_agent):
+    if canonical_agent != "roadmap-agent":
+        return False
+    if not isinstance(block, dict):
+        return False
+    if block.get("type") not in {"hook_blocked", "domain_state_mismatch", "user_decision_required"}:
+        return False
+    return _canonical_agent_name(block.get("route_to_agent", "")) == canonical_agent
+
+
+def _allows_blocked_dispatch(state, agent):
+    canonical_agent = _canonical_agent_name(agent)
+    if state.get("status") != "blocked":
+        return False
+    block = state.get("block") or {}
+    if _roadmap_block_routes_to_agent(block, canonical_agent):
+        return True
+    if block.get("type") != "worker_failed":
+        return False
+    actions = _normalized_block_actions(block.get("next_allowed"))
+    if any(_action_routes_to_agent(action, canonical_agent) for action in actions):
+        return True
+    if _latest_blocker_routes_to_agent(state, canonical_agent):
+        return True
+    return False
 
 
 def cmd_before_dispatch(root, args):
@@ -1614,14 +1689,15 @@ def cmd_before_dispatch(root, args):
             "recommended_action": f"flow_type must be one of: {sorted(VALID_FLOW_TYPES)}",
         })
     allow_replan = _allows_replan_from_apply_change(state, canonical_agent)
-    if state.get("status") == "blocked" and agent not in {"finish-agent", "finish_agent"} and not allow_replan:
+    allow_blocked_dispatch = _allows_blocked_dispatch(state, canonical_agent)
+    if state.get("status") == "blocked" and agent not in {"finish-agent", "finish_agent"} and not (allow_replan or allow_blocked_dispatch):
         block = state.get("block", {})
         blocker_reasons.append({
             "reason": "run_is_blocked",
             "message": f"Workflow run is blocked: {block.get('type', 'unknown')} — {block.get('message', 'no message')}",
             "recommended_action": "resolve the block before dispatching agents",
         })
-    if agent in VALID_AGENT_NAMES and not (_phase_allows_agent(current_phase, canonical_agent) or allow_replan):
+    if agent in VALID_AGENT_NAMES and not (_phase_allows_agent(current_phase, canonical_agent) or allow_replan or allow_blocked_dispatch):
         blocker_reasons.append({
             "reason": "agent_not_allowed_for_phase",
             "message": f"Agent '{canonical_agent}' is not allowed in phase '{current_phase}'",
@@ -1771,6 +1847,7 @@ def cmd_after_dispatch(root, args):
         "flow_type": flow_type,
         "evidence": agent_evidence,
         "blockers": agent_blockers,
+        "recommended_next_action": agent_recommended,
         "recorded_at": _ts(),
     }
     evidence = state.setdefault("evidence", {})
@@ -2011,6 +2088,7 @@ def _apply_roadmap_hook_block(state, hook_name, block_type, message, next_allowe
         "type": block_type,
         "message": message,
         "next_allowed": next_allowed,
+        "route_to_agent": "roadmap-agent",
         "remediation": "Use 'roadmap-agent' (sdlc-roadmap skill) to update the roadmap item state, then re-run complete-hook.",
     }
     return state

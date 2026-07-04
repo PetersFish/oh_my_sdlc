@@ -1294,6 +1294,13 @@ class TestAgentPromptBody(unittest.TestCase):
         self.assertIn('"recommended_next_action": "dispatch_implement_agent"', body)
         self.assertIn('"recommended_next_action": "dispatch_plan_agent"', body)
 
+    def test_review_agent_blocked_guidance_keeps_alias_and_blocker_action_in_sync(self):
+        body = self._read_agent_body("review-agent")
+        self.assertIn('"recommended_action": "back_to_implement"', body)
+        self.assertIn('"recommended_action": "back_to_plan"', body)
+        self.assertIn("dispatch_implement_agent", body)
+        self.assertIn("dispatch_plan_agent", body)
+
     def test_test_agent_mentions_overfit(self):
         body = self._read_agent_body("test-agent")
         self.assertIn("overfit", body)

@@ -4035,6 +4035,383 @@ class TestDispatchHooks(FixtureBase):
         data = json.loads(out)
         self.assertEqual(data["status"], "dispatched")
 
+    def test_before_dispatch_allows_implement_agent_from_worker_failed_next_allowed_alias(self):
+        self._create_run()
+        state = self._read_current_state()
+        state["current_phase"] = "apply_change"
+        state["status"] = "blocked"
+        state["block"] = {
+            "type": "worker_failed",
+            "message": "review requested implementation fixes",
+            "next_allowed": ["dispatch_implement_agent"],
+        }
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="implement-agent",
+        )
+
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "dispatched")
+
+    def test_before_dispatch_allows_implement_agent_from_latest_blocker_alias(self):
+        self._create_run()
+        state = self._read_current_state()
+        state["current_phase"] = "apply_change"
+        state["status"] = "blocked"
+        state["block"] = {
+            "type": "worker_failed",
+            "message": "implementation retry required",
+            "next_allowed": ["resolve", "block"],
+        }
+        state.setdefault("evidence", {})["agent_result"] = {
+            "agent": "review-agent",
+            "status": "blocked",
+            "phase": "apply_change",
+            "slice_id": "slice-1",
+            "flow_type": "lightweight-flow",
+            "evidence": {"review_complete": False},
+            "blockers": [{
+                "reason": "review_blocked",
+                "message": "fix implementation issues",
+                "recommended_action": "back_to_implement",
+            }],
+        }
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="implement-agent",
+            slice_id="slice-1",
+        )
+
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "dispatched")
+
+    def test_before_dispatch_rejects_next_allowed_agent_alias_for_unsupported_block_types(self):
+        for block_type in (
+            "missing_required_inputs",
+            "exit_criteria_failed",
+            "eval_failed",
+            "user_decision_required",
+        ):
+            with self.subTest(block_type=block_type):
+                self._create_run()
+                state = self._read_current_state()
+                state["current_phase"] = "apply_change"
+                state["status"] = "blocked"
+                state["block"] = {
+                    "type": block_type,
+                    "message": "dispatch-like aliases must not bypass the block",
+                    "next_allowed": ["dispatch_implement_agent"],
+                }
+                self._write_current_state(state)
+
+                rc, out, _ = run_workflow(
+                    self.tmp, "before-dispatch",
+                    agent="implement-agent",
+                )
+
+                self.assertNotEqual(rc, 0)
+                data = json.loads(out)
+                reasons = [b["reason"] for b in data.get("blockers", [])]
+                self.assertIn("run_is_blocked", reasons)
+
+    def test_before_dispatch_rejects_latest_blocker_agent_alias_for_unsupported_block_types(self):
+        cases = [
+            ("exit_criteria_failed", {"recommended_action": "back_to_implement"}),
+            ("eval_failed", {"recommended_next_action": "dispatch_implement_agent"}),
+            ("user_decision_required", {"recommended_action": "dispatch_implement_agent"}),
+        ]
+        for block_type, blocker in cases:
+            with self.subTest(block_type=block_type, blocker=blocker):
+                self._create_run()
+                state = self._read_current_state()
+                state["current_phase"] = "apply_change"
+                state["status"] = "blocked"
+                state["block"] = {
+                    "type": block_type,
+                    "message": "latest blocker alias must not bypass the block",
+                    "next_allowed": ["resolve", "block"],
+                }
+                state.setdefault("evidence", {})["agent_result"] = {
+                    "agent": "review-agent",
+                    "status": "blocked",
+                    "phase": "apply_change",
+                    "slice_id": "slice-1",
+                    "flow_type": "lightweight-flow",
+                    "evidence": {"review_complete": False},
+                    "blockers": [{
+                        "reason": "review_blocked",
+                        "message": "implementation retry requested",
+                        **blocker,
+                    }],
+                }
+                self._write_current_state(state)
+
+                rc, out, _ = run_workflow(
+                    self.tmp, "before-dispatch",
+                    agent="implement-agent",
+                    slice_id="slice-1",
+                )
+
+                self.assertNotEqual(rc, 0)
+                data = json.loads(out)
+                reasons = [b["reason"] for b in data.get("blockers", [])]
+                self.assertIn("run_is_blocked", reasons)
+
+    def test_worker_failed_round_trip_routes_back_to_implement_agent(self):
+        self._create_run()
+        state = self._read_current_state()
+        state["current_phase"] = "apply_change"
+        self._write_current_state(state)
+
+        agent_result = json.dumps({
+            "status": "failed",
+            "evidence": {"focused_tests": [{"command": "pytest -k impl", "result": "fail"}]},
+            "blockers": [{
+                "reason": "test_failure",
+                "message": "implementation fixes required",
+                "recommended_action": "back_to_implement",
+            }],
+            "recommended_next_action": "back_to_implement",
+        })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="test-agent",
+            slice_id="slice-impl-roundtrip",
+            value=agent_result,
+        )
+        self.assertEqual(rc, 0)
+        transition = json.loads(out)
+        self.assertEqual(transition["workflow_command"], "workflow.py block")
+
+        rc, _, _ = run_workflow(
+            self.tmp, "block",
+            block_type=transition["workflow_args"]["block_type"],
+            message=transition["workflow_args"]["message"],
+            next_allowed=transition["workflow_args"]["next_allowed"],
+        )
+        self.assertEqual(rc, 0)
+
+        state = self._read_current_state()
+        self.assertEqual(state["block"]["next_allowed"], ["back_to_implement"])
+
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="implement-agent",
+            slice_id="slice-impl-roundtrip",
+        )
+
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "dispatched")
+
+    def test_before_dispatch_allows_plan_agent_from_dispatch_plan_alias(self):
+        self._create_run()
+        state = self._read_current_state()
+        state["current_phase"] = "apply_change"
+        state["status"] = "blocked"
+        state["block"] = {
+            "type": "worker_failed",
+            "message": "requirements need replanning",
+            "next_allowed": ["dispatch_plan_agent"],
+        }
+        state.setdefault("evidence", {})["agent_result"] = {
+            "agent": "review-agent",
+            "status": "blocked",
+            "phase": "apply_change",
+            "slice_id": "slice-plan",
+            "flow_type": "spec-flow",
+            "evidence": {"review_complete": False},
+            "blockers": [{
+                "reason": "review_blocked",
+                "message": "replan required",
+            }],
+        }
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="plan-agent",
+            slice_id="slice-plan",
+        )
+
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "dispatched")
+
+    def test_before_dispatch_allows_roadmap_agent_for_blocked_roadmap_remediation(self):
+        for block_type in ("hook_blocked", "domain_state_mismatch", "user_decision_required"):
+            with self.subTest(block_type=block_type):
+                self._create_run()
+                state = self._read_current_state()
+                state["current_phase"] = "apply_change"
+                state["status"] = "blocked"
+                state["block"] = {
+                    "type": block_type,
+                    "message": "roadmap item needs remediation",
+                    "next_allowed": ["resolve", "record-evidence", "block"],
+                    "route_to_agent": "roadmap-agent",
+                    "remediation": "Use 'roadmap-agent' (sdlc-roadmap skill) to update the roadmap item state, then re-run complete-hook.",
+                }
+                self._write_current_state(state)
+
+                rc, out, _ = run_workflow(
+                    self.tmp, "before-dispatch",
+                    agent="roadmap-agent",
+                )
+
+                self.assertEqual(rc, 0)
+                data = json.loads(out)
+                self.assertEqual(data["status"], "dispatched")
+
+    def test_before_dispatch_hook_blocked_alias_does_not_reroute_implement_agent(self):
+        self._create_run()
+        state = self._read_current_state()
+        state["current_phase"] = "apply_change"
+        state["status"] = "blocked"
+        state["block"] = {
+            "type": "hook_blocked",
+            "message": "roadmap remediation is required before implementation can continue",
+            "next_allowed": ["dispatch_implement_agent"],
+            "route_to_agent": "test-agent",
+        }
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="implement-agent",
+        )
+
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [b["reason"] for b in data.get("blockers", [])]
+        self.assertEqual(data["status"], "blocked")
+        self.assertIn("run_is_blocked", reasons)
+
+    def test_before_dispatch_domain_state_mismatch_latest_alias_does_not_reroute_implement_agent(self):
+        self._create_run()
+        state = self._read_current_state()
+        state["current_phase"] = "apply_change"
+        state["status"] = "blocked"
+        state["block"] = {
+            "type": "domain_state_mismatch",
+            "message": "roadmap item state must be fixed before implementation can continue",
+            "next_allowed": ["resolve", "block"],
+            "route_to_agent": "test-agent",
+        }
+        state.setdefault("evidence", {})["agent_result"] = {
+            "agent": "roadmap-agent",
+            "status": "blocked",
+            "phase": "apply_change",
+            "slice_id": "slice-1",
+            "flow_type": "spec-flow",
+            "evidence": {"tasks_complete": False},
+            "blockers": [{
+                "reason": "roadmap_blocked",
+                "message": "fix roadmap state before resuming implementation",
+                "recommended_action": "back_to_implement",
+            }],
+        }
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="implement-agent",
+            slice_id="slice-1",
+        )
+
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [b["reason"] for b in data.get("blockers", [])]
+        self.assertEqual(data["status"], "blocked")
+        self.assertIn("run_is_blocked", reasons)
+
+    def test_roadmap_hook_block_round_trip_routes_back_to_roadmap_agent(self):
+        change_id = "route-hook-roundtrip"
+        item_id = "RM-RT-ROUNDTRIP"
+        self._make_openspec_change(change_id)
+        self._make_roadmap_item(item_id, "ready", openspec_change=change_id)
+        self._write_current_state({
+            "version": 1,
+            "run_id": f"2026-06-20-{change_id}",
+            "workflow": "sdlc-main",
+            "status": "running",
+            "current_phase": "apply_change",
+            "primary_subject": {"type": "spec_change", "id": change_id},
+            "context": {"change_id": change_id, "roadmap_item_id": item_id},
+            "phase_readiness": {
+                "phase": "apply_change",
+                "ready": True,
+                "missing_required_inputs": [],
+            },
+            "pending_hooks": ["roadmap_apply_start_if_ready"],
+            "completed_hooks": ["roadmap_status_ready_if_linked"],
+            "completed_phases": ["create_change", "apply_change"],
+            "gates": {},
+            "evidence": {
+                "roadmap_link": {
+                    "count": 1,
+                    "items": [{
+                        "item_id": item_id,
+                        "status": "ready",
+                        "file": f".ai/roadmap/areas/area1/items/{item_id}.md",
+                        "area": "area1",
+                    }],
+                },
+            },
+            "block": None,
+            "updated_at": "2026-06-20T00:00:00",
+            "flow_type": "spec-flow",
+        })
+
+        rc, out, _ = run_workflow(
+            self.tmp, "complete-hook",
+            hook="roadmap_apply_start_if_ready",
+        )
+        self.assertNotEqual(rc, 0)
+        blocked_state = json.loads(out)
+        self.assertEqual(blocked_state["block"]["type"], "domain_state_mismatch")
+        self.assertEqual(blocked_state["block"]["route_to_agent"], "roadmap-agent")
+
+        state = self._read_current_state()
+        self.assertEqual(state["block"]["route_to_agent"], "roadmap-agent")
+
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="roadmap-agent",
+        )
+
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "dispatched")
+
+    def test_before_dispatch_rejects_mismatched_agent_while_blocked(self):
+        self._create_run()
+        state = self._read_current_state()
+        state["current_phase"] = "apply_change"
+        state["status"] = "blocked"
+        state["block"] = {
+            "type": "worker_failed",
+            "message": "review requested implementation fixes",
+            "next_allowed": ["dispatch_implement_agent"],
+        }
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="test-agent",
+        )
+
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [b["reason"] for b in data.get("blockers", [])]
+        self.assertIn("run_is_blocked", reasons)
+
     def test_before_dispatch_finish_agent_skips_blocked_check(self):
         self._create_run()
         state = self._read_current_state()

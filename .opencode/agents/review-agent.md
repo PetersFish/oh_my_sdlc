@@ -178,7 +178,11 @@ Blocked example when review finds an executable issue that implement-agent must 
     "raw_log_paths": []
   },
   "blockers": [
-    {"reason": "review_blocked", "message": "Review found implementation issues that must be fixed."}
+    {
+      "reason": "review_blocked",
+      "message": "Review found implementation issues that must be fixed.",
+      "recommended_action": "back_to_implement"
+    }
   ],
   "recommended_next_action": "dispatch_implement_agent"
 }
@@ -201,7 +205,11 @@ Blocked example when review exposes requirement or design ambiguity that needs r
     "raw_log_paths": []
   },
   "blockers": [
-    {"reason": "review_blocked", "message": "Review found requirement ambiguity that must be resolved in plan/spec artifacts before implementation continues."}
+    {
+      "reason": "review_blocked",
+      "message": "Review found requirement ambiguity that must be resolved in plan/spec artifacts before implementation continues.",
+      "recommended_action": "back_to_plan"
+    }
   ],
   "recommended_next_action": "dispatch_plan_agent"
 }
@@ -211,9 +219,10 @@ Blocked example when review exposes requirement or design ambiguity that needs r
 
 When review finds issues:
 1. DO NOT modify code yourself.
-2. Return blocker with `recommended_action: back_to_implement`.
-3. Include specific findings in blocker message.
-4. dev-orchestrator routes back to implement-agent.
+2. For executable fixes, return blocker with `recommended_action: back_to_implement` and `recommended_next_action: dispatch_implement_agent`.
+3. For replanning, return blocker with `recommended_action: back_to_plan` and `recommended_next_action: dispatch_plan_agent`.
+4. Include specific findings in blocker message.
+5. dev-orchestrator routes back to implement-agent.
 
 ## Evidence Emission
 
