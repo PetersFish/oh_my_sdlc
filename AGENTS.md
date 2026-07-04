@@ -197,3 +197,35 @@ python3 scripts/setup_agents.py --target ./.cursor/agents --force
 # Verify template + activation consistency (exit 1 on drift)
 python3 scripts/setup_agents.py --target ./.opencode/agents --check
 ```
+
+## Plan Checkbox Sync Discipline
+
+When executing a superpowers plan (path matches `docs/superpowers/plans/*.md`),
+the executor MUST sync plan checkboxes to reflect actual progress.
+
+Applies to:
+- Primary session executing `executing-plans` or `subagent-driven-development`
+  (build mode — direct skill invocation)
+- Lifecycle subagents dispatched for lightweight-flow `apply_change`
+  (implement-agent reading `artifacts.primary_design_path`)
+
+Does NOT apply to spec-flow (`openspec/changes/.../proposal.md` has no
+checkboxes).
+
+Procedure:
+1. After completing each step (`- [ ] **Step N: ...**`), use the `edit` tool
+   to change that line to `- [x] **Step N: ...**`. Match the exact line by
+   Task heading context and Step text.
+2. Before declaring work complete — calling `finishing-a-development-branch`,
+   returning `tasks_complete: true`, or calling `complete-phase` — run:
+
+   ```bash
+   python3 scripts/check_plan_checkboxes.py <plan_path>
+   ```
+
+3. If exit 1: some steps were not checked. Go back and check them.
+   If exit 0: proceed to completion.
+
+This rule exists because superpowers skills update in-session TodoWrite state
+but never write checkbox state back to the plan file. The plan file is the
+durable record; without sync, a new session cannot tell what was completed.

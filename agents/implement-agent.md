@@ -122,6 +122,11 @@ Reading priority:
 Use `artifacts.primary_design_path` as the approved review entry, not as the
 only source of implementation requirements.
 
+Plan checkbox sync: when `artifacts.primary_design_path` matches
+`docs/superpowers/plans/*.md`, follow AGENTS.md `Plan Checkbox Sync Discipline`
+section — check off each step as it completes and run the validation script
+before returning `tasks_complete: true`.
+
 ## Output — Structured Evidence Envelope
 
 Return JSON:
