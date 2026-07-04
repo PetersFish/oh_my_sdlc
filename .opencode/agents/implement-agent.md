@@ -33,7 +33,7 @@ permission:
     "openspec instructions*": allow
     "openspec list*": allow
     "openspec apply*": allow
-model: opencode-go/deepseek-v4-pro
+model: ollama-cloud/deepseek-v4-pro
 variant: Default
 ---
 

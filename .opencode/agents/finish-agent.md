@@ -32,7 +32,7 @@ permission:
     "openspec status*": allow
     "openspec list*": allow
     "openspec archive*": allow
-model: opencode-go/mimo-v2.5-pro
+model: ollama-cloud/deepseek-v4-pro
 variant: Default
 ---
 

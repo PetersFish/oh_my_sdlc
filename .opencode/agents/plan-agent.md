@@ -27,7 +27,7 @@ permission:
     "openspec status*": allow
     "openspec instructions*": allow
     "openspec list*": allow
-model: ollama-cloud/glm-5.2
+model: openai/gpt-5.5
 variant: Default
 ---
 

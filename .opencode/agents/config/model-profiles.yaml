@@ -1,6 +1,12 @@
 # Canonical model profile template for SDLC agent subagents.
 # Each CLI target owns its own effective copy under <target>/agents/config/model-profiles.yaml.
 # Edit the target copy to override model choices per CLI environment.
+# variant与具体验例模型注释:
+# xhigh: ollama-cloud/glm-5.2, openai/gpt-5.5
+# high: openai/gpt-5.4
+# medium: ollama-cloud/deepseek-v4-pro, opencode-go/deepseek-v4-pro, opencode-go/mimo-v2.5-pro
+# low: ollama-cloud/deepseek-v4-flash, opencode-go/deepseek-v4-flash
+
 schema_version: 1
 
 defaults:
@@ -8,22 +14,22 @@ defaults:
 
 profiles:
   orchestrator:
-    model: ollama-cloud/glm-5.2
+    model: openai/gpt-5.4
     variant: Default
   planning:
-    model: ollama-cloud/glm-5.2
+    model: openai/gpt-5.5
     variant: Default
   implementation:
-    model: opencode-go/deepseek-v4-pro
+    model: ollama-cloud/deepseek-v4-pro
     variant: Default
   testing:
-    model: opencode-go/mimo-v2.5-pro
+    model: ollama-cloud/deepseek-v4-pro
     variant: Default
   review:
     model: ollama-cloud/glm-5.2
     variant: Default
   finish:
-    model: opencode-go/mimo-v2.5-pro
+    model: ollama-cloud/deepseek-v4-pro
     variant: Default
 
 agents:

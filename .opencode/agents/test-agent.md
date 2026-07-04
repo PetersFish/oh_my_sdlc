@@ -27,7 +27,7 @@ permission:
     "git status*": allow
     "git diff*": allow
     "git log*": allow
-model: opencode-go/mimo-v2.5-pro
+model: ollama-cloud/deepseek-v4-pro
 variant: Default
 ---
 
