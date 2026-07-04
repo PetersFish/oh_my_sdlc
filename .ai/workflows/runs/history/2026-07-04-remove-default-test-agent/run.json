@@ -1,0 +1,206 @@
+{
+  "version": 1,
+  "run_id": "2026-07-04-remove-default-test-agent",
+  "workflow": "sdlc-main",
+  "flow_type": "lightweight-flow",
+  "status": "done",
+  "current_phase": "done",
+  "primary_subject": {
+    "type": "spec_change",
+    "id": "remove-default-test-agent"
+  },
+  "context": {
+    "change_id": "remove-default-test-agent"
+  },
+  "phase_readiness": {
+    "phase": "done",
+    "ready": true,
+    "missing_required_inputs": []
+  },
+  "pending_hooks": [],
+  "completed_hooks": [
+    "roadmap_apply_start_if_ready",
+    "memory_sync",
+    "roadmap_done_if_relevant"
+  ],
+  "completed_phases": [
+    "apply_change",
+    "archive_change",
+    "post_archive_actions"
+  ],
+  "gates": {},
+  "evidence": {
+    "spec_status": {
+      "classification": "missing",
+      "source": null
+    },
+    "lightweight_flow_confirmed": true,
+    "agent_phase": {
+      "agent_phase": "archive_change",
+      "agent": "finish-agent",
+      "flow_type": "lightweight-flow",
+      "dispatched_at": "2026-07-04T21:06:17.925176"
+    },
+    "agent_result": {
+      "agent": "roadmap-agent",
+      "status": "success",
+      "phase": "apply_change",
+      "slice_id": "default",
+      "flow_type": "lightweight-flow",
+      "evidence": {
+        "roadmap_hook_executed": "roadmap_apply_start_if_ready",
+        "roadmap_item_id": null,
+        "item_status": "no_linked_item",
+        "transition_applied": false,
+        "detail": "No roadmap item linked to change 'remove-default-test-agent'. Lightweight-flow change does not require a roadmap item. Hook is a no-op."
+      },
+      "blockers": [],
+      "recommended_next_action": "complete_hooks",
+      "recorded_at": "2026-07-04T21:05:56.735037"
+    },
+    "agent_results": {
+      "default": {
+        "implement-agent": {
+          "agent": "implement-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "focused_tests": [
+              {
+                "command": "python3 -m pytest tests/test_workflow.py -v",
+                "result": "pass",
+                "detail": "245 passed, 25 subtests passed"
+              },
+              {
+                "command": "python3 -m pytest tests/test_wrapper_contracts.py -v",
+                "result": "pass",
+                "detail": "187 passed, 2 subtests passed"
+              },
+              {
+                "command": "python3 -m pytest tests/test_agent_config_lib.py tests/test_install_agents.py tests/test_activate_agents_config.py tests/test_setup_agents.py tests/test_project_bootstrap_skills.py tests/test_precommit_hook.py -v",
+                "result": "pass",
+                "detail": "119 passed"
+              },
+              {
+                "command": "python3 -m pytest tests/ -v",
+                "result": "pass",
+                "detail": "962 passed, 49 subtests passed"
+              }
+            ],
+            "commands_run": [
+              {
+                "command": "python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py --root . --check",
+                "result": "OK: all governed files in sync with canonical"
+              },
+              {
+                "command": "python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py --root . --distribute",
+                "result": "DISTRIBUTED: .opencode/.claude/.cursor workflow.py; OK: sdlc-main.yaml copies"
+              },
+              {
+                "command": "python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py --root . --check-distributed",
+                "result": "OK: all distributed copies match canonical"
+              },
+              {
+                "command": "python3 scripts/check_plan_checkboxes.py docs/superpowers/plans/2026-07-04-remove-default-test-agent.md",
+                "result": "ok: all checkboxes complete"
+              }
+            ],
+            "files_changed": [
+              ".ai/workflows/scripts/workflow.py",
+              "skills/sdlc-project-bootstrap/templates/workflow/workflow.py",
+              ".opencode/skills/sdlc-project-bootstrap/templates/workflow/workflow.py",
+              ".claude/skills/sdlc-project-bootstrap/templates/workflow/workflow.py",
+              ".cursor/skills/sdlc-project-bootstrap/templates/workflow/workflow.py",
+              "tests/test_workflow.py",
+              "tests/test_wrapper_contracts.py"
+            ],
+            "files_deleted": [],
+            "criteria_satisfied": [
+              "Active workflow runtime no longer routes through test-agent: removed test-agent/test_agent from VALID_AGENT_NAMES, CANONICAL_AGENT_NAMES, BLOCK_AGENT_ACTION_MAP (dispatch_test_agent), and PHASE_AGENT_MAP apply_change set",
+              "implement-agent success now recommends dispatch_review_agent instead of dispatch_test_agent",
+              "test-agent after-dispatch routing branch removed; apply_change routes implement-agent -> review-agent",
+              "Review acceptance verification-basis guard now requires prior successful implement-agent evidence (verification_passed/regression_passed/tdd_passed/focused_tests) instead of test-agent evidence",
+              "Canonical workflow template and all distributed copies (.opencode/.claude/.cursor) synced and verified clean of test-agent residue",
+              "Workflow tests rewritten to assert implement-agent -> review-agent routing and review acceptance based on implement-agent verification evidence",
+              "Stale test-agent tests removed (test_after_dispatch_test_agent_success_recommends_review, test_after_dispatch_preserves_handoff_history_for_failed_test_agent) or renamed/rewritten (test_after_dispatch_implement_agent_success_recommends_review, TestApplyChangeVerificationBasis using implement-agent evidence)",
+              "test_wrapper_contracts.py updated: dispatch_test_agent fixture values replaced, test-agent docstrings/test names updated to reflect new model; abstract testing wrapper module contract preserved as optional non-default verification",
+              "Plan checkbox sync validated: all checkboxes complete"
+            ],
+            "verification_summary": "All 962 tests pass (49 subtests) across the full test suite. Active workflow runtime (.ai/workflows/scripts/workflow.py), canonical template (skills/sdlc-project-bootstrap/templates/workflow/workflow.py), and all distributed template copies (.opencode/.claude/.cursor) are clean of test-agent residue. Template sync verified via --check, --distribute, and --check-distributed. Plan checkbox sync validated. Remaining test-agent references in .ai/workflows/ are only in run state/handoff artifacts for this very cleanup run and in historical archive snapshots (per spec: historical archives remain untouched).",
+            "implementation_summary": "Fixed the remaining executable lifecycle residue identified by review-agent. Removed test-agent from the active workflow runtime's agent name registries, dispatch action map, apply_change phase agent map, and after-dispatch routing logic. Changed implement-agent success to recommend dispatch_review_agent (no default test-agent intermediary). Rewrote the review acceptance verification-basis guard to require prior successful implement-agent verification evidence instead of test-agent evidence. Applied identical changes to the canonical workflow template and distributed to all three project-level distributed copies. Rewrote 12 workflow tests to assert the new executable behavior (implement-agent -> review-agent, review acceptance based on implement-agent evidence) and removed 2 stale test-agent-specific tests. Updated 6 wrapper-contract test fixture values and docstrings. The abstract testing wrapper module contract is preserved as optional non-default independent verification per spec.",
+            "errors": []
+          },
+          "blockers": [],
+          "recommended_next_action": "dispatch_review_agent",
+          "recorded_at": "2026-07-04T20:54:22.303466"
+        },
+        "review-agent": {
+          "agent": "review-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "review_decision": "approved",
+            "criteria_satisfied": [
+              "tasks_complete",
+              "tdd_passed",
+              "eval_passed_or_human_decision_recorded",
+              "implement_agent_verification_present",
+              "workflow_routes_implement_agent_to_review_agent",
+              "template_sync_passed",
+              "plan_checkboxes_complete"
+            ],
+            "focused_tests": [
+              "python3 -m pytest tests/test_workflow.py tests/test_wrapper_contracts.py -q: 432 passed, 27 subtests passed",
+              "python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py --root . --check: passed",
+              "python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py --root . --check-distributed: passed",
+              "python3 scripts/check_plan_checkboxes.py docs/superpowers/plans/2026-07-04-remove-default-test-agent.md: passed"
+            ],
+            "verification_summary": "Implement-agent evidence exists and shows success with full suite evidence: 962 tests passed, 49 subtests passed. Additional review verification passed for workflow tests, wrapper contract tests, template sync, distributed template sync, and plan checkbox completion.",
+            "review_summary": "Approved. The prior blocker is resolved: active workflow routing removes test-agent from apply_change, implement-agent success now routes directly to review-agent, and review acceptance requires prior successful implement-agent verification evidence. Tests exercise executable workflow behavior rather than only string presence. No concrete implementation blockers remain.",
+            "tasks_complete": true,
+            "tdd_passed": true,
+            "eval_passed_or_human_decision_recorded": true,
+            "errors": []
+          },
+          "blockers": [],
+          "recommended_next_action": "complete_phase",
+          "recorded_at": "2026-07-04T20:59:37.281437"
+        },
+        "roadmap-agent": {
+          "agent": "roadmap-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "roadmap_hook_executed": "roadmap_apply_start_if_ready",
+            "roadmap_item_id": null,
+            "item_status": "no_linked_item",
+            "transition_applied": false,
+            "detail": "No roadmap item linked to change 'remove-default-test-agent'. Lightweight-flow change does not require a roadmap item. Hook is a no-op."
+          },
+          "blockers": [],
+          "recommended_next_action": "complete_hooks",
+          "recorded_at": "2026-07-04T21:05:56.735037"
+        }
+      }
+    },
+    "tasks_complete": true,
+    "tdd_passed": true,
+    "eval_passed_or_human_decision_recorded": true,
+    "roadmap_hook_resolution": "no_linked_item",
+    "archive_path_exists": true,
+    "memory_sync_resolution": "synced",
+    "memory_sync_reason": "",
+    "roadmap_link": {
+      "count": 0,
+      "items": []
+    }
+  },
+  "block": null,
+  "updated_at": "2026-07-04T21:10:40.543340"
+}

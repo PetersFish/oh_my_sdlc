@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-06-29T12:35:24.814054Z",
+  "generated_at": "2026-07-04T13:10:09.416038Z",
   "entries": [
     {
       "id": "agents",
@@ -12,10 +12,11 @@
         "agents",
         "prompts",
         "sdlc",
-        "subagents"
+        "subagents",
+        "roadmap"
       ],
-      "updated_at": "2026-06-29T20:27:00Z",
-      "confidence": "medium",
+      "updated_at": "2026-07-02T11:20:00Z",
+      "confidence": "high",
       "status": "pending_commit",
       "parent_id": "root",
       "owned_paths": [
@@ -509,6 +510,17 @@
       "status": "synced"
     },
     {
+      "id": "pitfalls/after-dispatch-stale-phase-evidence",
+      "type": "pitfalls",
+      "path": "pitfalls/after-dispatch-stale-phase-evidence.md",
+      "title": "after-dispatch can preserve stale phase evidence or fake progress when worker contracts are inconsistent",
+      "summary": ">-",
+      "tags": [],
+      "updated_at": "2026-07-02T11:20:00Z",
+      "confidence": "high",
+      "status": "pending_commit"
+    },
+    {
       "id": "pitfalls/deepseek-v4-pro-grader-json-extraction-failure",
       "type": "pitfalls",
       "path": "pitfalls/deepseek-v4-pro-grader-json-extraction-failure.md",
@@ -694,6 +706,25 @@
       "updated_at": "2026-06-21T16:00:00Z",
       "confidence": "high",
       "status": "synced",
+      "parent_id": "root"
+    },
+    {
+      "id": "20260702-roadmap-hook-governance-hardening",
+      "type": "evolution",
+      "path": "evolution/20260702-roadmap-hook-governance-hardening.md",
+      "title": "2026-07-02 - Roadmap Hook Governance Hardening",
+      "summary": "Hardened workflow roadmap hook governance by adding roadmap-agent lifecycle routing, validating ready/apply-start hook state at complete-hook time, fixing after-dispatch stale evidence promotion, and enforcing template/distribution sync.",
+      "tags": [
+        "workflow",
+        "roadmap",
+        "agents",
+        "hooks",
+        "templates",
+        "governance"
+      ],
+      "updated_at": "2026-07-02T11:20:00Z",
+      "confidence": "high",
+      "status": "pending_commit",
       "parent_id": "root"
     }
   ],
