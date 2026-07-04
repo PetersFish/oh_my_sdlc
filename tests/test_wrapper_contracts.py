@@ -2279,5 +2279,31 @@ class TestDevOrchestratorWrapperDispatch(unittest.TestCase):
                           f"{target_dir}/agents/dev-orchestrator.md must mirror wrapper dispatch changes")
 
 
+class TestApplyChangeEvidencePromptContracts(unittest.TestCase):
+    def test_review_agent_success_example_includes_apply_phase_evidence(self):
+        body = (AGENTS_DIR / "review-agent.md").read_text(encoding="utf-8")
+
+        self.assertIn('"tasks_complete": true', body)
+        self.assertIn('"tdd_passed": true', body)
+        self.assertIn('"eval_passed_or_human_decision_recorded": true', body)
+        self.assertIn(
+            '"criteria_satisfied": "tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded"',
+            body,
+        )
+
+    def test_implement_agent_no_longer_marks_verification_handoff_as_blocked(self):
+        body = (AGENTS_DIR / "implement-agent.md").read_text(encoding="utf-8")
+
+        self.assertIn('"recommended_next_action": "dispatch_test_agent"', body)
+        self.assertNotIn('"reason": "verification_pending"', body)
+
+    def test_dev_orchestrator_documents_phase_requirements_for_review_dispatch(self):
+        body = (AGENTS_DIR / "dev-orchestrator.md").read_text(encoding="utf-8")
+
+        self.assertIn("evidence_keys", body)
+        self.assertIn("exit_criteria", body)
+        self.assertIn("eval_passed_or_human_decision_recorded", body)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

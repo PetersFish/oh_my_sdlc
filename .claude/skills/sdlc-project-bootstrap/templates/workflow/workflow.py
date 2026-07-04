@@ -1789,6 +1789,33 @@ def _missing_exit_criteria(agent_evidence: Dict[str, Any], phase_def: Dict[str, 
     return sorted(required - satisfied)
 
 
+def _build_phase_evidence_view(state, phase, slice_id, agent_evidence):
+    merged = {}
+    if phase == "apply_change":
+        prior = state.get("evidence", {}).get("agent_results", {}).get(slice_id, {})
+        for result in prior.values():
+            if result.get("status") == "success":
+                merged.update(result.get("evidence", {}))
+        merged.update(state.get("evidence", {}))
+        merged.update(agent_evidence)
+        return merged
+    merged.update(agent_evidence)
+    return merged
+
+
+def _write_handoff_history_copy(root, handoff_path):
+    abs_latest = _resolve_path(root, handoff_path)
+    if not os.path.exists(abs_latest):
+        return None
+    history_dir = os.path.join(os.path.dirname(abs_latest), "history")
+    os.makedirs(history_dir, exist_ok=True)
+    stem, ext = os.path.splitext(os.path.basename(abs_latest))
+    history_name = f"{stem}-{datetime.datetime.utcnow().strftime('%Y%m%dT%H%M%S%fZ')}{ext}"
+    history_path = os.path.join(history_dir, history_name)
+    shutil.copyfile(abs_latest, history_path)
+    return history_path
+
+
 def cmd_after_dispatch(root, args):
     state = load_run_state(root)
     if not state:
@@ -1854,20 +1881,29 @@ def cmd_after_dispatch(root, args):
     evidence["agent_result"] = latest_result
     evidence.setdefault("agent_results", {}).setdefault(slice_id, {})[canonical_agent] = latest_result
 
-    # 3.8c: Map agent evidence to phase-level evidence_keys.
-    # Only promote evidence from agents that succeeded without blockers.
-    # When promoted, overwrite stale prior values (e.g., a prior
-    # failed/blocked dispatch may have left a false value that a
-    # subsequent successful dispatch must correct).
     wf = load_workflow(root, state.get("workflow", "sdlc-main"))
+    phase_def = None
+    phase_evidence_view = dict(agent_evidence)
     if wf:
         phase_def = get_phase(wf, phase)
         if phase_def:
+            phase_evidence_view = _build_phase_evidence_view(state, phase, slice_id, agent_evidence)
             phase_evidence_keys = phase_def.get("evidence_keys", [])
             if agent_status == "success" and not agent_blockers:
                 for ek in phase_evidence_keys:
-                    if ek in agent_evidence:
-                        evidence[ek] = agent_evidence[ek]
+                    source = phase_evidence_view if phase == "apply_change" else agent_evidence
+                    if ek in source:
+                        evidence[ek] = source[ek]
+
+    if phase == "apply_change":
+        artifacts = agent_result.get("artifacts") or {}
+        handoff_path = artifacts.get("handoff_path")
+        if handoff_path:
+            history_path = _write_handoff_history_copy(root, handoff_path)
+            if history_path:
+                artifacts.setdefault("history_handoff_paths", []).append(
+                    os.path.relpath(history_path, root) if root else history_path
+                )
 
     # Synchronize canonical change_id from provider-created spec artifacts.
     # When a provider (e.g., OpenSpec) normalizes the change_id during artifact
@@ -1906,7 +1942,7 @@ def cmd_after_dispatch(root, args):
         recommended_next_action = agent_recommended or "complete_hooks"
 
     if wf and phase_def and agent_status == "success" and not agent_blockers and next_cmd == "complete-phase":
-        missing_evidence_keys = _missing_phase_evidence_keys(agent_evidence, phase_def)
+        missing_evidence_keys = _missing_phase_evidence_keys(phase_evidence_view, phase_def)
         if missing_evidence_keys:
             agent_blockers.append({
                 "reason": "missing_phase_evidence_keys",
@@ -1914,7 +1950,7 @@ def cmd_after_dispatch(root, args):
                 "recommended_action": "resolve_failure",
             })
         else:
-            missing_exit_criteria = _missing_exit_criteria(agent_evidence, phase_def)
+            missing_exit_criteria = _missing_exit_criteria(phase_evidence_view, phase_def)
             if missing_exit_criteria:
                 agent_blockers.append({
                     "reason": "missing_exit_criteria_satisfied",
@@ -1922,20 +1958,57 @@ def cmd_after_dispatch(root, args):
                     "recommended_action": "resolve_failure",
                 })
 
-    state["updated_at"] = _ts()
-    save_run_state(root, state)
+        if phase == "apply_change" and phase_evidence_view.get("eval_passed_or_human_decision_recorded"):
+            # Require prior successful test-agent evidence for verification basis.
+            # Review-agent must not self-claim verification_passed without test-agent proof.
+            prior_test_agent = state.get("evidence", {}).get("agent_results", {}).get(slice_id, {}).get("test-agent", {})
+            test_agent_verified = (
+                prior_test_agent.get("status") == "success"
+                and (
+                    prior_test_agent.get("evidence", {}).get("verification_passed")
+                    or prior_test_agent.get("evidence", {}).get("regression_passed")
+                )
+            )
+            if not test_agent_verified:
+                agent_blockers.append({
+                    "reason": "missing_verification_basis",
+                    "message": "apply_change acceptance cannot record eval_passed_or_human_decision_recorded without successful verification evidence",
+                    "recommended_action": "resolve_failure",
+                })
 
+        if phase == "apply_change" and agent_status == "success" and not agent_blockers:
+            for ek in phase_def.get("evidence_keys", []):
+                if ek in phase_evidence_view:
+                    evidence[ek] = phase_evidence_view[ek]
+
+    should_block = next_cmd == "block"
     if agent_blockers and next_cmd == "complete-phase":
         next_cmd = "block"
         recommended_next_action = "resolve_failure"
+        should_block = True
 
-    should_block = next_cmd == "block"
     if agent_blockers:
         block_message = "; ".join(b.get("reason", b.get("message", "")) for b in agent_blockers)
         next_allowed = ",".join(b.get("recommended_action", recommended_next_action or "resolve") for b in agent_blockers)
     else:
         block_message = f"agent_status={agent_status}" if should_block else ""
         next_allowed = recommended_next_action if should_block else ""
+
+    if should_block:
+        state["status"] = "blocked"
+        state["block"] = {
+            "type": "worker_failed",
+            "message": block_message,
+            "next_allowed": [item for item in next_allowed.split(",") if item],
+        }
+    else:
+        if state.get("block") and state.get("block", {}).get("type") == "worker_failed":
+            state["block"] = None
+        if state.get("status") == "blocked":
+            state["status"] = "running"
+
+    state["updated_at"] = _ts()
+    save_run_state(root, state)
 
     transition = {
         "agent": canonical_agent,
@@ -1949,7 +2022,7 @@ def cmd_after_dispatch(root, args):
         "recommended_next_action": recommended_next_action,
         "workflow_command": f"workflow.py {next_cmd}" if next_cmd else "",
         "workflow_args": {
-            "exit_criteria_satisfied": agent_evidence.get("criteria_satisfied", ""),
+            "exit_criteria_satisfied": phase_evidence_view.get("criteria_satisfied", agent_evidence.get("criteria_satisfied", "")),
             "block_type": "worker_failed" if should_block else "",
             "message": block_message,
             "next_allowed": next_allowed,

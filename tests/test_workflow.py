@@ -4853,6 +4853,266 @@ class TestDispatchHooks(FixtureBase):
         self.assertEqual(data["recommended_next_action"], "complete_phase")
         self.assertEqual(data["blockers"], [])
 
+    def test_after_dispatch_review_success_uses_agent_evidence_for_apply_change(self):
+        run_workflow(self.tmp, "start", subject_type="spec_change", subject_id="demo-change")
+        state = self._read_current_state()
+        state["current_phase"] = "apply_change"
+        state.setdefault("context", {})["change_id"] = "demo-change"
+        # Add prior successful test-agent evidence for verification basis
+        state.setdefault("evidence", {}).setdefault("agent_results", {}).setdefault("default", {})["test-agent"] = {
+            "status": "success",
+            "evidence": {
+                "verification_passed": True,
+                "regression_passed": True,
+                "tdd_passed": True,
+            },
+        }
+        self._write_current_state(state)
+
+        result = {
+            "status": "success",
+            "phase": "apply_change",
+            "slice_id": "default",
+            "flow_type": "lightweight-flow",
+            "evidence": {
+                "tasks_complete": True,
+                "tdd_passed": True,
+                "eval_passed_or_human_decision_recorded": True,
+                "criteria_satisfied": "tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded",
+                "review_complete": True,
+                "verification_passed": True,
+                "review_decision": "accepted",
+            },
+            "blockers": [],
+            "recommended_next_action": "complete_phase",
+        }
+
+        rc, out, _ = run_workflow(self.tmp, "after-dispatch", agent="review-agent", value=json.dumps(result))
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["workflow_command"], "workflow.py complete-phase")
+        self.assertEqual(data["recommended_next_action"], "complete_phase")
+
+    def test_after_dispatch_review_success_can_use_existing_apply_phase_evidence(self):
+        run_workflow(self.tmp, "start", subject_type="spec_change", subject_id="demo-change")
+        state = self._read_current_state()
+        state["current_phase"] = "apply_change"
+        state.setdefault("context", {})["change_id"] = "demo-change"
+        state.setdefault("evidence", {}).update({
+            "tasks_complete": True,
+            "tdd_passed": True,
+            "eval_passed_or_human_decision_recorded": True,
+        })
+        # Add prior successful test-agent evidence for verification basis
+        state.setdefault("evidence", {}).setdefault("agent_results", {}).setdefault("default", {})["test-agent"] = {
+            "status": "success",
+            "evidence": {
+                "verification_passed": True,
+                "regression_passed": True,
+                "tdd_passed": True,
+            },
+        }
+        self._write_current_state(state)
+
+        result = {
+            "status": "success",
+            "phase": "apply_change",
+            "slice_id": "default",
+            "flow_type": "lightweight-flow",
+            "evidence": {
+                "review_complete": True,
+                "verification_passed": True,
+                "review_decision": "accepted",
+                "criteria_satisfied": "tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded",
+            },
+            "blockers": [],
+            "recommended_next_action": "complete_phase",
+        }
+
+        rc, out, _ = run_workflow(self.tmp, "after-dispatch", agent="review-agent", value=json.dumps(result))
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["workflow_command"], "workflow.py complete-phase")
+
+    def test_after_dispatch_review_success_without_eval_key_still_blocks(self):
+        run_workflow(self.tmp, "start", subject_type="spec_change", subject_id="demo-change")
+        state = self._read_current_state()
+        state["current_phase"] = "apply_change"
+        state.setdefault("context", {})["change_id"] = "demo-change"
+        self._write_current_state(state)
+
+        result = {
+            "status": "success",
+            "phase": "apply_change",
+            "slice_id": "default",
+            "flow_type": "lightweight-flow",
+            "evidence": {
+                "tasks_complete": True,
+                "tdd_passed": True,
+                "criteria_satisfied": "tasks_complete,tdd_passed",
+                "review_complete": True,
+                "verification_passed": True,
+                "review_decision": "accepted",
+            },
+            "blockers": [],
+            "recommended_next_action": "complete_phase",
+        }
+
+        rc, out, _ = run_workflow(self.tmp, "after-dispatch", agent="review-agent", value=json.dumps(result))
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["blockers"][0]["reason"], "missing_phase_evidence_keys")
+
+    def test_after_dispatch_review_acceptance_can_finalize_eval_key_from_test_agent_success(self):
+        run_workflow(self.tmp, "start", subject_type="spec_change", subject_id="demo-change")
+        state = self._read_current_state()
+        state["current_phase"] = "apply_change"
+        state.setdefault("context", {})["change_id"] = "demo-change"
+        state.setdefault("evidence", {}).setdefault("agent_results", {}).setdefault("default", {})["test-agent"] = {
+            "status": "success",
+            "evidence": {
+                "verification_passed": True,
+                "regression_passed": True,
+                "tdd_passed": True,
+            },
+        }
+        self._write_current_state(state)
+
+        result = {
+            "status": "success",
+            "phase": "apply_change",
+            "slice_id": "default",
+            "flow_type": "lightweight-flow",
+            "evidence": {
+                "tasks_complete": True,
+                "tdd_passed": True,
+                "eval_passed_or_human_decision_recorded": True,
+                "criteria_satisfied": "tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded",
+                "review_complete": True,
+                "verification_passed": True,
+                "review_decision": "accepted",
+            },
+            "blockers": [],
+            "recommended_next_action": "complete_phase",
+        }
+
+        rc, out, _ = run_workflow(self.tmp, "after-dispatch", agent="review-agent", value=json.dumps(result))
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["workflow_command"], "workflow.py complete-phase")
+
+    def test_after_dispatch_review_acceptance_without_verification_basis_blocks(self):
+        run_workflow(self.tmp, "start", subject_type="spec_change", subject_id="demo-change")
+        state = self._read_current_state()
+        state["current_phase"] = "apply_change"
+        state.setdefault("context", {})["change_id"] = "demo-change"
+        self._write_current_state(state)
+
+        result = {
+            "status": "success",
+            "phase": "apply_change",
+            "slice_id": "default",
+            "flow_type": "lightweight-flow",
+            "evidence": {
+                "tasks_complete": True,
+                "tdd_passed": True,
+                "eval_passed_or_human_decision_recorded": True,
+                "criteria_satisfied": "tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded",
+                "review_complete": True,
+                "review_decision": "accepted",
+            },
+            "blockers": [],
+            "recommended_next_action": "complete_phase",
+        }
+
+        rc, out, _ = run_workflow(self.tmp, "after-dispatch", agent="review-agent", value=json.dumps(result))
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [blocker["reason"] for blocker in data["blockers"]]
+        self.assertIn("missing_verification_basis", reasons)
+
+    def test_after_dispatch_missing_apply_phase_evidence_persists_block_state(self):
+        run_workflow(self.tmp, "start", subject_type="spec_change", subject_id="demo-change")
+        state = self._read_current_state()
+        state["current_phase"] = "apply_change"
+        state.setdefault("context", {})["change_id"] = "demo-change"
+        self._write_current_state(state)
+
+        result = {
+            "status": "success",
+            "phase": "apply_change",
+            "slice_id": "default",
+            "flow_type": "lightweight-flow",
+            "evidence": {
+                "tasks_complete": True,
+                "tdd_passed": True,
+                "review_complete": True,
+                "verification_passed": True,
+                "review_decision": "accepted",
+                "criteria_satisfied": "tasks_complete,tdd_passed",
+            },
+            "blockers": [],
+            "recommended_next_action": "complete_phase",
+        }
+
+        rc, out, _ = run_workflow(self.tmp, "after-dispatch", agent="review-agent", value=json.dumps(result))
+
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["workflow_command"], "workflow.py block")
+        self.assertEqual(data["workflow_args"]["block_type"], "worker_failed")
+        self.assertIn("missing_phase_evidence_keys", data["workflow_args"]["message"])
+
+        persisted = self._read_current_state()
+        self.assertEqual(persisted["status"], "blocked")
+        self.assertEqual(persisted["block"]["type"], "worker_failed")
+        self.assertIn("missing_phase_evidence_keys", persisted["block"]["message"])
+
+    def test_after_dispatch_writes_review_handoff_history_copy(self):
+        run_workflow(self.tmp, "start", subject_type="spec_change", subject_id="demo-change")
+        state = self._read_current_state()
+        state["current_phase"] = "apply_change"
+        state.setdefault("context", {})["change_id"] = "demo-change"
+        self._write_current_state(state)
+
+        handoff_path = ".ai/workflows/runs/active/2026-07-03-demo-change/handoffs/default/review-agent.md"
+        latest_abs = os.path.join(self.tmp, handoff_path)
+        os.makedirs(os.path.dirname(latest_abs), exist_ok=True)
+        with open(latest_abs, "w", encoding="utf-8") as f:
+            f.write("# Review Agent Handoff\n\n## Status\n\nsuccess\n")
+
+        result = {
+            "status": "success",
+            "phase": "apply_change",
+            "slice_id": "default",
+            "flow_type": "lightweight-flow",
+            "evidence": {
+                "tasks_complete": True,
+                "tdd_passed": True,
+                "eval_passed_or_human_decision_recorded": True,
+                "criteria_satisfied": "tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded",
+                "review_complete": True,
+                "verification_passed": True,
+                "review_decision": "accepted",
+            },
+            "artifacts": {"handoff_path": handoff_path},
+            "blockers": [],
+            "recommended_next_action": "complete_phase",
+        }
+
+        rc, _, _ = run_workflow(self.tmp, "after-dispatch", agent="review-agent", value=json.dumps(result))
+        self.assertEqual(rc, 0)
+        self.assertTrue(os.path.exists(os.path.join(self.tmp, handoff_path)))
+
+        history_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "active", "2026-07-03-demo-change", "handoffs", "default", "history")
+        self.assertTrue(os.path.isdir(history_dir))
+        history_files = os.listdir(history_dir)
+        self.assertTrue(any(name.startswith("review-agent-") for name in history_files))
+
+        copied = os.path.join(history_dir, history_files[0])
+        with open(copied, encoding="utf-8") as f:
+            self.assertIn("# Review Agent Handoff", f.read())
+
     # --- stale evidence overwrite on successful re-dispatch ---
 
     def test_after_dispatch_overwrites_stale_evidence_from_prior_failed_dispatch(self):
@@ -5169,6 +5429,194 @@ class TestDispatchHooks(FixtureBase):
             data["recommended_next_action"], "dispatch_review_agent",
             "roadmap-agent success must not route to review-agent",
         )
+
+
+class TestApplyChangeHandoffHistory(FixtureBase):
+    """Tests for handoff history preservation for all apply_change worker results."""
+
+    def test_after_dispatch_preserves_handoff_history_for_failed_implement_agent(self):
+        """Failed implement-agent with handoff_path must preserve history copy."""
+        run_workflow(self.tmp, "start", subject_type="spec_change", subject_id="demo-change")
+        state = self._read_current_state()
+        state["current_phase"] = "apply_change"
+        state.setdefault("context", {})["change_id"] = "demo-change"
+        self._write_current_state(state)
+
+        run_id = state["run_id"]
+        handoff_path = f".ai/workflows/runs/active/{run_id}/handoffs/default/implement-agent.md"
+        latest_abs = os.path.join(self.tmp, handoff_path)
+        os.makedirs(os.path.dirname(latest_abs), exist_ok=True)
+        with open(latest_abs, "w", encoding="utf-8") as f:
+            f.write("# Implement Agent Handoff\n\n## Status\n\nfailed\n")
+
+        result = {
+            "status": "failed",
+            "phase": "apply_change",
+            "slice_id": "default",
+            "flow_type": "lightweight-flow",
+            "evidence": {},
+            "artifacts": {"handoff_path": handoff_path},
+            "blockers": [{"reason": "implementation_failed", "message": "error"}],
+            "recommended_next_action": "resolve_failure",
+        }
+
+        rc, _, _ = run_workflow(self.tmp, "after-dispatch", agent="implement-agent", value=json.dumps(result))
+        self.assertEqual(rc, 0)
+
+        history_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "active", run_id, "handoffs", "default", "history")
+        self.assertTrue(os.path.isdir(history_dir), "history directory must exist for failed implement-agent")
+        history_files = os.listdir(history_dir)
+        self.assertTrue(any(name.startswith("implement-agent-") for name in history_files),
+                        "history must contain implement-agent timestamped copy")
+
+    def test_after_dispatch_preserves_handoff_history_for_blocked_review_agent(self):
+        """Blocked review-agent with handoff_path must preserve history copy."""
+        run_workflow(self.tmp, "start", subject_type="spec_change", subject_id="demo-change")
+        state = self._read_current_state()
+        state["current_phase"] = "apply_change"
+        state.setdefault("context", {})["change_id"] = "demo-change"
+        self._write_current_state(state)
+
+        run_id = state["run_id"]
+        handoff_path = f".ai/workflows/runs/active/{run_id}/handoffs/default/review-agent.md"
+        latest_abs = os.path.join(self.tmp, handoff_path)
+        os.makedirs(os.path.dirname(latest_abs), exist_ok=True)
+        with open(latest_abs, "w", encoding="utf-8") as f:
+            f.write("# Review Agent Handoff\n\n## Status\n\nblocked\n")
+
+        result = {
+            "status": "blocked",
+            "phase": "apply_change",
+            "slice_id": "default",
+            "flow_type": "lightweight-flow",
+            "evidence": {},
+            "artifacts": {"handoff_path": handoff_path},
+            "blockers": [{"reason": "missing_verification_basis", "message": "no test-agent evidence"}],
+            "recommended_next_action": "resolve_failure",
+        }
+
+        rc, _, _ = run_workflow(self.tmp, "after-dispatch", agent="review-agent", value=json.dumps(result))
+        self.assertEqual(rc, 0)
+
+        history_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "active", run_id, "handoffs", "default", "history")
+        self.assertTrue(os.path.isdir(history_dir), "history directory must exist for blocked review-agent")
+        history_files = os.listdir(history_dir)
+        self.assertTrue(any(name.startswith("review-agent-") for name in history_files),
+                        "history must contain review-agent timestamped copy")
+
+    def test_after_dispatch_preserves_handoff_history_for_failed_test_agent(self):
+        """Failed test-agent with handoff_path must preserve history copy."""
+        run_workflow(self.tmp, "start", subject_type="spec_change", subject_id="demo-change")
+        state = self._read_current_state()
+        state["current_phase"] = "apply_change"
+        state.setdefault("context", {})["change_id"] = "demo-change"
+        self._write_current_state(state)
+
+        run_id = state["run_id"]
+        handoff_path = f".ai/workflows/runs/active/{run_id}/handoffs/default/test-agent.md"
+        latest_abs = os.path.join(self.tmp, handoff_path)
+        os.makedirs(os.path.dirname(latest_abs), exist_ok=True)
+        with open(latest_abs, "w", encoding="utf-8") as f:
+            f.write("# Test Agent Handoff\n\n## Status\n\nfailed\n")
+
+        result = {
+            "status": "failed",
+            "phase": "apply_change",
+            "slice_id": "default",
+            "flow_type": "lightweight-flow",
+            "evidence": {},
+            "artifacts": {"handoff_path": handoff_path},
+            "blockers": [{"reason": "verification_failed", "message": "tests failed"}],
+            "recommended_next_action": "resolve_failure",
+        }
+
+        rc, _, _ = run_workflow(self.tmp, "after-dispatch", agent="test-agent", value=json.dumps(result))
+        self.assertEqual(rc, 0)
+
+        history_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "active", run_id, "handoffs", "default", "history")
+        self.assertTrue(os.path.isdir(history_dir), "history directory must exist for failed test-agent")
+        history_files = os.listdir(history_dir)
+        self.assertTrue(any(name.startswith("test-agent-") for name in history_files),
+                        "history must contain test-agent timestamped copy")
+
+
+class TestApplyChangeVerificationBasis(FixtureBase):
+    """Tests for verification-basis guard requiring prior test-agent evidence."""
+
+    def test_after_dispatch_review_claiming_verification_without_test_agent_blocks(self):
+        """Review-agent claiming verification_passed without prior test-agent evidence must block."""
+        run_workflow(self.tmp, "start", subject_type="spec_change", subject_id="demo-change")
+        state = self._read_current_state()
+        state["current_phase"] = "apply_change"
+        state.setdefault("context", {})["change_id"] = "demo-change"
+        # No prior test-agent result in agent_results
+        self._write_current_state(state)
+
+        result = {
+            "status": "success",
+            "phase": "apply_change",
+            "slice_id": "default",
+            "flow_type": "lightweight-flow",
+            "evidence": {
+                "tasks_complete": True,
+                "tdd_passed": True,
+                "eval_passed_or_human_decision_recorded": True,
+                "criteria_satisfied": "tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded",
+                "review_complete": True,
+                "verification_passed": True,
+                "review_decision": "accepted",
+            },
+            "blockers": [],
+            "recommended_next_action": "complete_phase",
+        }
+
+        rc, out, _ = run_workflow(self.tmp, "after-dispatch", agent="review-agent", value=json.dumps(result))
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [blocker["reason"] for blocker in data["blockers"]]
+        self.assertIn("missing_verification_basis", reasons,
+                       "review-agent must not self-claim verification_passed without prior test-agent evidence")
+
+    def test_after_dispatch_review_with_failed_test_agent_still_blocks(self):
+        """Review-agent with failed test-agent result must still block on verification basis."""
+        run_workflow(self.tmp, "start", subject_type="spec_change", subject_id="demo-change")
+        state = self._read_current_state()
+        state["current_phase"] = "apply_change"
+        state.setdefault("context", {})["change_id"] = "demo-change"
+        # Add a FAILED test-agent result
+        state.setdefault("evidence", {}).setdefault("agent_results", {}).setdefault("default", {})["test-agent"] = {
+            "status": "failed",
+            "evidence": {
+                "verification_passed": False,
+                "regression_passed": False,
+            },
+        }
+        self._write_current_state(state)
+
+        result = {
+            "status": "success",
+            "phase": "apply_change",
+            "slice_id": "default",
+            "flow_type": "lightweight-flow",
+            "evidence": {
+                "tasks_complete": True,
+                "tdd_passed": True,
+                "eval_passed_or_human_decision_recorded": True,
+                "criteria_satisfied": "tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded",
+                "review_complete": True,
+                "verification_passed": True,
+                "review_decision": "accepted",
+            },
+            "blockers": [],
+            "recommended_next_action": "complete_phase",
+        }
+
+        rc, out, _ = run_workflow(self.tmp, "after-dispatch", agent="review-agent", value=json.dumps(result))
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [blocker["reason"] for blocker in data["blockers"]]
+        self.assertIn("missing_verification_basis", reasons,
+                       "failed test-agent must not satisfy verification basis")
 
 
 def _import_workflow():

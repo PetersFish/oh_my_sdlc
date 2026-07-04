@@ -434,6 +434,16 @@ plan-agent → implement-agent → test-agent → review-agent → finish-agent
 5. After review-agent success, complete phase and advance.
 6. Dispatch finish-agent for archive_change and post_archive_actions.
 
+When dispatching `review-agent` for `apply_change`, include:
+- current phase `evidence_keys`
+- current phase `exit_criteria`
+- latest successful test-agent verification summary
+
+The review-agent must return an acceptance envelope that satisfies the
+`apply_change` phase contract, including
+`eval_passed_or_human_decision_recorded` when final acceptance is based on
+successful verification.
+
 ## Plan Approval Gate
 
 For `create_change`, plan-agent success does NOT automatically mean phase completion.
