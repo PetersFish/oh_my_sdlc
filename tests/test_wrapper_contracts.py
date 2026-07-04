@@ -129,14 +129,14 @@ class TestEvidenceEnvelope(unittest.TestCase):
 
     def test_envelope_to_json_serializable(self):
         envelope = make_evidence_envelope(
-            agent="test-agent",
+            agent="custom-verifier",
             status="failed",
             phase="apply_change",
             slice_id="slice-2",
         )
         raw = envelope.to_json()
         parsed = json.loads(raw)
-        self.assertEqual(parsed["agent"], "test-agent")
+        self.assertEqual(parsed["agent"], "custom-verifier")
         self.assertEqual(parsed["status"], "failed")
 
     def test_envelope_validate_detects_allowed_statuses(self):
@@ -441,7 +441,7 @@ class TestDevOrchestratorStartWithPlanHandoff(unittest.TestCase):
         self.assertIn("handoff Markdown", content)
 
     def test_apply_agents_include_learning_sections(self):
-        for filename in ("implement-agent.md", "test-agent.md", "review-agent.md"):
+        for filename in ("implement-agent.md", "review-agent.md"):
             content = (AGENTS_DIR / filename).read_text(encoding="utf-8")
             with self.subTest(filename=filename):
                 self.assertIn("Issues", content)
@@ -567,7 +567,7 @@ class TestPhaseAgentMapping(unittest.TestCase):
         self.assertFalse(is_agent_allowed_in_phase("plan-agent", "archive_change"))
 
     def test_implement_test_review_in_apply_change(self):
-        for agent in ("implement-agent", "test-agent", "review-agent"):
+        for agent in ("implement-agent", "review-agent"):
             self.assertTrue(
                 is_agent_allowed_in_phase(agent, "apply_change"),
                 f"{agent} should be allowed in apply_change",
@@ -586,7 +586,6 @@ class TestPhaseAgentMapping(unittest.TestCase):
     def test_canonical_agent_name_accepts_dash_and_underscore(self):
         for input_name in ("plan-agent", "plan_agent",
                            "implement-agent", "implement_agent",
-                           "test-agent", "test_agent",
                            "review-agent", "review_agent",
                            "finish-agent", "finish_agent",
                            "roadmap-agent", "roadmap_agent"):
@@ -788,26 +787,6 @@ class TestNormalizedResultContract(unittest.TestCase):
             self.assertIn(key, d, f"Missing gate field: {key}")
 
 
-class TestSdlcOrchestratorManualTrigger(unittest.TestCase):
-    """Task 1.6: sdlc-orchestrator is manual-trigger only."""
-
-    def test_frontmatter_description_rejects_auto_trigger_phrases(self):
-        skill_dir = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)),
-            "..", "skills", "sdlc-orchestrator",
-        )
-        skill_path = os.path.join(skill_dir, "SKILL.md")
-        if not os.path.exists(skill_path):
-            self.skipTest("sdlc-orchestrator SKILL.md not found")
-
-        with open(skill_path) as f:
-            content = f.read()
-
-        self.assertIn("manual invocation only", content.lower())
-        self.assertIn(
-            'Do NOT auto-trigger on "new development task"', content)
-
-
 class TestRoadmapAgentReviewContract(unittest.TestCase):
     def test_roadmap_agent_documents_review_contract(self):
         body = (AGENTS_DIR / "roadmap-agent.md").read_text(encoding="utf-8")
@@ -829,7 +808,7 @@ class TestRoadmapAgentReviewContract(unittest.TestCase):
 
 AGENT_NAMES = [
     "dev-orchestrator", "plan-agent", "implement-agent",
-    "test-agent", "review-agent", "finish-agent", "roadmap-agent",
+    "review-agent", "finish-agent", "roadmap-agent",
 ]
 
 AGENT_DIRS = [".opencode", ".claude", ".cursor"]
@@ -840,7 +819,6 @@ REQUIRED_SKILLS_MAP = {
     "dev-orchestrator": ["sdlc-repository-memory-load", "brainstorming"],
     "plan-agent": ["brainstorming", "writing-plans"],
     "implement-agent": ["test-driven-development", "systematic-debugging", "executing-plans", "using-git-worktrees", "implementation-contract-discipline"],
-    "test-agent": ["systematic-debugging", "behavioral-test-design", "sdlc-evalops"],
     "review-agent": ["requesting-code-review", "receiving-code-review", "verification-before-completion"],
     "finish-agent": ["finishing-a-development-branch", "sdlc-openspec-memory-sync", "sdlc-repository-memory-sync", "sdlc-roadmap"],
     "roadmap-agent": ["sdlc-roadmap", "sdlc-repository-memory-load"],
@@ -957,10 +935,6 @@ class TestAgentFrontmatter(unittest.TestCase):
 
     def test_implement_agent_edit_is_allow(self):
         fm = _read_agent_frontmatter(".opencode", "implement-agent")
-        self.assertEqual(fm["permission"]["edit"], "allow")
-
-    def test_test_agent_edit_is_allow(self):
-        fm = _read_agent_frontmatter(".opencode", "test-agent")
         self.assertEqual(fm["permission"]["edit"], "allow")
 
     def test_review_agent_edit_is_allow(self):
@@ -1198,7 +1172,7 @@ class TestAgentPromptBody(unittest.TestCase):
                          f"{name}: missing raw log reference")
 
     def test_worker_agents_write_active_run_artifacts(self):
-        for name in ("plan-agent", "implement-agent", "test-agent", "review-agent", "finish-agent"):
+        for name in ("plan-agent", "implement-agent", "review-agent", "finish-agent"):
             body = self._read_agent_body(name)
             self.assertIn(".ai/workflows/runs/active/<run_id>/", body,
                           f"{name}: missing active run artifact path")
@@ -1301,20 +1275,6 @@ class TestAgentPromptBody(unittest.TestCase):
         self.assertIn("dispatch_implement_agent", body)
         self.assertIn("dispatch_plan_agent", body)
 
-    def test_test_agent_mentions_overfit(self):
-        body = self._read_agent_body("test-agent")
-        self.assertIn("overfit", body)
-
-    def test_test_agent_mentions_verification_sequence(self):
-        body = self._read_agent_body("test-agent")
-        self.assertIn("focused test", body.lower())
-        self.assertIn("regression", body.lower())
-
-    def test_test_agent_routing_table_uses_documented_failure_reasons_only(self):
-        body = self._read_agent_body("test-agent")
-        self.assertIn("verification_failure, overfit_detected", body)
-        self.assertNotIn("regression_failure", body)
-
     def test_each_agent_mentions_required_skills(self):
         for name in AGENT_NAMES:
             body = self._read_agent_body(name)
@@ -1387,7 +1347,7 @@ class TestAgentPromptBody(unittest.TestCase):
         self.assertNotIn("confirms green", body)
 
     def test_non_implementation_agents_limit_writes_to_workflow_artifacts(self):
-        for name in ("plan-agent", "test-agent", "review-agent", "finish-agent"):
+        for name in ("plan-agent", "review-agent", "finish-agent"):
             body = self._read_agent_body(name).lower()
             self.assertIn("workflow artifact", body, f"{name}: missing workflow artifact boundary")
             self.assertIn("must not modify source", body, f"{name}: missing source-edit prohibition")
@@ -1432,40 +1392,6 @@ class TestExecutableRoutingTests(unittest.TestCase):
     def test_dev_orchestrator_mentions_parallel_dispatch_guard(self):
         body = self._read_agent_body("dev-orchestrator")
         self.assertIn("parallel", body.lower())
-
-    # 1.7b: test-agent full verification sequence
-    def test_test_agent_mentions_rerun_focused_tests_first(self):
-        body = self._read_agent_body("test-agent")
-        self.assertIn("rerun", body.lower())
-
-    def test_test_agent_mentions_full_verification_sequence(self):
-        body = self._read_agent_body("test-agent")
-        self.assertIn("rerun focused tests", body.lower())
-        self.assertIn("overfit", body.lower())
-        self.assertIn("regression", body.lower())
-        self.assertIn("integration", body.lower())
-
-    def test_test_agent_mentions_pass_fail_evidence_emission(self):
-        body = self._read_agent_body("test-agent")
-        self.assertIn("passing", body.lower())
-        self.assertIn("evidence", body.lower())
-
-    # 1.8b: test-agent preserves slice_id, escalates to plan-agent on ambiguity
-    def test_test_agent_mentions_slice_id_preservation(self):
-        body = self._read_agent_body("test-agent")
-        self.assertIn("slice_id", body.lower())
-
-    def test_test_agent_mentions_plan_agent_escalation(self):
-        body = self._read_agent_body("test-agent")
-        self.assertIn("plan-agent", body.lower())
-        self.assertIn("ambiguity", body.lower())
-
-    def test_test_agent_mentions_implement_agent_as_default_route(self):
-        body = self._read_agent_body("test-agent")
-        self.assertIn("implement-agent", body.lower())
-        idx = body.lower().find("implement-agent")
-        ambiguity_idx = body.lower().find("plan-agent")
-        self.assertGreater(ambiguity_idx, -1)
 
     # 1.12b: raw log write policy test
     def test_raw_logs_stored_under_workflow_run_path(self):
@@ -2294,7 +2220,7 @@ class TestApplyChangeEvidencePromptContracts(unittest.TestCase):
     def test_implement_agent_no_longer_marks_verification_handoff_as_blocked(self):
         body = (AGENTS_DIR / "implement-agent.md").read_text(encoding="utf-8")
 
-        self.assertIn('"recommended_next_action": "dispatch_test_agent"', body)
+        self.assertIn('"recommended_next_action": "dispatch_review_agent"', body)
         self.assertNotIn('"reason": "verification_pending"', body)
 
     def test_dev_orchestrator_documents_phase_requirements_for_review_dispatch(self):

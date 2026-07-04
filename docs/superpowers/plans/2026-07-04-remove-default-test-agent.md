@@ -64,7 +64,7 @@ Historical archive/snapshot files should not be modified unless an active templa
 **Files:**
 - Read-only inventory first.
 
-- [ ] **Step 1: Search exact `test-agent` references**
+- [x] **Step 1: Search exact `test-agent` references**
 
 Run:
 
@@ -82,7 +82,7 @@ Expected:
   - `historical-archive` — leave unchanged.
   - `test-fixture` — update only if it asserts default lifecycle behavior.
 
-- [ ] **Step 2: Search spaced phrase references**
+- [x] **Step 2: Search spaced phrase references**
 
 Run:
 
@@ -95,7 +95,7 @@ Expected:
 - Identify references that do not use the exact token `test-agent`.
 - Classify each active reference using the same categories as Step 1.
 
-- [ ] **Step 3: Search default lifecycle role lists**
+- [x] **Step 3: Search default lifecycle role lists**
 
 Run:
 
@@ -119,7 +119,7 @@ Expected:
 - `.cursor/agents/test-agent.md`
 - Agent install/config metadata discovered by search.
 
-- [ ] **Step 1: Confirm these are active runtime files, not examples**
+- [x] **Step 1: Confirm these are active runtime files, not examples**
 
 Run:
 
@@ -131,7 +131,7 @@ Expected:
 
 - The files are active agent specs and should be removed from the runtime path.
 
-- [ ] **Step 2: Search config metadata for `test-agent` registrations**
+- [x] **Step 2: Search config metadata for `test-agent` registrations**
 
 Run:
 
@@ -143,7 +143,7 @@ Expected:
 
 - Remove active registrations or update test expectations that still install `test-agent` by default.
 
-- [ ] **Step 3: Delete active test-agent files**
+- [x] **Step 3: Delete active test-agent files**
 
 Remove:
 
@@ -169,7 +169,7 @@ Expected:
 - `agents/review-agent.md` and distributed copies.
 - `agents/finish-agent.md` and distributed copies.
 
-- [ ] **Step 1: Update dev-orchestrator default role list and boundaries**
+- [x] **Step 1: Update dev-orchestrator default role list and boundaries**
 
 In `agents/dev-orchestrator.md` and distributed copies:
 
@@ -181,7 +181,7 @@ Expected:
 
 - `dev-orchestrator` routes normal `apply_change` work to `implement-agent` and then `review-agent`, not `test-agent`.
 
-- [ ] **Step 2: Update implement-agent verification ownership**
+- [x] **Step 2: Update implement-agent verification ownership**
 
 In `agents/implement-agent.md` and distributed copies, ensure it explicitly owns:
 
@@ -195,7 +195,7 @@ Expected:
 
 - `implement-agent` does not hand normal full regression to `test-agent`.
 
-- [ ] **Step 3: Update review-agent quality gate ownership**
+- [x] **Step 3: Update review-agent quality gate ownership**
 
 In `agents/review-agent.md` and distributed copies, ensure it explicitly owns:
 
@@ -208,7 +208,7 @@ Expected:
 
 - `review-agent` does not become a broad debugging or full-regression executor.
 
-- [ ] **Step 4: Update finish-agent preconditions**
+- [x] **Step 4: Update finish-agent preconditions**
 
 In `agents/finish-agent.md` and distributed copies:
 
@@ -231,7 +231,7 @@ Expected:
 - `.cursor/agents/finish-agent.md`
 - Agent config tests if command allowlists are asserted.
 
-- [ ] **Step 1: Add required bash permissions**
+- [x] **Step 1: Add required bash permissions**
 
 Add allowlist entries needed by the finishing procedure:
 
@@ -248,7 +248,7 @@ Expected:
 
 - `finish-agent` can create and push closure commits.
 
-- [ ] **Step 2: Insert pre-hook commit procedure before memory/roadmap hooks**
+- [x] **Step 2: Insert pre-hook commit procedure before memory/roadmap hooks**
 
 Before resolving `memory_sync` or `roadmap_done_if_relevant`, `finish-agent` must:
 
@@ -261,7 +261,7 @@ Expected:
 
 - Memory sync records a stable commit id representing the reviewed implementation/archive state before sync-generated files are added.
 
-- [ ] **Step 3: Resolve hooks and complete workflow cleanup before the post-cleanup dirty-tree check**
+- [x] **Step 3: Resolve hooks and complete workflow cleanup before the post-cleanup dirty-tree check**
 
 Run hook work and workflow cleanup in this order:
 
@@ -275,7 +275,7 @@ Expected:
 - Hook outputs can reference the pre-hook commit id.
 - Workflow cleanup has run before checking whether generated files remain.
 
-- [ ] **Step 4: Add post-cleanup dirty-tree commit procedure**
+- [x] **Step 4: Add post-cleanup dirty-tree commit procedure**
 
 After all hook resolution, sync scripts, and workflow cleanup through `workflow.py` complete, `finish-agent` must:
 
@@ -290,7 +290,7 @@ Expected:
 - No generated memory/roadmap/workflow files remain uncommitted after finish-agent completes.
 - The second commit happens after workflow cleanup, not before it.
 
-- [ ] **Step 5: Extend finish-agent evidence schema**
+- [x] **Step 5: Extend finish-agent evidence schema**
 
 Add evidence fields:
 
@@ -316,7 +316,7 @@ Expected:
 **Files:**
 - `.ai/roadmap/areas/workflow.sdlc-orchestrator/items/RM-ORCH-007-workflow-wrapper-abstraction.md`
 
-- [ ] **Step 1: Update completion notes if they still mention landed `test-agent` split**
+- [x] **Step 1: Update completion notes if they still mention landed `test-agent` split**
 
 Look for wording equivalent to:
 
@@ -334,7 +334,7 @@ Expected:
 
 - The active roadmap item should not simultaneously say `test-agent` is non-default and that a `test-agent` split was landed.
 
-- [ ] **Step 2: Verify active roadmap no longer contains default `test-agent` wording**
+- [x] **Step 2: Verify active roadmap no longer contains default `test-agent` wording**
 
 Run:
 
@@ -360,7 +360,7 @@ Expected:
 - `.ai/evals/manifest.yaml`
 - tests and scripts that reference the legacy skill.
 
-- [ ] **Step 1: Confirm dev-orchestrator does not depend on the legacy skill**
+- [x] **Step 1: Confirm dev-orchestrator does not depend on the legacy skill**
 
 Run:
 
@@ -373,7 +373,7 @@ Expected:
 - No required skill, allowed skill, or dispatch dependency on `sdlc-orchestrator`.
 - References in historical prose or comments must be inspected manually before deletion.
 
-- [ ] **Step 2: Confirm workflow definitions use dev-orchestrator**
+- [x] **Step 2: Confirm workflow definitions use dev-orchestrator**
 
 Run:
 
@@ -385,7 +385,7 @@ Expected:
 
 - Active workflow definitions and bootstrap workflow templates use `dev-orchestrator`, not `sdlc-orchestrator`.
 
-- [ ] **Step 3: Audit installation, activation, and tests**
+- [x] **Step 3: Audit installation, activation, and tests**
 
 Run:
 
@@ -398,7 +398,7 @@ Expected:
 - Active references are either migrated, deleted, or documented as blockers.
 - Archive references are ignored unless they are copied into active templates.
 
-- [ ] **Step 4: Delete legacy skill directories if no blockers remain**
+- [x] **Step 4: Delete legacy skill directories if no blockers remain**
 
 Delete:
 
@@ -413,7 +413,7 @@ Expected:
 
 - Legacy skill is no longer installed or distributed as an active skill.
 
-- [ ] **Step 5: Retire legacy EvalOps target**
+- [x] **Step 5: Retire legacy EvalOps target**
 
 If no active eval pipeline still requires `skill.sdlc-orchestrator`, either delete it or migrate useful cases to `agent.dev-orchestrator`:
 
@@ -439,7 +439,7 @@ Expected:
 - `.cursor/skills/sdlc-project-bootstrap/templates/AGENTS.md`
 - Workflow templates under `skills/sdlc-project-bootstrap/templates/workflow/` and distributed copies.
 
-- [ ] **Step 1: Inspect generated behavior templates**
+- [x] **Step 1: Inspect generated behavior templates**
 
 Run:
 
@@ -452,7 +452,7 @@ Expected:
 - Templates must not reinstall default `test-agent` or legacy `sdlc-orchestrator`.
 - Templates should describe implement-agent/review-agent verification ownership only if they already describe subagent lifecycle behavior.
 
-- [ ] **Step 2: Run or update template sync only after inspecting convention**
+- [x] **Step 2: Run or update template sync only after inspecting convention**
 
 Run read-only checks first:
 
@@ -474,7 +474,7 @@ Expected:
 - `.ai/evals/targets/`
 - `.ai/evals/manifest.yaml`
 
-- [ ] **Step 1: Search tests for default `test-agent` assumptions**
+- [x] **Step 1: Search tests for default `test-agent` assumptions**
 
 Run:
 
@@ -488,7 +488,7 @@ Expected:
 - If tests assert installed skill lists, update them to remove legacy `sdlc-orchestrator` when deletion is performed.
 - If eval cases use `test-agent` historically but do not assert current default behavior, leave them unchanged only when they are under archive/history paths.
 
-- [ ] **Step 2: Add regression checks only if there is deterministic code behavior**
+- [x] **Step 2: Add regression checks only if there is deterministic code behavior**
 
 Add pytest only if implementation modifies:
 
@@ -508,7 +508,7 @@ Expected:
 
 ## Task 9: Verification Commands
 
-- [ ] **Step 1: Verify no active default `test-agent` role remains**
+- [x] **Step 1: Verify no active default `test-agent` role remains**
 
 Run:
 
@@ -566,7 +566,7 @@ Expected:
 
 - Command exits 0.
 
-- [ ] **Step 2: Verify finish-agent commit checkpoints**
+- [x] **Step 2: Verify finish-agent commit checkpoints**
 
 Run:
 
@@ -609,7 +609,7 @@ Expected:
 - Command exits 0.
 - Manual review confirms the second commit/push is after `workflow.py` cleanup, not before it.
 
-- [ ] **Step 3: Verify legacy `sdlc-orchestrator` removal or blocker**
+- [x] **Step 3: Verify legacy `sdlc-orchestrator` removal or blocker**
 
 Run:
 
@@ -637,7 +637,7 @@ Expected:
 
 - Either no legacy directories exist, or the final summary documents an exact active dependency blocker.
 
-- [ ] **Step 4: Run relevant deterministic tests**
+- [x] **Step 4: Run relevant deterministic tests**
 
 Run targeted tests:
 
@@ -662,7 +662,7 @@ Expected:
 - Targeted tests pass.
 - If full suite is not run, final summary must state that explicitly.
 
-- [ ] **Step 5: Confirm final diff is scoped**
+- [x] **Step 5: Confirm final diff is scoped**
 
 Run:
 
@@ -679,7 +679,7 @@ Expected:
 
 ## Task 10: Review Handoff
 
-- [ ] **Step 1: Produce review summary**
+- [x] **Step 1: Produce review summary**
 
 The final implementation summary must include:
 
@@ -694,7 +694,7 @@ The final implementation summary must include:
 - Whether historical/archive references were intentionally left untouched.
 - Any follow-up decisions needed from the reviewer.
 
-- [ ] **Step 2: Request code/doc review**
+- [x] **Step 2: Request code/doc review**
 
 Use Superpowers `requesting-code-review` after the cleanup, with emphasis on:
 
@@ -709,16 +709,16 @@ Use Superpowers `requesting-code-review` after the cleanup, with emphasis on:
 
 ## Done Criteria
 
-- [ ] The spec in `docs/superpowers/specs/2026-07-04-remove-default-test-agent.md` has been reviewed.
-- [ ] Active default lifecycle docs no longer include `test-agent`.
-- [ ] Active `test-agent` runtime files are deleted or explicitly disabled as non-default examples.
-- [ ] Normal verification ownership is assigned to `implement-agent`.
-- [ ] Test quality and overfitting review ownership is assigned to `review-agent`.
-- [ ] `finish-agent` performs a pre-hook commit/push checkpoint before memory and roadmap hooks.
-- [ ] `finish-agent` completes workflow cleanup through `workflow.py`, then performs a post-cleanup dirty-tree check and commits/pushes generated files if needed.
-- [ ] Optional independent verification is non-default and risk-triggered.
-- [ ] Legacy `sdlc-orchestrator` skill assets are deleted or exact dependency blockers are documented.
-- [ ] Legacy `skill.sdlc-orchestrator` EvalOps assets are deleted, archived, or migrated.
-- [ ] Relevant grep checks pass.
-- [ ] Relevant pytest commands pass or skipped commands are explicitly reported.
-- [ ] Review handoff is complete.
+- [x] The spec in `docs/superpowers/specs/2026-07-04-remove-default-test-agent.md` has been reviewed.
+- [x] Active default lifecycle docs no longer include `test-agent`.
+- [x] Active `test-agent` runtime files are deleted or explicitly disabled as non-default examples.
+- [x] Normal verification ownership is assigned to `implement-agent`.
+- [x] Test quality and overfitting review ownership is assigned to `review-agent`.
+- [x] `finish-agent` performs a pre-hook commit/push checkpoint before memory and roadmap hooks.
+- [x] `finish-agent` completes workflow cleanup through `workflow.py`, then performs a post-cleanup dirty-tree check and commits/pushes generated files if needed.
+- [x] Optional independent verification is non-default and risk-triggered.
+- [x] Legacy `sdlc-orchestrator` skill assets are deleted or exact dependency blockers are documented.
+- [x] Legacy `skill.sdlc-orchestrator` EvalOps assets are deleted, archived, or migrated.
+- [x] Relevant grep checks pass.
+- [x] Relevant pytest commands pass or skipped commands are explicitly reported.
+- [x] Review handoff is complete.

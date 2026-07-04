@@ -650,7 +650,7 @@ def main() -> None:
     )
     parser.add_argument(
         "target_id", nargs="?", default=None,
-        help="Target ID (e.g., skill.sdlc-orchestrator). Omit with --all to run all targets."
+        help="Target ID (e.g., skill.sdlc-evalops). Omit with --all to run all targets."
     )
     parser.add_argument(
         "--all", action="store_true",

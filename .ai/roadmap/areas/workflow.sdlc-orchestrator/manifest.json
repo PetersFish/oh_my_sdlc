@@ -3,6 +3,6 @@
   "id": "workflow.sdlc-orchestrator",
   "kind": "workflow",
   "title": "SDLC Orchestrator Workflow",
-  "owner_path": "skills/sdlc-orchestrator",
+  "owner_path": "agents/dev-orchestrator.md",
   "id_prefix": "RM-ORCH"
 }

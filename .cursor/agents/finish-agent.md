@@ -4,8 +4,10 @@ description: >-
   review passes, during archive_change or post_archive_actions. For
   spec-flow, archives the OpenSpec change. For lightweight-flow, uses
   finishing-a-development-branch. Executes cleanup through roadmap,
-  memory, and workflow hooks. Requires test-agent and review-agent
-  evidence before proceeding. May proceed in blocked state for cleanup.
+  memory, and workflow hooks. Requires implement-agent verification
+  evidence and review-agent completion evidence before proceeding.
+  Performs pre-hook commit/push before memory/roadmap hooks and
+  post-cleanup commit/push for generated artifacts.
 mode: subagent
 permission:
   read: allow
@@ -24,6 +26,10 @@ permission:
     "python3 scripts/*": allow
     "python3 skills/*": allow
     "python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py *": allow
+    "git add*": allow
+    "git commit*": allow
+    "git push*": allow
+    "git rev-parse*": allow
     "git status*": allow
     "git diff*": allow
     "git log*": allow
@@ -109,7 +115,7 @@ From dev-orchestrator:
 - `action`, `flow_type`, `slice_id`
 - `context.change_id` (spec-flow)
 - resolved wrapper dispatch contract for archive_change spec-flow: `dispatch.kind`, `dispatch.target`, `verifier.target`, `result_contract`
-- `evidence.verification_passed` from test-agent (must be true)
+- `evidence.verification_passed` from implement-agent (must be true)
 - `evidence.review_complete` from review-agent (must be true)
 - `pending_hooks`: memory_sync, roadmap_done_if_relevant
 
@@ -123,7 +129,12 @@ From dev-orchestrator:
   "flow_type": "spec-flow|lightweight-flow",
   "evidence": {
     "archive_path_exists": "true|false",
-    "pending_hooks_empty": "true|false"
+    "pending_hooks_empty": "true|false",
+    "pre_hook_commit_id": "<sha>",
+    "pre_hook_pushed": true,
+    "post_hook_commit_id": "<sha|null>",
+    "post_hook_pushed": "true|false",
+    "post_hook_dirty_tree": false
   },
   "artifacts": {
     "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/<slice_id>/finish-agent.md"
@@ -243,15 +254,56 @@ After finalization, resolve pending hooks:
    python3 .ai/workflows/scripts/workflow.py --root . complete-hook --hook <hook-name>
    ```
 
+## Commit/Push Checkpoints
+
+### Pre-Hook Commit Procedure
+
+Before resolving `memory_sync` or `roadmap_done_if_relevant` hooks, finish-agent must:
+
+1. Run `git status --short --branch`.
+2. If the tree is dirty, stage approved implementation/archive changes, commit them with a descriptive message (e.g., `"chore: pre-hook checkpoint — archive and implementation changes complete"`), push, and record `git rev-parse HEAD` as `pre_hook_commit_id`.
+3. If the tree is clean, record current `git rev-parse HEAD` as `pre_hook_commit_id` and verify the branch is not ahead of upstream.
+4. Use `pre_hook_commit_id` as the commit id supplied to memory sync.
+
+Memory sync records a stable commit id representing the reviewed implementation/archive state before sync-generated files are added.
+
+### Hook Resolution and Workflow Cleanup Order
+
+Run hook work and workflow cleanup in this order:
+
+1. `memory_sync` through `sdlc-openspec-memory-sync` or `sdlc-repository-memory-sync`.
+2. `roadmap_done_if_relevant` through `roadmap-agent` / `sdlc-roadmap` boundary as currently required.
+3. `workflow.py complete-hook --hook <hook-name>` after each hook's evidence is present.
+4. Any remaining `workflow.py` cleanup required to satisfy `pending_hooks_empty` and phase completion evidence.
+
+Hook outputs can reference the pre-hook commit id. Workflow cleanup has run before checking whether generated files remain.
+
+### Post-Cleanup Dirty-Tree Commit Procedure
+
+After all hook resolution, sync scripts, and workflow cleanup through `workflow.py` complete, finish-agent must:
+
+1. Run `git status --short --branch` again.
+2. If memory sync, roadmap sync, template sync, or workflow hook completion generated additional files, stage only those generated/approved artifacts.
+3. Commit with a message (e.g., `"chore: post-hook checkpoint — sync-generated artifacts"`) and push them.
+4. Record `post_hook_commit_id`.
+5. If the tree is clean, record `post_hook_commit_id: null` and `post_hook_dirty_tree: false`.
+
+No generated memory/roadmap/workflow files remain uncommitted after finish-agent completes. The second commit happens after workflow cleanup, not before it.
+
 ## Pre-Checks
 
-Require BOTH test-agent verification evidence AND review-agent completion
+Require BOTH implement-agent verification evidence AND review-agent completion
 evidence before proceeding. If missing, return blocker.
 
 ## Evidence Emission
 
 - `evidence.archive_path_exists`: true when archive/finish succeeded.
 - `evidence.pending_hooks_empty`: true when all hooks are resolved.
+- `evidence.pre_hook_commit_id`: git commit SHA recorded before hook resolution.
+- `evidence.pre_hook_pushed`: true when pre-hook commit was pushed to remote.
+- `evidence.post_hook_commit_id`: git commit SHA recorded after hook-resolution-generated artifacts were committed, or null if tree was clean.
+- `evidence.post_hook_pushed`: true when post-hook commit was pushed, false if no generated artifacts existed.
+- `evidence.post_hook_dirty_tree`: false when post-cleanup tree is clean.
 
 ## Handoff Artifact
 
@@ -267,7 +319,7 @@ Retain for hook completion output. Store under
 | Failure | Blocker Reason | Action |
 |---|---|---|
 | Archive/finish failed | `archive_failed` | Surface error to user |
-| Missing verification evidence | `missing_verification_evidence` | Ensure test-agent and review-agent completed |
+| Missing verification evidence | `missing_verification_evidence` | Ensure implement-agent and review-agent completed |
 | Missing resolved wrapper dispatch | `missing_resolved_dispatch` | Ask dev-orchestrator to provide resolved dispatch.kind/target and verifier |
 | Hook resolution failed | `hook_blocked` | Surface to user with hook-specific remediation |
 | Roadmap item not found | `item_not_found` | May resolve with no_linked_item |

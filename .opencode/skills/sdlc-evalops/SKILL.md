@@ -190,7 +190,7 @@ The skill maintains assets under `.ai/evals/` at the project root:
 ```
 
 `target-id` format: `<target-type>.<name>`. Examples:
-- `skill.sdlc-orchestrator`
+- `skill.sdlc-evalops`
 - `skill.research-general`
 - `agent.contract-review`
 - `workflow.repository-memory-sync`
@@ -735,7 +735,7 @@ These rules override any contextual ambiguity. Violating them produces an incorr
 
 `meta-skill-lifecycle-governance` is a repository skill lifecycle governance capability, not a Superpowers core workflow. It can require `evalops run` during EVALUATE-IN-REPO and require critical golden eval pass before RELEASE.
 
-### With sdlc-orchestrator
+### With dev-orchestrator
 
 The orchestrator gates new AI skill development and material AI behavior changes through EvalOps:
 1. Identify the AI behavior target.

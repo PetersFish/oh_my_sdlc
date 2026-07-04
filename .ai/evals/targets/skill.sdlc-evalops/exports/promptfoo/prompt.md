@@ -197,7 +197,7 @@ The skill maintains assets under `.ai/evals/` at the project root:
 ```
 
 `target-id` format: `<target-type>.<name>`. Examples:
-- `skill.sdlc-orchestrator`
+- `skill.sdlc-evalops`
 - `skill.research-general`
 - `agent.contract-review`
 - `workflow.repository-memory-sync`
@@ -274,7 +274,12 @@ python <sdlc-evalops-skill-dir>/scripts/run-eval-matrix.py <target-id>
 python <sdlc-evalops-skill-dir>/scripts/run-eval-matrix.py --all
 python <sdlc-evalops-skill-dir>/scripts/run-eval-matrix.py <target-id> --dry-run
 python <sdlc-evalops-skill-dir>/scripts/run-eval-matrix.py <target-id> --from-auth
+python <sdlc-evalops-skill-dir>/scripts/run-eval-matrix.py <target-id> --only-new
+python <sdlc-evalops-skill-dir>/scripts/run-eval-matrix.py <target-id> --only-failed --failed-from latest
+python <sdlc-evalops-skill-dir>/scripts/run-eval-matrix.py <target-id> --only-failed --failed-from full
 ```
+
+Incremental run flags (`--only-new`, `--only-failed`, `--failed-from`) work the same as the single-target runner.
 
 ### Matrix Report Layout
 
@@ -304,6 +309,8 @@ Reports are written under the target workspace with a matrix run id and per-mode
 | `apiKeyEnvar` | Preserved from model matrix; raw keys never written |
 | `headers.Accept-Encoding: identity` | Preserved in all generated configs |
 | `fail_fast` | Honored from `run_policy.fail_fast`; defaults to false |
+| `parallel` | Honored from `run_policy.parallel`; when true, model entries run via `ThreadPoolExecutor` |
+| `max_parallel_models` | Caps concurrent model entries when `parallel` is true (default 2) |
 | Exit code | Non-zero if any model run fails or returns errors |
 | Metadata | Per-model summary records both configured and observed provider/model |
 
@@ -367,9 +374,23 @@ The final golden eval report summary for an EvalOps-gated change SHALL include:
 - Case counts (total, passed, failed)
 - Export freshness status
 - Eval command used
+- Run Mode (full / only-new / only-failed)
 - Pass/fail result count
 - Report path
 - Any blocked runner dependency (if applicable)
+
+### Run Index
+
+Each target workspace maintains a `reports/run-index.json` file as local audit state. It records metadata for every eval run and enables incremental eval modes.
+
+```
+.ai/evals/targets/<target-id>/reports/run-index.json
+```
+
+Schema: `target_id`, `runs[]` with per-run fields:
+- `run_id`, `mode` (full / only-new / only-failed), `git_baseline`, `case_files`, `case_status` (per-case: passed / failed / skipped / not_run), `failed_cases`, `failure_source` (latest / full, only-failed only), `report_path`, `timestamp`
+
+The run index is local audit state (git-ignored, not versioned). It is written on every run completion.
 
 ## Commands
 
@@ -595,6 +616,22 @@ The opencode-go OpenAI-compatible endpoint REQUIRES these provider config fields
 
 The `Accept-Encoding: identity` header is REQUIRED. Without it, the endpoint may return a compressed response that triggers a bug in Promptfoo/Node's decompress pipeline, causing every eval case to fail with `TypeError: terminated` in 2-3 seconds regardless of timeout settings.
 
+### Run Policy Fields
+
+The `run_policy` block in `.ai/evals/model-matrix.yaml` controls execution behavior:
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `mode` | string | `sequential` | Run ordering |
+| `fail_fast` | bool | `false` | Stop on first model failure |
+| `timeout_seconds` | int | `300` | Per-model eval timeout |
+| `retry_count` | int | `0` | Retry attempts per model |
+| `parallel` | bool | `true` | Enable parallel model execution |
+| `max_concurrency` | int | `3` | Promptfoo case-level concurrency (`--max-concurrency N`) |
+| `max_parallel_models` | int | `2` | Max concurrent model entries in matrix runner |
+
+Existing configs without `max_concurrency` default to 1 (serial). Configs without `max_parallel_models` default to 1 when `parallel` is true.
+
 ### Target Provider vs Grader Provider
 
 The `providers` block configures the eval target model (the model being evaluated). The `defaultTest.options.provider` block configures the grader model used for `llm-rubric` assertions. They may differ.
@@ -648,9 +685,18 @@ The `defaultTest.options.provider` block is the grader for `llm-rubric` assertio
 ```bash
 export OPENCODE_GO_API_KEY=<key>
 python <sdlc-evalops-skill-dir>/scripts/run-promptfoo-eval.py <target-id>
+python <sdlc-evalops-skill-dir>/scripts/run-promptfoo-eval.py <target-id> --from-auth
+python <sdlc-evalops-skill-dir>/scripts/run-promptfoo-eval.py <target-id> --only-new
+python <sdlc-evalops-skill-dir>/scripts/run-promptfoo-eval.py <target-id> --only-failed --failed-from latest
+python <sdlc-evalops-skill-dir>/scripts/run-promptfoo-eval.py <target-id> --only-failed --failed-from full
 ```
 
-This chains export freshness, `promptfoo eval` with `-o` report output, and structured `summary.md`/`failures.yaml` writing under `.ai/evals/targets/<target-id>/reports/<run-id>/`.
+This chains export freshness, `promptfoo eval` with `-o` report output, and structured `summary.md`/`failures.yaml` writing under `.ai/evals/targets/<target-id>/reports/<run-id>/`. Concurrency is read from `run_policy.max_concurrency` in `.ai/evals/model-matrix.yaml`.
+
+**Incremental run flags:**
+- `--only-new`: Run only golden cases changed since the last full run (uses Git diff against the baseline recorded in `reports/run-index.json`). Exits if no prior full run baseline exists.
+- `--only-failed --failed-from latest`: Retry only cases that failed in the most recent run (any mode).
+- `--only-failed --failed-from full`: Retry only cases that failed in the most recent full run.
 
 #### Raw Promptfoo Command (fallback)
 
@@ -696,7 +742,7 @@ These rules override any contextual ambiguity. Violating them produces an incorr
 
 `meta-skill-lifecycle-governance` is a repository skill lifecycle governance capability, not a Superpowers core workflow. It can require `evalops run` during EVALUATE-IN-REPO and require critical golden eval pass before RELEASE.
 
-### With sdlc-orchestrator
+### With dev-orchestrator
 
 The orchestrator gates new AI skill development and material AI behavior changes through EvalOps:
 1. Identify the AI behavior target.

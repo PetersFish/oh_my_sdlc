@@ -56,7 +56,7 @@ DESIGN_ARTIFACT_SOURCES: Set[str] = {"superpowers", "openspec", "other"}
 PHASE_AGENT_MAP: Dict[str, Set[str]] = {
     "review_roadmap": {"roadmap-agent"},
     "create_change": {"plan-agent", "roadmap-agent"},
-    "apply_change": {"implement-agent", "test-agent", "review-agent", "roadmap-agent"},
+    "apply_change": {"implement-agent", "review-agent", "roadmap-agent"},
     "archive_change": {"finish-agent", "roadmap-agent"},
     "post_archive_actions": {"finish-agent", "roadmap-agent"},
 }
@@ -69,8 +69,6 @@ CANONICAL_AGENT_NAMES: Dict[str, str] = {
     "plan_agent": "plan-agent",
     "implement-agent": "implement-agent",
     "implement_agent": "implement-agent",
-    "test-agent": "test-agent",
-    "test_agent": "test-agent",
     "review-agent": "review-agent",
     "review_agent": "review-agent",
     "finish-agent": "finish-agent",
@@ -648,7 +646,7 @@ REVIEW_WRAPPER = WrapperContract(
     remediation=[
         {
             "for": "review_blocked",
-            "action": "Implement review feedback and re-run test-agent verification",
+            "action": "Implement review feedback and re-run implement-agent verification",
         },
     ],
 )

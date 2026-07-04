@@ -243,7 +243,7 @@ class TestSdlcProjectBootstrapSkill(unittest.TestCase):
         """Canonical agents/*.md no longer contain model or variant fields."""
         agent_names = [
             "dev-orchestrator", "plan-agent", "implement-agent",
-            "test-agent", "review-agent", "finish-agent", "roadmap-agent",
+            "review-agent", "finish-agent", "roadmap-agent",
         ]
         for name in agent_names:
             path = REPO_ROOT / "agents" / f"{name}.md"
@@ -450,82 +450,6 @@ class TestEndToEndScenarios(unittest.TestCase):
         result = self._simulate_full_bootstrap()
         self.assertEqual(result["openspec"], "skip")
         self.assertEqual(result["memory"], "init")
-
-
-ORCHESTRATOR_SKILL = REPO_ROOT / "skills" / "sdlc-orchestrator"
-
-
-class TestSdlcOrchestratorSkill(unittest.TestCase):
-    """Validate sdlc-orchestrator skill structure and routing coverage."""
-
-    def test_skill_md_exists(self) -> None:
-        self.assertTrue(
-            (ORCHESTRATOR_SKILL / "SKILL.md").exists(),
-            "sdlc-orchestrator/SKILL.md must exist",
-        )
-
-    def test_skill_md_has_valid_frontmatter(self) -> None:
-        fm = read_frontmatter(ORCHESTRATOR_SKILL / "SKILL.md")
-        self.assertEqual(fm.get("name"), "sdlc-orchestrator")
-        self.assertIn("description", fm)
-        self.assertGreater(len(fm["description"]), 20, "description too short")
-        self.assertIn("orchestrat", fm["description"].lower())
-
-    def test_skill_md_has_route_classification(self) -> None:
-        content = (ORCHESTRATOR_SKILL / "SKILL.md").read_text(encoding="utf-8")
-        self.assertIn("Route Classification", content)
-        self.assertIn("score", content.lower())
-        self.assertIn("superpowers-direct", content.lower())
-
-    def test_skill_md_has_propose_flow(self) -> None:
-        content = (ORCHESTRATOR_SKILL / "SKILL.md").read_text(encoding="utf-8")
-        self.assertIn("spec-driven-propose-flow", content.lower())
-        self.assertIn("openspec-propose", content.lower())
-
-    def test_skill_md_has_incremental_flow(self) -> None:
-        content = (ORCHESTRATOR_SKILL / "SKILL.md").read_text(encoding="utf-8")
-        self.assertIn("spec-driven-incremental-flow", content.lower())
-        self.assertIn("openspec-new-change", content.lower())
-        self.assertIn("openspec-continue-change", content.lower())
-
-    def test_skill_md_has_review_summary(self) -> None:
-        content = (ORCHESTRATOR_SKILL / "SKILL.md").read_text(encoding="utf-8")
-        self.assertIn("Review Summary", content)
-        self.assertIn("Review Focus", content)
-
-    def test_skill_md_has_boundary_rules(self) -> None:
-        content = (ORCHESTRATOR_SKILL / "SKILL.md").read_text(encoding="utf-8")
-        self.assertIn("Boundary Rules", content)
-        self.assertIn("Orchestrator vs OpenSpec", content)
-        self.assertIn("Orchestrator vs Roadmap", content)
-        self.assertIn("Orchestrator vs EvalOps", content)
-
-    def test_skill_md_has_routing_examples(self) -> None:
-        content = (ORCHESTRATOR_SKILL / "SKILL.md").read_text(encoding="utf-8")
-        self.assertIn("## Examples", content)
-        self.assertIn("superpowers-direct", content.lower())
-        self.assertIn("roadmap-first", content.lower())
-        self.assertIn("evalops-gated", content.lower())
-        self.assertIn("memory-sync", content.lower())
-
-    def test_skill_md_mentions_roadmap_first(self) -> None:
-        content = (ORCHESTRATOR_SKILL / "SKILL.md").read_text(encoding="utf-8")
-        self.assertIn("roadmap-first", content.lower())
-        self.assertIn("sdlc-roadmap", content.lower())
-
-    def test_skill_md_mentions_evalops_gate(self) -> None:
-        content = (ORCHESTRATOR_SKILL / "SKILL.md").read_text(encoding="utf-8")
-        self.assertIn("evalops-gated", content.lower())
-        self.assertIn("sdlc-evalops", content.lower())
-
-    def test_skill_md_mentions_memory_sync(self) -> None:
-        content = (ORCHESTRATOR_SKILL / "SKILL.md").read_text(encoding="utf-8")
-        self.assertIn("memory-sync", content.lower())
-        self.assertIn("sdlc-repository-memory-sync", content.lower())
-
-    def test_skill_md_does_not_mention_sdd_plus_superpowers(self) -> None:
-        content = (ORCHESTRATOR_SKILL / "SKILL.md").read_text(encoding="utf-8")
-        self.assertNotIn("sdd-plus-superpowers", content.lower())
 
 
 if __name__ == "__main__":

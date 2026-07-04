@@ -103,7 +103,6 @@ From dev-orchestrator:
 - resolved wrapper dispatch contract for spec-flow: `dispatch.kind`, `dispatch.target`, `verifier.target`, `result_contract`
 - `artifacts.primary_design_path` and `artifacts.design_artifact_paths[]` from plan-agent
 - Handoff artifact from plan-agent for readable context only
-- Blocker evidence from test-agent (if retrying)
 
 ## Design Artifact Reading Priority
 
@@ -151,7 +150,7 @@ Return JSON:
     ]
   },
   "blockers": [],
-  "recommended_next_action": "dispatch_test_agent"
+  "recommended_next_action": "dispatch_review_agent"
 }
 ```
 
@@ -161,7 +160,7 @@ Return `success` only when ALL of the following are true:
 - Provider verification succeeded (for spec-flow).
 - No blockers remain.
 
-For lightweight-flow, normal handoff from implementation to test-agent is a
+For lightweight-flow, normal handoff from implementation to review-agent is a
 successful result, not a blocker.
 
 Blocked example when workflow context prevents safe execution:
@@ -228,7 +227,7 @@ Success example when implementation is complete and ready for downstream verific
     ]
   },
   "blockers": [],
-  "recommended_next_action": "dispatch_test_agent"
+  "recommended_next_action": "dispatch_review_agent"
 }
 ```
 

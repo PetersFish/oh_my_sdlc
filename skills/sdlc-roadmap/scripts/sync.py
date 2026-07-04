@@ -3,7 +3,7 @@
 
 Compares OpenSpec change status against roadmap item status and reports
 discrepancies. Does NOT trigger state transitions — that is owned by
-sdlc-orchestrator (post-archive gate) and sdlc-roadmap done (mutation).
+dev-orchestrator (post-archive gate) and sdlc-roadmap done (mutation).
 
 Usage:
   sync.py                       # Report all mismatches
@@ -213,7 +213,7 @@ def main():
         for m in mismatches:
             print(f"  - {m}")
         print("\nNote: sync.py is diagnostic-only. Use 'roadmap done' or let")
-        print("sdlc-orchestrator route post-archive transitions to resolve mismatches.")
+        print("dev-orchestrator route post-archive transitions to resolve mismatches.")
         return 0
     else:
         print("No lifecycle mismatches detected.")

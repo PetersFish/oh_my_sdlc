@@ -196,7 +196,7 @@ class TestRoadmapSkillFrontmatter(unittest.TestCase):
     def test_skill_md_documents_orchestrator_boundary(self) -> None:
         content = (ROADMAP_SKILL / "SKILL.md").read_text(encoding="utf-8")
         content_lower = content.lower()
-        self.assertIn("sdlc-orchestrator", content_lower)
+        self.assertIn("dev-orchestrator", content_lower)
         self.assertIn("post-archive gate", content_lower)
 
     def test_skill_md_documents_revision_history_model(self) -> None:

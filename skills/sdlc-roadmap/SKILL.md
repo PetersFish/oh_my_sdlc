@@ -28,7 +28,7 @@ Thin orchestration layer between long-term product roadmap and single formal Ope
 - Single OpenSpec change management (use `openspec-propose`, `openspec-new-change`, `openspec-apply-change`).
 - Code implementation or testing (use Superpowers: TDD, debugging, review).
 - Repository memory sync (use `sdlc-repository-memory-sync`).
-- Post-archive roadmap state sync trigger (owned by `sdlc-orchestrator`, not roadmap).
+- Post-archive roadmap state sync trigger (owned by `dev-orchestrator` and `workflow.py`, not roadmap).
 
 ## File Model
 
@@ -402,7 +402,7 @@ Replace unfinished roadmap plans for a whole area while preserving completed and
 
 ### roadmap done RM-xxx
 
-Mark a roadmap item as done. This is the roadmap-side mutation invoked either directly by the user or by `sdlc-orchestrator` from the post-archive gate.
+Mark a roadmap item as done. This is the roadmap-side mutation invoked either directly by the user or by `dev-orchestrator` from the post-archive gate.
 
 **Workflow:**
 1. Read the item file.
@@ -419,7 +419,7 @@ Mark a roadmap item as done. This is the roadmap-side mutation invoked either di
    - "Should the roadmap be re-planned? Use `roadmap replan`."
 
 **Rules:**
-- `sdlc-orchestrator` owns the post-archive gate. When OpenSpec archive succeeds, the orchestrator finds the matching `active` roadmap item and routes to `sdlc-roadmap done <item-id>`. Roadmap only executes the mutation after being invoked.
+- `dev-orchestrator` and `workflow.py` own the post-archive gate. When OpenSpec archive succeeds, the orchestrator finds the matching `active` roadmap item and routes to `sdlc-roadmap done <item-id>`. Roadmap only executes the mutation after being invoked.
 - Manual `roadmap done` is also supported for items without a linked OpenSpec change.
 - Do NOT auto-trigger memory sync — only prompt the user.
 
@@ -440,7 +440,7 @@ When apply or implementation begins for a `ready` item, transition it to `active
 
 ## Orchestrator Post-Archive Boundary
 
-The `sdlc-orchestrator` and the SDLC workflow runtime (`workflow.py`) own the post-archive gate that triggers roadmap completion. `sdlc-roadmap` only owns the safe mutation (the `done` capability) after being invoked.
+The `dev-orchestrator` and the SDLC workflow runtime (`workflow.py`) own the post-archive gate that triggers roadmap completion. `sdlc-roadmap` only owns the safe mutation (the `done` capability) after being invoked.
 
 The workflow runtime coordinates post-archive hooks:
 - `roadmap_done_if_relevant`: registered in `pending_hooks` after `archive_change` completes. The orchestrator uses `workflow.py` to detect active linked items, route to `sdlc-roadmap done <item-id>` for the mutation, then call `workflow.py complete-hook --hook roadmap_done_if_relevant`.
@@ -453,7 +453,7 @@ Roadmap item files (`.ai/roadmap/areas/*/items/*.md`) remain the domain source o
 
 ## Workflow Governance Boundary
 
-Stateful roadmap mutations are governed by the SDLC workflow runtime via `sdlc-orchestrator`.
+Stateful roadmap mutations are governed by the SDLC workflow runtime via `dev-orchestrator`.
 The roadmap worker SHALL NOT own workflow lifecycle:
 
 - `sdlc-roadmap` SHALL NOT call `workflow.py start`, `workflow.py preflight`, `workflow.py advance`, or `workflow.py done`.

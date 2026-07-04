@@ -1,7 +1,5 @@
 schema_version: '1.0'
 targets:
-- id: skill.sdlc-orchestrator
-  workspace: targets/skill.sdlc-orchestrator
 - id: skill.sdlc-evalops
   workspace: targets/skill.sdlc-evalops
 - id: skill.sdlc-roadmap

@@ -135,7 +135,7 @@ Implemented and archived as `2026-06-29-agent-backed-lifecycle-wrapper-architect
 
 - Added the agent-backed wrapper contract and routing model across the SDLC workflow runtime.
 - Recorded explicit `flow_type` handling and normalized evidence expectations for agent-backed phases.
-- Landed the dev-orchestrator / plan-agent / implement-agent / test-agent / review-agent / finish-agent lifecycle split without moving workflow state ownership out of `workflow.py`.
+- Landed the dev-orchestrator / plan-agent / implement-agent / review-agent / finish-agent lifecycle split, with normal verification owned by implement-agent and test-quality review owned by review-agent. No default test-agent role is part of the first migration.
 - Follow-up roadmap work remains in RM-ORCH-008/009/010 for contract refinement and later runtime modularization.
 
 # Design Reference

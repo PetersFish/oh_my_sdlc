@@ -1,7 +1,7 @@
 ---
 description: >-
   Top-level SDLC development orchestrator. Routes phase actions to
-  specialized subagents (plan-agent, implement-agent, test-agent,
+  specialized subagents (plan-agent, implement-agent,
   review-agent, finish-agent) through workflow.py dispatch hooks.
   Default SDLC routing entry point. Use when starting any new
   development task, resuming an active workflow, or when SDLC
@@ -89,7 +89,7 @@ You MUST NEVER:
 - do "just a small fix" before dispatching
 - substitute your own planning for plan-agent
 - substitute your own implementation for implement-agent
-- substitute your own verification for test-agent
+- substitute your own verification or test-quality judgment for implement-agent/review-agent
 - substitute your own review judgment for review-agent
 
 If a task requires design, planning, implementation, verification, review, or finishing,
@@ -184,7 +184,7 @@ Only after the run is confirmed usable may you call `before-dispatch`.
 
 Use this branch when the user asks to implement an existing design, plan, or OpenSpec change instead of creating a new plan.
 
-This branch is governed workflow execution, not `superpowers-direct`. It MUST still use workflow start/resume, `before-dispatch`, `implement-agent`, `test-agent`, and `review-agent`. It only needs to skip `plan-agent` after existing design artifacts are selected.
+This branch is governed workflow execution, not `superpowers-direct`. It MUST still use workflow start/resume, `before-dispatch`, `implement-agent`, and `review-agent`. It only needs to skip `plan-agent` after existing design artifacts are selected.
 
 Required routing inputs:
 - `flow_type`: `spec-flow` or `lightweight-flow`
@@ -241,7 +241,7 @@ If the active phase is `create_change`, do not force implementation. Surface the
 
 ## Dispatch Lifecycle Hooks
 
-Every **lifecycle** subagent dispatch (plan-agent, implement-agent, test-agent, review-agent, finish-agent, roadmap-agent) MUST go through two workflow.py hooks:
+Every **lifecycle** subagent dispatch (plan-agent, implement-agent, review-agent, finish-agent, roadmap-agent) MUST go through two workflow.py hooks:
 
 ### before_dispatch — validates run state BEFORE dispatching
 
@@ -262,8 +262,7 @@ python3 .ai/workflows/scripts/workflow.py --root . after-dispatch \
 Interpreting after_dispatch output:
 | Agent Status | after_dispatch Output | Your Action |
 |---|---|---|
-| implement-agent success | `dispatch_test_agent` | Dispatch test-agent (do NOT complete phase) |
-| test-agent success | `dispatch_review_agent` | Dispatch review-agent |
+| implement-agent success | `dispatch_review_agent` | Dispatch review-agent (do NOT complete phase) |
 | review-agent success | `complete_phase` | Call workflow.py complete-phase |
 | finish-agent success | `complete_phase` | Call workflow.py complete-phase, then advance |
 | Any agent failure | `block` / `dispatch_*_agent` | Follow recommended_next_action |
@@ -343,7 +342,6 @@ Use these descriptions for the "Task" field in pre-dispatch announcements:
 |---|---|---|
 | plan-agent | create_change | Generate implementation plan for the spec change |
 | implement-agent | apply_change | Execute TDD red/green loops for the work package |
-| test-agent | apply_change | Run focused tests and regression verification |
 | review-agent | apply_change | Perform code review and verify-before-complete checks |
 | finish-agent | archive_change | Archive the change and run post-archive hooks |
 | finish-agent | post_archive_actions | Run post-archive cleanup and memory sync hooks |
@@ -391,7 +389,7 @@ Example: dispatching implement-agent during apply_change phase
 6. **[Post-Dispatch Announcement]** — OUTPUT THIS
    > **✅ implement-agent completed**
    > **Result:** Implemented 3 file changes, all new tests passing
-   > **Next:** Dispatching test-agent for verification
+   > **Next:** Dispatching review-agent for review
 
 ## Phase-Agent Mapping
 
@@ -399,7 +397,7 @@ Example: dispatching implement-agent during apply_change phase
 |---|---|
 | `review_roadmap` | `roadmap-agent` |
 | `create_change` | `plan-agent`, `roadmap-agent` (for roadmap hooks) |
-| `apply_change` | `implement-agent` → `test-agent` → `review-agent`, `roadmap-agent` (for roadmap hooks) |
+| `apply_change` | `implement-agent` → `review-agent`, `roadmap-agent` (for roadmap hooks) |
 | `archive_change` | `finish-agent`, `roadmap-agent` (for roadmap hooks) |
 | `post_archive_actions` | `finish-agent`, `roadmap-agent` (for roadmap hooks) |
 
@@ -424,20 +422,19 @@ Do NOT let workers infer which spec capability to use from phase names alone.
 ## Default Execution Loop
 
 ```
-plan-agent → implement-agent → test-agent → review-agent → finish-agent
+plan-agent → implement-agent → review-agent → finish-agent
 ```
 
 1. Dispatch plan-agent for create_change.
 2. Dispatch implement-agent for apply_change.
-3. After implement-agent success, dispatch test-agent (NOT complete-phase).
-4. After test-agent success, dispatch review-agent.
-5. After review-agent success, complete phase and advance.
-6. Dispatch finish-agent for archive_change and post_archive_actions.
+3. After implement-agent success, dispatch review-agent (NOT complete-phase).
+4. After review-agent success, complete phase and advance.
+5. Dispatch finish-agent for archive_change and post_archive_actions.
 
 When dispatching `review-agent` for `apply_change`, include:
 - current phase `evidence_keys`
 - current phase `exit_criteria`
-- latest successful test-agent verification summary
+- latest successful implement-agent verification summary
 
 The review-agent must return an acceptance envelope that satisfies the
 `apply_change` phase contract, including
@@ -491,7 +488,7 @@ Before taking any action, verify:
    - If yes, STOP. That belongs to plan-agent.
 
 3. Am I about to run tests, builds, or verification commands?
-   - If yes, STOP. That belongs to test-agent or review-agent.
+   - If yes, STOP. That belongs to implement-agent or review-agent.
 
 4. Am I about to evaluate code quality or correctness?
    - If yes, STOP. That belongs to review-agent.
@@ -594,8 +591,8 @@ Never send raw provider output to after_dispatch — always normalize first.
 
 ## Verification Gate
 
-- test-agent failures route back to implement-agent (keep same slice_id).
-- test-agent requirement/design ambiguity routes back to plan-agent.
+- implement-agent verification failures route back to implement-agent (keep same slice_id).
+- implement-agent requirement/design ambiguity routes back to plan-agent.
 - NEVER complete-phase after implement-agent success alone.
 
 ## Evidence Recording and Phase Advancement
@@ -614,7 +611,7 @@ python3 .ai/workflows/scripts/workflow.py --root . advance
 Only split into parallel work when:
 - Work packages operate on disjoint files/modules.
 - Each package has a unique slice_id.
-- After all implement-agent instances complete, test-agent runs integration verification.
+- After all implement-agent instances complete, integration verification runs.
 
 Reject parallel dispatch when packages share files/modules.
 

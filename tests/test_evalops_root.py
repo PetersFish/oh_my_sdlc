@@ -10,7 +10,7 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 EVALS_ROOT = REPO_ROOT / ".ai" / "evals"
-TARGET_WS = EVALS_ROOT / "targets" / "skill.sdlc-orchestrator"
+TARGET_WS = EVALS_ROOT / "targets" / "skill.sdlc-evalops"
 EVALOPS_TARGET_WS = EVALS_ROOT / "targets" / "skill.sdlc-evalops"
 SKILL_SCRIPTS = REPO_ROOT / "skills" / "sdlc-evalops" / "scripts"
 EXPORT_SCRIPT = SKILL_SCRIPTS / "export-promptfoo.py"
@@ -55,13 +55,13 @@ class TestEvalsRoot:
             assert field in manifest, \
                 f"Global manifest missing required field: {field}"
 
-    def test_global_manifest_registers_orchestrator(self):
+    def test_global_manifest_registers_evalops(self):
         manifest = yaml.safe_load(
             (EVALS_ROOT / "manifest.yaml").read_text(encoding="utf-8")
         )
         target_ids = [t["id"] for t in manifest.get("targets", [])]
-        assert "skill.sdlc-orchestrator" in target_ids, \
-            "Global manifest must register skill.sdlc-orchestrator"
+        assert "skill.sdlc-evalops" in target_ids, \
+            "Global manifest must register skill.sdlc-evalops"
 
     def test_model_matrix_exists(self):
         assert (EVALS_ROOT / "model-matrix.yaml").is_file(), \
@@ -78,11 +78,11 @@ class TestEvalsRoot:
 
 
 class TestTargetWorkspace:
-    """Validate skill.sdlc-orchestrator target workspace."""
+    """Validate skill.sdlc-evalops target workspace."""
 
     def test_target_workspace_exists(self):
         assert TARGET_WS.is_dir(), \
-            ".ai/evals/targets/skill.sdlc-orchestrator/ must exist"
+            ".ai/evals/targets/skill.sdlc-evalops/ must exist"
 
     def test_target_manifest_exists(self):
         assert (TARGET_WS / "manifest.yaml").is_file(), \
@@ -146,7 +146,7 @@ class TestExportPromptfooScript:
 
     def test_export_generates_from_golden_cases(self):
         result = subprocess.run(
-            [sys.executable, str(EXPORT_SCRIPT), "skill.sdlc-orchestrator"],
+            [sys.executable, str(EXPORT_SCRIPT), "skill.sdlc-evalops"],
             capture_output=True, text=True, cwd=str(REPO_ROOT),
         )
         assert result.returncode == 0, \
@@ -156,7 +156,7 @@ class TestExportPromptfooScript:
 
     def test_export_check_passes_after_export(self):
         result = subprocess.run(
-            [sys.executable, str(EXPORT_SCRIPT), "skill.sdlc-orchestrator", "--check"],
+            [sys.executable, str(EXPORT_SCRIPT), "skill.sdlc-evalops", "--check"],
             capture_output=True, text=True, cwd=str(REPO_ROOT),
         )
         assert result.returncode == 0, \
@@ -165,9 +165,9 @@ class TestExportPromptfooScript:
     def test_prompt_injects_skill_source(self):
         prompt_path = TARGET_WS / "exports" / "promptfoo" / "prompt.md"
         prompt = prompt_path.read_text(encoding="utf-8")
-        assert "skill.sdlc-orchestrator" in prompt, \
+        assert "skill.sdlc-evalops" in prompt, \
             "Prompt must reference the target skill name"
-        assert "Route decisions are action-binding" in prompt, \
+        assert "EvalOps Skill" in prompt, \
             "Prompt must inject current skill source content"
         assert "{{input}}" in prompt, \
             "Prompt must contain input variable placeholder"
@@ -320,7 +320,7 @@ class TestExportPromptfooCheck:
 
     def test_check_passes_when_exports_fresh(self):
         result = subprocess.run(
-            [sys.executable, str(EXPORT_SCRIPT), "skill.sdlc-orchestrator", "--check"],
+            [sys.executable, str(EXPORT_SCRIPT), "skill.sdlc-evalops", "--check"],
             capture_output=True, text=True, cwd=str(REPO_ROOT),
         )
         assert result.returncode == 0, \
@@ -351,24 +351,6 @@ class TestDistributedSkillCopies:
         assert copy.read_text(encoding="utf-8") == canonical, \
             ".cursor sdlc-evalops copy must match canonical"
 
-    def test_opencode_orchestrator_copy_matches(self):
-        canonical = self._canonical("sdlc-orchestrator")
-        copy = REPO_ROOT / ".opencode" / "skills" / "sdlc-orchestrator" / "SKILL.md"
-        assert copy.read_text(encoding="utf-8") == canonical, \
-            ".opencode sdlc-orchestrator copy must match canonical"
-
-    def test_claude_orchestrator_copy_matches(self):
-        canonical = self._canonical("sdlc-orchestrator")
-        copy = REPO_ROOT / ".claude" / "skills" / "sdlc-orchestrator" / "SKILL.md"
-        assert copy.read_text(encoding="utf-8") == canonical, \
-            ".claude sdlc-orchestrator copy must match canonical"
-
-    def test_cursor_orchestrator_copy_matches(self):
-        canonical = self._canonical("sdlc-orchestrator")
-        copy = REPO_ROOT / ".cursor" / "skills" / "sdlc-orchestrator" / "SKILL.md"
-        assert copy.read_text(encoding="utf-8") == canonical, \
-            ".cursor sdlc-orchestrator copy must match canonical"
-
     def test_evalops_skill_does_not_mention_fallback_provider(self):
         canonical = self._canonical("sdlc-evalops")
         assert "opencode_go_provider.py" not in canonical, \
@@ -395,7 +377,7 @@ class TestDistributedSkillCopies:
             ".cursor copy must not reference opencode_go_provider.py"
 
 
-class TestOrchestratorSkillMentionsTargetWorkspaces:
+class TestEvalopsSkillMentionsTargetWorkspaces:
     """Validate skill files reference new EvalOps structure."""
 
     def test_evalops_skill_mentions_evals_root(self):
@@ -441,28 +423,6 @@ class TestOrchestratorSkillMentionsTargetWorkspaces:
             "sdlc-evalops init must produce .ai/evals/.gitignore"
         assert "targets/*/reports/" in content, \
             "sdlc-evalops .gitignore must ignore targets/*/reports/"
-
-    def test_orchestrator_skill_mentions_evalops_target_id(self):
-        content = (REPO_ROOT / "skills" / "sdlc-orchestrator" / "SKILL.md") \
-            .read_text(encoding="utf-8")
-        assert "target id" in content.lower() or "target-id" in content.lower(), \
-            "sdlc-orchestrator must mention EvalOps target id"
-
-    def test_orchestrator_skill_mentions_human_confirmation(self):
-        content = (REPO_ROOT / "skills" / "sdlc-orchestrator" / "SKILL.md") \
-            .read_text(encoding="utf-8")
-        lower = content.lower()
-        assert "human confirmation" in lower or "user explicitly confirms" in lower, \
-            "sdlc-orchestrator must mention human confirmation boundaries"
-
-    def test_orchestrator_skill_mentions_golden_eval_reporting(self):
-        content = (REPO_ROOT / "skills" / "sdlc-orchestrator" / "SKILL.md") \
-            .read_text(encoding="utf-8")
-        lower = content.lower()
-        assert "case counts" in lower or "case count" in lower, \
-            "sdlc-orchestrator must mention case counts in reporting"
-        assert "export freshness" in lower, \
-            "sdlc-orchestrator must mention export freshness in reporting"
 
 
 class TestEvalRunnerScript:
@@ -553,14 +513,14 @@ class TestEvalMatrixRunner:
     def test_matrix_runner_dry_run_generates_plan(self):
         result = subprocess.run(
             [sys.executable, str(MATRIX_RUNNER_SCRIPT),
-             "skill.sdlc-orchestrator", "--dry-run"],
+             "skill.sdlc-evalops", "--dry-run"],
             capture_output=True, text=True, cwd=str(REPO_ROOT),
         )
         assert result.returncode == 0, \
             f"Matrix dry-run failed: {result.stderr}"
         assert "Dry-run" in result.stderr, \
             "Dry-run must print Dry-run mode indicator"
-        assert "skill.sdlc-orchestrator" in result.stderr, \
+        assert "skill.sdlc-evalops" in result.stderr, \
             "Dry-run must reference the target"
 
     def test_matrix_runner_dry_run_does_not_mutate_canonical_exports(self):
@@ -571,7 +531,7 @@ class TestEvalMatrixRunner:
 
         result = subprocess.run(
             [sys.executable, str(MATRIX_RUNNER_SCRIPT),
-             "skill.sdlc-orchestrator", "--dry-run"],
+             "skill.sdlc-evalops", "--dry-run"],
             capture_output=True, text=True, cwd=str(REPO_ROOT),
         )
         assert result.returncode == 0

@@ -327,7 +327,7 @@ def run_export(target_id: str, check_mode: bool = False) -> int:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate Promptfoo export from golden cases")
-    parser.add_argument("target_id", help="Target ID (e.g., skill.sdlc-orchestrator)")
+    parser.add_argument("target_id", help="Target ID (e.g., skill.sdlc-evalops)")
     parser.add_argument("--check", action="store_true",
                         help="Check freshness without rewriting files")
     args = parser.parse_args()

@@ -352,7 +352,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Run Promptfoo eval and write reports to repo"
     )
-    parser.add_argument("target_id", help="Target ID (e.g., skill.sdlc-orchestrator)")
+    parser.add_argument("target_id", help="Target ID (e.g., skill.sdlc-evalops)")
     parser.add_argument("--from-auth", action="store_true",
                         help="Read OPENCODE_GO_API_KEY from ~/.local/share/opencode/auth.json")
     parser.add_argument("--only-new", action="store_true",

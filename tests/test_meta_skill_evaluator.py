@@ -61,7 +61,7 @@ class TestMetaSkillEvaluatorContract:
         assert "sdlc-evalops" in lower
         assert "skill-creator" in lower
         assert "meta-skill-lifecycle-governance" in lower
-        assert "sdlc-orchestrator" in lower
+        assert "dev-orchestrator" in lower
 
     def test_includes_all_scorecard_dimensions(self):
         content = SKILL_MD.read_text(encoding="utf-8").lower()

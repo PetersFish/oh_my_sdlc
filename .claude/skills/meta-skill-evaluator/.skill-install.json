@@ -1,0 +1,14 @@
+{
+  "skill": "meta-skill-evaluator",
+  "source_repo": ".",
+  "source_path": "skills/meta-skill-evaluator",
+  "source_ref": "HEAD",
+  "status": "stable",
+  "target": ".claude/skills/meta-skill-evaluator",
+  "installed_at": "2026-07-04T12:02:31.045832Z",
+  "backport_policy": "review-required",
+  "payload_hash": "1924487dc174b0836bc024ca5ba7857f58ee89fc1a4ad7b9e1c5e53e87528aa0",
+  "files": [
+    "SKILL.md"
+  ]
+}

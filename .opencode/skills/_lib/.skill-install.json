@@ -5,9 +5,9 @@
   "source_ref": "HEAD",
   "status": "stable",
   "target": ".opencode/skills/_lib",
-  "installed_at": "2026-07-03T14:25:17.543887Z",
+  "installed_at": "2026-07-04T12:22:17.595464Z",
   "backport_policy": "review-required",
-  "payload_hash": "5416c87240eb5e76fcacdb5b49fe3d4334b4c1e7ec9f3e3f6b2807e7f51f7a65",
+  "payload_hash": "18aa72d772bea7d70595a9e1153c76d7a2cb9bc243cef2b9fb789f39bd826016",
   "files": [
     "provider_registry.yaml",
     "provider_registry_loader.py",
