@@ -8,11 +8,11 @@ The intended operating model is Superpowers-style execution: keep the common pat
 
 ## Context
 
-The repository's SDLC direction currently favors agent-backed lifecycle wrappers while preserving deterministic workflow governance in `workflow.py`. The current RM-ORCH-007 design already states that the default specialized lifecycle agents are `plan-agent`, `implement-agent`, `review-agent`, and `finish-agent`, and that `test-agent` must not be introduced as a default specialized agent.
+The repository's SDLC direction now centers on `dev-orchestrator` plus specialized agent files under `agents/`. The active `sdlc-main` workflow routes SDLC phases to `dev-orchestrator`, not to the legacy `sdlc-orchestrator` skill. `dev-orchestrator` is the routing coordinator and must dispatch specialized agents rather than doing planning, implementation, verification, review, or finishing work itself.
 
-The remaining risk is design drift: historical snapshots, completion notes, templates, future agent specs, or prompt text may still refer to a default `test-agent` lifecycle split. If those references remain, future implementation work may recreate the extra session hop even though the intended common path no longer needs it.
+The current agent tree still contains active `test-agent` files. Those files describe a default verification subagent dispatched after `implement-agent`, which conflicts with the desired common path. The cleanup must therefore remove or de-register active `test-agent` files, not merely reword roadmap documentation.
 
-This spec defines the desired model and the reviewable acceptance criteria before making implementation changes.
+There is also a legacy `skills/sdlc-orchestrator/SKILL.md` family and corresponding EvalOps assets. Based on current workflow and `dev-orchestrator` configuration, this skill should be treated as a retirement candidate rather than a file to update. It may be deleted after dependency checks confirm no active runtime, installer, bootstrap, eval, or test path still requires it.
 
 ## Problem
 
@@ -26,20 +26,21 @@ A mandatory `test-agent` creates avoidable overhead in the normal development lo
 
 ## Goals
 
-- Remove `test-agent` from the default lifecycle mental model.
+- Remove `test-agent` from the default lifecycle mental model and from active agent runtime loading.
 - Keep normal TDD, focused tests, full regression, and failure repair inside `implement-agent`.
 - Move test quality, overfitting detection, assertion strength, and verification evidence review into `review-agent`.
 - Preserve optional independent verification as a future wrapper concept for high-risk or exceptional cases.
 - Keep `workflow.py` as the deterministic owner of lifecycle state, gates, hooks, and transitions.
+- Make `finish-agent` capture a clean commit id before memory/roadmap hook synchronization and commit again after generated hook artifacts, if any.
+- Retire legacy `sdlc-orchestrator` skill assets if dependency audit confirms `dev-orchestrator` no longer depends on them.
 - Maintain compatibility with Superpowers-style task execution: small, direct, reviewable, and evidence-first.
-- Produce a clean plan that can be executed incrementally and reviewed before modifying runtime behavior.
 
 ## Non-Goals
 
 - Do not delete historical archive snapshots solely to rewrite history.
 - Do not remove deterministic test requirements from workflow gates.
 - Do not weaken TDD expectations.
-- Do not remove EvalOps golden evaluation gates for EvalOps-gated changes.
+- Do not remove EvalOps golden evaluation gates for EvalOps-gated changes that still target active agents or skills.
 - Do not add a new `verification-agent` in this change.
 - Do not redesign the entire SDLC workflow state machine.
 - Do not modify upstream Superpowers skills.
@@ -73,7 +74,11 @@ review-agent
 
 finish-agent
   -> archive or finish branch
-  -> run roadmap, memory, and workflow cleanup hooks
+  -> pre-hook commit and push
+  -> resolve roadmap and memory hooks
+  -> post-hook dirty-tree check
+  -> second commit and push if sync-generated files remain
+  -> complete workflow cleanup through workflow.py
 ```
 
 ## Responsibility Boundaries
@@ -146,13 +151,17 @@ Responsibilities:
 
 - Archive OpenSpec changes when using `spec-flow`.
 - Run Superpowers `finishing-a-development-branch` when using `lightweight-flow`.
-- Resolve roadmap and memory hooks.
+- Before resolving roadmap or memory hooks, check repository status, commit all already-approved implementation/archive changes, push, and record the resulting commit id for memory sync.
+- Resolve memory and roadmap hooks only after the pre-hook commit id exists.
+- After hook resolution, inspect the repository again. If memory sync, roadmap sync, template sync, or workflow hook completion generated additional files, commit and push those files in a second commit.
 - Ensure workflow cleanup is completed through `workflow.py`.
+- Emit evidence for both commit checkpoints: pre-hook commit id and optional post-hook commit id.
 
 Non-responsibilities:
 
 - Does not approve unreviewed implementation.
 - Does not ignore pending hooks.
+- Does not hide uncommitted generated artifacts after hook execution.
 
 ## Optional Independent Verification Wrapper
 
@@ -170,6 +179,26 @@ Valid trigger examples:
 Default rule:
 
 > If a failure is directly related to the current implementation slice and `implement-agent` still has active context, repair should remain with `implement-agent`.
+
+## Legacy `sdlc-orchestrator` Skill Retirement
+
+The legacy `skills/sdlc-orchestrator/SKILL.md` file should not be updated as part of this cleanup unless a dependency audit proves it is still active.
+
+Retirement criteria:
+
+- `agents/dev-orchestrator.md` does not list `sdlc-orchestrator` in required skills or skill permissions.
+- `.ai/workflows/definitions/sdlc-main.yaml` does not list `sdlc-orchestrator` as an active worker.
+- Agent installation, activation, and rendering scripts do not read or distribute it as a required asset.
+- Bootstrap templates do not install it as the default orchestrator entrypoint.
+- Tests do not require the legacy skill for active runtime behavior.
+- EvalOps targets for `skill.sdlc-orchestrator` are either deleted, archived, or explicitly marked as historical after the active agent target replaces them.
+
+If all checks pass, delete the canonical legacy skill and its distributed copies instead of editing them:
+
+- `skills/sdlc-orchestrator/`
+- `.opencode/skills/sdlc-orchestrator/`
+- `.claude/skills/sdlc-orchestrator/`
+- `.cursor/skills/sdlc-orchestrator/`
 
 ## Test Overfitting Review Criteria
 
@@ -189,23 +218,28 @@ Default rule:
 The implementation plan should inspect and update these categories:
 
 1. Active roadmap and design docs that still name default `test-agent`.
-2. Agent specs or templates that create or reference `test-agent` as a default role.
-3. Orchestrator prompts or skills that route normal verification to `test-agent`.
-4. Tests or eval cases that expect `test-agent` as a mandatory lifecycle participant.
-5. Documentation examples that show `test-agent` in the common path.
+2. Active agent specs and distributed copies that define or reference `test-agent` as a default role.
+3. Active `finish-agent` specs and distributed copies so commit/push checkpoints happen before and after hook synchronization.
+4. Legacy `sdlc-orchestrator` skill assets and EvalOps assets, deleting them if no active dependency remains.
+5. Orchestrator prompts, tests, or eval cases that route normal verification to `test-agent`.
+6. Documentation examples that show `test-agent` in the common path.
 
 Historical archives and snapshots may remain unchanged unless they are copied into active templates or used by current instructions.
 
 ## Acceptance Criteria
 
 - No active default lifecycle documentation says `test-agent` is a required specialized agent.
+- Active runtime agent files no longer include `agents/test-agent.md` or distributed `test-agent` copies unless explicitly retained as disabled/historical examples.
 - Active lifecycle mapping lists `plan-agent`, `implement-agent`, `review-agent`, and `finish-agent` as default roles.
 - `implement-agent` is documented as owning normal TDD, focused tests, full regression, and failure-fix loops.
 - `review-agent` is documented as owning test quality review, overfitting detection, and verification evidence review.
+- `finish-agent` performs a pre-hook commit and push before memory/roadmap hook resolution and records that commit id for memory sync.
+- `finish-agent` performs a post-hook dirty-tree check and creates a second commit and push if generated files remain.
 - Optional independent verification is documented only as a risk-triggered future wrapper, not a default session.
-- Any remaining `test-agent` references are either historical/archive-only or explicitly marked non-default.
+- Any remaining `test-agent` references are either historical/archive-only or explicitly marked disabled/non-default.
+- Legacy `sdlc-orchestrator` skill assets are deleted when dependency checks prove they are unused, or the blocker is documented with the exact active dependency.
 - Existing workflow gates for TDD, EvalOps, review, archive, roadmap, memory, and workflow completion remain intact.
-- The plan includes verification commands for searching remaining references and running relevant tests.
+- The plan includes verification commands for active agent cleanup, legacy skill dependency checks, finish-agent commit checkpoints, and relevant tests.
 
 ## Review Questions
 
@@ -214,3 +248,5 @@ Historical archives and snapshots may remain unchanged unless they are copied in
 3. Should full regression commands be fixed per repository, inferred from plan artifacts, or carried in workflow context?
 4. Should repeated implement-agent test failures have a numeric threshold before optional independent verification is considered?
 5. Should `review-agent` block on missing full regression evidence for all changes, or only behavior-changing code changes?
+6. Should retired `skill.sdlc-orchestrator` EvalOps cases be deleted, moved to an archive area, or migrated to `agent.dev-orchestrator` coverage?
+7. What commit message convention should `finish-agent` use for the pre-hook commit and the post-hook generated-artifacts commit?
