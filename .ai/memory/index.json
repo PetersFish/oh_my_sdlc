@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-07-04T13:10:09.416038Z",
+  "generated_at": "2026-07-05T00:30:00Z",
   "entries": [
     {
       "id": "agents",
@@ -15,9 +15,9 @@
         "subagents",
         "roadmap"
       ],
-      "updated_at": "2026-07-02T11:20:00Z",
+      "updated_at": "2026-07-05T00:30:00Z",
       "confidence": "high",
-      "status": "pending_commit",
+      "status": "synced",
       "parent_id": "root",
       "owned_paths": [
         "agents/"

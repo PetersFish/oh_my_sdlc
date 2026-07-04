@@ -8,12 +8,12 @@ summary: >-
   output JSON contracts, failure-mode routing, required skills, and
   lifecycle-phase permissions.
 parent_id: root
-sync_status: pending_commit
-evidence_mode: uncommitted_snapshot
-linked_commits: []
+sync_status: synced
+evidence_mode: commit
+linked_commits: ["ab70b4f087524f9a1344fd561f8ae4c5b2653c09"]
 linked_specs: []
-linked_sessions: ["20260629-202700"]
-updated_at: 2026-07-02T11:20:00Z
+linked_sessions: ["20260629-202700", "20260705-lifecycle-hardening-and-derived-sync"]
+updated_at: 2026-07-05T00:30:00Z
 confidence: high
 tags: [agents, prompts, sdlc, subagents, roadmap]
 owned_paths: [agents/]
@@ -67,3 +67,4 @@ drift during subagent dispatch.
 
 - 2026-06-29: Added blocked/failed JSON examples to implement, review, and finish agent prompts
 - 2026-07-02: Added `roadmap-agent`; `dev-orchestrator` routes governed roadmap hooks through lifecycle dispatch; `implement-agent` must return `blocked` instead of `success + blockers` when verification or sync follow-ups remain.
+- 2026-07-05: Lifecycle hardening — added `safe_delete.py` allow-rules to implement-agent and finish-agent; moved derived-drift ownership to finish-agent with Derived Artifact Sync section; implement-agent no longer treats distributed-copy drift as a default apply-change blocker; review-agent flags derived drift as a finish follow-up; permission-contract ordering locked via deny-first bash rules.
