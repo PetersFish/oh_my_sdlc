@@ -31,7 +31,7 @@ A mandatory `test-agent` creates avoidable overhead in the normal development lo
 - Move test quality, overfitting detection, assertion strength, and verification evidence review into `review-agent`.
 - Preserve optional independent verification as a future wrapper concept for high-risk or exceptional cases.
 - Keep `workflow.py` as the deterministic owner of lifecycle state, gates, hooks, and transitions.
-- Make `finish-agent` capture a clean commit id before memory/roadmap hook synchronization and commit again after generated hook artifacts, if any.
+- Make `finish-agent` capture a clean commit id before memory/roadmap hook synchronization and commit again after workflow cleanup if generated hook artifacts remain.
 - Retire legacy `sdlc-orchestrator` skill assets if dependency audit confirms `dev-orchestrator` no longer depends on them.
 - Maintain compatibility with Superpowers-style task execution: small, direct, reviewable, and evidence-first.
 
@@ -76,9 +76,9 @@ finish-agent
   -> archive or finish branch
   -> pre-hook commit and push
   -> resolve roadmap and memory hooks
+  -> complete workflow cleanup through workflow.py
   -> post-hook dirty-tree check
   -> second commit and push if sync-generated files remain
-  -> complete workflow cleanup through workflow.py
 ```
 
 ## Responsibility Boundaries
@@ -153,8 +153,8 @@ Responsibilities:
 - Run Superpowers `finishing-a-development-branch` when using `lightweight-flow`.
 - Before resolving roadmap or memory hooks, check repository status, commit all already-approved implementation/archive changes, push, and record the resulting commit id for memory sync.
 - Resolve memory and roadmap hooks only after the pre-hook commit id exists.
-- After hook resolution, inspect the repository again. If memory sync, roadmap sync, template sync, or workflow hook completion generated additional files, commit and push those files in a second commit.
-- Ensure workflow cleanup is completed through `workflow.py`.
+- Ensure workflow cleanup is completed through `workflow.py` after hook resolution.
+- After hook resolution and workflow cleanup, inspect the repository again. If memory sync, roadmap sync, template sync, or workflow hook completion generated additional files, commit and push those files in a second commit.
 - Emit evidence for both commit checkpoints: pre-hook commit id and optional post-hook commit id.
 
 Non-responsibilities:
@@ -219,7 +219,7 @@ The implementation plan should inspect and update these categories:
 
 1. Active roadmap and design docs that still name default `test-agent`.
 2. Active agent specs and distributed copies that define or reference `test-agent` as a default role.
-3. Active `finish-agent` specs and distributed copies so commit/push checkpoints happen before and after hook synchronization.
+3. Active `finish-agent` specs and distributed copies so commit/push checkpoints happen before hook synchronization and after workflow cleanup.
 4. Legacy `sdlc-orchestrator` skill assets and EvalOps assets, deleting them if no active dependency remains.
 5. Orchestrator prompts, tests, or eval cases that route normal verification to `test-agent`.
 6. Documentation examples that show `test-agent` in the common path.
@@ -234,7 +234,7 @@ Historical archives and snapshots may remain unchanged unless they are copied in
 - `implement-agent` is documented as owning normal TDD, focused tests, full regression, and failure-fix loops.
 - `review-agent` is documented as owning test quality review, overfitting detection, and verification evidence review.
 - `finish-agent` performs a pre-hook commit and push before memory/roadmap hook resolution and records that commit id for memory sync.
-- `finish-agent` performs a post-hook dirty-tree check and creates a second commit and push if generated files remain.
+- `finish-agent` performs workflow cleanup through `workflow.py`, then performs a post-cleanup dirty-tree check and creates a second commit and push if generated files remain.
 - Optional independent verification is documented only as a risk-triggered future wrapper, not a default session.
 - Any remaining `test-agent` references are either historical/archive-only or explicitly marked disabled/non-default.
 - Legacy `sdlc-orchestrator` skill assets are deleted when dependency checks prove they are unused, or the blocker is documented with the exact active dependency.
