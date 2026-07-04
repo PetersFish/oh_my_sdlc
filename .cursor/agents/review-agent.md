@@ -71,6 +71,7 @@ Load these skills before acting:
 - If a preferred tool is unavailable, unindexed, or demonstrably
   insufficient, you MUST stop and return a blocker with remediation. You
   must not degrade to bash exploration.
+- Review may note derived drift as a finish follow-up, but should not reject otherwise-sufficient implementation evidence solely for project-level redistribution lag.
 
 ### CodeGraph Tool Names
 

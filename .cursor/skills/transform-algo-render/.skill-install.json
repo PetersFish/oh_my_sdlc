@@ -1,9 +1,15 @@
 {
   "skill": "transform-algo-render",
-  "source_repo": ".",
-  "source_ref": "2b0e7581d12198746dc50df9fb6f7485dc3e3cf5",
+  "source_repo": "/Users/yuping/Documents/workspace/oh_my_skills",
+  "source_path": "skills/transform-algo-render",
+  "source_ref": "HEAD",
   "status": "stable",
-  "target": ".cursor/skills/transform-algo-render",
-  "installed_at": "2026-06-10T13:35:23.907796Z",
-  "backport_policy": "review-required"
+  "target": "/Users/yuping/Documents/workspace/oh_my_skills/.cursor/skills/transform-algo-render",
+  "installed_at": "2026-07-04T16:12:30.731678Z",
+  "backport_policy": "review-required",
+  "payload_hash": "cb865854e6266fd551799c40a113a39366a8fe8b3eb089be903f0e28b99cb0a2",
+  "files": [
+    "SKILL.md",
+    "SOURCE.md"
+  ]
 }

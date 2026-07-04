@@ -1816,6 +1816,63 @@ def _write_handoff_history_copy(root, handoff_path):
     return history_path
 
 
+def _read_handoff_metadata(path):
+    """Parse the ``## Metadata`` block of a handoff markdown file.
+
+    Returns a dict of canonical metadata keys (e.g. ``"Run ID"``,
+    ``"Slice ID"``, ``"Agent"``, ``"Phase"``, ``"Flow Type"``, ``"Status"``)
+    mapped to their stripped string values.  Returns an empty dict if the
+    file is missing or has no ``## Metadata`` section.
+    """
+    try:
+        with open(path, encoding="utf-8") as f:
+            content = f.read()
+    except OSError:
+        return {}
+
+    metadata: Dict[str, str] = {}
+    in_metadata = False
+    for line in content.splitlines():
+        stripped = line.strip()
+        if stripped == "## Metadata":
+            in_metadata = True
+            continue
+        if in_metadata and stripped.startswith("## "):
+            break
+        if in_metadata and stripped.startswith("- **") and "**:" in stripped:
+            key, value = stripped[4:].split("**:", 1)
+            metadata[key.strip()] = value.strip()
+    return metadata
+
+
+def _handoff_metadata_mismatch_blocker(metadata, expected):
+    """Return a structured blocker dict if handoff metadata mismatches context.
+
+    ``expected`` is a dict of canonical keys to expected values.  Returns the
+    first mismatch as a blocker dict, or None when all present metadata fields
+    match (missing metadata fields are tolerated — only present-but-mismatched
+    fields block).
+    """
+    field_map = {
+        "Agent": expected.get("agent", ""),
+        "Phase": expected.get("phase", ""),
+        "Slice ID": expected.get("slice_id", ""),
+        "Flow Type": expected.get("flow_type", ""),
+    }
+    for field, expected_value in field_map.items():
+        actual = metadata.get(field)
+        if actual is not None and str(actual) != str(expected_value):
+            return {
+                "reason": "handoff_metadata_mismatch",
+                "message": (
+                    f"handoff metadata field '{field}' value '{actual}' does not "
+                    f"match active run context '{expected_value}'"
+                ),
+                "recommended_action": "regenerate_handoff_artifact",
+            }
+    return None
+
+
 def cmd_after_dispatch(root, args):
     state = load_run_state(root)
     if not state:
@@ -1899,11 +1956,25 @@ def cmd_after_dispatch(root, args):
         artifacts = agent_result.get("artifacts") or {}
         handoff_path = artifacts.get("handoff_path")
         if handoff_path:
-            history_path = _write_handoff_history_copy(root, handoff_path)
-            if history_path:
-                artifacts.setdefault("history_handoff_paths", []).append(
-                    os.path.relpath(history_path, root) if root else history_path
-                )
+            abs_handoff = _resolve_path(root, handoff_path)
+            metadata = _read_handoff_metadata(abs_handoff) if os.path.exists(abs_handoff) else {}
+            mismatch_blocker = _handoff_metadata_mismatch_blocker(
+                metadata,
+                {
+                    "agent": canonical_agent,
+                    "phase": phase,
+                    "slice_id": slice_id,
+                    "flow_type": flow_type,
+                },
+            )
+            if mismatch_blocker:
+                agent_blockers.append(mismatch_blocker)
+            else:
+                history_path = _write_handoff_history_copy(root, handoff_path)
+                if history_path:
+                    artifacts.setdefault("history_handoff_paths", []).append(
+                        os.path.relpath(history_path, root) if root else history_path
+                    )
 
     # Synchronize canonical change_id from provider-created spec artifacts.
     # When a provider (e.g., OpenSpec) normalizes the change_id during artifact

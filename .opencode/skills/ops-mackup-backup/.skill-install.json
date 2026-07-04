@@ -1,9 +1,15 @@
 {
   "skill": "ops-mackup-backup",
-  "source_repo": ".",
-  "source_ref": "2b0e7581d12198746dc50df9fb6f7485dc3e3cf5",
+  "source_repo": "/Users/yuping/Documents/workspace/oh_my_skills",
+  "source_path": "skills/ops-mackup-backup",
+  "source_ref": "HEAD",
   "status": "stable",
-  "target": ".opencode/skills/ops-mackup-backup",
-  "installed_at": "2026-06-10T13:35:26.586355Z",
-  "backport_policy": "review-required"
+  "target": "/Users/yuping/Documents/workspace/oh_my_skills/.opencode/skills/ops-mackup-backup",
+  "installed_at": "2026-07-04T16:12:28.900794Z",
+  "backport_policy": "review-required",
+  "payload_hash": "a8e8c54e104b5013a9ce6253ed6de14a654a73e5b769c37c2de1b6f8168d73fd",
+  "files": [
+    "SKILL.md",
+    "SOURCE.md"
+  ]
 }

@@ -1,9 +1,16 @@
 {
   "skill": "qa-ai-architecture",
-  "source_repo": ".",
-  "source_ref": "2b0e7581d12198746dc50df9fb6f7485dc3e3cf5",
+  "source_repo": "/Users/yuping/Documents/workspace/oh_my_skills",
+  "source_path": "skills/qa-ai-architecture",
+  "source_ref": "HEAD",
   "status": "stable",
-  "target": ".cursor/skills/qa-ai-architecture",
-  "installed_at": "2026-06-10T13:35:23.766187Z",
-  "backport_policy": "review-required"
+  "target": "/Users/yuping/Documents/workspace/oh_my_skills/.cursor/skills/qa-ai-architecture",
+  "installed_at": "2026-07-04T16:12:29.087379Z",
+  "backport_policy": "review-required",
+  "payload_hash": "fdc324fd584c697301c2d9f91a00e825e05afb613385ef6c35f6464e8c11dd13",
+  "files": [
+    "SKILL.md",
+    "SOURCE.md",
+    "reference.md"
+  ]
 }

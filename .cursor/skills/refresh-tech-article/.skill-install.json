@@ -1,9 +1,18 @@
 {
   "skill": "refresh-tech-article",
-  "source_repo": ".",
-  "source_ref": "2b0e7581d12198746dc50df9fb6f7485dc3e3cf5",
+  "source_repo": "/Users/yuping/Documents/workspace/oh_my_skills",
+  "source_path": "skills/refresh-tech-article",
+  "source_ref": "HEAD",
   "status": "stable",
-  "target": ".cursor/skills/refresh-tech-article",
-  "installed_at": "2026-06-10T13:35:23.802316Z",
-  "backport_policy": "review-required"
+  "target": "/Users/yuping/Documents/workspace/oh_my_skills/.cursor/skills/refresh-tech-article",
+  "installed_at": "2026-07-04T16:12:29.201841Z",
+  "backport_policy": "review-required",
+  "payload_hash": "5fcc9b50169eb0c0aa41cc694dc9500fae662cf4e0e4feeb4dc62c988fca82fe",
+  "files": [
+    "SKILL.md",
+    "evals/evals.json",
+    "references/report-template.md",
+    "references/rewrite-policy.md",
+    "references/source-quality.md"
+  ]
 }

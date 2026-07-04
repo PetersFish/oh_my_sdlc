@@ -1,9 +1,19 @@
 {
   "skill": "transform-markdown-svg",
-  "source_repo": ".",
-  "source_ref": "2b0e7581d12198746dc50df9fb6f7485dc3e3cf5",
+  "source_repo": "/Users/yuping/Documents/workspace/oh_my_skills",
+  "source_path": "skills/transform-markdown-svg",
+  "source_ref": "HEAD",
   "status": "stable",
-  "target": ".cursor/skills/transform-markdown-svg",
-  "installed_at": "2026-06-10T13:35:23.947890Z",
-  "backport_policy": "review-required"
+  "target": "/Users/yuping/Documents/workspace/oh_my_skills/.cursor/skills/transform-markdown-svg",
+  "installed_at": "2026-07-04T16:12:30.848969Z",
+  "backport_policy": "review-required",
+  "payload_hash": "c0067b8a3c49884dfe5aa36d4bb69854acef36c9bf6f08b1a9a228922086f918",
+  "files": [
+    "SKILL.md",
+    "SOURCE.md",
+    "palettes/academic-clean.md",
+    "palettes/minimal-gray.md",
+    "palettes/muted-morandi.md",
+    "scripts/embed_drawio_svg.py"
+  ]
 }

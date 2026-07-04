@@ -5530,6 +5530,198 @@ class TestApplyChangeHandoffHistory(FixtureBase):
                         "history must contain review-agent timestamped copy")
 
 
+class TestApplyChangeHandoffMetadataValidation(FixtureBase):
+    """Tests for handoff metadata mismatch blocking before history copy."""
+
+    def _write_handoff(self, run_id, slice_id, agent, metadata_lines, body=""):
+        handoff_path = f".ai/workflows/runs/active/{run_id}/handoffs/{slice_id}/{agent}.md"
+        latest_abs = os.path.join(self.tmp, handoff_path)
+        os.makedirs(os.path.dirname(latest_abs), exist_ok=True)
+        content = f"# {agent.replace('-', ' ').title()} Handoff\n\n## Metadata\n\n"
+        for line in metadata_lines:
+            content += f"- {line}\n"
+        if body:
+            content += "\n" + body
+        with open(latest_abs, "w", encoding="utf-8") as f:
+            f.write(content)
+        return handoff_path
+
+    def test_after_dispatch_blocks_when_review_handoff_metadata_phase_mismatches(self):
+        run_workflow(self.tmp, "start", subject_type="spec_change", subject_id="demo-change")
+        state = self._read_current_state()
+        state["current_phase"] = "apply_change"
+        state.setdefault("context", {})["change_id"] = "demo-change"
+        # Provide prior implement-agent verification basis so the only blocker
+        # is the handoff metadata mismatch.
+        state.setdefault("evidence", {}).setdefault("agent_results", {}).setdefault("default", {})["implement-agent"] = {
+            "status": "success",
+            "evidence": {
+                "verification_passed": True,
+                "regression_passed": True,
+                "tdd_passed": True,
+            },
+        }
+        self._write_current_state(state)
+        run_id = state["run_id"]
+
+        handoff_path = self._write_handoff(
+            run_id, "default", "review-agent",
+            [
+                "**Run ID**: demo-run",
+                "**Slice ID**: default",
+                "**Agent**: review-agent",
+                "**Phase**: archive_change",
+                "**Flow Type**: lightweight-flow",
+                "**Status**: success",
+            ],
+        )
+
+        result = {
+            "status": "success",
+            "phase": "apply_change",
+            "slice_id": "default",
+            "flow_type": "lightweight-flow",
+            "evidence": {
+                "tasks_complete": True,
+                "tdd_passed": True,
+                "eval_passed_or_human_decision_recorded": True,
+                "review_complete": True,
+                "verification_passed": True,
+                "review_decision": "accepted",
+                "criteria_satisfied": "tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded",
+            },
+            "artifacts": {"handoff_path": handoff_path},
+            "blockers": [],
+            "recommended_next_action": "complete_phase",
+        }
+        rc, out, _ = run_workflow(self.tmp, "after-dispatch", agent="review-agent", value=json.dumps(result))
+        data = json.loads(out)
+        self.assertEqual(data["workflow_command"], "workflow.py block",
+                         f"expected workflow block, got stdout={out!r}")
+        self.assertEqual(data["workflow_args"]["block_type"], "worker_failed")
+        reasons = [b.get("reason") for b in data["blockers"]]
+        self.assertIn("handoff_metadata_mismatch", reasons)
+
+        # History copy must NOT be written when metadata mismatches
+        history_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "active", run_id, "handoffs", "default", "history")
+        if os.path.isdir(history_dir):
+            files = os.listdir(history_dir)
+            self.assertFalse(
+                any(name.startswith("review-agent-") for name in files),
+                "history must NOT contain review-agent copy when metadata mismatches",
+            )
+
+    def test_after_dispatch_blocks_when_handoff_metadata_agent_mismatches(self):
+        run_workflow(self.tmp, "start", subject_type="spec_change", subject_id="demo-change")
+        state = self._read_current_state()
+        state["current_phase"] = "apply_change"
+        state.setdefault("context", {})["change_id"] = "demo-change"
+        state.setdefault("evidence", {}).setdefault("agent_results", {}).setdefault("default", {})["implement-agent"] = {
+            "status": "success",
+            "evidence": {
+                "verification_passed": True,
+                "regression_passed": True,
+                "tdd_passed": True,
+            },
+        }
+        self._write_current_state(state)
+        run_id = state["run_id"]
+
+        # Handoff metadata says agent=implement-agent, but dispatch agent=review-agent
+        handoff_path = self._write_handoff(
+            run_id, "default", "review-agent",
+            [
+                "**Run ID**: demo-run",
+                "**Slice ID**: default",
+                "**Agent**: implement-agent",
+                "**Phase**: apply_change",
+                "**Flow Type**: lightweight-flow",
+                "**Status**: success",
+            ],
+        )
+
+        result = {
+            "status": "success",
+            "phase": "apply_change",
+            "slice_id": "default",
+            "flow_type": "lightweight-flow",
+            "evidence": {
+                "tasks_complete": True,
+                "tdd_passed": True,
+                "eval_passed_or_human_decision_recorded": True,
+                "review_complete": True,
+                "verification_passed": True,
+                "review_decision": "accepted",
+                "criteria_satisfied": "tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded",
+            },
+            "artifacts": {"handoff_path": handoff_path},
+            "blockers": [],
+            "recommended_next_action": "complete_phase",
+        }
+        rc, out, _ = run_workflow(self.tmp, "after-dispatch", agent="review-agent", value=json.dumps(result))
+        data = json.loads(out)
+        self.assertEqual(data["workflow_command"], "workflow.py block")
+        self.assertEqual(data["workflow_args"]["block_type"], "worker_failed")
+        reasons = [b.get("reason") for b in data["blockers"]]
+        self.assertIn("handoff_metadata_mismatch", reasons)
+
+    def test_after_dispatch_writes_history_copy_when_metadata_matches(self):
+        run_workflow(self.tmp, "start", subject_type="spec_change", subject_id="demo-change")
+        state = self._read_current_state()
+        state["current_phase"] = "apply_change"
+        state.setdefault("context", {})["change_id"] = "demo-change"
+        state.setdefault("evidence", {}).setdefault("agent_results", {}).setdefault("default", {})["implement-agent"] = {
+            "status": "success",
+            "evidence": {
+                "verification_passed": True,
+                "regression_passed": True,
+                "tdd_passed": True,
+            },
+        }
+        self._write_current_state(state)
+        run_id = state["run_id"]
+        flow_type = state.get("flow_type", "lightweight-flow")
+
+        handoff_path = self._write_handoff(
+            run_id, "default", "review-agent",
+            [
+                f"**Run ID**: {run_id}",
+                "**Slice ID**: default",
+                "**Agent**: review-agent",
+                "**Phase**: apply_change",
+                f"**Flow Type**: {flow_type}",
+                "**Status**: success",
+            ],
+        )
+
+        result = {
+            "status": "success",
+            "phase": "apply_change",
+            "slice_id": "default",
+            "flow_type": flow_type,
+            "evidence": {
+                "tasks_complete": True,
+                "tdd_passed": True,
+                "eval_passed_or_human_decision_recorded": True,
+                "review_complete": True,
+                "verification_passed": True,
+                "review_decision": "accepted",
+                "criteria_satisfied": "tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded",
+            },
+            "artifacts": {"handoff_path": handoff_path},
+            "blockers": [],
+            "recommended_next_action": "complete_phase",
+        }
+        rc, out, _ = run_workflow(self.tmp, "after-dispatch", agent="review-agent", value=json.dumps(result))
+        self.assertEqual(rc, 0, f"valid metadata should succeed, got stdout={out!r}")
+
+        history_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "active", run_id, "handoffs", "default", "history")
+        self.assertTrue(os.path.isdir(history_dir), "history directory must exist for valid metadata")
+        files = os.listdir(history_dir)
+        self.assertTrue(any(name.startswith("review-agent-") for name in files),
+                        "history must contain review-agent copy when metadata matches")
+
+
 class TestApplyChangeVerificationBasis(FixtureBase):
     """Tests for verification-basis guard requiring prior implement-agent evidence."""
 

@@ -1,11 +1,11 @@
 {
   "skill": "implementation-contract-discipline",
-  "source_repo": ".",
+  "source_repo": "/Users/yuping/Documents/workspace/oh_my_skills",
   "source_path": "skills/implementation-contract-discipline",
   "source_ref": "HEAD",
   "status": "stable",
-  "target": ".opencode/skills/implementation-contract-discipline",
-  "installed_at": "2026-06-23T10:00:23.694672Z",
+  "target": "/Users/yuping/Documents/workspace/oh_my_skills/.opencode/skills/implementation-contract-discipline",
+  "installed_at": "2026-07-04T16:12:28.332791Z",
   "backport_policy": "review-required",
   "payload_hash": "c9a717e870d76b9686dc7152e0253ae3f22a888fb0559cf5b78d416a9bd8cdf6",
   "files": [

@@ -1,11 +1,11 @@
 {
   "skill": "sdlc-roadmap",
-  "source_repo": ".",
+  "source_repo": "/Users/yuping/Documents/workspace/oh_my_skills",
   "source_path": "skills/sdlc-roadmap",
   "source_ref": "HEAD",
   "status": "stable",
-  "target": ".claude/skills/sdlc-roadmap",
-  "installed_at": "2026-07-04T12:02:30.961717Z",
+  "target": "/Users/yuping/Documents/workspace/oh_my_skills/.claude/skills/sdlc-roadmap",
+  "installed_at": "2026-07-04T16:12:30.466052Z",
   "backport_policy": "review-required",
   "payload_hash": "c4bf0d516e3b67e6b84d381f04a5c6af11fc62eae257ef5e4fb390db46a9a907",
   "files": [

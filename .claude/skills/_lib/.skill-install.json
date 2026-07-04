@@ -1,11 +1,11 @@
 {
   "skill": "_lib",
-  "source_repo": ".",
+  "source_repo": "/Users/yuping/Documents/workspace/oh_my_skills",
   "source_path": "skills/_lib",
   "source_ref": "HEAD",
   "status": "stable",
-  "target": ".claude/skills/_lib",
-  "installed_at": "2026-07-04T12:22:18.131801Z",
+  "target": "/Users/yuping/Documents/workspace/oh_my_skills/.claude/skills/_lib",
+  "installed_at": "2026-07-04T16:12:28.139743Z",
   "backport_policy": "review-required",
   "payload_hash": "18aa72d772bea7d70595a9e1153c76d7a2cb9bc243cef2b9fb789f39bd826016",
   "files": [

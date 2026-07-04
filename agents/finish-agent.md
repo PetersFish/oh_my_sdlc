@@ -24,6 +24,7 @@ permission:
     "pytest*": allow
     "python3 .ai/workflows/scripts/workflow.py *": allow
     "python3 scripts/*": allow
+    "python3 scripts/safe_delete.py *": allow
     "python3 skills/*": allow
     "python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py *": allow
     "git add*": allow
@@ -62,6 +63,18 @@ Load these skills before acting:
 - `sdlc-openspec-memory-sync` — for post-archive memory sync (spec-flow)
 - `sdlc-repository-memory-sync` — for non-OpenSpec memory sync
 - `sdlc-roadmap` — for roadmap_done_if_relevant hook
+
+## Derived Artifact Sync
+
+Before declaring closure complete, run:
+
+- `python3 scripts/sync_derived_artifacts.py --check`
+
+If drift is reported and safe remediation is allowed, run:
+
+- `python3 scripts/sync_derived_artifacts.py --fix`
+
+Re-run `python3 scripts/sync_derived_artifacts.py --check` and keep the run blocked until it passes.
 
 ## Tool Usage Policy
 

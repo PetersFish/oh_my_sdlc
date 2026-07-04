@@ -1,9 +1,15 @@
 {
   "skill": "media-ocr-router",
-  "source_repo": ".",
-  "source_ref": "2b0e7581d12198746dc50df9fb6f7485dc3e3cf5",
+  "source_repo": "/Users/yuping/Documents/workspace/oh_my_skills",
+  "source_path": "skills/media-ocr-router",
+  "source_ref": "HEAD",
   "status": "stable",
-  "target": ".cursor/skills/media-ocr-router",
-  "installed_at": "2026-06-10T13:35:23.655356Z",
-  "backport_policy": "review-required"
+  "target": "/Users/yuping/Documents/workspace/oh_my_skills/.cursor/skills/media-ocr-router",
+  "installed_at": "2026-07-04T16:12:28.626877Z",
+  "backport_policy": "review-required",
+  "payload_hash": "1c3a6536c7c5b757f8ab97bed6a2c27bcd44ff66e04c6c09462c5096eb298e05",
+  "files": [
+    "SKILL.md",
+    "SOURCE.md"
+  ]
 }

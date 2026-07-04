@@ -1,0 +1,21 @@
+{
+  "skill": "research-general",
+  "source_repo": "/Users/yuping/Documents/workspace/oh_my_skills",
+  "source_path": "skills/research-general",
+  "source_ref": "HEAD",
+  "status": "stable",
+  "target": "/Users/yuping/Documents/workspace/oh_my_skills/.claude/skills/research-general",
+  "installed_at": "2026-07-04T16:12:29.285166Z",
+  "backport_policy": "review-required",
+  "payload_hash": "8384e8efc4e87eba113e0fb15f0788d1b67b24cca97329f298689d7ed7f5dc69",
+  "files": [
+    "SKILL.md",
+    "SOURCE.md",
+    "evals/evals.json",
+    "references/action-dispatch.md",
+    "references/research-quality.md",
+    "references/safety-boundaries.md",
+    "references/templates.md",
+    "references/topic-protocol.md"
+  ]
+}

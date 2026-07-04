@@ -104,6 +104,23 @@ When checking for the existence of `.ai/roadmap/`, `.ai/evals/`, `.ai/memory/`, 
 
 This applies to all tooling and skill workflows that inspect `.ai/` state, including SDLC roadmap, EvalOps, and repository memory gates.
 
+## Derived Artifact Sync
+
+Canonical source files (under `agents/`, `skills/`, and `.ai/workflows/scripts/` + definitions) are the single source of truth. Distributed copies under `.opencode/`, `.claude/`, and `.cursor/` are derived artifacts that must be checked at finish time.
+
+**Primary entrypoint (use this for finish-phase closure and routine drift checks):**
+
+```bash
+python3 scripts/sync_derived_artifacts.py --check
+python3 scripts/sync_derived_artifacts.py --fix
+```
+
+`--check` verifies workflow templates, distributed workflow templates, project-level agent copies, and all canonical skill distributions. `--fix` syncs live → canonical workflow templates, distributes to all project-level workflow template copies, force-installs + activates agents in every project-level target, and re-installs every canonical skill to `.opencode/`, `.claude/`, and `.cursor/`.
+
+First-version coverage: workflow templates, agents, and all canonical skills under `skills/`. Excluded: `.ai/memory/`, EvalOps exports, research artifacts, and other ephemeral runtime outputs.
+
+The lower-level commands in the sections below are implementation details and specialized escape hatches (e.g., user-level distribution, single-skill re-install). For routine project-level drift closure, prefer the aggregate entrypoint above.
+
 ## Workflow Template Sync
 
 When modifying files under `.ai/workflows/scripts/workflow.py` or `.ai/workflows/definitions/sdlc-main.yaml`, the corresponding templates in `sdlc-project-bootstrap/templates/workflow/` MUST be synced before commit. The pre-commit hook enforces this.

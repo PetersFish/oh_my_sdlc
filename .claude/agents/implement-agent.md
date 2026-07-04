@@ -21,6 +21,7 @@ permission:
     "pytest *": allow
     "python3 .ai/workflows/scripts/workflow.py *": allow
     "python3 scripts/*": allow
+    "python3 scripts/safe_delete.py *": allow
     "python3 skills/*": allow
     "git status*": allow
     "git diff*": allow
@@ -236,6 +237,8 @@ Success example when implementation is complete and ready for downstream verific
 Do not treat normal downstream verification handoff as a blocker. Reserve
 `blocked` for real execution blockers such as missing workflow context,
 failing focused tests, or provider/apply failures.
+
+- Do not treat distributed-copy drift as a default apply-change blocker; report it for finish-phase closure.
 
 Failed example when OpenSpec apply cannot produce the requested artifact:
 ```json

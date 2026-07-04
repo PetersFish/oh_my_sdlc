@@ -1,0 +1,185 @@
+{
+  "version": 1,
+  "run_id": "2026-07-05-lifecycle-hardening-and-derived-sync",
+  "workflow": "sdlc-main",
+  "flow_type": "lightweight-flow",
+  "status": "running",
+  "current_phase": "archive_change",
+  "primary_subject": {
+    "type": "spec_change",
+    "id": "lifecycle-hardening-and-derived-sync"
+  },
+  "context": {
+    "change_id": "lifecycle-hardening-and-derived-sync"
+  },
+  "phase_readiness": {
+    "phase": "archive_change",
+    "ready": true,
+    "missing_required_inputs": []
+  },
+  "pending_hooks": [],
+  "completed_hooks": [
+    "roadmap_apply_start_if_ready"
+  ],
+  "completed_phases": [
+    "apply_change"
+  ],
+  "gates": {},
+  "evidence": {
+    "spec_status": {
+      "classification": "missing",
+      "source": null
+    },
+    "lightweight_flow_confirmed": true,
+    "agent_phase": {
+      "agent_phase": "archive_change",
+      "agent": "finish-agent",
+      "flow_type": "lightweight-flow",
+      "dispatched_at": "2026-07-05T00:23:41.852713"
+    },
+    "agent_result": {
+      "agent": "roadmap-agent",
+      "status": "success",
+      "phase": "apply_change",
+      "slice_id": "default",
+      "flow_type": "lightweight-flow",
+      "evidence": {
+        "roadmap_hook_executed": "roadmap_apply_start_if_ready",
+        "roadmap_item_id": null,
+        "item_status": "no_linked_item",
+        "transition_applied": false,
+        "detail": "No roadmap_item_id found in run context and no roadmap item links to change lifecycle-hardening-and-derived-sync. This is a lightweight-flow change without a roadmap link \u2014 the hook is a no-op."
+      },
+      "blockers": [],
+      "recommended_next_action": "complete_hook_via_workflow",
+      "recorded_at": "2026-07-05T00:23:25.115970"
+    },
+    "agent_results": {
+      "default": {
+        "implement-agent": {
+          "agent": "implement-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "tasks_complete": true,
+            "tdd_passed": true,
+            "focused_tests": [
+              {
+                "command": "python3 -m pytest tests/test_wrapper_contracts.py -k \"review_agent_bash or implement_agent_bash_catch or finish_agent_bash_catch\" -v",
+                "result": "pass"
+              },
+              {
+                "command": "python3 scripts/setup_agents.py --target ./.opencode/agents --check",
+                "result": "pass"
+              },
+              {
+                "command": "python3 scripts/setup_agents.py --target ./.claude/agents --check",
+                "result": "pass"
+              },
+              {
+                "command": "python3 scripts/setup_agents.py --target ./.cursor/agents --check",
+                "result": "pass"
+              },
+              {
+                "command": "python3 -m pytest tests/test_safe_delete.py -v",
+                "result": "pass"
+              },
+              {
+                "command": "python3 -m pytest tests/test_safe_delete.py tests/test_wrapper_contracts.py -k \"safe_delete or finish_agent or implement_agent\" -v",
+                "result": "pass"
+              },
+              {
+                "command": "python3 -m pytest tests/test_sync_derived_artifacts.py -v",
+                "result": "pass"
+              },
+              {
+                "command": "python3 -m pytest tests/test_sync_derived_artifacts.py tests/test_sync_templates.py -v",
+                "result": "pass"
+              },
+              {
+                "command": "python3 -m pytest tests/test_wrapper_contracts.py -k \"agents_md or DerivedDriftBoundary\" -v",
+                "result": "pass"
+              },
+              {
+                "command": "python3 -m pytest tests/test_workflow.py -k \"handoff_metadata or history_copy\" -v",
+                "result": "pass"
+              },
+              {
+                "command": "python3 -m pytest tests/test_sync_all_distributed.py tests/test_sync_templates.py -v",
+                "result": "pass"
+              },
+              {
+                "command": "python3 -m pytest tests/test_wrapper_contracts.py tests/test_safe_delete.py tests/test_sync_derived_artifacts.py tests/test_sync_templates.py tests/test_sync_all_distributed.py tests/test_workflow.py -v",
+                "result": "pass"
+              },
+              {
+                "command": "python3 scripts/sync_derived_artifacts.py --fix",
+                "result": "pass"
+              },
+              {
+                "command": "python3 scripts/sync_derived_artifacts.py --check --json",
+                "result": "pass"
+              },
+              {
+                "command": "python3 -m pytest tests/test_precommit_hook.py tests/test_install_agents.py tests/test_setup_agents.py -v",
+                "result": "pass"
+              },
+              {
+                "command": "python3 -m pytest tests/ -v",
+                "result": "pass"
+              },
+              {
+                "command": "python3 scripts/check_plan_checkboxes.py docs/superpowers/plans/2026-07-04-lifecycle-hardening-and-derived-sync.md",
+                "result": "pass"
+              }
+            ]
+          },
+          "blockers": [],
+          "recommended_next_action": "dispatch_review_agent",
+          "recorded_at": "2026-07-05T00:16:08.012627"
+        },
+        "review-agent": {
+          "agent": "review-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "review_decision": "approved",
+            "tasks_complete": true,
+            "tdd_passed": true,
+            "eval_passed_or_human_decision_recorded": true
+          },
+          "blockers": [],
+          "recommended_next_action": "complete_phase",
+          "recorded_at": "2026-07-05T00:21:25.825281"
+        },
+        "roadmap-agent": {
+          "agent": "roadmap-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "roadmap_hook_executed": "roadmap_apply_start_if_ready",
+            "roadmap_item_id": null,
+            "item_status": "no_linked_item",
+            "transition_applied": false,
+            "detail": "No roadmap_item_id found in run context and no roadmap item links to change lifecycle-hardening-and-derived-sync. This is a lightweight-flow change without a roadmap link \u2014 the hook is a no-op."
+          },
+          "blockers": [],
+          "recommended_next_action": "complete_hook_via_workflow",
+          "recorded_at": "2026-07-05T00:23:25.115970"
+        }
+      }
+    },
+    "tasks_complete": true,
+    "tdd_passed": true,
+    "eval_passed_or_human_decision_recorded": true,
+    "roadmap_hook_resolution": "no_linked_item"
+  },
+  "block": null,
+  "updated_at": "2026-07-05T00:23:41.853020"
+}

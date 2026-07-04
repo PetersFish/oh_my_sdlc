@@ -1,11 +1,11 @@
 {
   "skill": "meta-skill-lifecycle-governance",
-  "source_repo": ".",
+  "source_repo": "/Users/yuping/Documents/workspace/oh_my_skills",
   "source_path": "skills/meta-skill-lifecycle-governance",
   "source_ref": "HEAD",
   "status": "stable",
-  "target": ".claude/skills/meta-skill-lifecycle-governance",
-  "installed_at": "2026-06-23T06:56:18.134256Z",
+  "target": "/Users/yuping/Documents/workspace/oh_my_skills/.claude/skills/meta-skill-lifecycle-governance",
+  "installed_at": "2026-07-04T16:12:28.819908Z",
   "backport_policy": "review-required",
   "payload_hash": "384ec55b1bb4ed21bee78857d5b31546a6e370d6a31097ef1716cd7f8946f13c",
   "files": [

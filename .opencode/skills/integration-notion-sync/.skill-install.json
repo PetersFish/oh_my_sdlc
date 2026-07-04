@@ -1,9 +1,16 @@
 {
   "skill": "integration-notion-sync",
-  "source_repo": ".",
-  "source_ref": "2b0e7581d12198746dc50df9fb6f7485dc3e3cf5",
+  "source_repo": "/Users/yuping/Documents/workspace/oh_my_skills",
+  "source_path": "skills/integration-notion-sync",
+  "source_ref": "HEAD",
   "status": "stable",
-  "target": ".opencode/skills/integration-notion-sync",
-  "installed_at": "2026-06-10T13:35:26.478621Z",
-  "backport_policy": "review-required"
+  "target": "/Users/yuping/Documents/workspace/oh_my_skills/.opencode/skills/integration-notion-sync",
+  "installed_at": "2026-07-04T16:12:28.443919Z",
+  "backport_policy": "review-required",
+  "payload_hash": "afdbc512571d259bd9691dd33d6a5958e3ddd4a4b617a832b038d6e148b73a18",
+  "files": [
+    "SKILL.md",
+    "SOURCE.md",
+    "reference.md"
+  ]
 }

@@ -1,9 +1,16 @@
 {
   "skill": "transform-xmind",
-  "source_repo": ".",
-  "source_ref": "2b0e7581d12198746dc50df9fb6f7485dc3e3cf5",
+  "source_repo": "/Users/yuping/Documents/workspace/oh_my_skills",
+  "source_path": "skills/transform-xmind",
+  "source_ref": "HEAD",
   "status": "stable",
-  "target": ".opencode/skills/transform-xmind",
-  "installed_at": "2026-06-10T13:35:26.870754Z",
-  "backport_policy": "review-required"
+  "target": "/Users/yuping/Documents/workspace/oh_my_skills/.opencode/skills/transform-xmind",
+  "installed_at": "2026-07-04T16:12:31.008335Z",
+  "backport_policy": "review-required",
+  "payload_hash": "4eedd9736c315d63b15ef199d57a92c3a82dd173a6f14502fd19421c3a663ec0",
+  "files": [
+    "SKILL.md",
+    "SOURCE.md",
+    "reference.md"
+  ]
 }

@@ -2205,6 +2205,105 @@ class TestDevOrchestratorWrapperDispatch(unittest.TestCase):
                           f"{target_dir}/agents/dev-orchestrator.md must mirror wrapper dispatch changes")
 
 
+class TestReviewAgentBashPermissionOrdering(unittest.TestCase):
+    """Task 1: lock review-agent bash deny-first ordering per last-match-wins semantics."""
+
+    def test_review_agent_bash_catch_all_deny_is_first_rule(self):
+        fm = _read_agent_frontmatter(".opencode", "review-agent")
+        bash_rules = list(fm["permission"]["bash"].items())
+        self.assertEqual(
+            bash_rules[0], ("*", "deny"),
+            "review-agent: catch-all deny must be the first bash rule so specific allows after it take effect",
+        )
+
+    def test_review_agent_bash_specific_allows_follow_catch_all_deny(self):
+        fm = _read_agent_frontmatter(".opencode", "review-agent")
+        bash_rules = list(fm["permission"]["bash"].items())
+        keys = [k for k, _ in bash_rules]
+        deny_index = keys.index("*")
+        for command in (
+            "python3 -m pytest*",
+            "pytest*",
+            "python3 .ai/workflows/scripts/workflow.py *",
+            "python3 scripts/*",
+            "python3 skills/*",
+            "git status*",
+            "git diff*",
+            "git log*",
+        ):
+            self.assertIn(command, keys)
+            self.assertGreater(
+                keys.index(command), deny_index,
+                f"review-agent: allow rule '{command}' must come after catch-all deny",
+            )
+            self.assertEqual(
+                fm["permission"]["bash"][command], "allow",
+                f"review-agent: {command} must be allow",
+            )
+
+    def test_review_agent_bash_deny_first_in_all_distributed_copies(self):
+        for target in (".opencode", ".claude", ".cursor"):
+            fm = _read_agent_frontmatter(target, "review-agent")
+            bash_rules = fm["permission"].get("bash", {})
+            self.assertEqual(
+                next(iter(bash_rules)), "*",
+                f"review-agent ({target}): catch-all deny must precede specific allows",
+            )
+            self.assertEqual(bash_rules["*"], "deny")
+
+    def test_implement_agent_bash_catch_all_deny_is_first_rule(self):
+        fm = _read_agent_frontmatter(".opencode", "implement-agent")
+        bash_rules = list(fm["permission"]["bash"].items())
+        self.assertEqual(bash_rules[0], ("*", "deny"))
+
+    def test_finish_agent_bash_catch_all_deny_is_first_rule(self):
+        fm = _read_agent_frontmatter(".opencode", "finish-agent")
+        bash_rules = list(fm["permission"]["bash"].items())
+        self.assertEqual(bash_rules[0], ("*", "deny"))
+
+
+class TestDerivedDriftBoundaryAndAggregateEntrypoint(unittest.TestCase):
+    """Task 4: derived drift ownership moved to finish; aggregate entrypoint documented."""
+
+    def _read_agent_body(self, agent_name):
+        path = _agent_path(".opencode", agent_name)
+        with open(path) as f:
+            content = f.read()
+        idx = content.find("\n---", 3)
+        if idx == -1:
+            return ""
+        return content[idx + 4:]
+
+    def test_implement_agent_states_distributed_drift_is_not_default_blocker(self):
+        body = self._read_agent_body("implement-agent")
+        self.assertIn(
+            "Do not treat distributed-copy drift as a default apply-change blocker",
+            body,
+            "implement-agent must state that distributed drift is not a default apply-change blocker",
+        )
+
+    def test_review_agent_states_distributed_drift_is_finish_followup(self):
+        body = self._read_agent_body("review-agent")
+        self.assertIn(
+            "derived drift as a finish follow-up",
+            body,
+            "review-agent must state that derived drift is a finish follow-up, not an apply-change blocker",
+        )
+
+    def test_finish_agent_mentions_sync_derived_artifacts_entrypoint(self):
+        body = self._read_agent_body("finish-agent")
+        self.assertIn("python3 scripts/sync_derived_artifacts.py --check", body)
+        self.assertIn("python3 scripts/sync_derived_artifacts.py --fix", body)
+
+    def test_agents_md_uses_aggregate_derived_sync_entrypoint(self):
+        content = (REPO_ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn("python3 scripts/sync_derived_artifacts.py --check", content)
+
+    def test_finish_agent_owns_derived_drift_before_closure(self):
+        body = self._read_agent_body("finish-agent")
+        self.assertIn("Derived Artifact Sync", body)
+
+
 class TestApplyChangeEvidencePromptContracts(unittest.TestCase):
     def test_review_agent_success_example_includes_apply_phase_evidence(self):
         body = (AGENTS_DIR / "review-agent.md").read_text(encoding="utf-8")

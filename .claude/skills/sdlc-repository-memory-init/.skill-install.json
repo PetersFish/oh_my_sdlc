@@ -1,11 +1,11 @@
 {
   "skill": "sdlc-repository-memory-init",
-  "source_repo": ".",
+  "source_repo": "/Users/yuping/Documents/workspace/oh_my_skills",
   "source_path": "skills/sdlc-repository-memory-init",
   "source_ref": "HEAD",
   "status": "stable",
-  "target": ".claude/skills/sdlc-repository-memory-init",
-  "installed_at": "2026-06-23T06:52:58.590499Z",
+  "target": "/Users/yuping/Documents/workspace/oh_my_skills/.claude/skills/sdlc-repository-memory-init",
+  "installed_at": "2026-07-04T16:12:29.941427Z",
   "backport_policy": "review-required",
   "payload_hash": "00e2ce85090d8d9cf25ef54804c4c61cbc1768e24aefb50523f648f622f3c73a",
   "files": [

@@ -1,11 +1,11 @@
 {
   "skill": "sdlc-openspec-init",
-  "source_repo": ".",
+  "source_repo": "/Users/yuping/Documents/workspace/oh_my_skills",
   "source_path": "skills/sdlc-openspec-init",
   "source_ref": "HEAD",
   "status": "stable",
-  "target": ".opencode/skills/sdlc-openspec-init",
-  "installed_at": "2026-06-23T06:52:58.098607Z",
+  "target": "/Users/yuping/Documents/workspace/oh_my_skills/.opencode/skills/sdlc-openspec-init",
+  "installed_at": "2026-07-04T16:12:29.530184Z",
   "backport_policy": "review-required",
   "payload_hash": "1536f07f6c7bf296c328f706ec1427d9cd9debe1408ca6cb998a7f89c35777ca",
   "files": [

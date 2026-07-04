@@ -1,11 +1,11 @@
 {
   "skill": "sdlc-repository-memory-load",
-  "source_repo": ".",
+  "source_repo": "/Users/yuping/Documents/workspace/oh_my_skills",
   "source_path": "skills/sdlc-repository-memory-load",
   "source_ref": "HEAD",
   "status": "stable",
-  "target": ".cursor/skills/sdlc-repository-memory-load",
-  "installed_at": "2026-06-23T06:52:58.751777Z",
+  "target": "/Users/yuping/Documents/workspace/oh_my_skills/.cursor/skills/sdlc-repository-memory-load",
+  "installed_at": "2026-07-04T16:12:30.122618Z",
   "backport_policy": "review-required",
   "payload_hash": "fee6504ba99f0ed3fb860ab2ec968b2a208b37ba7a75bd1331bb2f2cab368625",
   "files": [

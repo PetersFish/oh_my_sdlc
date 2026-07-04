@@ -139,3 +139,4 @@ Then paste the generated draw.io XML into stdin (end with EOF).
   - detected candidates
   - how to pass `--drawio-app`
   - what to install/fix (PATH, app location, first-run permissions)
+
