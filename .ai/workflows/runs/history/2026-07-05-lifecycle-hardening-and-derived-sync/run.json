@@ -3,8 +3,8 @@
   "run_id": "2026-07-05-lifecycle-hardening-and-derived-sync",
   "workflow": "sdlc-main",
   "flow_type": "lightweight-flow",
-  "status": "running",
-  "current_phase": "archive_change",
+  "status": "done",
+  "current_phase": "done",
   "primary_subject": {
     "type": "spec_change",
     "id": "lifecycle-hardening-and-derived-sync"
@@ -13,16 +13,20 @@
     "change_id": "lifecycle-hardening-and-derived-sync"
   },
   "phase_readiness": {
-    "phase": "archive_change",
+    "phase": "done",
     "ready": true,
     "missing_required_inputs": []
   },
   "pending_hooks": [],
   "completed_hooks": [
-    "roadmap_apply_start_if_ready"
+    "roadmap_apply_start_if_ready",
+    "memory_sync",
+    "roadmap_done_if_relevant"
   ],
   "completed_phases": [
-    "apply_change"
+    "apply_change",
+    "archive_change",
+    "post_archive_actions"
   ],
   "gates": {},
   "evidence": {
@@ -178,8 +182,26 @@
     "tasks_complete": true,
     "tdd_passed": true,
     "eval_passed_or_human_decision_recorded": true,
-    "roadmap_hook_resolution": "no_linked_item"
+    "roadmap_hook_resolution": "no_linked_item",
+    "finish_agent_archive_complete": {
+      "archive_path_exists": true,
+      "pending_hooks_empty": true,
+      "pre_hook_commit_id": "ab70b4f087524f9a1344fd561f8ae4c5b2653c09",
+      "pre_hook_pushed": true,
+      "post_hook_commit_id": "7dcb06f503626bf2713cab26d0e7e6da8bc29cfa",
+      "post_hook_pushed": true,
+      "post_hook_dirty_tree": false,
+      "derived_sync_check_passed": true,
+      "memory_sync_complete": true
+    },
+    "archive_path_exists": true,
+    "memory_sync_resolution": "synced",
+    "memory_sync_reason": "",
+    "roadmap_link": {
+      "count": 0,
+      "items": []
+    }
   },
   "block": null,
-  "updated_at": "2026-07-05T00:23:41.853020"
+  "updated_at": "2026-07-05T00:32:13.630808"
 }
