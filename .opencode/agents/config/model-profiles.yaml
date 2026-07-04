@@ -8,23 +8,23 @@ defaults:
 
 profiles:
   orchestrator:
-    model: openai/gpt-5.4
-    variant: medium
+    model: ollama-cloud/glm-5.2
+    variant: Default
   planning:
-    model: openai/gpt-5.5
-    variant: medium
+    model: ollama-cloud/glm-5.2
+    variant: Default
   implementation:
-    model: opencode-go/mimo-v2.5-pro
-    variant: medium
+    model: opencode-go/deepseek-v4-pro
+    variant: Default
   testing:
-    model: openai/gpt-5.4
-    variant: medium
+    model: opencode-go/mimo-v2.5-pro
+    variant: Default
   review:
-    model: openai/gpt-5.5
-    variant: medium
+    model: ollama-cloud/glm-5.2
+    variant: Default
   finish:
     model: opencode-go/mimo-v2.5-pro
-    variant: medium
+    variant: Default
 
 agents:
   dev-orchestrator:

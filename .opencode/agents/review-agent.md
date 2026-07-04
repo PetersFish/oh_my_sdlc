@@ -25,8 +25,8 @@ permission:
     "git status*": allow
     "git diff*": allow
     "git log*": allow
-model: openai/gpt-5.5
-variant: medium
+model: ollama-cloud/glm-5.2
+variant: Default
 ---
 
 # Review Agent

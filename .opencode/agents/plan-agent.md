@@ -27,8 +27,8 @@ permission:
     "openspec status*": allow
     "openspec instructions*": allow
     "openspec list*": allow
-model: openai/gpt-5.5
-variant: medium
+model: ollama-cloud/glm-5.2
+variant: Default
 ---
 
 # Plan Agent

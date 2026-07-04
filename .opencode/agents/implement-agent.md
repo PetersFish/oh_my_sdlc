@@ -33,8 +33,8 @@ permission:
     "openspec instructions*": allow
     "openspec list*": allow
     "openspec apply*": allow
-model: opencode-go/mimo-v2.5-pro
-variant: medium
+model: opencode-go/deepseek-v4-pro
+variant: Default
 ---
 
 # Implement Agent

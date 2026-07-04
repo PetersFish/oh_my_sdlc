@@ -33,7 +33,7 @@ permission:
     "openspec list*": allow
     "openspec archive*": allow
 model: opencode-go/mimo-v2.5-pro
-variant: medium
+variant: Default
 ---
 
 # Finish Agent
