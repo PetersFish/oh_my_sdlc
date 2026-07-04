@@ -15,7 +15,7 @@ completed_at: 2026-06-29
 
 # Goal
 
-Introduce an agent-backed lifecycle wrapper architecture that decouples deterministic workflow governance from concrete planning, implementation, testing, review, finish, spec, roadmap, memory, and eval workers.
+Introduce an agent-backed lifecycle wrapper architecture that decouples deterministic workflow governance from concrete planning, implementation, review, finish, spec, roadmap, memory, eval, and optional verification workers.
 
 # Problem Context
 
@@ -29,20 +29,21 @@ The design borrows from agent-platform patterns such as harness-neutral core log
 
 ## In
 
-- Define agent-backed wrapper interfaces for lifecycle modules: spec, memory, roadmap, eval, planning, implementation, testing, review, finish, and verification.
+- Define agent-backed wrapper interfaces for lifecycle modules: spec, memory, roadmap, eval, planning, implementation, review, finish, and optional verification.
 - Keep `workflow.py` as the deterministic runtime and gatekeeper; wrappers and agents handle worker dispatch and evidence normalization.
-- Introduce `dev-orchestrator` as the routing coordinator for phase actions, with specialized `plan-agent`, `implement-agent`, `test-agent`, `review-agent`, and `finish-agent`.
+- Introduce `dev-orchestrator` as the routing coordinator for phase actions, with specialized `plan-agent`, `implement-agent`, `review-agent`, and `finish-agent`.
 - Support two explicit flow types: `spec-flow` for OpenSpec-governed changes and `lightweight-flow` for changes that need planning, implementation, verification, review, and finish without a formal OpenSpec change.
 - Map current OpenSpec, Superpowers, Roadmap, Memory, and EvalOps skills as wrapped backends behind agent-facing contracts.
 - Document wrapper contract: inputs, outputs, evidence keys, exit criteria, failure modes, and remediation guidance.
 - Define how wrappers and agents are selected/configured without changing workflow phase semantics.
-- Define TDD as a cross-cutting discipline: `plan-agent` plans TDD tasks, `implement-agent` executes red/green loops for behavior changes, and `test-agent` performs independent verification, debugging, regression, and EvalOps capture.
+- Define TDD as a cross-cutting discipline: `plan-agent` plans TDD tasks, `implement-agent` executes red/green loops, focused tests, full regression, and failure-fix loops for behavior changes, and `review-agent` audits test quality, overfitting risk, and verification evidence.
 - Define finish behavior for both flow types: `spec-flow` archives OpenSpec changes; `lightweight-flow` runs development-branch finishing; both flows run workflow cleanup hooks.
 - Define safe parallel dispatch as a `dev-orchestrator` responsibility, not nested subagent delegation.
 - Preserve current OpenSpec, Roadmap, Memory, EvalOps, and Superpowers behavior during the first migration.
 
 ## Out
 
+- No default `test-agent` role in the first migration. Normal implementation verification is owned by `implement-agent`; independent verification may be introduced later as an optional wrapper only when clear risk triggers exist.
 - No replacement of existing skills in the first phase; they remain wrapped backends.
 - No marketplace/plugin registry.
 - No generic agent framework rewrite.
@@ -56,12 +57,13 @@ The design borrows from agent-platform patterns such as harness-neutral core log
 - Treat wrappers as module contracts, not workflow phases. A phase may call a wrapper, and a wrapper may choose the concrete worker implementation.
 - Use an agent-backed wrapper model for all lifecycle execution while keeping `workflow.py` as the deterministic owner of state transitions, pending hooks, allowed actions, and completion gates.
 - Use `dev-orchestrator` as a routing coordinator, not as a concrete executor. It routes the current allowed phase action to a specialized agent and collects structured evidence.
-- Represent planning, implementation, testing, review, and finish as specialized agents with fixed responsibilities.
+- Represent planning, implementation, review, and finish as specialized agents with fixed responsibilities.
+- Do not introduce `test-agent` as a default specialized agent. Testing is a responsibility distributed across planning, implementation, review, and EvalOps gates rather than a mandatory extra session.
 - Record `flow_type: spec-flow | lightweight-flow` in workflow run state. Agents must not infer the flow type from context.
 - Route `spec-flow` through OpenSpec wrappers and `lightweight-flow` through lightweight execution wrappers, while sharing test, review, and cleanup gates across both flows.
 - Keep evidence normalized at the wrapper boundary so downstream gates do not depend on tool-specific output formats.
 - Require every agent-backed wrapper to return structured evidence. Natural-language summaries alone are not sufficient for phase transitions.
-- Treat TDD as a cross-cutting execution discipline. `plan-agent` plans TDD tasks but does not execute them; `implement-agent` executes TDD red/green loops for behavior-changing code; `test-agent` performs independent verification, debugging, regression, and EvalOps capture.
+- Treat TDD as a cross-cutting execution discipline. `plan-agent` plans TDD tasks but does not execute them; `implement-agent` executes TDD red/green loops, focused tests, full regression, and failure-fix loops for behavior-changing code; `review-agent` checks test quality, overfitting risk, and verification-before-completion evidence.
 - Move safe parallel dispatch to `dev-orchestrator` to avoid nested subagent orchestration limits. `implement-agent` handles a single bounded implementation slice and returns package-level evidence.
 - Use current skills as wrapped backends to avoid a big-bang migration.
 - Flow names describe governance weight, not implementation backend. `spec-flow` means a formal OpenSpec lifecycle is required; `lightweight-flow` means it is not. Superpowers remains the default backend for `lightweight-flow`, but the name must not depend on that implementation.
@@ -71,7 +73,7 @@ The design borrows from agent-platform patterns such as harness-neutral core log
 - Adds abstraction, agent contracts, and documentation overhead, but reduces coupling between the workflow engine and concrete tools, skills, and harnesses.
 - Agent-backed wrappers are more flexible than pure Python wrappers, but they increase nondeterminism risk; `workflow.py` must retain all state and gate authority.
 - Normalizing evidence at wrapper boundaries may hide tool-specific details; wrapper logs should retain raw evidence where useful.
-- Full agentization improves lifecycle separation, but it increases debugging complexity unless each agent has a fixed input/output contract.
+- Removing the default `test-agent` reduces independent verification by default, but it avoids routine session churn and keeps implementation failure repair in the agent with the freshest code context.
 - Moving parallelism to `dev-orchestrator` avoids nested subagent limitations, but requires stricter work-package boundaries and final integration verification.
 
 ## Initial Approach
@@ -83,13 +85,16 @@ The design borrows from agent-platform patterns such as harness-neutral core log
    - Always use `brainstorming` for design clarification when needed.
    - For `spec-flow`, call `spec-wrapper` for OpenSpec propose, new change, or continue.
    - For `lightweight-flow`, use `writing-plans`.
-   - Produce a TDD-aware plan that states required failing tests, verification commands, and EvalOps candidates, without executing tests or modifying code.
+   - Produce a TDD-aware plan that states required failing tests, focused verification commands, full regression commands, and EvalOps candidates, without executing tests or modifying code.
 5. Define `implement-agent` behavior:
    - For `spec-flow`, call `spec-wrapper` for OpenSpec apply.
    - For `lightweight-flow`, use `executing-plans` and `using-git-worktrees`.
    - For behavior-changing code, execute the TDD red/green loop: write failing test, verify failure, implement minimally, and verify pass.
-6. Define `test-agent` behavior for both flow types: systematic debugging, independent verification/regression, and EvalOps capture for durable regression cases.
-7. Define `review-agent` behavior for both flow types: requesting/receiving code review and verification-before-completion evidence checks.
+   - After slice completion, run relevant focused tests and the agreed full regression command set.
+   - If verification fails and the failure is related to the current slice, debug and fix within the same implementation context before returning.
+   - Return structured evidence for commands run, pass/fail status, remaining blockers, and any explicit verification gaps.
+6. Define `review-agent` behavior for both flow types: request/receive code review, review verification-before-completion evidence, check test quality, detect overfitting risk, and route failures back to `implement-agent` with concise remediation evidence.
+7. Define optional independent verification behavior without a default `test-agent`: future verification wrappers may be added only for high-risk changes, repeated verification failures, suspected flaky/environmental issues, release/integration gates, or EvalOps regression capture.
 8. Define `finish-agent` behavior:
    - For `spec-flow`, call `spec-wrapper` to archive the OpenSpec change after verification passes.
    - For `lightweight-flow`, call `finishing-a-development-branch` after verification passes.
@@ -101,16 +106,18 @@ The design borrows from agent-platform patterns such as harness-neutral core log
 
 - Where should wrapper and agent configuration live first: workflow YAML, orchestrator skill documentation, or a small module registry? The first implementation should pick the smallest option that still records `flow_type` and phase-agent mappings deterministically.
 - Which evidence fields should be mandatory for each phase versus optional raw logs? The contract must be strict enough for gate validation without overfitting to a single CLI tool.
+- What risk triggers are sufficient to introduce a future optional independent verification wrapper without reintroducing a default `test-agent` session into the common path?
 
 # Acceptance Criteria
 
-- Agent-backed wrapper contract document exists for spec, memory, roadmap, eval, planning, implementation, testing, review, finish, and verification modules.
+- Agent-backed wrapper contract document exists for spec, memory, roadmap, eval, planning, implementation, review, finish, and optional verification modules.
 - `flow_type: spec-flow | lightweight-flow` is documented as an explicit workflow run state field, not inferred by agents.
 - `dev-orchestrator` routing responsibilities are documented, including the rule that it routes and coordinates evidence but does not own workflow state transitions.
-- Phase-agent mapping is documented for `plan-agent`, `implement-agent`, `test-agent`, `review-agent`, and `finish-agent`.
+- Phase-agent mapping is documented for `plan-agent`, `implement-agent`, `review-agent`, and `finish-agent`.
+- The design explicitly states that there is no default `test-agent`; normal testing and failure-fix loops are owned by `implement-agent`, while test quality and overfitting checks are owned by `review-agent`.
 - `spec-flow` behavior is documented: plan uses OpenSpec propose/new/continue, implement uses OpenSpec apply, finish uses OpenSpec archive.
 - `lightweight-flow` behavior is documented: plan uses `writing-plans`, implement uses `executing-plans` and `using-git-worktrees`, finish uses `finishing-a-development-branch`.
-- TDD responsibility split is documented: `plan-agent` plans TDD tasks, `implement-agent` executes red/green loops, and `test-agent` performs independent verification/debug/regression/EvalOps capture.
+- TDD responsibility split is documented: `plan-agent` plans TDD tasks, `implement-agent` executes red/green loops plus focused/full regression and failure repair, and `review-agent` audits test quality, overfitting risk, and verification evidence.
 - Evidence keys, exit criteria, blockers, artifacts, and raw-log retention are documented per wrapper and agent.
 - Safe parallel dispatch is documented as a `dev-orchestrator` responsibility with constraints on independent work packages, per-package evidence, and final integration verification.
 - Current OpenSpec, Roadmap, Memory, EvalOps, and Superpowers skills are mapped as wrapped backends without changing user-visible workflow behavior.
