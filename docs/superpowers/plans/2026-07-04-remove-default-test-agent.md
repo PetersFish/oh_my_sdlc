@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use Superpowers `executing-plans` for sequential implementation. Use `test-driven-development` when modifying executable behavior or deterministic tests. Use `requesting-code-review` before final completion. Do not introduce OpenSpec artifacts for this cleanup unless the reviewer explicitly escalates the work.
 
-**Goal:** Remove `test-agent` from the default SDLC lifecycle and align active docs, templates, and agent responsibilities with the Superpowers-style implementation loop: implement-agent owns normal verification and repair; review-agent owns test quality and overfitting review; optional independent verification remains non-default.
+**Goal:** Remove `test-agent` from the default SDLC lifecycle and align active agent files, templates, eval assets, and docs with the Superpowers-style implementation loop: implement-agent owns normal verification and repair; review-agent owns test quality and overfitting review; optional independent verification remains non-default.
 
-**Architecture:** Documentation-first cleanup with search-based verification. Do not add a new agent. Do not modify workflow runtime unless search reveals an active hard-coded `test-agent` dependency. Preserve workflow gates and evidence requirements.
+**Architecture:** Agent-first cleanup. Active runtime should center on `dev-orchestrator` and specialized agent files under `agents/`, with workflow state still owned by `workflow.py`. Delete active `test-agent` files, remove default test-agent references from dispatching/finishing contracts, add finish-agent commit/push checkpoints around hook synchronization, and retire legacy `sdlc-orchestrator` skill assets if dependency audit confirms they are unused.
 
-**Tech Stack:** Markdown docs, agent/skill templates, repository search, existing pytest suite for deterministic workflow/runtime behavior.
+**Tech Stack:** Markdown agent specs, skill assets, EvalOps target manifests, repository search, existing pytest suite for deterministic workflow/runtime behavior.
 
 ---
 
@@ -14,28 +14,48 @@
 
 Expected files to inspect and potentially modify:
 
+- Modify: `agents/dev-orchestrator.md`
+  - Responsibility: top-level SDLC dispatcher; remove `test-agent` from default dispatch model and boundaries.
+- Modify: `.opencode/agents/dev-orchestrator.md`
+  - Responsibility: OpenCode distributed copy.
+- Modify: `.claude/agents/dev-orchestrator.md`
+  - Responsibility: Claude distributed copy.
+- Modify: `.cursor/agents/dev-orchestrator.md`
+  - Responsibility: Cursor distributed copy.
+- Modify: `agents/implement-agent.md`
+  - Responsibility: normal TDD, focused/full regression, and failure-fix ownership.
+- Modify: distributed implement-agent copies under `.opencode/agents/`, `.claude/agents/`, and `.cursor/agents/`.
+- Modify: `agents/review-agent.md`
+  - Responsibility: test quality, overfitting, and verification evidence review.
+- Modify: distributed review-agent copies under `.opencode/agents/`, `.claude/agents/`, and `.cursor/agents/`.
+- Modify: `agents/finish-agent.md`
+  - Responsibility: finishing, pre-hook commit/push, hook resolution, post-hook dirty-tree commit/push.
+- Modify: distributed finish-agent copies under `.opencode/agents/`, `.claude/agents/`, and `.cursor/agents/`.
+- Delete: `agents/test-agent.md`
+  - Responsibility: active default test-agent must not load.
+- Delete: `.opencode/agents/test-agent.md`
+  - Responsibility: OpenCode distributed copy.
+- Delete: `.claude/agents/test-agent.md`
+  - Responsibility: Claude distributed copy.
+- Delete: `.cursor/agents/test-agent.md`
+  - Responsibility: Cursor distributed copy.
 - Modify if needed: `.ai/roadmap/areas/workflow.sdlc-orchestrator/items/RM-ORCH-007-workflow-wrapper-abstraction.md`
   - Responsibility: active roadmap statement for agent-backed lifecycle wrapper architecture.
-- Modify if needed: `skills/sdlc-orchestrator/SKILL.md`
-  - Responsibility: active SDLC route and gate instructions.
-- Modify if needed: `.opencode/skills/sdlc-orchestrator/SKILL.md`
-  - Responsibility: distributed OpenCode copy of orchestrator skill.
-- Modify if needed: `.claude/skills/sdlc-orchestrator/SKILL.md`
-  - Responsibility: distributed Claude copy of orchestrator skill.
-- Modify if needed: `.cursor/skills/sdlc-orchestrator/SKILL.md`
-  - Responsibility: distributed Cursor copy of orchestrator skill.
+- Delete if dependency audit passes: `skills/sdlc-orchestrator/`
+  - Responsibility: legacy skill entrypoint replaced by `dev-orchestrator`.
+- Delete if dependency audit passes: `.opencode/skills/sdlc-orchestrator/`, `.claude/skills/sdlc-orchestrator/`, `.cursor/skills/sdlc-orchestrator/`
+  - Responsibility: distributed legacy copies.
+- Delete, archive, or migrate if dependency audit passes: `.ai/evals/targets/skill.sdlc-orchestrator/`
+  - Responsibility: legacy skill EvalOps target; active coverage should move to `agent.dev-orchestrator` if still valuable.
+- Modify if needed: `.ai/evals/manifest.yaml`
+  - Responsibility: remove or retarget `skill.sdlc-orchestrator` entries.
 - Modify if needed: `skills/sdlc-project-bootstrap/templates/AGENTS.md`
   - Responsibility: generated project-level behavior guidance.
-- Modify if needed: `.opencode/skills/sdlc-project-bootstrap/templates/AGENTS.md`
-  - Responsibility: distributed OpenCode template copy.
-- Modify if needed: `.claude/skills/sdlc-project-bootstrap/templates/AGENTS.md`
-  - Responsibility: distributed Claude template copy.
-- Modify if needed: `.cursor/skills/sdlc-project-bootstrap/templates/AGENTS.md`
-  - Responsibility: distributed Cursor template copy.
+- Modify if needed: distributed bootstrap templates under `.opencode/skills/`, `.claude/skills/`, and `.cursor/skills/`.
 - Modify if needed: tests under `tests/`
-  - Responsibility: expectations for bootstrap, templates, wrapper contracts, and workflow behavior.
+  - Responsibility: expectations for agent installation, bootstrap, wrapper contracts, and workflow behavior.
 
-Historical archive/snapshot files should not be modified unless an active template or current instruction copies from them.
+Historical archive/snapshot files should not be modified unless an active template, active eval, or current instruction copies from them.
 
 ---
 
@@ -54,11 +74,11 @@ grep -RIn --exclude-dir=.git --exclude-dir=.venv --exclude-dir=node_modules "tes
 
 Expected:
 
-- Active files may contain stale references.
+- Active agent files currently contain stale default `test-agent` references.
 - Archive or snapshot files may contain historical references.
 - Record each active reference and classify it as one of:
-  - `active-default-role` — must change.
-  - `active-non-default-risk-trigger` — may keep if wording is explicit.
+  - `active-default-role` — must change or delete.
+  - `active-non-default-risk-trigger` — may keep only if explicitly non-default.
   - `historical-archive` — leave unchanged.
   - `test-fixture` — update only if it asserts default lifecycle behavior.
 
@@ -80,7 +100,7 @@ Expected:
 Run:
 
 ```bash
-grep -RIn --exclude-dir=.git --exclude-dir=.venv --exclude-dir=node_modules -E "plan-agent.*implement-agent.*review-agent|implement-agent.*test-agent|planning, implementation, testing, review|plan-agent.*test-agent" .
+grep -RIn --exclude-dir=.git --exclude-dir=.venv --exclude-dir=node_modules -E "plan-agent.*implement-agent.*test-agent|implement-agent.*test-agent|planning, implementation, testing, review|substitute your own verification for test-agent|Requires test-agent" agents .opencode/agents .claude/agents .cursor/agents .ai/roadmap docs/superpowers tests .ai/evals || true
 ```
 
 Expected:
@@ -90,7 +110,205 @@ Expected:
 
 ---
 
-## Task 2: Fix Active Roadmap Drift
+## Task 2: Remove Active `test-agent` Runtime Files
+
+**Files:**
+- `agents/test-agent.md`
+- `.opencode/agents/test-agent.md`
+- `.claude/agents/test-agent.md`
+- `.cursor/agents/test-agent.md`
+- Agent install/config metadata discovered by search.
+
+- [ ] **Step 1: Confirm these are active runtime files, not examples**
+
+Run:
+
+```bash
+find agents .opencode/agents .claude/agents .cursor/agents -maxdepth 2 -name '*test-agent*' -print
+```
+
+Expected:
+
+- The files are active agent specs and should be removed from the runtime path.
+
+- [ ] **Step 2: Search config metadata for `test-agent` registrations**
+
+Run:
+
+```bash
+grep -RIn --exclude-dir=.git "test-agent" agents .opencode/agents .claude/agents .cursor/agents scripts tests || true
+```
+
+Expected:
+
+- Remove active registrations or update test expectations that still install `test-agent` by default.
+
+- [ ] **Step 3: Delete active test-agent files**
+
+Remove:
+
+```text
+agents/test-agent.md
+.opencode/agents/test-agent.md
+.claude/agents/test-agent.md
+.cursor/agents/test-agent.md
+```
+
+Expected:
+
+- No active runtime path loads `test-agent`.
+- Historical `.ai/workflows/runs/history/**/test-agent*` artifacts remain untouched.
+
+---
+
+## Task 3: Update Default Agent Responsibilities
+
+**Files:**
+- `agents/dev-orchestrator.md` and distributed copies.
+- `agents/implement-agent.md` and distributed copies.
+- `agents/review-agent.md` and distributed copies.
+- `agents/finish-agent.md` and distributed copies.
+
+- [ ] **Step 1: Update dev-orchestrator default role list and boundaries**
+
+In `agents/dev-orchestrator.md` and distributed copies:
+
+- Remove `test-agent` from the description's default specialized subagent list.
+- Replace any boundary such as `substitute your own verification for test-agent` with `substitute your own verification or test-quality judgment for implement-agent/review-agent`.
+- Ensure dispatch language treats normal verification as part of the implement/review lifecycle, not as a separate default subagent.
+
+Expected:
+
+- `dev-orchestrator` routes normal `apply_change` work to `implement-agent` and then `review-agent`, not `test-agent`.
+
+- [ ] **Step 2: Update implement-agent verification ownership**
+
+In `agents/implement-agent.md` and distributed copies, ensure it explicitly owns:
+
+- TDD red/green loops.
+- Focused tests for the slice.
+- Full regression command set agreed by the plan.
+- Failure-fix loop while implementation context is still fresh.
+- Structured verification evidence.
+
+Expected:
+
+- `implement-agent` does not hand normal full regression to `test-agent`.
+
+- [ ] **Step 3: Update review-agent quality gate ownership**
+
+In `agents/review-agent.md` and distributed copies, ensure it explicitly owns:
+
+- Test quality review.
+- Overfitting detection.
+- Verification evidence review.
+- Routing concrete remediation back to `implement-agent`.
+
+Expected:
+
+- `review-agent` does not become a broad debugging or full-regression executor.
+
+- [ ] **Step 4: Update finish-agent preconditions**
+
+In `agents/finish-agent.md` and distributed copies:
+
+- Remove requirements for `test-agent` evidence.
+- Require implementation verification evidence from `implement-agent` and review completion evidence from `review-agent`.
+- Update failure modes so missing verification evidence points to `implement-agent` evidence, not `test-agent` completion.
+
+Expected:
+
+- `finish-agent` can proceed after implement-agent verification evidence and review-agent approval, without a test-agent handoff.
+
+---
+
+## Task 4: Add Finish-Agent Commit/Push Checkpoints
+
+**Files:**
+- `agents/finish-agent.md`
+- `.opencode/agents/finish-agent.md`
+- `.claude/agents/finish-agent.md`
+- `.cursor/agents/finish-agent.md`
+- Agent config tests if command allowlists are asserted.
+
+- [ ] **Step 1: Add required bash permissions**
+
+Add allowlist entries needed by the finishing procedure:
+
+```yaml
+"git add*": allow
+"git commit*": allow
+"git push*": allow
+"git rev-parse*": allow
+```
+
+Keep existing observational git permissions.
+
+Expected:
+
+- `finish-agent` can create and push closure commits.
+
+- [ ] **Step 2: Insert pre-hook commit procedure before memory/roadmap hooks**
+
+Before resolving `memory_sync` or `roadmap_done_if_relevant`, `finish-agent` must:
+
+1. Run `git status --short --branch`.
+2. If the tree is dirty, stage approved implementation/archive changes, commit them, push, and record `git rev-parse HEAD` as `pre_hook_commit_id`.
+3. If the tree is clean, record current `git rev-parse HEAD` as `pre_hook_commit_id` and verify the branch is not ahead of upstream.
+4. Use `pre_hook_commit_id` as the commit id supplied to memory sync.
+
+Expected:
+
+- Memory sync records a stable commit id representing the reviewed implementation/archive state before sync-generated files are added.
+
+- [ ] **Step 3: Resolve hooks only after pre-hook commit id exists**
+
+Run hook work in this order:
+
+1. `memory_sync` through `sdlc-openspec-memory-sync` or `sdlc-repository-memory-sync`.
+2. `roadmap_done_if_relevant` through `roadmap-agent` / `sdlc-roadmap` boundary as currently required.
+3. `workflow.py complete-hook --hook <hook-name>` after each hook's evidence is present.
+
+Expected:
+
+- Hook outputs can reference the pre-hook commit id.
+
+- [ ] **Step 4: Add post-hook dirty-tree commit procedure**
+
+After all hook resolution and sync scripts complete, `finish-agent` must:
+
+1. Run `git status --short --branch` again.
+2. If memory sync, roadmap sync, template sync, or workflow hook completion generated additional files, stage only those generated/approved artifacts.
+3. Commit and push them.
+4. Record `post_hook_commit_id`.
+5. If the tree is clean, record `post_hook_commit_id: null` and `post_hook_dirty_tree: false`.
+
+Expected:
+
+- No generated memory/roadmap/workflow files remain uncommitted after finish-agent completes.
+
+- [ ] **Step 5: Extend finish-agent evidence schema**
+
+Add evidence fields:
+
+```json
+{
+  "pre_hook_commit_id": "<sha>",
+  "pre_hook_pushed": true,
+  "post_hook_commit_id": "<sha|null>",
+  "post_hook_pushed": "true|false",
+  "post_hook_dirty_tree": false,
+  "pending_hooks_empty": true
+}
+```
+
+Expected:
+
+- Reviewers can verify both commit checkpoints.
+
+---
+
+## Task 5: Fix Active Roadmap Drift
 
 **Files:**
 - `.ai/roadmap/areas/workflow.sdlc-orchestrator/items/RM-ORCH-007-workflow-wrapper-abstraction.md`
@@ -128,138 +346,164 @@ Expected:
 
 ---
 
-## Task 3: Update Orchestrator Guidance If Needed
+## Task 6: Audit and Retire Legacy `sdlc-orchestrator` Skill
 
 **Files:**
-- `skills/sdlc-orchestrator/SKILL.md`
-- `.opencode/skills/sdlc-orchestrator/SKILL.md`
-- `.claude/skills/sdlc-orchestrator/SKILL.md`
-- `.cursor/skills/sdlc-orchestrator/SKILL.md`
+- `skills/sdlc-orchestrator/`
+- `.opencode/skills/sdlc-orchestrator/`
+- `.claude/skills/sdlc-orchestrator/`
+- `.cursor/skills/sdlc-orchestrator/`
+- `.ai/evals/targets/skill.sdlc-orchestrator/`
+- `.ai/evals/manifest.yaml`
+- tests and scripts that reference the legacy skill.
 
-- [ ] **Step 1: Inspect route and verification sections**
-
-Search:
-
-```bash
-grep -nE "test-agent|test agent|independent verification|verification-before-completion|tdd_passed|full regression|overfitting" skills/sdlc-orchestrator/SKILL.md
-```
-
-Expected:
-
-- If no `test-agent` references exist, do not edit solely for style.
-- If verification guidance is incomplete, add a concise responsibility rule rather than a large rewrite.
-
-- [ ] **Step 2: Add or normalize default verification responsibility wording if needed**
-
-Use this wording if the orchestrator skill needs an explicit rule:
-
-```md
-### Default Verification Ownership
-
-Normal implementation verification stays with the implementation worker. For behavior-changing work, the implementation worker owns TDD red/green loops, focused tests, the agreed full regression command set, and failure-fix loops while implementation context is still fresh.
-
-Review owns quality judgment over that evidence: test adequacy, overfitting risk, assertion strength, edge-case coverage, mock realism, and whether verification evidence is credible. Do not introduce a default `test-agent` session between implementation and review. Independent verification may be requested only for high-risk changes, repeated verification failures, suspected flaky/environmental issues, release/integration gates, or EvalOps regression capture.
-```
-
-Expected:
-
-- The rule should be placed near route, apply, or verification guidance.
-- The same content should be synchronized to `.opencode`, `.claude`, and `.cursor` copies if those are generated live copies.
-
-- [ ] **Step 3: Check distributed copies remain synchronized**
+- [ ] **Step 1: Confirm dev-orchestrator does not depend on the legacy skill**
 
 Run:
 
 ```bash
-python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py --help >/dev/null 2>&1 || true
+grep -RIn --exclude-dir=.git "sdlc-orchestrator" agents/dev-orchestrator.md .opencode/agents/dev-orchestrator.md .claude/agents/dev-orchestrator.md .cursor/agents/dev-orchestrator.md || true
 ```
-
-Then inspect the repository's existing template sync tests or scripts before running any write-generating sync command. Do not blindly run a sync script if it modifies many unrelated files.
 
 Expected:
 
-- If project convention requires editing canonical `skills/` first and then syncing copies, follow that convention.
-- If no safe sync path is clear, update canonical file only and list distributed copies as follow-up blockers.
+- No required skill, allowed skill, or dispatch dependency on `sdlc-orchestrator`.
+- References in historical prose or comments must be inspected manually before deletion.
+
+- [ ] **Step 2: Confirm workflow definitions use dev-orchestrator**
+
+Run:
+
+```bash
+grep -RIn --exclude-dir=.git "allowed_workers:" -A5 .ai/workflows/definitions skills/sdlc-project-bootstrap/templates/workflow .opencode/skills/sdlc-project-bootstrap/templates/workflow .claude/skills/sdlc-project-bootstrap/templates/workflow .cursor/skills/sdlc-project-bootstrap/templates/workflow | grep -E "sdlc-orchestrator|dev-orchestrator" || true
+```
+
+Expected:
+
+- Active workflow definitions and bootstrap workflow templates use `dev-orchestrator`, not `sdlc-orchestrator`.
+
+- [ ] **Step 3: Audit installation, activation, and tests**
+
+Run:
+
+```bash
+grep -RIn --exclude-dir=.git "sdlc-orchestrator\|skill.sdlc-orchestrator" scripts tests skills .opencode .claude .cursor .ai/evals .ai/workflows docs/superpowers || true
+```
+
+Expected:
+
+- Active references are either migrated, deleted, or documented as blockers.
+- Archive references are ignored unless they are copied into active templates.
+
+- [ ] **Step 4: Delete legacy skill directories if no blockers remain**
+
+Delete:
+
+```text
+skills/sdlc-orchestrator/
+.opencode/skills/sdlc-orchestrator/
+.claude/skills/sdlc-orchestrator/
+.cursor/skills/sdlc-orchestrator/
+```
+
+Expected:
+
+- Legacy skill is no longer installed or distributed as an active skill.
+
+- [ ] **Step 5: Retire legacy EvalOps target**
+
+If no active eval pipeline still requires `skill.sdlc-orchestrator`, either delete it or migrate useful cases to `agent.dev-orchestrator`:
+
+```text
+.ai/evals/targets/skill.sdlc-orchestrator/
+```
+
+Then update `.ai/evals/manifest.yaml` accordingly.
+
+Expected:
+
+- Eval manifest no longer points at a deleted skill target.
+- Useful behavioral coverage is preserved under `agent.dev-orchestrator` when still relevant.
 
 ---
 
-## Task 4: Update Agent or Bootstrap Templates If Needed
+## Task 7: Update Bootstrap Templates If Needed
 
 **Files:**
 - `skills/sdlc-project-bootstrap/templates/AGENTS.md`
 - `.opencode/skills/sdlc-project-bootstrap/templates/AGENTS.md`
 - `.claude/skills/sdlc-project-bootstrap/templates/AGENTS.md`
 - `.cursor/skills/sdlc-project-bootstrap/templates/AGENTS.md`
-- Any actual agent files discovered by search.
+- Workflow templates under `skills/sdlc-project-bootstrap/templates/workflow/` and distributed copies.
 
 - [ ] **Step 1: Inspect generated behavior templates**
 
 Run:
 
 ```bash
-grep -RIn --exclude-dir=.git "test-agent\|test agent\|full regression\|overfitting" skills/sdlc-project-bootstrap/templates .opencode/skills/sdlc-project-bootstrap/templates .claude/skills/sdlc-project-bootstrap/templates .cursor/skills/sdlc-project-bootstrap/templates
+grep -RIn --exclude-dir=.git "test-agent\|test agent\|sdlc-orchestrator\|full regression\|overfitting" skills/sdlc-project-bootstrap/templates .opencode/skills/sdlc-project-bootstrap/templates .claude/skills/sdlc-project-bootstrap/templates .cursor/skills/sdlc-project-bootstrap/templates || true
 ```
 
 Expected:
 
-- If templates do not mention subagent lifecycle roles, leave them unchanged.
-- If they mention default `test-agent`, update them.
+- Templates must not reinstall default `test-agent` or legacy `sdlc-orchestrator`.
+- Templates should describe implement-agent/review-agent verification ownership only if they already describe subagent lifecycle behavior.
 
-- [ ] **Step 2: Update actual agent specs if present**
+- [ ] **Step 2: Run or update template sync only after inspecting convention**
 
-If search finds files such as:
+Run read-only checks first:
 
-```text
-.opencode/agents/test-agent.md
-.opencode/agent/test-agent.md
-agents/test-agent.md
+```bash
+python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py --help >/dev/null 2>&1 || true
 ```
-
-then remove or de-register them only after confirming they are active runtime files. If they are sample docs, mark them non-default instead of deleting without review.
 
 Expected:
 
-- No active runtime agent file should cause OpenCode to load a default `test-agent` unless the reviewer explicitly chooses to keep it.
+- If project convention requires editing canonical files first and then syncing distributed copies, follow that convention.
+- Do not blindly run a sync script if it modifies unrelated files.
 
 ---
 
-## Task 5: Update Tests and Eval Expectations If Needed
+## Task 8: Update Tests and Eval Expectations
 
 **Files:**
 - `tests/`
 - `.ai/evals/targets/`
+- `.ai/evals/manifest.yaml`
 
 - [ ] **Step 1: Search tests for default `test-agent` assumptions**
 
 Run:
 
 ```bash
-grep -RIn --exclude-dir=.git "test-agent\|plan-agent.*implement-agent.*test-agent\|testing, review" tests .ai/evals || true
+grep -RIn --exclude-dir=.git "test-agent\|plan-agent.*implement-agent.*test-agent\|testing, review\|skill.sdlc-orchestrator\|sdlc-orchestrator" tests .ai/evals || true
 ```
 
 Expected:
 
 - If tests assert default lifecycle role lists, update expected values to remove `test-agent`.
-- If eval cases use `test-agent` historically but do not assert current default behavior, leave them unchanged or annotate as historical.
+- If tests assert installed skill lists, update them to remove legacy `sdlc-orchestrator` when deletion is performed.
+- If eval cases use `test-agent` historically but do not assert current default behavior, leave them unchanged only when they are under archive/history paths.
 
 - [ ] **Step 2: Add regression checks only if there is deterministic code behavior**
 
-Do not add pytest just for documentation wording. Add pytest only if implementation modifies:
+Add pytest only if implementation modifies:
 
 - template generation logic,
 - agent installation logic,
 - workflow role mapping logic,
 - wrapper registry code,
-- deterministic routing code.
+- deterministic routing code,
+- EvalOps manifest generation.
 
 Expected:
 
-- Documentation-only cleanup should rely on grep verification and existing tests.
-- Runtime or template generation changes require pytest.
+- Pure agent/doc cleanup can rely on grep verification plus existing tests.
+- Runtime or template generation changes require pytest updates.
 
 ---
 
-## Task 6: Verification Commands
+## Task 9: Verification Commands
 
 - [ ] **Step 1: Verify no active default `test-agent` role remains**
 
@@ -270,12 +514,17 @@ python3 - <<'PY'
 from pathlib import Path
 
 active_roots = [
+    Path('agents'),
+    Path('.opencode/agents'),
+    Path('.claude/agents'),
+    Path('.cursor/agents'),
     Path('skills'),
     Path('.opencode/skills'),
     Path('.claude/skills'),
     Path('.cursor/skills'),
     Path('.ai/roadmap/areas/workflow.sdlc-orchestrator/items'),
     Path('docs/superpowers'),
+    Path('tests'),
 ]
 
 bad = []
@@ -291,7 +540,12 @@ for root in active_roots:
             'plan-agent / implement-agent / test-agent',
             'planning, implementation, testing, review, and finish as specialized agents',
             '`test-agent` performs independent verification',
+            'Requires test-agent',
+            'evidence.verification_passed` from test-agent',
+            'substitute your own verification for test-agent',
         ]
+        if path.name == 'test-agent.md' and '.ai/workflows/runs/history' not in str(path):
+            bad.append((str(path), 'active test-agent file remains'))
         for needle in suspicious:
             if needle in text:
                 bad.append((str(path), needle))
@@ -309,13 +563,86 @@ Expected:
 
 - Command exits 0.
 
-- [ ] **Step 2: Run relevant deterministic tests**
+- [ ] **Step 2: Verify finish-agent commit checkpoints**
 
-For docs-only changes:
+Run:
 
 ```bash
+python3 - <<'PY'
+from pathlib import Path
+
+paths = [
+    Path('agents/finish-agent.md'),
+    Path('.opencode/agents/finish-agent.md'),
+    Path('.claude/agents/finish-agent.md'),
+    Path('.cursor/agents/finish-agent.md'),
+]
+required = [
+    'git commit',
+    'git push',
+    'pre_hook_commit_id',
+    'post_hook_commit_id',
+    'memory_sync',
+    'roadmap_done_if_relevant',
+]
+missing = []
+for path in paths:
+    text = path.read_text(errors='ignore')
+    for needle in required:
+        if needle not in text:
+            missing.append((str(path), needle))
+if missing:
+    print('finish-agent commit checkpoint requirements missing:')
+    for path, needle in missing:
+        print(f'- {path}: {needle}')
+    raise SystemExit(1)
+print('finish-agent commit checkpoint requirements present')
+PY
+```
+
+Expected:
+
+- Command exits 0.
+
+- [ ] **Step 3: Verify legacy `sdlc-orchestrator` removal or blocker**
+
+Run:
+
+```bash
+python3 - <<'PY'
+from pathlib import Path
+legacy = [
+    Path('skills/sdlc-orchestrator'),
+    Path('.opencode/skills/sdlc-orchestrator'),
+    Path('.claude/skills/sdlc-orchestrator'),
+    Path('.cursor/skills/sdlc-orchestrator'),
+]
+existing = [str(p) for p in legacy if p.exists()]
+if existing:
+    print('legacy sdlc-orchestrator skill directories still exist:')
+    for path in existing:
+        print(f'- {path}')
+    print('If retained, final summary must document the active dependency blocker.')
+else:
+    print('legacy sdlc-orchestrator skill directories removed')
+PY
+```
+
+Expected:
+
+- Either no legacy directories exist, or the final summary documents an exact active dependency blocker.
+
+- [ ] **Step 4: Run relevant deterministic tests**
+
+Run targeted tests:
+
+```bash
+python3 -m pytest tests/test_agent_config_lib.py -v
+python3 -m pytest tests/test_install_agents.py -v
+python3 -m pytest tests/test_activate_agents_config.py -v
+python3 -m pytest tests/test_setup_agents.py -v
 python3 -m pytest tests/test_project_bootstrap_skills.py -v
-python3 -m pytest tests/test_sync_templates.py -v
+python3 -m pytest tests/test_wrapper_contracts.py -v
 python3 -m pytest tests/test_workflow.py -v
 ```
 
@@ -330,12 +657,12 @@ Expected:
 - Targeted tests pass.
 - If full suite is not run, final summary must state that explicitly.
 
-- [ ] **Step 3: Confirm final diff is scoped**
+- [ ] **Step 5: Confirm final diff is scoped**
 
 Run:
 
 ```bash
-git diff -- docs/superpowers .ai/roadmap skills .opencode .claude .cursor tests
+git diff -- agents .opencode/agents .claude/agents .cursor/agents docs/superpowers .ai/roadmap skills .opencode/skills .claude/skills .cursor/skills .ai/evals tests scripts
 ```
 
 Expected:
@@ -345,16 +672,21 @@ Expected:
 
 ---
 
-## Task 7: Review Handoff
+## Task 10: Review Handoff
 
 - [ ] **Step 1: Produce review summary**
 
 The final implementation summary must include:
 
 - Files changed.
+- Files deleted.
 - Whether any active `test-agent` references remain.
-- Whether historical/archive references were intentionally left untouched.
+- Whether active `test-agent` files were deleted from all runtime distributions.
+- Whether legacy `sdlc-orchestrator` skill directories were deleted or which active dependency blocked deletion.
+- Whether legacy `skill.sdlc-orchestrator` EvalOps assets were deleted, archived, or migrated.
+- Finish-agent pre-hook and post-hook commit/push behavior added.
 - Verification commands run and results.
+- Whether historical/archive references were intentionally left untouched.
 - Any follow-up decisions needed from the reviewer.
 
 - [ ] **Step 2: Request code/doc review**
@@ -364,6 +696,8 @@ Use Superpowers `requesting-code-review` after the cleanup, with emphasis on:
 - Responsibility boundary correctness.
 - Whether the common path remains efficient.
 - Whether optional independent verification is clear enough without reintroducing default `test-agent`.
+- Whether finish-agent commit/push checkpoints are safe and auditable.
+- Whether legacy `sdlc-orchestrator` deletion is justified by dependency evidence.
 - Whether implement-agent and review-agent responsibilities are too broad.
 
 ---
@@ -372,9 +706,14 @@ Use Superpowers `requesting-code-review` after the cleanup, with emphasis on:
 
 - [ ] The spec in `docs/superpowers/specs/2026-07-04-remove-default-test-agent.md` has been reviewed.
 - [ ] Active default lifecycle docs no longer include `test-agent`.
+- [ ] Active `test-agent` runtime files are deleted or explicitly disabled as non-default examples.
 - [ ] Normal verification ownership is assigned to `implement-agent`.
 - [ ] Test quality and overfitting review ownership is assigned to `review-agent`.
+- [ ] `finish-agent` performs a pre-hook commit/push checkpoint before memory and roadmap hooks.
+- [ ] `finish-agent` performs a post-hook dirty-tree check and commits/pushes generated files if needed.
 - [ ] Optional independent verification is non-default and risk-triggered.
+- [ ] Legacy `sdlc-orchestrator` skill assets are deleted or exact dependency blockers are documented.
+- [ ] Legacy `skill.sdlc-orchestrator` EvalOps assets are deleted, archived, or migrated.
 - [ ] Relevant grep checks pass.
 - [ ] Relevant pytest commands pass or skipped commands are explicitly reported.
 - [ ] Review handoff is complete.
