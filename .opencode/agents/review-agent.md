@@ -25,7 +25,7 @@ permission:
     "git status*": allow
     "git diff*": allow
     "git log*": allow
-model: ollama-cloud/glm-5.2
+model: openai/gpt-5.5
 variant: Default
 ---
 

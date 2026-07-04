@@ -24,6 +24,8 @@ permission:
     "git log*": allow
     "python3 skills/sdlc-roadmap/scripts/*": allow
     "roadmap *": allow
+model: opencode-go/deepseek-v4-pro
+variant: Default
 ---
 
 # Roadmap Agent
