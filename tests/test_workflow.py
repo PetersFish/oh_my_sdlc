@@ -4793,7 +4793,7 @@ class TestDispatchHooks(FixtureBase):
         self.assertEqual(data["blockers"][0]["reason"], "missing_phase_evidence_keys")
         self.assertIn("spec_artifacts_done", data["blockers"][0]["message"])
 
-    def test_after_dispatch_blocks_success_missing_required_exit_criteria_signal(self):
+    def test_after_dispatch_allows_success_without_criteria_satisfied_when_evidence_key_truthy(self):
         self._create_run()
         state = self._read_current_state()
         state["current_phase"] = "create_change"
@@ -4818,9 +4818,8 @@ class TestDispatchHooks(FixtureBase):
 
         self.assertEqual(rc, 0)
         data = json.loads(out)
-        self.assertEqual(data["workflow_command"], "workflow.py block")
-        self.assertEqual(data["blockers"][0]["reason"], "missing_exit_criteria_satisfied")
-        self.assertIn("spec_artifacts_done", data["blockers"][0]["message"])
+        self.assertEqual(data["workflow_command"], "workflow.py complete-phase")
+        self.assertEqual(data["blockers"], [])
 
     def test_after_dispatch_allows_success_when_phase_evidence_and_criteria_are_present(self):
         self._create_run()
@@ -5885,6 +5884,263 @@ class TestRunArtifactsUnify(FixtureBase):
 
         self.assertTrue(os.path.isfile(os.path.join(run_dir, "plans", "default", "plan.md")))
         self.assertFalse(os.path.exists(split_dir), "split run directory should still migrate when sentinel exists")
+
+
+class TestExitCriteriaEvidenceKeySatisfaction(FixtureBase):
+    """Tests that _missing_exit_criteria accepts truthy evidence key values
+    as satisfaction for matching exit criteria, in addition to criteria_satisfied string.
+
+    Tests that verify _missing_exit_criteria in isolation use post_archive_actions,
+    which defines exit_criteria=[pending_hooks_empty] but NO evidence_keys.  This
+    means _missing_phase_evidence_keys returns [] (no keys to check) and
+    _missing_exit_criteria actually runs — allowing direct assertion on the
+    missing_exit_criteria_satisfied blocker reason.
+
+    Tests that verify the integrated path (evidence_keys + exit_criteria together)
+    use archive_change and apply_change, where both gates run sequentially.
+    """
+
+    def _start_post_archive_run(self, change_id="exit-criteria-demo"):
+        """Start a workflow at post_archive_actions via an archived spec_change."""
+        self._make_openspec_archive(change_id)
+        run_workflow(
+            self.tmp, "start",
+            subject_type="spec_change",
+            subject_id=change_id,
+        )
+
+    def test_exit_criteria_satisfied_by_evidence_key_value_without_string(self):
+        """archive_change: agent provides archive_path_exists=True but omits it
+        from criteria_satisfied.  Should pass because the truthy evidence key
+        value satisfies the exit criterion (new behavior)."""
+        self._make_roadmap_item("RM-EXIT-001", "ready", openspec_change="exit-criteria-evidence-key-satisfaction")
+        run_workflow(self.tmp, "start", subject_type="roadmap_item", subject_id="RM-EXIT-001")
+        state = self._read_current_state()
+        state["current_phase"] = "archive_change"
+        state.setdefault("context", {})["change_id"] = "demo-change"
+        self._write_current_state(state)
+
+        result = {
+            "status": "success",
+            "phase": "archive_change",
+            "slice_id": "default",
+            "flow_type": "lightweight-flow",
+            "evidence": {
+                "archive_path_exists": True,
+                "criteria_satisfied": "tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded",
+            },
+            "blockers": [],
+            "recommended_next_action": "complete_phase",
+        }
+
+        rc, out, _ = run_workflow(self.tmp, "after-dispatch", agent="finish-agent", value=json.dumps(result))
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertNotIn(
+            "missing_exit_criteria_satisfied",
+            str(data.get("blockers", [])),
+            "Truthy evidence key should satisfy exit criteria without string declaration",
+        )
+
+    def test_exit_criteria_satisfied_by_string_only(self):
+        """post_archive_actions: agent provides criteria_satisfied string but no
+        matching evidence key value.  Should pass (backward compatible).
+
+        Uses post_archive_actions (no evidence_keys) so _missing_phase_evidence_keys
+        does not short-circuit, isolating the string-only satisfaction path."""
+        self._start_post_archive_run()
+
+        result = {
+            "status": "success",
+            "phase": "post_archive_actions",
+            "slice_id": "default",
+            "flow_type": "spec-flow",
+            "evidence": {
+                "criteria_satisfied": "pending_hooks_empty",
+            },
+            "blockers": [],
+            "recommended_next_action": "complete_phase",
+        }
+
+        rc, out, _ = run_workflow(self.tmp, "after-dispatch", agent="finish-agent", value=json.dumps(result))
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertNotIn(
+            "missing_exit_criteria_satisfied",
+            str(data.get("blockers", [])),
+            "criteria_satisfied string should still work as before (backward compatible)",
+        )
+
+    def test_exit_criteria_missing_both_value_and_string_blocks(self):
+        """post_archive_actions: agent provides neither evidence value nor string
+        declaration.  Should block with missing_exit_criteria_satisfied.
+
+        Uses post_archive_actions (no evidence_keys) so _missing_exit_criteria
+        actually runs — the block reason is specifically missing_exit_criteria_satisfied,
+        not missing_phase_evidence_keys."""
+        self._start_post_archive_run()
+
+        result = {
+            "status": "success",
+            "phase": "post_archive_actions",
+            "slice_id": "default",
+            "flow_type": "spec-flow",
+            "evidence": {
+                "criteria_satisfied": "",
+            },
+            "blockers": [],
+            "recommended_next_action": "complete_phase",
+        }
+
+        rc, out, _ = run_workflow(self.tmp, "after-dispatch", agent="finish-agent", value=json.dumps(result))
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        blocker_reasons = [b.get("reason", "") for b in data.get("blockers", [])]
+        self.assertIn(
+            "missing_exit_criteria_satisfied",
+            blocker_reasons,
+            "Missing both evidence value and string should block with missing_exit_criteria_satisfied",
+        )
+
+    def test_exit_criteria_evidence_key_falsy_does_not_satisfy(self):
+        """post_archive_actions: agent returns pending_hooks_empty=False.
+        Should block with missing_exit_criteria_satisfied because falsy values
+        do not satisfy exit criteria.
+
+        Uses post_archive_actions (no evidence_keys) so _missing_phase_evidence_keys
+        does not short-circuit on the falsy value — _missing_exit_criteria runs
+        and must reject the falsy evidence key."""
+        self._start_post_archive_run()
+
+        result = {
+            "status": "success",
+            "phase": "post_archive_actions",
+            "slice_id": "default",
+            "flow_type": "spec-flow",
+            "evidence": {
+                "pending_hooks_empty": False,
+                "criteria_satisfied": "",
+            },
+            "blockers": [],
+            "recommended_next_action": "complete_phase",
+        }
+
+        rc, out, _ = run_workflow(self.tmp, "after-dispatch", agent="finish-agent", value=json.dumps(result))
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        blocker_reasons = [b.get("reason", "") for b in data.get("blockers", [])]
+        self.assertIn(
+            "missing_exit_criteria_satisfied",
+            blocker_reasons,
+            "Falsy evidence value should not satisfy exit criteria",
+        )
+
+    def test_exit_criteria_apply_change_evidence_key_satisfies_without_string(self):
+        """apply_change: agent provides tasks_complete=True but omits it from
+        criteria_satisfied.  Should pass via evidence key value in aggregated
+        phase_evidence_view."""
+        self._make_roadmap_item("RM-EXIT-001", "ready", openspec_change="exit-criteria-evidence-key-satisfaction")
+        run_workflow(self.tmp, "start", subject_type="roadmap_item", subject_id="RM-EXIT-001")
+        state = self._read_current_state()
+        state["current_phase"] = "apply_change"
+        state.setdefault("context", {})["change_id"] = "demo-change"
+        state.setdefault("evidence", {}).setdefault("agent_results", {}).setdefault("default", {})["test-agent"] = {
+            "status": "success",
+            "evidence": {
+                "verification_passed": True,
+                "regression_passed": True,
+                "tdd_passed": True,
+            },
+        }
+        self._write_current_state(state)
+
+        result = {
+            "status": "success",
+            "phase": "apply_change",
+            "slice_id": "default",
+            "flow_type": "lightweight-flow",
+            "evidence": {
+                "tasks_complete": True,
+                "tdd_passed": True,
+                "eval_passed_or_human_decision_recorded": True,
+                "review_complete": True,
+                "verification_passed": True,
+                "review_decision": "accepted",
+                "criteria_satisfied": "eval_passed_or_human_decision_recorded",
+            },
+            "blockers": [],
+            "recommended_next_action": "complete_phase",
+        }
+
+        rc, out, _ = run_workflow(self.tmp, "after-dispatch", agent="review-agent", value=json.dumps(result))
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        blocker_reasons = [b.get("reason", "") for b in data.get("blockers", [])]
+        self.assertNotIn(
+            "missing_exit_criteria_satisfied",
+            blocker_reasons,
+            "Truthy evidence keys in phase_evidence_view should satisfy exit criteria",
+        )
+
+    def test_post_archive_actions_both_paths_satisfy(self):
+        """post_archive_actions edge case (spec line 206): agent provides both
+        pending_hooks_empty=True (truthy evidence key) AND
+        criteria_satisfied="pending_hooks_empty" (string).  Both paths satisfy;
+        no change in behavior."""
+        self._start_post_archive_run()
+
+        result = {
+            "status": "success",
+            "phase": "post_archive_actions",
+            "slice_id": "default",
+            "flow_type": "spec-flow",
+            "evidence": {
+                "pending_hooks_empty": True,
+                "criteria_satisfied": "pending_hooks_empty",
+            },
+            "blockers": [],
+            "recommended_next_action": "complete_phase",
+        }
+
+        rc, out, _ = run_workflow(self.tmp, "after-dispatch", agent="finish-agent", value=json.dumps(result))
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertNotIn(
+            "missing_exit_criteria_satisfied",
+            str(data.get("blockers", [])),
+            "Both truthy evidence key and string should satisfy exit criteria",
+        )
+
+    def test_empty_criteria_satisfied_with_truthy_evidence_keys_passes(self):
+        """Edge case (spec line 208): empty criteria_satisfied string with truthy
+        evidence keys should pass via the evidence key value path.
+
+        Uses post_archive_actions (no evidence_keys gate) so the truthy
+        pending_hooks_empty value reaches _missing_exit_criteria, which must
+        accept it despite the empty string."""
+        self._start_post_archive_run()
+
+        result = {
+            "status": "success",
+            "phase": "post_archive_actions",
+            "slice_id": "default",
+            "flow_type": "spec-flow",
+            "evidence": {
+                "pending_hooks_empty": True,
+                "criteria_satisfied": "",
+            },
+            "blockers": [],
+            "recommended_next_action": "complete_phase",
+        }
+
+        rc, out, _ = run_workflow(self.tmp, "after-dispatch", agent="finish-agent", value=json.dumps(result))
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertNotIn(
+            "missing_exit_criteria_satisfied",
+            str(data.get("blockers", [])),
+            "Empty criteria_satisfied with truthy evidence keys should pass via evidence key path",
+        )
 
 
 if __name__ == "__main__":

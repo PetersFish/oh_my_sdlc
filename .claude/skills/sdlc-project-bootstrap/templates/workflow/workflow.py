@@ -1782,10 +1782,14 @@ def _missing_phase_evidence_keys(agent_evidence: Dict[str, Any], phase_def: Dict
     return missing
 
 
-def _missing_exit_criteria(agent_evidence: Dict[str, Any], phase_def: Dict[str, Any]) -> List[str]:
-    raw = agent_evidence.get("criteria_satisfied", "")
+def _missing_exit_criteria(phase_evidence_view: Dict[str, Any], phase_def: Dict[str, Any]) -> List[str]:
+    raw = phase_evidence_view.get("criteria_satisfied", "")
     satisfied = {item for item in str(raw).split(",") if item}
     required = set(phase_def.get("exit_criteria", []))
+    for key in list(required - satisfied):
+        value = phase_evidence_view.get(key)
+        if value is not None and value != "" and value is not False:
+            satisfied.add(key)
     return sorted(required - satisfied)
 
 
