@@ -4,7 +4,7 @@
 
 **Goal:** Remove `test-agent` from the default SDLC lifecycle and align active agent files, templates, eval assets, and docs with the Superpowers-style implementation loop: implement-agent owns normal verification and repair; review-agent owns test quality and overfitting review; optional independent verification remains non-default.
 
-**Architecture:** Agent-first cleanup. Active runtime should center on `dev-orchestrator` and specialized agent files under `agents/`, with workflow state still owned by `workflow.py`. Delete active `test-agent` files, remove default test-agent references from dispatching/finishing contracts, add finish-agent commit/push checkpoints around hook synchronization, and retire legacy `sdlc-orchestrator` skill assets if dependency audit confirms they are unused.
+**Architecture:** Agent-first cleanup. Active runtime should center on `dev-orchestrator` and specialized agent files under `agents/`, with workflow state still owned by `workflow.py`. Delete active `test-agent` files, remove default test-agent references from dispatching/finishing contracts, add finish-agent commit/push checkpoints before hook synchronization and after workflow cleanup, and retire legacy `sdlc-orchestrator` skill assets if dependency audit confirms they are unused.
 
 **Tech Stack:** Markdown agent specs, skill assets, EvalOps target manifests, repository search, existing pytest suite for deterministic workflow/runtime behavior.
 
@@ -29,7 +29,7 @@ Expected files to inspect and potentially modify:
   - Responsibility: test quality, overfitting, and verification evidence review.
 - Modify: distributed review-agent copies under `.opencode/agents/`, `.claude/agents/`, and `.cursor/agents/`.
 - Modify: `agents/finish-agent.md`
-  - Responsibility: finishing, pre-hook commit/push, hook resolution, post-hook dirty-tree commit/push.
+  - Responsibility: finishing, pre-hook commit/push, hook resolution, workflow cleanup, post-cleanup dirty-tree commit/push.
 - Modify: distributed finish-agent copies under `.opencode/agents/`, `.claude/agents/`, and `.cursor/agents/`.
 - Delete: `agents/test-agent.md`
   - Responsibility: active default test-agent must not load.
@@ -261,21 +261,23 @@ Expected:
 
 - Memory sync records a stable commit id representing the reviewed implementation/archive state before sync-generated files are added.
 
-- [ ] **Step 3: Resolve hooks only after pre-hook commit id exists**
+- [ ] **Step 3: Resolve hooks and complete workflow cleanup before the post-cleanup dirty-tree check**
 
-Run hook work in this order:
+Run hook work and workflow cleanup in this order:
 
 1. `memory_sync` through `sdlc-openspec-memory-sync` or `sdlc-repository-memory-sync`.
 2. `roadmap_done_if_relevant` through `roadmap-agent` / `sdlc-roadmap` boundary as currently required.
 3. `workflow.py complete-hook --hook <hook-name>` after each hook's evidence is present.
+4. Any remaining `workflow.py` cleanup required to satisfy `pending_hooks_empty` and phase completion evidence.
 
 Expected:
 
 - Hook outputs can reference the pre-hook commit id.
+- Workflow cleanup has run before checking whether generated files remain.
 
-- [ ] **Step 4: Add post-hook dirty-tree commit procedure**
+- [ ] **Step 4: Add post-cleanup dirty-tree commit procedure**
 
-After all hook resolution and sync scripts complete, `finish-agent` must:
+After all hook resolution, sync scripts, and workflow cleanup through `workflow.py` complete, `finish-agent` must:
 
 1. Run `git status --short --branch` again.
 2. If memory sync, roadmap sync, template sync, or workflow hook completion generated additional files, stage only those generated/approved artifacts.
@@ -286,6 +288,7 @@ After all hook resolution and sync scripts complete, `finish-agent` must:
 Expected:
 
 - No generated memory/roadmap/workflow files remain uncommitted after finish-agent completes.
+- The second commit happens after workflow cleanup, not before it.
 
 - [ ] **Step 5: Extend finish-agent evidence schema**
 
@@ -584,6 +587,7 @@ required = [
     'post_hook_commit_id',
     'memory_sync',
     'roadmap_done_if_relevant',
+    'workflow.py complete-hook',
 ]
 missing = []
 for path in paths:
@@ -603,6 +607,7 @@ PY
 Expected:
 
 - Command exits 0.
+- Manual review confirms the second commit/push is after `workflow.py` cleanup, not before it.
 
 - [ ] **Step 3: Verify legacy `sdlc-orchestrator` removal or blocker**
 
@@ -684,7 +689,7 @@ The final implementation summary must include:
 - Whether active `test-agent` files were deleted from all runtime distributions.
 - Whether legacy `sdlc-orchestrator` skill directories were deleted or which active dependency blocked deletion.
 - Whether legacy `skill.sdlc-orchestrator` EvalOps assets were deleted, archived, or migrated.
-- Finish-agent pre-hook and post-hook commit/push behavior added.
+- Finish-agent pre-hook and post-cleanup commit/push behavior added.
 - Verification commands run and results.
 - Whether historical/archive references were intentionally left untouched.
 - Any follow-up decisions needed from the reviewer.
@@ -710,7 +715,7 @@ Use Superpowers `requesting-code-review` after the cleanup, with emphasis on:
 - [ ] Normal verification ownership is assigned to `implement-agent`.
 - [ ] Test quality and overfitting review ownership is assigned to `review-agent`.
 - [ ] `finish-agent` performs a pre-hook commit/push checkpoint before memory and roadmap hooks.
-- [ ] `finish-agent` performs a post-hook dirty-tree check and commits/pushes generated files if needed.
+- [ ] `finish-agent` completes workflow cleanup through `workflow.py`, then performs a post-cleanup dirty-tree check and commits/pushes generated files if needed.
 - [ ] Optional independent verification is non-default and risk-triggered.
 - [ ] Legacy `sdlc-orchestrator` skill assets are deleted or exact dependency blockers are documented.
 - [ ] Legacy `skill.sdlc-orchestrator` EvalOps assets are deleted, archived, or migrated.
