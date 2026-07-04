@@ -72,7 +72,7 @@ class TestEvidenceEnvelope(unittest.TestCase):
             evidence={"focused_tests": [{"command": "pytest -k test_x", "result": "pass"}]},
             artifacts={"handoff_path": "/tmp/handoff.md"},
             blockers=[],
-            recommended_next_action="dispatch_test_agent",
+            recommended_next_action="dispatch_review_agent",
         )
         d = envelope.to_dict()
         for key in EVIDENCE_ENVELOPE_KEYS:
@@ -689,7 +689,7 @@ class TestBlockerConstruction(unittest.TestCase):
 
 
 class TestAgentVerificationSequence(unittest.TestCase):
-    """Task 1.7: test-agent reruns focused tests, checks overfit, runs broader regression/integration."""
+    """Testing wrapper contract covers independent verification (optional, non-default)."""
 
     def test_testing_wrapper_has_verification_evidence_keys(self):
         contract = get_wrapper("testing")
@@ -713,7 +713,7 @@ class TestAgentVerificationSequence(unittest.TestCase):
 
 
 class TestAgentFailureRouting(unittest.TestCase):
-    """Task 1.8: test-agent emits verification failures back to implement-agent by default;
+    """Testing wrapper routes verification failures back to implement-agent by default;
     escalates to plan-agent for requirement/design ambiguity."""
 
     def test_testing_wrapper_failure_routes_to_implement(self):
@@ -746,7 +746,7 @@ class TestAgentFailureRouting(unittest.TestCase):
         self.assertIn("ambiguous_requirements", modes)
         self.assertEqual(modes["ambiguous_requirements"]["blocks_phase"], "true")
 
-    def test_test_agent_routes_to_plan_for_ambiguity(self):
+    def test_testing_wrapper_routes_to_plan_for_ambiguity(self):
         contract = get_wrapper("testing")
         modes = {m["mode"] for m in contract.failure_modes}
         self.assertIn("verification_failure", modes)
@@ -771,7 +771,7 @@ class TestNormalizedResultContract(unittest.TestCase):
 
     def test_normalized_result_contains_all_gate_fields(self):
         envelope = make_evidence_envelope(
-            agent="test-agent",
+            agent="review-agent",
             status="success",
             phase="apply_change",
             slice_id="slice-2",
@@ -779,7 +779,7 @@ class TestNormalizedResultContract(unittest.TestCase):
             evidence={"verification_passed": True},
             artifacts={"handoff_path": "/path/to/handoff.md"},
             blockers=[],
-            recommended_next_action="dispatch_review_agent",
+            recommended_next_action="complete_phase",
         )
         d = envelope.to_dict()
         for key in ("agent", "status", "phase", "evidence", "artifacts", "blockers",
@@ -1397,7 +1397,7 @@ class TestExecutableRoutingTests(unittest.TestCase):
     def test_raw_logs_stored_under_workflow_run_path(self):
         from _lib.wrapper_contracts import make_raw_log_entry, RAW_LOG_META_KEYS
         entry = make_raw_log_entry(
-            path=".ai/workflows/runs/run-1/logs/slice-1/test-agent/pytest.log",
+            path=".ai/workflows/runs/run-1/logs/slice-1/review-agent/pytest.log",
             kind="pytest",
             command="pytest tests/ -v",
             result="fail",
@@ -1409,14 +1409,14 @@ class TestExecutableRoutingTests(unittest.TestCase):
     def test_raw_logs_artifacts_referenced_from_evidence(self):
         from _lib.wrapper_contracts import make_evidence_envelope
         envelope = make_evidence_envelope(
-            agent="test-agent",
+            agent="review-agent",
             status="failed",
             phase="apply_change",
             slice_id="slice-1",
             flow_type="spec-flow",
             artifacts={
                 "raw_log_paths": [
-                    {"path": ".ai/workflows/runs/run-1/logs/slice-1/test-agent/debug.log",
+                    {"path": ".ai/workflows/runs/run-1/logs/slice-1/review-agent/debug.log",
                      "kind": "pytest", "command": "pytest -k test", "result": "fail"},
                 ],
             },

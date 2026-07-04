@@ -4013,7 +4013,7 @@ class TestDispatchHooks(FixtureBase):
             "next_allowed": ["dispatch_plan_agent"],
         }
         state.setdefault("evidence", {})["agent_result"] = {
-            "agent": "test-agent",
+            "agent": "implement-agent",
             "status": "failed",
             "phase": "apply_change",
             "slice_id": "slice-1",
@@ -4181,7 +4181,7 @@ class TestDispatchHooks(FixtureBase):
         })
         rc, out, _ = run_workflow(
             self.tmp, "after-dispatch",
-            agent="test-agent",
+            agent="implement-agent",
             slice_id="slice-impl-roundtrip",
             value=agent_result,
         )
@@ -4278,7 +4278,7 @@ class TestDispatchHooks(FixtureBase):
             "type": "hook_blocked",
             "message": "roadmap remediation is required before implementation can continue",
             "next_allowed": ["dispatch_implement_agent"],
-            "route_to_agent": "test-agent",
+            "route_to_agent": "review-agent",
         }
         self._write_current_state(state)
 
@@ -4302,7 +4302,7 @@ class TestDispatchHooks(FixtureBase):
             "type": "domain_state_mismatch",
             "message": "roadmap item state must be fixed before implementation can continue",
             "next_allowed": ["resolve", "block"],
-            "route_to_agent": "test-agent",
+            "route_to_agent": "review-agent",
         }
         state.setdefault("evidence", {})["agent_result"] = {
             "agent": "roadmap-agent",
@@ -4404,7 +4404,7 @@ class TestDispatchHooks(FixtureBase):
 
         rc, out, _ = run_workflow(
             self.tmp, "before-dispatch",
-            agent="test-agent",
+            agent="review-agent",
         )
 
         self.assertNotEqual(rc, 0)
@@ -4459,7 +4459,7 @@ class TestDispatchHooks(FixtureBase):
         self._write_current_state(state)
         rc, out, _ = run_workflow(
             self.tmp, "before-dispatch",
-            agent="test-agent",
+            agent="review-agent",
         )
         self.assertEqual(rc, 0)
         data = json.loads(out)
@@ -4469,7 +4469,7 @@ class TestDispatchHooks(FixtureBase):
     def test_before_dispatch_supports_dash_and_underscore_agents(self):
         cases = [
             ("create_change", ["plan-agent", "plan_agent"]),
-            ("apply_change", ["implement-agent", "implement_agent", "test-agent", "test_agent", "review-agent", "review_agent"]),
+            ("apply_change", ["implement-agent", "implement_agent", "review-agent", "review_agent"]),
             ("archive_change", ["finish-agent", "finish_agent"]),
         ]
         for phase, agents in cases:
@@ -4510,7 +4510,7 @@ class TestDispatchHooks(FixtureBase):
 
         rc, out, _ = run_workflow(
             self.tmp, "before-dispatch",
-            agent="test-agent",
+            agent="review-agent",
         )
         self.assertNotEqual(rc, 0)
         data = json.loads(out)
@@ -4547,7 +4547,7 @@ class TestDispatchHooks(FixtureBase):
         self.assertEqual(data["status"], "success")
         self.assertEqual(data["agent"], "implement-agent")
         self.assertEqual(data["workflow_command"], "")
-        self.assertEqual(data["recommended_next_action"], "dispatch_test_agent")
+        self.assertEqual(data["recommended_next_action"], "dispatch_review_agent")
 
     def test_after_dispatch_with_blockers_recommends_block(self):
         self._create_run()
@@ -4560,7 +4560,7 @@ class TestDispatchHooks(FixtureBase):
         })
         rc, out, _ = run_workflow(
             self.tmp, "after-dispatch",
-            agent="test-agent",
+            agent="review-agent",
             slice_id="test-slice-3",
             value=agent_result,
         )
@@ -4581,7 +4581,7 @@ class TestDispatchHooks(FixtureBase):
             "status": "failed",
             "evidence": {},
             "blockers": [],
-            "recommended_next_action": "dispatch_test_agent",
+            "recommended_next_action": "dispatch_review_agent",
         })
         rc, out, _ = run_workflow(
             self.tmp, "after-dispatch",
@@ -4599,7 +4599,7 @@ class TestDispatchHooks(FixtureBase):
             "status": "success",
             "evidence": {"focused_tests": [{"command": "pytest -k a", "result": "pass"}]},
             "blockers": [],
-            "recommended_next_action": "dispatch_test_agent",
+            "recommended_next_action": "dispatch_review_agent",
         })
         second_result = json.dumps({
             "status": "failed",
@@ -4617,7 +4617,7 @@ class TestDispatchHooks(FixtureBase):
         self.assertEqual(rc, 0)
         rc, _, _ = run_workflow(
             self.tmp, "after-dispatch",
-            agent="test-agent",
+            agent="review-agent",
             slice_id="slice-b",
             value=second_result,
         )
@@ -4628,7 +4628,7 @@ class TestDispatchHooks(FixtureBase):
         self.assertIn("slice-a", results)
         self.assertIn("slice-b", results)
         self.assertEqual(results["slice-a"]["implement-agent"]["status"], "success")
-        self.assertEqual(results["slice-b"]["test-agent"]["status"], "failed")
+        self.assertEqual(results["slice-b"]["review-agent"]["status"], "failed")
 
     def test_after_dispatch_preserves_artifacts_in_transition(self):
         self._create_run()
@@ -4668,8 +4668,8 @@ class TestDispatchHooks(FixtureBase):
         reasons = [b["reason"] for b in data.get("blockers", [])]
         self.assertIn("invalid_flow_type", reasons)
 
-    def test_after_dispatch_implement_agent_does_not_request_review(self):
-        """Task 1.9: implement-agent success recommends dispatch_test_agent, not review/complete."""
+    def test_after_dispatch_implement_agent_success_recommends_review(self):
+        """implement-agent success recommends dispatch_review_agent (no default test-agent)."""
         self._create_run()
         agent_result = json.dumps({
             "status": "success",
@@ -4685,28 +4685,9 @@ class TestDispatchHooks(FixtureBase):
         self.assertEqual(rc, 0)
         data = json.loads(out)
         self.assertEqual(data["agent"], "implement-agent")
-        self.assertNotEqual(data["recommended_next_action"], "dispatch_review_agent")
-        self.assertNotEqual(data["recommended_next_action"], "complete_phase")
-        self.assertEqual(data["recommended_next_action"], "dispatch_test_agent")
-        self.assertEqual(data["workflow_command"], "")
-
-    def test_after_dispatch_test_agent_success_recommends_review(self):
-        """Task 1.9: test-agent success recommends dispatch_review_agent."""
-        self._create_run()
-        agent_result = json.dumps({
-            "status": "success",
-            "evidence": {"verification_passed": True, "overfit_check_passed": True, "regression_passed": True},
-            "blockers": [],
-            "recommended_next_action": "dispatch_review_agent",
-        })
-        rc, out, _ = run_workflow(
-            self.tmp, "after-dispatch",
-            agent="test-agent",
-            value=agent_result,
-        )
-        self.assertEqual(rc, 0)
-        data = json.loads(out)
         self.assertEqual(data["recommended_next_action"], "dispatch_review_agent")
+        self.assertNotEqual(data["recommended_next_action"], "complete_phase")
+        self.assertEqual(data["workflow_command"], "")
 
     def test_dispatch_hooks_only_write_under_workflows_runs(self):
         """Task 1.3b: before-dispatch and after-dispatch only write under .ai/workflows/runs/."""
@@ -4857,8 +4838,8 @@ class TestDispatchHooks(FixtureBase):
         state = self._read_current_state()
         state["current_phase"] = "apply_change"
         state.setdefault("context", {})["change_id"] = "demo-change"
-        # Add prior successful test-agent evidence for verification basis
-        state.setdefault("evidence", {}).setdefault("agent_results", {}).setdefault("default", {})["test-agent"] = {
+        # Add prior successful implement-agent evidence for verification basis
+        state.setdefault("evidence", {}).setdefault("agent_results", {}).setdefault("default", {})["implement-agent"] = {
             "status": "success",
             "evidence": {
                 "verification_passed": True,
@@ -4902,8 +4883,8 @@ class TestDispatchHooks(FixtureBase):
             "tdd_passed": True,
             "eval_passed_or_human_decision_recorded": True,
         })
-        # Add prior successful test-agent evidence for verification basis
-        state.setdefault("evidence", {}).setdefault("agent_results", {}).setdefault("default", {})["test-agent"] = {
+        # Add prior successful implement-agent evidence for verification basis
+        state.setdefault("evidence", {}).setdefault("agent_results", {}).setdefault("default", {})["implement-agent"] = {
             "status": "success",
             "evidence": {
                 "verification_passed": True,
@@ -4962,12 +4943,12 @@ class TestDispatchHooks(FixtureBase):
         data = json.loads(out)
         self.assertEqual(data["blockers"][0]["reason"], "missing_phase_evidence_keys")
 
-    def test_after_dispatch_review_acceptance_can_finalize_eval_key_from_test_agent_success(self):
+    def test_after_dispatch_review_acceptance_can_finalize_eval_key_from_implement_agent_success(self):
         run_workflow(self.tmp, "start", subject_type="spec_change", subject_id="demo-change")
         state = self._read_current_state()
         state["current_phase"] = "apply_change"
         state.setdefault("context", {})["change_id"] = "demo-change"
-        state.setdefault("evidence", {}).setdefault("agent_results", {}).setdefault("default", {})["test-agent"] = {
+        state.setdefault("evidence", {}).setdefault("agent_results", {}).setdefault("default", {})["implement-agent"] = {
             "status": "success",
             "evidence": {
                 "verification_passed": True,
@@ -5421,12 +5402,12 @@ class TestDispatchHooks(FixtureBase):
         )
         # Must not route to another lifecycle phase worker
         self.assertNotEqual(
-            data["recommended_next_action"], "dispatch_test_agent",
-            "roadmap-agent success must not route to test-agent",
-        )
-        self.assertNotEqual(
             data["recommended_next_action"], "dispatch_review_agent",
             "roadmap-agent success must not route to review-agent",
+        )
+        self.assertNotEqual(
+            data["recommended_next_action"], "dispatch_implement_agent",
+            "roadmap-agent success must not route to implement-agent",
         )
 
 
@@ -5490,7 +5471,7 @@ class TestApplyChangeHandoffHistory(FixtureBase):
             "flow_type": "lightweight-flow",
             "evidence": {},
             "artifacts": {"handoff_path": handoff_path},
-            "blockers": [{"reason": "missing_verification_basis", "message": "no test-agent evidence"}],
+            "blockers": [{"reason": "missing_verification_basis", "message": "no implement-agent evidence"}],
             "recommended_next_action": "resolve_failure",
         }
 
@@ -5503,20 +5484,30 @@ class TestApplyChangeHandoffHistory(FixtureBase):
         self.assertTrue(any(name.startswith("review-agent-") for name in history_files),
                         "history must contain review-agent timestamped copy")
 
-    def test_after_dispatch_preserves_handoff_history_for_failed_test_agent(self):
-        """Failed test-agent with handoff_path must preserve history copy."""
+    def test_after_dispatch_preserves_handoff_history_for_failed_review_agent(self):
+        """Failed review-agent with handoff_path must preserve history copy."""
         run_workflow(self.tmp, "start", subject_type="spec_change", subject_id="demo-change")
         state = self._read_current_state()
         state["current_phase"] = "apply_change"
         state.setdefault("context", {})["change_id"] = "demo-change"
+        # Provide implement-agent verification basis so the review-agent failure
+        # is not confused with a missing_verification_basis block.
+        state.setdefault("evidence", {}).setdefault("agent_results", {}).setdefault("default", {})["implement-agent"] = {
+            "status": "success",
+            "evidence": {
+                "verification_passed": True,
+                "regression_passed": True,
+                "tdd_passed": True,
+            },
+        }
         self._write_current_state(state)
 
         run_id = state["run_id"]
-        handoff_path = f".ai/workflows/runs/active/{run_id}/handoffs/default/test-agent.md"
+        handoff_path = f".ai/workflows/runs/active/{run_id}/handoffs/default/review-agent.md"
         latest_abs = os.path.join(self.tmp, handoff_path)
         os.makedirs(os.path.dirname(latest_abs), exist_ok=True)
         with open(latest_abs, "w", encoding="utf-8") as f:
-            f.write("# Test Agent Handoff\n\n## Status\n\nfailed\n")
+            f.write("# Review Agent Handoff\n\n## Status\n\nfailed\n")
 
         result = {
             "status": "failed",
@@ -5525,30 +5516,30 @@ class TestApplyChangeHandoffHistory(FixtureBase):
             "flow_type": "lightweight-flow",
             "evidence": {},
             "artifacts": {"handoff_path": handoff_path},
-            "blockers": [{"reason": "verification_failed", "message": "tests failed"}],
-            "recommended_next_action": "resolve_failure",
+            "blockers": [{"reason": "review_rejected", "message": "tests overfit"}],
+            "recommended_next_action": "back_to_implement",
         }
 
-        rc, _, _ = run_workflow(self.tmp, "after-dispatch", agent="test-agent", value=json.dumps(result))
+        rc, _, _ = run_workflow(self.tmp, "after-dispatch", agent="review-agent", value=json.dumps(result))
         self.assertEqual(rc, 0)
 
         history_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "active", run_id, "handoffs", "default", "history")
-        self.assertTrue(os.path.isdir(history_dir), "history directory must exist for failed test-agent")
+        self.assertTrue(os.path.isdir(history_dir), "history directory must exist for failed review-agent")
         history_files = os.listdir(history_dir)
-        self.assertTrue(any(name.startswith("test-agent-") for name in history_files),
-                        "history must contain test-agent timestamped copy")
+        self.assertTrue(any(name.startswith("review-agent-") for name in history_files),
+                        "history must contain review-agent timestamped copy")
 
 
 class TestApplyChangeVerificationBasis(FixtureBase):
-    """Tests for verification-basis guard requiring prior test-agent evidence."""
+    """Tests for verification-basis guard requiring prior implement-agent evidence."""
 
-    def test_after_dispatch_review_claiming_verification_without_test_agent_blocks(self):
-        """Review-agent claiming verification_passed without prior test-agent evidence must block."""
+    def test_after_dispatch_review_claiming_verification_without_implement_agent_blocks(self):
+        """Review-agent claiming verification_passed without prior implement-agent evidence must block."""
         run_workflow(self.tmp, "start", subject_type="spec_change", subject_id="demo-change")
         state = self._read_current_state()
         state["current_phase"] = "apply_change"
         state.setdefault("context", {})["change_id"] = "demo-change"
-        # No prior test-agent result in agent_results
+        # No prior implement-agent result in agent_results
         self._write_current_state(state)
 
         result = {
@@ -5574,16 +5565,16 @@ class TestApplyChangeVerificationBasis(FixtureBase):
         data = json.loads(out)
         reasons = [blocker["reason"] for blocker in data["blockers"]]
         self.assertIn("missing_verification_basis", reasons,
-                       "review-agent must not self-claim verification_passed without prior test-agent evidence")
+                       "review-agent must not self-claim verification_passed without prior implement-agent evidence")
 
-    def test_after_dispatch_review_with_failed_test_agent_still_blocks(self):
-        """Review-agent with failed test-agent result must still block on verification basis."""
+    def test_after_dispatch_review_with_failed_implement_agent_still_blocks(self):
+        """Review-agent with failed implement-agent result must still block on verification basis."""
         run_workflow(self.tmp, "start", subject_type="spec_change", subject_id="demo-change")
         state = self._read_current_state()
         state["current_phase"] = "apply_change"
         state.setdefault("context", {})["change_id"] = "demo-change"
-        # Add a FAILED test-agent result
-        state.setdefault("evidence", {}).setdefault("agent_results", {}).setdefault("default", {})["test-agent"] = {
+        # Add a FAILED implement-agent result
+        state.setdefault("evidence", {}).setdefault("agent_results", {}).setdefault("default", {})["implement-agent"] = {
             "status": "failed",
             "evidence": {
                 "verification_passed": False,
@@ -5615,7 +5606,7 @@ class TestApplyChangeVerificationBasis(FixtureBase):
         data = json.loads(out)
         reasons = [blocker["reason"] for blocker in data["blockers"]]
         self.assertIn("missing_verification_basis", reasons,
-                       "failed test-agent must not satisfy verification basis")
+                       "failed implement-agent must not satisfy verification basis")
 
 
 def _import_workflow():
@@ -6044,7 +6035,7 @@ class TestExitCriteriaEvidenceKeySatisfaction(FixtureBase):
         state = self._read_current_state()
         state["current_phase"] = "apply_change"
         state.setdefault("context", {})["change_id"] = "demo-change"
-        state.setdefault("evidence", {}).setdefault("agent_results", {}).setdefault("default", {})["test-agent"] = {
+        state.setdefault("evidence", {}).setdefault("agent_results", {}).setdefault("default", {})["implement-agent"] = {
             "status": "success",
             "evidence": {
                 "verification_passed": True,

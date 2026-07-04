@@ -1497,7 +1497,6 @@ def cmd_resolve(root, args):
 VALID_AGENT_NAMES = {
     "plan-agent", "plan_agent",
     "implement-agent", "implement_agent",
-    "test-agent", "test_agent",
     "review-agent", "review_agent",
     "finish-agent", "finish_agent",
     "roadmap-agent", "roadmap_agent",
@@ -1508,8 +1507,6 @@ CANONICAL_AGENT_NAMES = {
     "plan_agent": "plan-agent",
     "implement-agent": "implement-agent",
     "implement_agent": "implement-agent",
-    "test-agent": "test-agent",
-    "test_agent": "test-agent",
     "review-agent": "review-agent",
     "review_agent": "review-agent",
     "finish-agent": "finish-agent",
@@ -1524,14 +1521,13 @@ BLOCK_AGENT_ACTION_MAP = {
     "dispatch_plan_agent": "plan-agent",
     "back_to_plan": "plan-agent",
     "dispatch_review_agent": "review-agent",
-    "dispatch_test_agent": "test-agent",
     "dispatch_roadmap_agent": "roadmap-agent",
 }
 
 PHASE_AGENT_MAP = {
     "review_roadmap": {"roadmap-agent"},
     "create_change": {"plan-agent", "roadmap-agent"},
-    "apply_change": {"implement-agent", "test-agent", "review-agent", "roadmap-agent"},
+    "apply_change": {"implement-agent", "review-agent", "roadmap-agent"},
     "archive_change": {"finish-agent", "roadmap-agent"},
     "post_archive_actions": {"finish-agent", "roadmap-agent"},
 }
@@ -1927,14 +1923,12 @@ def cmd_after_dispatch(root, args):
     recommended_next_action = agent_recommended or "complete_phase"
     if agent_status != "success":
         next_cmd = "block"
-        if not agent_recommended or agent_recommended in {"dispatch_test_agent", "dispatch_review_agent", "complete_phase"}:
+        if not agent_recommended or agent_recommended in {"dispatch_review_agent", "complete_phase"}:
             recommended_next_action = "resolve_failure"
     elif agent_blockers:
         next_cmd = "block"
     elif canonical_agent == "implement-agent":
-        next_cmd = ""
-        recommended_next_action = "dispatch_test_agent"
-    elif canonical_agent == "test-agent":
+        # implement-agent owns normal verification; route to review-agent next.
         next_cmd = ""
         recommended_next_action = "dispatch_review_agent"
     elif canonical_agent == "roadmap-agent":
@@ -1963,20 +1957,23 @@ def cmd_after_dispatch(root, args):
                 })
 
         if phase == "apply_change" and phase_evidence_view.get("eval_passed_or_human_decision_recorded"):
-            # Require prior successful test-agent evidence for verification basis.
-            # Review-agent must not self-claim verification_passed without test-agent proof.
-            prior_test_agent = state.get("evidence", {}).get("agent_results", {}).get(slice_id, {}).get("test-agent", {})
-            test_agent_verified = (
-                prior_test_agent.get("status") == "success"
+            # Require prior successful implement-agent verification evidence as
+            # the verification basis.  Review-agent must not self-claim
+            # verification_passed without implement-agent proof.
+            prior_implement = state.get("evidence", {}).get("agent_results", {}).get(slice_id, {}).get("implement-agent", {})
+            implement_verified = (
+                prior_implement.get("status") == "success"
                 and (
-                    prior_test_agent.get("evidence", {}).get("verification_passed")
-                    or prior_test_agent.get("evidence", {}).get("regression_passed")
+                    prior_implement.get("evidence", {}).get("verification_passed")
+                    or prior_implement.get("evidence", {}).get("regression_passed")
+                    or prior_implement.get("evidence", {}).get("tdd_passed")
+                    or prior_implement.get("evidence", {}).get("focused_tests")
                 )
             )
-            if not test_agent_verified:
+            if not implement_verified:
                 agent_blockers.append({
                     "reason": "missing_verification_basis",
-                    "message": "apply_change acceptance cannot record eval_passed_or_human_decision_recorded without successful verification evidence",
+                    "message": "apply_change acceptance cannot record eval_passed_or_human_decision_recorded without successful implement-agent verification evidence",
                     "recommended_action": "resolve_failure",
                 })
 
