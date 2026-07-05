@@ -3,8 +3,8 @@
   "run_id": "2026-07-05-subagent-owned-post-archive-cleanup",
   "workflow": "sdlc-main",
   "flow_type": "lightweight-flow",
-  "status": "running",
-  "current_phase": "archive_change",
+  "status": "done",
+  "current_phase": "done",
   "primary_subject": {
     "type": "spec_change",
     "id": "subagent-owned-post-archive-cleanup"
@@ -13,14 +13,16 @@
     "change_id": "subagent-owned-post-archive-cleanup"
   },
   "phase_readiness": {
-    "phase": "archive_change",
+    "phase": "done",
     "ready": true,
     "missing_required_inputs": []
   },
   "pending_hooks": [],
   "completed_hooks": [],
   "completed_phases": [
-    "apply_change"
+    "apply_change",
+    "archive_change",
+    "post_archive_actions"
   ],
   "gates": {},
   "evidence": {
@@ -30,23 +32,22 @@
     },
     "lightweight_flow_confirmed": true,
     "agent_result": {
-      "agent": "review-agent",
+      "agent": "finish-agent",
       "status": "success",
-      "phase": "apply_change",
+      "phase": "post_archive_actions",
       "slice_id": "default",
       "flow_type": "lightweight-flow",
       "evidence": {
-        "tasks_complete": true,
-        "tdd_passed": true,
-        "eval_passed_or_human_decision_recorded": true,
-        "review_complete": true,
-        "verification_passed": true,
-        "review_decision": "accepted",
-        "criteria_satisfied": "tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded"
+        "memory_sync_done": true,
+        "roadmap_done_checked": true,
+        "derived_artifacts_synced": true,
+        "post_hook_dirty_tree": false,
+        "cleanup_complete": true,
+        "criteria_satisfied": "cleanup_complete"
       },
       "blockers": [],
       "recommended_next_action": "complete_phase",
-      "recorded_at": "2026-07-05T23:40:05.311613"
+      "recorded_at": "2026-07-05T23:52:03.132393"
     },
     "agent_results": {
       "default": {
@@ -88,6 +89,24 @@
           "blockers": [],
           "recommended_next_action": "complete_phase",
           "recorded_at": "2026-07-05T23:40:05.311613"
+        },
+        "finish-agent": {
+          "agent": "finish-agent",
+          "status": "success",
+          "phase": "post_archive_actions",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "memory_sync_done": true,
+            "roadmap_done_checked": true,
+            "derived_artifacts_synced": true,
+            "post_hook_dirty_tree": false,
+            "cleanup_complete": true,
+            "criteria_satisfied": "cleanup_complete"
+          },
+          "blockers": [],
+          "recommended_next_action": "complete_phase",
+          "recorded_at": "2026-07-05T23:52:03.132393"
         }
       }
     },
@@ -100,8 +119,18 @@
       "dispatched_at": "2026-07-05T23:42:10.256070",
       "slice_id": "default"
     },
-    "eval_passed_or_human_decision_recorded": true
+    "eval_passed_or_human_decision_recorded": true,
+    "archive_path_exists": true,
+    "roadmap_link": {
+      "count": 0,
+      "items": []
+    },
+    "memory_sync_done": true,
+    "roadmap_done_checked": true,
+    "derived_artifacts_synced": true,
+    "post_hook_dirty_tree": false,
+    "cleanup_complete": true
   },
   "block": null,
-  "updated_at": "2026-07-05T23:42:10.256177"
+  "updated_at": "2026-07-05T23:52:07.180665"
 }
