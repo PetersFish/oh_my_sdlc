@@ -289,6 +289,14 @@ General task dispatch flow:
 
 Roadmap lifecycle hooks (`roadmap_spec_link_if_ready`, `roadmap_apply_start_if_ready`, `roadmap_done_if_relevant`) are lifecycle-affecting work. They MUST use the lifecycle dispatch pipeline (before-dispatch → roadmap-agent → after-dispatch) and MUST NEVER use General Task dispatch.
 
+Before dispatching `roadmap-agent`, inspect the active run state.
+
+Dispatch `roadmap-agent` only when:
+
+- `primary_subject.type == "roadmap_item"`
+
+If `primary_subject.type != "roadmap_item"`, do not dispatch `roadmap-agent`, even if a roadmap hook appears in the workflow definition. Continue with the non-roadmap lifecycle path.
+
 Roadmap hook dispatch flow:
 1. Detect pending roadmap hook from workflow state (`pending_hooks` includes any of `roadmap_spec_link_if_ready`, `roadmap_apply_start_if_ready`, `roadmap_done_if_relevant`).
 2. Call `before-dispatch` with `--agent roadmap-agent`.
@@ -302,6 +310,8 @@ Roadmap hooks are NOT General Tasks. The General Task dispatch path skips before
 ### Roadmap Review Dispatch
 
 For `review_roadmap`, dispatch `roadmap-agent` through the lifecycle dispatch pipeline.
+
+`review_roadmap` is expected to run under `primary_subject.type == "roadmap_item"`, so roadmap-agent remains valid for roadmap review flows.
 
 If roadmap-agent returns:
 - `roadmap_review_decision: "passed"` — ask the user whether to create spec artifacts or review the next roadmap item.

@@ -27,7 +27,7 @@
 - Modify: `.ai/workflows/scripts/workflow.py`
 - Modify: `tests/test_workflow.py`
 
-- [ ] **Step 1.1: Add `_roadmap_agent_enabled` and `_is_roadmap_hook` helpers**
+- [x] **Step 1.1: Add `_roadmap_agent_enabled` and `_is_roadmap_hook` helpers**
 
   In `.ai/workflows/scripts/workflow.py`, add near phase/dispatch helpers:
 
@@ -50,7 +50,7 @@
 - Modify: `.ai/workflows/scripts/workflow.py`
 - Modify: `tests/test_workflow.py`
 
-- [ ] **Step 2.1: Add failing test for `spec_change` run hook filtering**
+- [x] **Step 2.1: Add failing test for `spec_change` run hook filtering**
 
   Add a test such as:
 
@@ -77,7 +77,7 @@
   self.assertIn("memory_sync", state["pending_hooks"])
   ```
 
-- [ ] **Step 2.2: Add failing test for `roadmap_item` run hook preservation**
+- [x] **Step 2.2: Add failing test for `roadmap_item` run hook preservation**
 
   Add a test such as:
 
@@ -98,7 +98,7 @@
 
   Use the roadmap hook appropriate for the tested phase if the fixture reaches a different phase.
 
-- [ ] **Step 2.3: Implement post-hook filtering**
+- [x] **Step 2.3: Implement post-hook filtering**
 
   Find the code that adds phase `post_hooks` into `state["pending_hooks"]`.
 
@@ -112,7 +112,7 @@
           state["pending_hooks"].append(hook)
   ```
 
-- [ ] **Step 2.4: Run focused hook filtering tests**
+- [x] **Step 2.4: Run focused hook filtering tests**
 
   Run:
 
@@ -130,7 +130,7 @@
 - Modify: `.ai/workflows/scripts/workflow.py`
 - Modify: `tests/test_workflow.py`
 
-- [ ] **Step 3.1: Add failing test for blocked roadmap-agent dispatch on `spec_change` run**
+- [x] **Step 3.1: Add failing test for blocked roadmap-agent dispatch on `spec_change` run**
 
   Add a test such as:
 
@@ -155,7 +155,7 @@
   self.assertEqual(data["blockers"][0]["reason"], "roadmap_not_enabled")
   ```
 
-- [ ] **Step 3.2: Add allowed dispatch test for `roadmap_item` run**
+- [x] **Step 3.2: Add allowed dispatch test for `roadmap_item` run**
 
   Add a test such as:
 
@@ -175,7 +175,7 @@
   self.assertEqual(data["status"], "dispatched")
   ```
 
-- [ ] **Step 3.3: Implement `cmd_before_dispatch` roadmap-agent gate**
+- [x] **Step 3.3: Implement `cmd_before_dispatch` roadmap-agent gate**
 
   In `cmd_before_dispatch`, after `canonical_agent` is computed and before returning success, add:
 
@@ -190,7 +190,7 @@
 
   Make sure this participates in the existing `blocker_reasons` flow instead of exiting separately.
 
-- [ ] **Step 3.4: Run focused dispatch gate tests**
+- [x] **Step 3.4: Run focused dispatch gate tests**
 
   Run:
 
@@ -208,7 +208,7 @@
 - Modify: `agents/dev-orchestrator.md`
 - Modify: distributed copies if required
 
-- [ ] **Step 4.1: Update Roadmap-Governed Hook Dispatch section**
+- [x] **Step 4.1: Update Roadmap-Governed Hook Dispatch section**
 
   Add this rule to `agents/dev-orchestrator.md`:
 
@@ -223,7 +223,7 @@
   Continue with the non-roadmap lifecycle path.
   ```
 
-- [ ] **Step 4.2: Preserve `review_roadmap` behavior**
+- [x] **Step 4.2: Preserve `review_roadmap` behavior**
 
   Add this clarification:
 
@@ -231,7 +231,7 @@
   `review_roadmap` is expected to run under `primary_subject.type == "roadmap_item"`, so roadmap-agent remains valid for roadmap review flows.
   ```
 
-- [ ] **Step 4.3: Add or update static prompt contract test if applicable**
+- [x] **Step 4.3: Add or update static prompt contract test if applicable**
 
   If `tests/test_wrapper_contracts.py` already checks dev-orchestrator prompt routing contracts, add assertions that the canonical prompt mentions:
   - `primary_subject.type == "roadmap_item"`
@@ -245,7 +245,7 @@
 **Files:**
 - Modify: distributed runtime and agent copies if the repository requires them
 
-- [ ] **Step 5.1: Inspect changed canonical files**
+- [x] **Step 5.1: Inspect changed canonical files**
 
   Run:
 
@@ -254,13 +254,13 @@
   git diff -- agents/dev-orchestrator.md
   ```
 
-- [ ] **Step 5.2: Sync distributed copies**
+- [x] **Step 5.2: Sync distributed copies**
 
   If this repository distributes canonical files into `.opencode`, `.claude`, or `.cursor`, sync after tests pass.
 
   Use the project sync script if available. Otherwise manually sync equivalent changes to distributed copies.
 
-- [ ] **Step 5.3: Inspect distribution diff**
+- [x] **Step 5.3: Inspect distribution diff**
 
   Run:
 
@@ -277,7 +277,7 @@
 **Files:**
 - Verify: workflow runtime, prompt contract, distributed copies
 
-- [ ] **Step 6.1: Run focused roadmap tests**
+- [x] **Step 6.1: Run focused roadmap tests**
 
   Run:
 
@@ -285,7 +285,7 @@
   python3 -m pytest tests/test_workflow.py -k "roadmap_agent or roadmap_hook or roadmap" -v
   ```
 
-- [ ] **Step 6.2: Run workflow tests**
+- [x] **Step 6.2: Run workflow tests**
 
   Run:
 
@@ -293,7 +293,7 @@
   python3 -m pytest tests/test_workflow.py -v
   ```
 
-- [ ] **Step 6.3: Run contract tests if prompt assertions changed**
+- [x] **Step 6.3: Run contract tests if prompt assertions changed**
 
   Run:
 
@@ -301,7 +301,7 @@
   python3 -m pytest tests/test_wrapper_contracts.py -v
   ```
 
-- [ ] **Step 6.4: Run full suite if feasible**
+- [x] **Step 6.4: Run full suite if feasible**
 
   Run:
 
@@ -309,7 +309,7 @@
   python3 -m pytest tests/ -v
   ```
 
-- [ ] **Step 6.5: Confirm done criteria**
+- [x] **Step 6.5: Confirm done criteria**
 
   Verify:
   - `spec_change` runs no longer enqueue roadmap hooks.

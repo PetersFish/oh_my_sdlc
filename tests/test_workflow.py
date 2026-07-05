@@ -1618,7 +1618,8 @@ class TestCompletePhase(FixtureBase):
         data = json.loads(out)
         self.assertIn("archive_change", data.get("completed_phases", []))
         self.assertIn("memory_sync", data.get("pending_hooks", []))
-        self.assertIn("roadmap_done_if_relevant", data.get("pending_hooks", []))
+        # spec_change runs do not enqueue roadmap hooks (primary_subject gating)
+        self.assertNotIn("roadmap_done_if_relevant", data.get("pending_hooks", []))
 
     def test_apply_change_requires_execution_evidence_keys(self):
         self._make_roadmap_item("RM-APPLY-001", "active", openspec_change="apply-evidence-test")
@@ -1643,6 +1644,104 @@ class TestCompletePhase(FixtureBase):
         self.assertIn("tasks_complete", data["error"])
         self.assertIn("tdd_passed", data["error"])
         self.assertIn("eval_passed_or_human_decision_recorded", data["error"])
+
+
+class TestRoadmapHookFiltering(FixtureBase):
+    """Roadmap hooks are only enqueued when primary_subject.type == roadmap_item."""
+
+    def test_spec_change_run_does_not_enqueue_roadmap_hooks_on_archive_change(self):
+        """complete-phase on archive_change for a spec_change run skips roadmap hooks."""
+        run_workflow(
+            self.tmp, "start",
+            subject_type="spec_change",
+            subject_id="hook-filter-archive",
+        )
+        state = self._read_current_state()
+        state["current_phase"] = "archive_change"
+        state["evidence"]["archive_path"] = "openspec/changes/archive/2026-07-05-hook-filter-archive"
+        state["evidence"]["archive_path_exists"] = True
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(
+            self.tmp, "complete-phase",
+            exit_criteria_satisfied="archive_path_exists",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertNotIn("roadmap_done_if_relevant", data.get("pending_hooks", []),
+                         "roadmap_done_if_relevant must not be enqueued for spec_change runs")
+        self.assertIn("memory_sync", data.get("pending_hooks", []),
+                      "memory_sync must still be enqueued for spec_change runs")
+
+    def test_spec_change_run_does_not_enqueue_roadmap_hooks_on_create_change(self):
+        """complete-phase on create_change for a spec_change run skips roadmap_spec_link_if_ready."""
+        run_workflow(
+            self.tmp, "start",
+            subject_type="spec_change",
+            subject_id="hook-filter-create",
+        )
+        state = self._read_current_state()
+        state["current_phase"] = "create_change"
+        state["evidence"]["spec_artifacts_done"] = True
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(
+            self.tmp, "complete-phase",
+            exit_criteria_satisfied="spec_artifacts_done",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertNotIn("roadmap_spec_link_if_ready", data.get("pending_hooks", []),
+                         "roadmap_spec_link_if_ready must not be enqueued for spec_change runs")
+
+    def test_spec_change_run_does_not_enqueue_roadmap_hooks_on_apply_change(self):
+        """complete-phase on apply_change for a spec_change run skips roadmap_apply_start_if_ready."""
+        run_workflow(
+            self.tmp, "start",
+            subject_type="spec_change",
+            subject_id="hook-filter-apply",
+        )
+        state = self._read_current_state()
+        state["current_phase"] = "apply_change"
+        state["evidence"]["tasks_complete"] = True
+        state["evidence"]["tdd_passed"] = True
+        state["evidence"]["eval_passed_or_human_decision_recorded"] = True
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(
+            self.tmp, "complete-phase",
+            exit_criteria_satisfied="tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertNotIn("roadmap_apply_start_if_ready", data.get("pending_hooks", []),
+                         "roadmap_apply_start_if_ready must not be enqueued for spec_change runs")
+
+    def test_roadmap_item_run_can_enqueue_roadmap_hooks_on_apply_change(self):
+        """complete-phase on apply_change for a roadmap_item run still enqueues roadmap_apply_start_if_ready."""
+        self._make_roadmap_item("RM-HF-001", "active", openspec_change="hook-filter-roadmap")
+        run_workflow(
+            self.tmp, "start",
+            subject_type="roadmap_item",
+            subject_id="RM-HF-001",
+        )
+        state = self._read_current_state()
+        state["current_phase"] = "apply_change"
+        state["evidence"]["tasks_complete"] = True
+        state["evidence"]["tdd_passed"] = True
+        state["evidence"]["eval_passed_or_human_decision_recorded"] = True
+        state["evidence"]["openspec_status"] = {"classification": "in-progress", "source": "active"}
+        state["evidence"]["roadmap_item_status"] = {"item_id": "RM-HF-001", "status": "active"}
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(
+            self.tmp, "complete-phase",
+            exit_criteria_satisfied="tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertIn("roadmap_apply_start_if_ready", data.get("pending_hooks", []),
+                      "roadmap_apply_start_if_ready must still be enqueued for roadmap_item runs")
 
 
 class TestWorkflowDefinitionContracts(FixtureBase):
@@ -2974,7 +3073,7 @@ class TestVerifyFoundations(FixtureBase):
 class TestRoadmapAgentRouting(FixtureBase):
     """Task 4.1: Prove roadmap-agent works through lifecycle dispatch, not General Task."""
 
-    def _make_apply_run_with_roadmap(self, change_id, item_id, item_status):
+    def _make_apply_run_with_roadmap(self, change_id, item_id, item_status, subject_type="roadmap_item"):
         """Create a run in apply_change phase with a linked roadmap item."""
         self._make_openspec_change(change_id)
         self._make_roadmap_item(
@@ -2988,7 +3087,7 @@ class TestRoadmapAgentRouting(FixtureBase):
             "workflow": "sdlc-main",
             "status": "running",
             "current_phase": "apply_change",
-            "primary_subject": {"type": "spec_change", "id": change_id},
+            "primary_subject": {"type": subject_type, "id": item_id if subject_type == "roadmap_item" else change_id},
             "context": {"change_id": change_id, "roadmap_item_id": item_id},
             "phase_readiness": {
                 "phase": "apply_change",
@@ -3067,6 +3166,56 @@ class TestRoadmapAgentRouting(FixtureBase):
         self.assertEqual(
             data.get("recommended_next_action"), "start_run"
         )
+
+    def test_before_dispatch_blocks_roadmap_agent_for_spec_change_run(self):
+        """roadmap-agent is blocked when primary_subject.type == spec_change."""
+        self._make_apply_run_with_roadmap(
+            "gate-block", "RM-GATE-001", "ready", subject_type="spec_change",
+        )
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="roadmap-agent",
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "blocked")
+        reasons = [b["reason"] for b in data.get("blockers", [])]
+        self.assertIn("roadmap_not_enabled", reasons)
+
+    def test_before_dispatch_allows_roadmap_agent_for_roadmap_item_run(self):
+        """roadmap-agent is allowed when primary_subject.type == roadmap_item in review_roadmap."""
+        self._make_roadmap_item("RM-GATE-002", "idea")
+        run_id = "2026-06-20-gate-allow"
+        state = {
+            "version": 1,
+            "run_id": run_id,
+            "workflow": "sdlc-main",
+            "status": "running",
+            "current_phase": "review_roadmap",
+            "primary_subject": {"type": "roadmap_item", "id": "RM-GATE-002"},
+            "context": {"roadmap_item_id": "RM-GATE-002"},
+            "phase_readiness": {
+                "phase": "review_roadmap",
+                "ready": True,
+                "missing_required_inputs": [],
+            },
+            "pending_hooks": [],
+            "completed_hooks": [],
+            "completed_phases": ["create_roadmap"],
+            "gates": {},
+            "evidence": {},
+            "block": None,
+            "updated_at": "2026-06-20T00:00:00",
+            "flow_type": "spec-flow",
+        }
+        self._write_current_state(state)
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="roadmap-agent",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "dispatched")
 
 
 class TestConcurrentRuns(FixtureBase):
@@ -4342,7 +4491,7 @@ class TestDispatchHooks(FixtureBase):
             "workflow": "sdlc-main",
             "status": "running",
             "current_phase": "apply_change",
-            "primary_subject": {"type": "spec_change", "id": change_id},
+            "primary_subject": {"type": "roadmap_item", "id": item_id},
             "context": {"change_id": change_id, "roadmap_item_id": item_id},
             "phase_readiness": {
                 "phase": "apply_change",

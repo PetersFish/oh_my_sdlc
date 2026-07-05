@@ -827,6 +827,14 @@ class TestRoadmapAgentReviewContract(unittest.TestCase):
         self.assertIn("roadmap_spec_link_if_ready", body)
         self.assertNotIn("roadmap_status_ready_if_linked", body)
 
+    def test_dev_orchestrator_documents_primary_subject_roadmap_gating(self):
+        """dev-orchestrator must document that roadmap-agent requires primary_subject.type == roadmap_item."""
+        body = (AGENTS_DIR / "dev-orchestrator.md").read_text(encoding="utf-8")
+
+        self.assertIn("primary_subject.type == \"roadmap_item\"", body)
+        self.assertIn("roadmap-agent", body)
+        self.assertIn("review_roadmap", body)
+
 
 AGENT_NAMES = [
     "dev-orchestrator", "plan-agent", "implement-agent",

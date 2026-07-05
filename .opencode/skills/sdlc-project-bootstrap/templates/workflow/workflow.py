@@ -1533,6 +1533,14 @@ PHASE_AGENT_MAP = {
 }
 
 
+def _roadmap_agent_enabled(state):
+    return state.get("primary_subject", {}).get("type") == "roadmap_item"
+
+
+def _is_roadmap_hook(hook):
+    return str(hook).startswith("roadmap_")
+
+
 def _canonical_agent_name(agent):
     return CANONICAL_AGENT_NAMES.get(agent, agent)
 
@@ -1698,6 +1706,12 @@ def cmd_before_dispatch(root, args):
             "reason": "agent_not_allowed_for_phase",
             "message": f"Agent '{canonical_agent}' is not allowed in phase '{current_phase}'",
             "recommended_action": "select an agent mapped to the current phase",
+        })
+    if canonical_agent == "roadmap-agent" and not _roadmap_agent_enabled(state):
+        blocker_reasons.append({
+            "reason": "roadmap_not_enabled",
+            "message": "roadmap-agent is disabled because primary_subject.type is not roadmap_item",
+            "recommended_action": "continue the non-roadmap workflow path without dispatching roadmap-agent",
         })
 
     if blocker_reasons:
@@ -2198,6 +2212,8 @@ def cmd_complete_phase(root, args):
         completed.append(current)
 
     for hook in phase_def.get("post_hooks", []):
+        if _is_roadmap_hook(hook) and not _roadmap_agent_enabled(state):
+            continue
         pending = state.setdefault("pending_hooks", [])
         if hook not in pending:
             pending.append(hook)
