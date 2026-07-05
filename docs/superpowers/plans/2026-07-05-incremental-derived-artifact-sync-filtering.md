@@ -41,11 +41,11 @@ Do not directly edit generated target files under `.opencode/`, `.claude/`, or `
 
 **Purpose:** Lock the desired behavior before implementation. Existing full-mode tests should keep passing; new incremental tests should fail before implementation.
 
-- [ ] **Step 1: Preserve existing full-mode compatibility tests**
+- [x] **Step 1: Preserve existing full-mode compatibility tests**
 
 Keep the existing tests that assert plain `run_aggregate(..., mode="fix")` installs all canonical skills. Do not weaken these tests. Full mode remains the compatibility baseline.
 
-- [ ] **Step 2: Add docs-only skipped fix test**
+- [x] **Step 2: Add docs-only skipped fix test**
 
 Add a test that calls the new incremental path with changed files equivalent to:
 
@@ -60,7 +60,7 @@ Expected:
 - `affected.agents` is false;
 - `affected.workflows` is false.
 
-- [ ] **Step 3: Add docs-only skipped check test**
+- [x] **Step 3: Add docs-only skipped check test**
 
 Repeat the skipped behavior for `mode="check"`.
 
@@ -71,7 +71,7 @@ Expected:
 - no skill distribution checks;
 - return code is `0`.
 
-- [ ] **Step 4: Add single-skill incremental fix test**
+- [x] **Step 4: Add single-skill incremental fix test**
 
 Create two canonical skill fixtures:
 
@@ -89,7 +89,7 @@ Expected:
 - no `setup_agents.py` commands;
 - no `sync_templates.py` commands.
 
-- [ ] **Step 5: Add multi-skill incremental fix test**
+- [x] **Step 5: Add multi-skill incremental fix test**
 
 Call incremental fix with changed files:
 
@@ -102,7 +102,7 @@ Expected:
 - each affected skill is installed to all three skill targets;
 - no unrelated skill is installed.
 
-- [ ] **Step 6: Add skill-scoped check test**
+- [x] **Step 6: Add skill-scoped check test**
 
 Call incremental check with changed files:
 
@@ -114,7 +114,7 @@ Expected:
 - command includes `--skills demo-skill`;
 - no agent or workflow commands.
 
-- [ ] **Step 7: Add agent-only fix and check tests**
+- [x] **Step 7: Add agent-only fix and check tests**
 
 Call incremental fix with changed files:
 
@@ -136,7 +136,7 @@ Expected:
 - no skill check commands;
 - no workflow commands.
 
-- [ ] **Step 8: Add workflow-only fix and check tests**
+- [x] **Step 8: Add workflow-only fix and check tests**
 
 Call incremental fix with changed files:
 
@@ -160,7 +160,7 @@ Expected:
 - no agent checks;
 - no skill checks.
 
-- [ ] **Step 9: Add sync-rule full-fallback test**
+- [x] **Step 9: Add sync-rule full-fallback test**
 
 Call incremental fix with changed files:
 
@@ -172,7 +172,7 @@ Expected:
 - report scope is `full` with a reason such as sync-rule change;
 - all current full-mode command categories are present.
 
-- [ ] **Step 10: Add Git changed-file discovery test**
+- [x] **Step 10: Add Git changed-file discovery test**
 
 Mock subprocess calls for Git discovery and verify `--changed-files-from-git` collects both:
 
@@ -185,7 +185,7 @@ Expected:
 - returned paths are sorted or otherwise deterministic;
 - non-zero Git discovery returns a clear error when discovery was explicitly requested.
 
-- [ ] **Step 11: Run focused tests and confirm expected failures**
+- [x] **Step 11: Run focused tests and confirm expected failures**
 
 Run:
 
@@ -207,7 +207,7 @@ Do not weaken the assertions to match the current full-sync behavior.
 
 **Purpose:** Add a deterministic classification layer that maps repository-relative paths to affected sync domains.
 
-- [ ] **Step 1: Add an affected-domain data structure**
+- [x] **Step 1: Add an affected-domain data structure**
 
 Use a small stdlib-only structure, such as a dataclass or plain dict, with these logical fields:
 
@@ -220,7 +220,7 @@ Use a small stdlib-only structure, such as a dataclass or plain dict, with these
 
 Keep the public JSON representation serializable and deterministic.
 
-- [ ] **Step 2: Add path normalization helper**
+- [x] **Step 2: Add path normalization helper**
 
 Normalize changed paths by:
 
@@ -231,7 +231,7 @@ Normalize changed paths by:
 
 Do not resolve paths against the filesystem; classification should work for deleted files too.
 
-- [ ] **Step 3: Classify skill paths**
+- [x] **Step 3: Classify skill paths**
 
 Map paths matching `skills/<skill-name>/...` to `affected.skills.add(<skill-name>)`.
 
@@ -241,7 +241,7 @@ Rules:
 - ignore bare `skills/` without a skill name;
 - preserve exact skill directory name.
 
-- [ ] **Step 4: Classify agent paths**
+- [x] **Step 4: Classify agent paths**
 
 Set `affected.agents = True` for:
 
@@ -250,7 +250,7 @@ Set `affected.agents = True` for:
 
 Do not classify generated `.opencode/agents/...`, `.claude/agents/...`, or `.cursor/agents/...` as canonical agent changes.
 
-- [ ] **Step 5: Classify workflow governed files**
+- [x] **Step 5: Classify workflow governed files**
 
 Set `affected.workflows = True` for exactly:
 
@@ -259,7 +259,7 @@ Set `affected.workflows = True` for exactly:
 
 Do not classify workflow run history under `.ai/workflows/runs/...` as workflow template changes.
 
-- [ ] **Step 6: Classify sync-rule fallback files**
+- [x] **Step 6: Classify sync-rule fallback files**
 
 Set `affected.full = True` and record a reason when changed paths include sync/install/check rule files such as:
 
@@ -273,7 +273,7 @@ Set `affected.full = True` and record a reason when changed paths include sync/i
 
 When `full` is true, suite construction should use existing full check/fix behavior.
 
-- [ ] **Step 7: Record ignored paths**
+- [x] **Step 7: Record ignored paths**
 
 For paths that do not affect derived artifacts, append the normalized path to `skipped_paths`.
 
@@ -294,7 +294,7 @@ Examples:
 
 **Purpose:** Build only the required check/fix command suites from the affected-domain result.
 
-- [ ] **Step 1: Refactor `_check_suites` to support selected domains**
+- [x] **Step 1: Refactor `_check_suites` to support selected domains**
 
 Keep the existing full behavior available.
 
@@ -308,7 +308,7 @@ For skill check, pass the existing lower-level filter:
 
     --skills <comma-separated-sorted-skill-names>
 
-- [ ] **Step 2: Refactor `_fix_steps` to support selected domains**
+- [x] **Step 2: Refactor `_fix_steps` to support selected domains**
 
 Keep current full behavior when called without incremental scope.
 
@@ -324,7 +324,7 @@ Use explicit semantics:
 - `skills == set()` means install no skills;
 - `skills == {"demo-skill"}` means install only that skill.
 
-- [ ] **Step 3: Validate affected skill directories during fix**
+- [x] **Step 3: Validate affected skill directories during fix**
 
 When an affected skill no longer exists because it was deleted or renamed, do not blindly call `install_skill.py` against a missing source directory.
 
@@ -336,7 +336,7 @@ Recommended behavior:
 
 This keeps the first implementation focused on changed/added/modified skills, not deletion cleanup.
 
-- [ ] **Step 4: Implement skipped mode**
+- [x] **Step 4: Implement skipped mode**
 
 If incremental mode has:
 
@@ -351,7 +351,7 @@ JSON report should use `scope: skipped` and include `skipped_paths`.
 
 Plain-text output should say no derived-artifact domains are affected.
 
-- [ ] **Step 5: Implement mixed-domain mode**
+- [x] **Step 5: Implement mixed-domain mode**
 
 If a change set includes multiple affected domains, compose all relevant suites without falling back to full unless `affected.full` is true.
 
@@ -371,7 +371,7 @@ Example:
 
 **Purpose:** Expose incremental behavior to workflow wrappers and local users without breaking existing callers.
 
-- [ ] **Step 1: Add CLI options**
+- [x] **Step 1: Add CLI options**
 
 Add parser options:
 
@@ -385,7 +385,7 @@ Validation rules:
 - Existing call shape with no changed-file options remains full behavior.
 - `--full` must not be combined with changed-file options unless it intentionally overrides them with a clear message.
 
-- [ ] **Step 2: Add Git changed-file discovery helper**
+- [x] **Step 2: Add Git changed-file discovery helper**
 
 When `--changed-files-from-git` is set, collect changed files with commands equivalent to:
 
@@ -400,7 +400,7 @@ Rules:
 - make output deterministic;
 - if a Git command fails, return a clear error and non-zero exit because discovery was explicitly requested.
 
-- [ ] **Step 3: Update `run_aggregate` signature**
+- [x] **Step 3: Update `run_aggregate` signature**
 
 Extend `run_aggregate` to accept optional changed-file data for tests and wrappers.
 
@@ -415,7 +415,7 @@ Semantics:
 - `incremental=True`: classify `changed_files` and build selected suites;
 - `changed_files` supplied by tests should not require Git.
 
-- [ ] **Step 4: Update JSON reporting**
+- [x] **Step 4: Update JSON reporting**
 
 For all modes, JSON report should include:
 
@@ -428,7 +428,7 @@ For all modes, JSON report should include:
 
 Preserve existing `suites` fields for command results.
 
-- [ ] **Step 5: Update plain-text reporting**
+- [x] **Step 5: Update plain-text reporting**
 
 Keep existing full-mode plain text stable.
 
@@ -448,7 +448,7 @@ For incremental mode:
 
 **Purpose:** Complete red/green loop and verify no compatibility regression.
 
-- [ ] **Step 1: Run focused aggregate tests**
+- [x] **Step 1: Run focused aggregate tests**
 
 Run:
 
@@ -459,7 +459,7 @@ Expected:
 - all old full-mode tests pass;
 - all new incremental tests pass.
 
-- [ ] **Step 2: Run related regression tests**
+- [x] **Step 2: Run related regression tests**
 
 Run likely affected suites:
 
@@ -474,7 +474,7 @@ Expected:
 
 - no regressions in agent install/activation or wrapper contracts.
 
-- [ ] **Step 3: Run full project regression**
+- [x] **Step 3: Run full project regression**
 
 Run:
 
@@ -486,7 +486,7 @@ Expected:
 
 If failures are unrelated/pre-existing, document exact failing commands, failing tests, and evidence in the implement-agent handoff. Do not mark the task complete without clear blocked evidence.
 
-- [ ] **Step 4: Smoke-test skipped mode locally**
+- [x] **Step 4: Smoke-test skipped mode locally**
 
 With only docs/spec/plan changes present, run:
 
@@ -499,7 +499,7 @@ Expected:
 - `scope` is `skipped`;
 - no `.skill-install.json` churn.
 
-- [ ] **Step 5: Smoke-test single-skill mode locally**
+- [x] **Step 5: Smoke-test single-skill mode locally**
 
 Use a real changed skill path, or a temporary controlled fixture if appropriate:
 
@@ -510,7 +510,7 @@ Expected:
 - only that skill is installed to skill targets;
 - unrelated skills are not installed.
 
-- [ ] **Step 6: Smoke-test Git discovery mode**
+- [x] **Step 6: Smoke-test Git discovery mode**
 
 Run from a controlled worktree with known changed paths:
 
@@ -531,7 +531,7 @@ Expected:
 
 **Purpose:** Make future agents use the incremental mode for normal finishing/sync checks, while preserving full mode for lifecycle hardening or sync-rule changes.
 
-- [ ] **Step 1: Document normal usage**
+- [x] **Step 1: Document normal usage**
 
 Add guidance that normal finish/drift checks should prefer:
 
@@ -540,7 +540,7 @@ Add guidance that normal finish/drift checks should prefer:
 
 when the intent is to sync only derived artifacts affected by the current change set.
 
-- [ ] **Step 2: Document full usage**
+- [x] **Step 2: Document full usage**
 
 Document that plain full mode remains appropriate for:
 
@@ -554,7 +554,7 @@ Commands:
     python3 scripts/sync_derived_artifacts.py --check
     python3 scripts/sync_derived_artifacts.py --fix
 
-- [ ] **Step 3: Avoid broad bash fallback changes**
+- [x] **Step 3: Avoid broad bash fallback changes**
 
 Do not solve this by opening broad shell permissions. The implementation should be native Python and existing allowlisted commands/scripts should remain sufficient.
 
@@ -568,7 +568,7 @@ Do not solve this by opening broad shell permissions. The implementation should 
 
 **Purpose:** Produce auditable completion evidence.
 
-- [ ] **Step 1: Record changed files**
+- [x] **Step 1: Record changed files**
 
 Implementation handoff should list changed files, expected categories:
 
@@ -577,7 +577,7 @@ Implementation handoff should list changed files, expected categories:
 - optional documentation/prompt files if Task 6 is implemented
 - generated derived files only if relevant domains were actually affected
 
-- [ ] **Step 2: Record verification commands**
+- [x] **Step 2: Record verification commands**
 
 Handoff must include exact commands and pass/fail/blocked results for:
 
@@ -587,7 +587,7 @@ Handoff must include exact commands and pass/fail/blocked results for:
 - incremental skipped smoke test;
 - single-skill or Git discovery smoke test when practical.
 
-- [ ] **Step 3: Validate plan checkbox discipline**
+- [x] **Step 3: Validate plan checkbox discipline**
 
 When implementation is complete, check off completed steps and run the repository checkbox validator for this plan:
 

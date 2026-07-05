@@ -108,7 +108,16 @@ This applies to all tooling and skill workflows that inspect `.ai/` state, inclu
 
 Canonical source files (under `agents/`, `skills/`, and `.ai/workflows/scripts/` + definitions) are the single source of truth. Distributed copies under `.opencode/`, `.claude/`, and `.cursor/` are derived artifacts that must be checked at finish time.
 
-**Primary entrypoint (use this for finish-phase closure and routine drift checks):**
+**Incremental entrypoint (prefer this for normal finish/drift checks so unrelated changes do not refresh `.skill-install.json`):**
+
+```bash
+python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git
+python3 scripts/sync_derived_artifacts.py --fix --changed-files-from-git
+```
+
+Incremental mode classifies the current Git worktree change set and runs only the affected sync/check suites. Docs-only, test-only, memory, and workflow-run-history changes are skipped (no subprocess suites, `scope: skipped`). Single-skill changes reinstall only that skill. Agent-only changes run only agent setup. Workflow-only changes run only workflow sync/distribution. Changes to sync/install/check rule files fall back to full mode.
+
+**Full entrypoint (lifecycle hardening, sync-rule changes, or intentional repository-wide drift repair):**
 
 ```bash
 python3 scripts/sync_derived_artifacts.py --check
