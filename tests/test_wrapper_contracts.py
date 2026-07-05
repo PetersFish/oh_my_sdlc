@@ -440,6 +440,28 @@ class TestDevOrchestratorStartWithPlanHandoff(unittest.TestCase):
         self.assertIn("Do not", content)
         self.assertIn("handoff Markdown", content)
 
+    def test_dev_orchestrator_does_not_reconfirm_supplied_flow_type(self):
+        """If the user already supplied flow_type, dev-orchestrator must not ask again."""
+        content = (AGENTS_DIR / "dev-orchestrator.md").read_text(encoding="utf-8")
+        self.assertIn("flow-type Confirmation Gate", content)
+        self.assertIn("do NOT ask the user to confirm flow type again", content)
+        self.assertIn("do NOT re-confirm `flow_type`", content)
+
+    def test_dev_orchestrator_asks_flow_type_only_when_missing_or_conflicting(self):
+        content = (AGENTS_DIR / "dev-orchestrator.md").read_text(encoding="utf-8")
+        self.assertIn("ONLY when", content)
+        self.assertIn("it is missing", content)
+        self.assertIn("maps to a different flow", content)
+        self.assertIn("ambiguous", content)
+
+    def test_dev_orchestrator_start_with_plan_only_flow_type_skips_reconfirm(self):
+        content = (AGENTS_DIR / "dev-orchestrator.md").read_text(encoding="utf-8")
+        # The "Provides only `flow_type`" row must explicitly skip re-confirmation.
+        row = content[content.find("Provides only `flow_type`"):]
+        row_end = row.find("\n|")
+        row_text = row[:row_end if row_end != -1 else len(row)]
+        self.assertIn("do NOT re-confirm", row_text)
+
     def test_apply_agents_include_learning_sections(self):
         for filename in ("implement-agent.md", "review-agent.md"):
             content = (AGENTS_DIR / filename).read_text(encoding="utf-8")

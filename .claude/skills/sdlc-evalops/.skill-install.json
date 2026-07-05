@@ -5,7 +5,7 @@
   "source_ref": "HEAD",
   "status": "stable",
   "target": "/Users/yuping/Documents/workspace/oh_my_skills/.claude/skills/sdlc-evalops",
-  "installed_at": "2026-07-04T16:12:29.445704Z",
+  "installed_at": "2026-07-05T05:42:38.172782Z",
   "backport_policy": "review-required",
   "payload_hash": "2511144abc787a7bfaa855e5c38c2a0acc7d281ced6721b4e6b2e4cef3023562",
   "files": [

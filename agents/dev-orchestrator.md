@@ -160,7 +160,7 @@ Use these runtime commands as the default entry toolkit:
 Follow this order:
 1. Run `verify-foundations` before attempting to start or resume any governed workflow.
 2. Infer `subject_type` from the user request. Use `spec_change` for spec-change work and `roadmap_item` for roadmap-governed work. If unclear, ask the user instead of guessing.
-3. Infer `flow_type` from the user request. If the user explicitly selected a flow, pass that exact value. If unclear, ask the user instead of letting runtime defaults decide.
+3. Resolve `flow_type` from the user request. If the user explicitly selected a flow, treat it as resolved — pass that exact value and do NOT ask the user to confirm flow type again. Only ask for `flow_type` when it is missing, ambiguous, or conflicts with a supplied `primary_design_path`. Never let runtime defaults decide silently.
 4. Inspect current run state with `status` and the subject identifiers already known from the user request.
 5. If no matching run exists for a new governed task, create one with `workflow.py start` and an explicit `--flow-type`.
 6. If the task is a repair flow that must recreate governance for an archived subject, use `workflow.py ensure-run` instead of `start`.
@@ -178,6 +178,17 @@ Canonical-run rules still apply:
 Only after the run is confirmed usable may you call `before-dispatch`.
 `before-dispatch` and `after-dispatch` are phase dispatch hooks, not workflow entry commands.
 
+## flow-type Confirmation Gate
+
+`flow_type` is resolved once and not re-confirmed:
+
+- If the user already supplied `flow_type` (explicitly named `spec-flow` or `lightweight-flow`, or unambiguously selected via a path that maps to one flow), treat it as resolved. Do NOT ask the user to confirm flow type again.
+- Ask for `flow_type` ONLY when:
+  - it is missing, or
+  - the supplied `primary_design_path` maps to a different flow than the one named, or
+  - the user's wording is ambiguous between the two flows.
+- When a `flow_type` conflict with `primary_design_path` is detected, surface the conflict and ask the user to pick one before proceeding — do not silently override either value.
+
 ## Start-With-Plan Handoff
 
 Use this branch when the user asks to implement an existing design, plan, or OpenSpec change instead of creating a new plan.
@@ -194,9 +205,9 @@ Input cases:
 
 | User input | Action |
 |---|---|
-| Provides both `flow_type` and `primary_design_path` | Validate that the path belongs to the flow, derive `subject_id`, then start/resume and dispatch implementation. |
-| Provides only `flow_type` | List apply-ready candidates for that flow and ask the user to select `primary_design_path`. |
-| Provides only `primary_design_path` | Infer `flow_type` by path rules; ask if ambiguous. |
+| Provides both `flow_type` and `primary_design_path` | Validate that the path belongs to the flow; if it matches, do NOT re-confirm `flow_type`. Derive `subject_id`, then start/resume and dispatch implementation. If the path maps to a different flow, surface the conflict and ask the user to pick one. |
+| Provides only `flow_type` | Treat `flow_type` as resolved — do NOT re-confirm it. List apply-ready candidates for that flow and ask the user to select `primary_design_path`. |
+| Provides only `primary_design_path` | Infer `flow_type` by path rules. If the path maps unambiguously to one flow, use it without asking. Ask only if the path is ambiguous or no flow can be inferred. |
 | Provides neither | Ask for `flow_type` first, then list candidates for that flow. |
 
 Path rules:

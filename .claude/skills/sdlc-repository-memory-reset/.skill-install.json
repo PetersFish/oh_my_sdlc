@@ -5,7 +5,7 @@
   "source_ref": "HEAD",
   "status": "stable",
   "target": "/Users/yuping/Documents/workspace/oh_my_skills/.claude/skills/sdlc-repository-memory-reset",
-  "installed_at": "2026-07-04T16:12:30.204308Z",
+  "installed_at": "2026-07-05T05:42:38.895210Z",
   "backport_policy": "review-required",
   "payload_hash": "0f93f269c4c2826c79e04bd536fd46c975f634953ab86458ebb017ed14b45bb9",
   "files": [
