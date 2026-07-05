@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-07-05T04:06:37.368666Z",
+  "generated_at": "2026-07-05T05:14:39.296607Z",
   "entries": [
     {
       "id": "agents",
@@ -518,7 +518,7 @@
       "tags": [],
       "updated_at": "2026-07-02T11:20:00Z",
       "confidence": "high",
-      "status": "pending_commit"
+      "status": "synced"
     },
     {
       "id": "pitfalls/deepseek-v4-pro-grader-json-extraction-failure",
@@ -616,7 +616,7 @@
       "tags": [],
       "updated_at": "2026-06-26T21:00:00Z",
       "confidence": "high",
-      "status": "pending_commit"
+      "status": "synced"
     },
     {
       "id": "skill-copies-drift",
@@ -724,7 +724,7 @@
       ],
       "updated_at": "2026-07-02T11:20:00Z",
       "confidence": "high",
-      "status": "pending_commit",
+      "status": "synced",
       "parent_id": "root"
     }
   ],

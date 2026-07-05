@@ -10,12 +10,12 @@ summary: >-
   `history/` and `active/`, and `governance-check` forever reports
   `stale_active_roadmap_run`.
 severity: high
-evidence_mode: uncommitted_snapshot
-linked_commits: []
+evidence_mode: commit
+linked_commits: ["171d4a8c6e20f59618c4b0c91d5fb1c3e5eb7967"]
 linked_sessions: []
 linked_specs:
   - workflow-state-machine-contract-enhancements
-sync_status: pending_commit
+sync_status: synced
 evidence:
   - error: governance-check infinite loop with stale_active_roadmap_run for RM-ORCH-008
   - failing_test: tests/test_workflow.py::TestPostArchiveHooks::test_roadmap_done_hook_does_not_recreate_current_run_after_finalizing_itself

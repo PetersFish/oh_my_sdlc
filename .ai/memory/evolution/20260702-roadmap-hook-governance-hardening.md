@@ -4,10 +4,10 @@ type: evolution
 title: 2026-07-02 - Roadmap Hook Governance Hardening
 summary: Hardened workflow roadmap hook governance by adding roadmap-agent lifecycle routing, validating ready/apply-start hook state at complete-hook time, fixing after-dispatch stale evidence promotion, and enforcing template/distribution sync.
 parent_id: root
-sync_status: pending_commit
-evidence_mode: uncommitted_snapshot
+sync_status: synced
+evidence_mode: commit
 confidence: high
-linked_commits: []
+linked_commits: ["171d4a8c6e20f59618c4b0c91d5fb1c3e5eb7967"]
 linked_specs: [roadmap-hook-governance-hardening]
 linked_sessions: []
 updated_at: 2026-07-02T11:20:00Z

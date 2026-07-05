@@ -8,12 +8,12 @@ summary: >-
   blockers, or if phase evidence is only set-once, the run can stay blocked on
   old false evidence or appear to progress with contradictory worker output.
 severity: high
-evidence_mode: uncommitted_snapshot
-linked_commits: []
+evidence_mode: commit
+linked_commits: ["171d4a8c6e20f59618c4b0c91d5fb1c3e5eb7967"]
 linked_sessions: []
 linked_specs:
   - roadmap-hook-governance-hardening
-sync_status: pending_commit
+sync_status: synced
 evidence:
   - error: after plan left stale `spec_artifacts_done: false` even after a successful replanned result
   - error: implement-agent reported `status: success` with blockers, causing apply lifecycle confusion
