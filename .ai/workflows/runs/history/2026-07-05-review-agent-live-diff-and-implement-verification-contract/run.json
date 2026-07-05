@@ -3,8 +3,8 @@
   "run_id": "2026-07-05-review-agent-live-diff-and-implement-verification-contract",
   "workflow": "sdlc-main",
   "flow_type": "lightweight-flow",
-  "status": "running",
-  "current_phase": "archive_change",
+  "status": "done",
+  "current_phase": "done",
   "primary_subject": {
     "type": "spec_change",
     "id": "review-agent-live-diff-and-implement-verification-contract"
@@ -13,7 +13,7 @@
     "change_id": "review-agent-live-diff-and-implement-verification-contract"
   },
   "phase_readiness": {
-    "phase": "archive_change",
+    "phase": "done",
     "ready": true,
     "missing_required_inputs": []
   },
@@ -25,7 +25,8 @@
   ],
   "completed_phases": [
     "apply_change",
-    "archive_change"
+    "archive_change",
+    "post_archive_actions"
   ],
   "gates": {},
   "evidence": {
@@ -49,15 +50,16 @@
       "evidence": {
         "archive_path_exists": "true",
         "pending_hooks_empty": "true",
-        "pre_hook_commit_id": "171d4a8c6e20f59618c4b0c91d5fb1c3e5eb7967",
+        "pre_hook_commit_id": "8c986f1e72dbebb35ba0e93f1251a424f06231e0",
         "pre_hook_pushed": true,
-        "post_hook_commit_id": "3d30eae3eec48e327524d1ebeaaefded3f4af538",
+        "post_hook_commit_id": "5b664e4eba44beb492384c7edd325c98a4fb5e83",
         "post_hook_pushed": true,
-        "post_hook_dirty_tree": false
+        "post_hook_dirty_tree": false,
+        "derived_artifact_sync_pass": true
       },
       "blockers": [],
       "recommended_next_action": "complete_phase",
-      "recorded_at": "2026-07-05T12:07:48.289136"
+      "recorded_at": "2026-07-05T13:16:17.386742"
     },
     "agent_results": {
       "default": {
@@ -142,15 +144,16 @@
           "evidence": {
             "archive_path_exists": "true",
             "pending_hooks_empty": "true",
-            "pre_hook_commit_id": "171d4a8c6e20f59618c4b0c91d5fb1c3e5eb7967",
+            "pre_hook_commit_id": "8c986f1e72dbebb35ba0e93f1251a424f06231e0",
             "pre_hook_pushed": true,
-            "post_hook_commit_id": "3d30eae3eec48e327524d1ebeaaefded3f4af538",
+            "post_hook_commit_id": "5b664e4eba44beb492384c7edd325c98a4fb5e83",
             "post_hook_pushed": true,
-            "post_hook_dirty_tree": false
+            "post_hook_dirty_tree": false,
+            "derived_artifact_sync_pass": true
           },
           "blockers": [],
           "recommended_next_action": "complete_phase",
-          "recorded_at": "2026-07-05T12:07:48.289136"
+          "recorded_at": "2026-07-05T13:16:17.386742"
         }
       }
     },
@@ -160,8 +163,12 @@
     "roadmap_hook_resolution": "no_linked_item",
     "archive_path_exists": "true",
     "memory_sync_resolution": "synced",
-    "memory_sync_reason": ""
+    "memory_sync_reason": "",
+    "roadmap_link": {
+      "count": 0,
+      "items": []
+    }
   },
   "block": null,
-  "updated_at": "2026-07-05T13:15:10.118478"
+  "updated_at": "2026-07-05T13:28:10.771057"
 }
