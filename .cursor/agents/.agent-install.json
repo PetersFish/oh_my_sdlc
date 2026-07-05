@@ -1,11 +1,11 @@
 {
   "source_repo": "/Users/yuping/Documents/workspace/oh_my_skills",
-  "source_ref": "05337200b8d67e806b10dbf8e2c45cc57b6e57cc",
-  "installed_at": "2026-07-05T13:04:12.083705+00:00",
+  "source_ref": "911ff06e644990c8c059c91eee28e7e300fcadc4",
+  "installed_at": "2026-07-05T15:34:54.784528+00:00",
   "status": "stable",
   "files": {
-    "dev-orchestrator.md": "06f54937c959e5379b6cefdd742e9abd1133fb32be93f0c547c8aa4cd1f38436",
-    "finish-agent.md": "52bdeaf9b1ed973d28ffd696374e295246fc88462abaea4c09f2db5781c2a7f2",
+    "dev-orchestrator.md": "2c03ace218bd32aff398c0f5e2c452906abb57c1706dae7fcfca2ad0958b778e",
+    "finish-agent.md": "44a3c2e88b619b007c07fcac2d91422cb550accab820b47731d334c09b31a836",
     "implement-agent.md": "98072a5c6a36abdd2a266ec22f7aef45bd33c62273b84d2e9064ffa39149919b",
     "plan-agent.md": "c54c00f707d586d5844a4c83602f62dc864db1daff97f1e1801a6bc415c7f600",
     "review-agent.md": "4cff3def5e9883b91528c0626e97bab42241fe50b032b6ed9dc1d6e5ae7aad77",

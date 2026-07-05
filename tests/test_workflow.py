@@ -520,6 +520,264 @@ class TestAdvanceGuarded(FixtureBase):
         self.assertEqual(history["current_phase"], "done")
 
 
+class TestSubagentOwnedLifecycleCleanup(FixtureBase):
+    def _write_archive_ready_state(self, change_id="subagent-cleanup"):
+        state = {
+            "version": 1,
+            "run_id": f"2026-07-05-{change_id}",
+            "workflow": "sdlc-main",
+            "flow_type": "lightweight-flow",
+            "status": "running",
+            "current_phase": "archive_change",
+            "primary_subject": {"type": "spec_change", "id": change_id},
+            "context": {"change_id": change_id},
+            "phase_readiness": {
+                "phase": "archive_change",
+                "ready": True,
+                "missing_required_inputs": [],
+            },
+            "pending_hooks": [],
+            "completed_hooks": [],
+            "completed_phases": ["apply_change"],
+            "gates": {},
+            "evidence": {},
+            "block": None,
+            "updated_at": "2026-07-05T00:00:00",
+        }
+        self._write_current_state(state)
+        return state
+
+    def test_archive_change_completion_does_not_enqueue_normal_cleanup_hooks(self):
+        self._write_archive_ready_state("no-hooks")
+        rc, out, _ = run_workflow(
+            self.tmp,
+            "record-evidence",
+            key="archive_path_exists",
+            value="true",
+        )
+        self.assertEqual(rc, 0)
+
+        rc, out, _ = run_workflow(
+            self.tmp,
+            "complete-phase",
+            exit_criteria_satisfied="archive_path_exists",
+        )
+
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertIn("archive_change", data.get("completed_phases", []))
+        self.assertEqual(data.get("pending_hooks"), [])
+        self.assertNotIn("memory_sync", data.get("pending_hooks", []))
+        self.assertNotIn("roadmap_done_if_relevant", data.get("pending_hooks", []))
+
+    def test_archive_change_advances_to_post_archive_actions_without_hooks(self):
+        self._write_archive_ready_state("advance-cleanup")
+        run_workflow(
+            self.tmp,
+            "record-evidence",
+            key="archive_path_exists",
+            value="true",
+        )
+        run_workflow(
+            self.tmp,
+            "complete-phase",
+            exit_criteria_satisfied="archive_path_exists",
+        )
+
+        rc, out, _ = run_workflow(self.tmp, "advance")
+
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["current_phase"], "post_archive_actions")
+        self.assertEqual(data.get("pending_hooks"), [])
+        self.assertTrue(data["phase_readiness"]["ready"])
+
+    def test_post_archive_actions_requires_cleanup_evidence(self):
+        self._write_archive_ready_state("cleanup-required")
+        state = self._read_current_state()
+        state["current_phase"] = "post_archive_actions"
+        state["completed_phases"] = ["apply_change", "archive_change"]
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(
+            self.tmp,
+            "complete-phase",
+            exit_criteria_satisfied="cleanup_complete",
+        )
+
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertIn("memory_sync_done", data["error"])
+        self.assertIn("cleanup_complete", data["error"])
+
+    def test_post_archive_actions_accepts_finish_agent_cleanup_evidence(self):
+        self._write_archive_ready_state("cleanup-success")
+        state = self._read_current_state()
+        state["current_phase"] = "post_archive_actions"
+        state["completed_phases"] = ["apply_change", "archive_change"]
+        self._write_current_state(state)
+        finish_result = {
+            "agent": "finish-agent",
+            "status": "success",
+            "phase": "post_archive_actions",
+            "slice_id": "default",
+            "flow_type": "lightweight-flow",
+            "evidence": {
+                "memory_sync_done": True,
+                "roadmap_done_checked": True,
+                "derived_artifacts_synced": True,
+                "post_hook_dirty_tree": False,
+                "cleanup_complete": True,
+                "criteria_satisfied": "cleanup_complete",
+            },
+            "artifacts": {},
+            "blockers": [],
+            "recommended_next_action": "complete_phase",
+        }
+
+        rc, out, _ = run_workflow(
+            self.tmp,
+            "after-dispatch",
+            agent="finish-agent",
+            phase="post_archive_actions",
+            value=json.dumps(finish_result),
+        )
+        self.assertEqual(rc, 0)
+        transition = json.loads(out)
+        self.assertEqual(transition["workflow_command"], "workflow.py complete-phase")
+
+        rc, out, _ = run_workflow(
+            self.tmp,
+            "complete-phase",
+            exit_criteria_satisfied="cleanup_complete",
+        )
+
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertIn("post_archive_actions", data.get("completed_phases", []))
+        self.assertTrue(data["evidence"]["memory_sync_done"])
+        self.assertTrue(data["evidence"]["roadmap_done_checked"])
+        self.assertTrue(data["evidence"]["derived_artifacts_synced"])
+        self.assertFalse(data["evidence"]["post_hook_dirty_tree"])
+        self.assertTrue(data["evidence"]["cleanup_complete"])
+
+    def test_archive_change_finish_agent_cannot_claim_cleanup_complete(self):
+        self._write_archive_ready_state("premature-cleanup")
+        finish_result = {
+            "agent": "finish-agent",
+            "status": "success",
+            "phase": "archive_change",
+            "slice_id": "default",
+            "flow_type": "lightweight-flow",
+            "evidence": {
+                "archive_path_exists": True,
+                "pending_hooks_empty": True,
+                "cleanup_complete": True,
+            },
+            "artifacts": {},
+            "blockers": [],
+            "recommended_next_action": "complete_phase",
+        }
+
+        rc, out, _ = run_workflow(
+            self.tmp,
+            "after-dispatch",
+            agent="finish-agent",
+            phase="archive_change",
+            value=json.dumps(finish_result),
+        )
+
+        self.assertEqual(rc, 0)
+        transition = json.loads(out)
+        self.assertEqual(transition["status"], "success")
+        self.assertEqual(transition["workflow_command"], "workflow.py block")
+        self.assertEqual(transition["blockers"][0]["reason"], "premature_cleanup_evidence")
+        state = self._read_current_state()
+        self.assertEqual(state["status"], "blocked")
+        self.assertEqual(state["block"]["type"], "worker_failed")
+
+    def test_existing_pending_hooks_still_block_until_legacy_complete_hook_repairs_them(self):
+        self._write_archive_ready_state("legacy-repair")
+        state = self._read_current_state()
+        state["current_phase"] = "post_archive_actions"
+        state["completed_phases"] = ["apply_change", "archive_change", "post_archive_actions"]
+        state["pending_hooks"] = ["memory_sync"]
+        state["evidence"] = {
+            "memory_sync_done": True,
+            "roadmap_done_checked": True,
+            "derived_artifacts_synced": True,
+            "post_hook_dirty_tree": False,
+            "cleanup_complete": True,
+        }
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(self.tmp, "advance")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["block"]["type"], "hook_blocked")
+
+        rc, out, _ = run_workflow(
+            self.tmp,
+            "complete-hook",
+            hook="memory_sync",
+            resolution="synced",
+        )
+        self.assertEqual(rc, 0)
+        repaired = json.loads(out)
+        self.assertNotIn("memory_sync", repaired.get("pending_hooks", []))
+
+        rc, out, _ = run_workflow(self.tmp, "done")
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "done")
+
+    def test_post_archive_actions_rejects_false_positive_cleanup_evidence(self):
+        """post_archive_actions: finish-agent returns cleanup_complete=True but
+        one of the required positive cleanup evidence keys is False.  The phase
+        must not pass because positive cleanup evidence must be true; only
+        post_hook_dirty_tree may be False (clean tree)."""
+        self._write_archive_ready_state("false-positive-cleanup")
+        state = self._read_current_state()
+        state["current_phase"] = "post_archive_actions"
+        state["completed_phases"] = ["apply_change", "archive_change"]
+        self._write_current_state(state)
+        finish_result = {
+            "agent": "finish-agent",
+            "status": "success",
+            "phase": "post_archive_actions",
+            "slice_id": "default",
+            "flow_type": "lightweight-flow",
+            "evidence": {
+                "memory_sync_done": False,
+                "roadmap_done_checked": True,
+                "derived_artifacts_synced": True,
+                "post_hook_dirty_tree": False,
+                "cleanup_complete": True,
+                "criteria_satisfied": "cleanup_complete",
+            },
+            "artifacts": {},
+            "blockers": [],
+            "recommended_next_action": "complete_phase",
+        }
+
+        rc, out, _ = run_workflow(
+            self.tmp,
+            "after-dispatch",
+            agent="finish-agent",
+            phase="post_archive_actions",
+            value=json.dumps(finish_result),
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        blocker_reasons = [b.get("reason", "") for b in data.get("blockers", [])]
+        self.assertIn(
+            "invalid_phase_evidence_values",
+            blocker_reasons,
+            f"False positive cleanup evidence must block; got {blocker_reasons}",
+        )
+        self.assertEqual(data["workflow_command"], "workflow.py block")
+
+
 class TestBranchPhase(FixtureBase):
     def test_branch_with_unknown_decision_blocks(self):
         run_workflow(
@@ -1611,16 +1869,19 @@ class TestCompletePhase(FixtureBase):
         self._write_current_state(state)
 
         rc, out, _ = run_workflow(
-            self.tmp, "complete-phase",
+            self.tmp,
+            "complete-phase",
             exit_criteria_satisfied="archive_path_exists",
         )
         self.assertEqual(rc, 0)
         data = json.loads(out)
         self.assertIn("archive_change", data.get("completed_phases", []))
-        self.assertIn("memory_sync", data.get("pending_hooks", []))
-        # spec_change runs do not enqueue roadmap hooks (primary_subject gating)
+        # Normal-flow phases no longer enqueue runtime post_hooks.
+        # memory_sync and roadmap_done_if_relevant belong to post_archive_actions
+        # finish-agent evidence, not to pending_hooks.
+        self.assertEqual(data.get("pending_hooks"), [])
+        self.assertNotIn("memory_sync", data.get("pending_hooks", []))
         self.assertNotIn("roadmap_done_if_relevant", data.get("pending_hooks", []))
-
     def test_apply_change_requires_execution_evidence_keys(self):
         self._make_roadmap_item("RM-APPLY-001", "active", openspec_change="apply-evidence-test")
         run_workflow(
@@ -1648,7 +1909,6 @@ class TestCompletePhase(FixtureBase):
 
 class TestRoadmapHookFiltering(FixtureBase):
     """Roadmap hooks are only enqueued when primary_subject.type == roadmap_item."""
-
     def test_spec_change_run_does_not_enqueue_roadmap_hooks_on_archive_change(self):
         """complete-phase on archive_change for a spec_change run skips roadmap hooks."""
         run_workflow(
@@ -1663,15 +1923,18 @@ class TestRoadmapHookFiltering(FixtureBase):
         self._write_current_state(state)
 
         rc, out, _ = run_workflow(
-            self.tmp, "complete-phase",
+            self.tmp,
+            "complete-phase",
             exit_criteria_satisfied="archive_path_exists",
         )
         self.assertEqual(rc, 0)
         data = json.loads(out)
         self.assertNotIn("roadmap_done_if_relevant", data.get("pending_hooks", []),
                          "roadmap_done_if_relevant must not be enqueued for spec_change runs")
-        self.assertIn("memory_sync", data.get("pending_hooks", []),
-                      "memory_sync must still be enqueued for spec_change runs")
+        # Normal-flow archive_change no longer enqueues memory_sync as a runtime hook.
+        # Cleanup is owned by finish-agent in post_archive_actions.
+        self.assertNotIn("memory_sync", data.get("pending_hooks", []),
+                         "memory_sync must not be enqueued for normal-flow runs")
 
     def test_spec_change_run_does_not_enqueue_roadmap_hooks_on_create_change(self):
         """complete-phase on create_change for a spec_change run skips roadmap_spec_link_if_ready."""
@@ -1718,7 +1981,9 @@ class TestRoadmapHookFiltering(FixtureBase):
                          "roadmap_apply_start_if_ready must not be enqueued for spec_change runs")
 
     def test_roadmap_item_run_can_enqueue_roadmap_hooks_on_apply_change(self):
-        """complete-phase on apply_change for a roadmap_item run still enqueues roadmap_apply_start_if_ready."""
+        """complete-phase on apply_change for a roadmap_item run no longer enqueues
+        roadmap_apply_start_if_ready because normal-flow phases do not use post_hooks.
+        Roadmap lifecycle transitions are now owned by phase agents and finish-agent evidence."""
         self._make_roadmap_item("RM-HF-001", "active", openspec_change="hook-filter-roadmap")
         run_workflow(
             self.tmp, "start",
@@ -1735,13 +2000,15 @@ class TestRoadmapHookFiltering(FixtureBase):
         self._write_current_state(state)
 
         rc, out, _ = run_workflow(
-            self.tmp, "complete-phase",
+            self.tmp,
+            "complete-phase",
             exit_criteria_satisfied="tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded",
         )
         self.assertEqual(rc, 0)
         data = json.loads(out)
-        self.assertIn("roadmap_apply_start_if_ready", data.get("pending_hooks", []),
-                      "roadmap_apply_start_if_ready must still be enqueued for roadmap_item runs")
+        # Normal-flow phases no longer enqueue runtime post_hooks.
+        self.assertNotIn("roadmap_apply_start_if_ready", data.get("pending_hooks", []),
+                         "roadmap_apply_start_if_ready must not be enqueued in normal flow")
 
 
 class TestWorkflowDefinitionContracts(FixtureBase):
@@ -1808,7 +2075,9 @@ class TestWorkflowDefinitionContracts(FixtureBase):
         wf = load_yaml(self.tmp, ".ai/workflows/definitions/sdlc-main.yaml")
         create_change = wf["phases"]["create_change"]
 
-        self.assertIn("roadmap_spec_link_if_ready", create_change.get("post_hooks", []))
+        # Normal-flow create_change no longer defines post_hooks.
+        # Roadmap spec link is now handled by plan-agent / dev-orchestrator evidence.
+        self.assertNotIn("roadmap_spec_link_if_ready", create_change.get("post_hooks", []))
         self.assertNotIn("roadmap_status_ready_if_linked", create_change.get("post_hooks", []))
 
 
@@ -3899,14 +4168,17 @@ class TestEvidenceKeyValidation(FixtureBase):
             shutil.rmtree(tc, ignore_errors=True)
 
     def test_complete_phase_fails_falsy_json_evidence_values(self):
-        """Falsy JSON values (False, 0, [], {}) are treated as empty evidence."""
-        falsy_cases = [
+        """None and empty string evidence values are treated as empty evidence.
+        Boolean False is a valid evidence value (e.g., post_hook_dirty_tree=False)."""
+        # Only None and empty string are treated as missing/empty.
+        # False, 0, [], {} are valid values that should be accepted.
+        valid_cases = [
             ("bool_false", False),
             ("int_zero", 0),
             ("empty_list", []),
             ("empty_dict", {}),
         ]
-        for key, value in falsy_cases:
+        for key, value in valid_cases:
             with self.subTest(key=key, value=value):
                 tc = tempfile.mkdtemp()
                 try:
@@ -3940,7 +4212,7 @@ class TestEvidenceKeyValidation(FixtureBase):
                         _yaml.dump(wf, f)
 
                     rc, _, _ = run_workflow(tc, "complete-phase")
-                    self.assertNotEqual(rc, 0, f"expected failure for {key}={value!r}")
+                    self.assertEqual(rc, 0, f"expected success for {key}={value!r} — boolean/collection values are valid evidence")
                 finally:
                     shutil.rmtree(tc, ignore_errors=True)
 
@@ -6305,11 +6577,10 @@ class TestExitCriteriaEvidenceKeySatisfaction(FixtureBase):
 
     def test_exit_criteria_missing_both_value_and_string_blocks(self):
         """post_archive_actions: agent provides neither evidence value nor string
-        declaration.  Should block with missing_exit_criteria_satisfied.
+        declaration.  Should block because cleanup evidence keys are missing.
 
-        Uses post_archive_actions (no evidence_keys) so _missing_exit_criteria
-        actually runs — the block reason is specifically missing_exit_criteria_satisfied,
-        not missing_phase_evidence_keys."""
+        post_archive_actions now defines evidence_keys for cleanup evidence,
+        so _missing_phase_evidence_keys blocks when cleanup evidence is absent."""
         self._start_post_archive_run()
 
         result = {
@@ -6328,20 +6599,20 @@ class TestExitCriteriaEvidenceKeySatisfaction(FixtureBase):
         self.assertEqual(rc, 0)
         data = json.loads(out)
         blocker_reasons = [b.get("reason", "") for b in data.get("blockers", [])]
-        self.assertIn(
-            "missing_exit_criteria_satisfied",
-            blocker_reasons,
-            "Missing both evidence value and string should block with missing_exit_criteria_satisfied",
+        self.assertTrue(
+            any(r in blocker_reasons for r in ("missing_phase_evidence_keys", "missing_exit_criteria_satisfied")),
+            f"Missing cleanup evidence should block; got {blocker_reasons}",
         )
 
     def test_exit_criteria_evidence_key_falsy_does_not_satisfy(self):
-        """post_archive_actions: agent returns pending_hooks_empty=False.
-        Should block with missing_exit_criteria_satisfied because falsy values
-        do not satisfy exit criteria.
+        """post_archive_actions: agent returns cleanup_complete=False.
+        Should block because a False cleanup_complete does not satisfy the
+        exit criteria.
 
-        Uses post_archive_actions (no evidence_keys) so _missing_phase_evidence_keys
-        does not short-circuit on the falsy value — _missing_exit_criteria runs
-        and must reject the falsy evidence key."""
+        post_archive_actions now defines evidence_keys including cleanup_complete.
+        With the new contract, boolean False is a valid evidence value (e.g.,
+        post_hook_dirty_tree=False means clean tree), but cleanup_complete=False
+        means cleanup is not complete and should block via missing_exit_criteria_satisfied."""
         self._start_post_archive_run()
 
         result = {
@@ -6350,7 +6621,11 @@ class TestExitCriteriaEvidenceKeySatisfaction(FixtureBase):
             "slice_id": "default",
             "flow_type": "spec-flow",
             "evidence": {
-                "pending_hooks_empty": False,
+                "memory_sync_done": True,
+                "roadmap_done_checked": True,
+                "derived_artifacts_synced": True,
+                "post_hook_dirty_tree": False,
+                "cleanup_complete": False,
                 "criteria_satisfied": "",
             },
             "blockers": [],
@@ -6364,7 +6639,7 @@ class TestExitCriteriaEvidenceKeySatisfaction(FixtureBase):
         self.assertIn(
             "missing_exit_criteria_satisfied",
             blocker_reasons,
-            "Falsy evidence value should not satisfy exit criteria",
+            "cleanup_complete=False should not satisfy exit criteria",
         )
 
     def test_exit_criteria_apply_change_evidence_key_satisfies_without_string(self):

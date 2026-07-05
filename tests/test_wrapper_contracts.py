@@ -1350,10 +1350,46 @@ class TestAgentPromptBody(unittest.TestCase):
         self.assertIn("provider verifier", body.lower())
         self.assertIn("spec wrapper via resolved provider dispatch", body.lower())
 
-    def test_finish_agent_mentions_hooks(self):
+    def test_finish_agent_separates_archive_and_post_archive_cleanup(self):
         body = self._read_agent_body("finish-agent")
-        self.assertIn("memory_sync", body)
-        self.assertIn("roadmap_done_if_relevant", body)
+        self.assertIn("archive_change", body)
+        self.assertIn("post_archive_actions", body)
+        self.assertIn("memory_sync_done", body)
+        self.assertIn("roadmap_done_checked", body)
+        self.assertIn("derived_artifacts_synced", body)
+        self.assertIn("cleanup_complete", body)
+        self.assertIn("must not claim cleanup_complete during archive_change", body.lower())
+
+    def test_finish_agent_archive_change_success_example_omits_legacy_cleanup_evidence(self):
+        body = self._read_agent_body("finish-agent")
+        archive_change_success_idx = body.find('"phase": "archive_change"')
+        self.assertGreater(archive_change_success_idx, -1,
+                           "finish-agent must define an archive_change output example")
+        archive_success_block = body[archive_change_success_idx:archive_change_success_idx + 400]
+        self.assertIn('"archive_path_exists": true', archive_success_block,
+                      "archive_change success example must include archive_path_exists")
+        self.assertNotIn("pending_hooks_empty", archive_success_block,
+                          "archive_change success example must not include legacy pending_hooks_empty")
+
+    def test_finish_agent_does_not_present_complete_hook_as_normal_flow(self):
+        body = self._read_agent_body("finish-agent")
+        legacy_idx = body.lower().find("legacy hook resolution procedure")
+        self.assertGreater(legacy_idx, -1,
+                           "finish-agent must scope complete-hook guidance under a legacy repair heading")
+        legacy_section = body[legacy_idx:]
+        self.assertIn("workflow.py complete-hook", legacy_section,
+                      "legacy repair section must mention workflow.py complete-hook")
+        normal_flow_section = body[:legacy_idx]
+        complete_hook_in_normal = "workflow.py complete-hook" in normal_flow_section
+        self.assertFalse(complete_hook_in_normal,
+                        "complete-hook must not appear outside the legacy repair section")
+
+    def test_dev_orchestrator_describes_subagent_owned_cleanup(self):
+        body = self._read_agent_body("dev-orchestrator")
+        self.assertIn("post_archive_actions", body)
+        self.assertIn("finish-agent", body)
+        self.assertIn("cleanup evidence", body.lower())
+        self.assertIn("legacy complete-hook", body.lower())
 
     def test_finish_agent_requires_resolved_dispatch_for_spec_flow(self):
         body = self._read_agent_body("finish-agent")

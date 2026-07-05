@@ -89,8 +89,6 @@ phases:
       - spec_artifacts_done
     evidence_keys:
       - spec_artifacts_done
-    post_hooks:
-      - roadmap_spec_link_if_ready
     next: apply_change
 
   apply_change:
@@ -109,8 +107,6 @@ phases:
       - tasks_complete
       - tdd_passed
       - eval_passed_or_human_decision_recorded
-    post_hooks:
-      - roadmap_apply_start_if_ready
     next: archive_change
 
   archive_change:
@@ -124,9 +120,6 @@ phases:
       - archive_path_exists
     evidence_keys:
       - archive_path_exists
-    post_hooks:
-      - memory_sync
-      - roadmap_done_if_relevant
     next: post_archive_actions
 
   post_archive_actions:
@@ -138,8 +131,13 @@ phases:
     allowed_workers:
       - dev-orchestrator
     exit_criteria:
-      - pending_hooks_empty
-    post_hooks: []
+      - cleanup_complete
+    evidence_keys:
+      - memory_sync_done
+      - roadmap_done_checked
+      - derived_artifacts_synced
+      - post_hook_dirty_tree
+      - cleanup_complete
     next: done
 
   done:

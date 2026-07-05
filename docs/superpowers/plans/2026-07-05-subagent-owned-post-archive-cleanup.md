@@ -25,7 +25,7 @@
 **Files:**
 - Modify: `tests/test_workflow.py`
 
-- [ ] **Step 1: Add failing tests for archive and post-archive normal flow**
+- [x] **Step 1: Add failing tests for archive and post-archive normal flow**
 
 Add this test class after `class TestAdvanceGuarded(FixtureBase):` and before `class TestBranchPhase(FixtureBase):`.
 
@@ -172,7 +172,7 @@ class TestSubagentOwnedLifecycleCleanup(FixtureBase):
         self.assertTrue(data["evidence"]["cleanup_complete"])
 ```
 
-- [ ] **Step 2: Run tests to verify current failure**
+- [x] **Step 2: Run tests to verify current failure**
 
 Run: `python3 -m pytest tests/test_workflow.py -k SubagentOwnedLifecycleCleanup -v`
 
@@ -184,7 +184,7 @@ Expected: at least the first two tests fail because `complete-phase archive_chan
 - Modify: `.ai/workflows/definitions/sdlc-main.yaml`
 - Later sync: `skills/sdlc-project-bootstrap/templates/workflow/sdlc-main.yaml` and distributed workflow definition copies if present
 
-- [ ] **Step 1: Remove normal-path hook queues from `create_change`, `apply_change`, and `archive_change`**
+- [x] **Step 1: Remove normal-path hook queues from `create_change`, `apply_change`, and `archive_change`**
 
 Edit `.ai/workflows/definitions/sdlc-main.yaml` so these phase sections have no `post_hooks` entries. The affected sections should have this shape:
 
@@ -235,7 +235,7 @@ Edit `.ai/workflows/definitions/sdlc-main.yaml` so these phase sections have no 
     next: post_archive_actions
 ```
 
-- [ ] **Step 2: Change `post_archive_actions` to require cleanup evidence**
+- [x] **Step 2: Change `post_archive_actions` to require cleanup evidence**
 
 Replace the `post_archive_actions` section with:
 
@@ -259,7 +259,7 @@ Replace the `post_archive_actions` section with:
     next: done
 ```
 
-- [ ] **Step 3: Run focused workflow tests**
+- [x] **Step 3: Run focused workflow tests**
 
 Run: `python3 -m pytest tests/test_workflow.py -k SubagentOwnedLifecycleCleanup -v`
 
@@ -271,7 +271,7 @@ Expected: the archive no-hook and post-archive evidence tests pass or only fail 
 - Modify: `tests/test_workflow.py`
 - Modify: `.ai/workflows/scripts/workflow.py`
 
-- [ ] **Step 1: Add failing test for premature cleanup evidence**
+- [x] **Step 1: Add failing test for premature cleanup evidence**
 
 Append this method to `TestSubagentOwnedLifecycleCleanup`.
 
@@ -312,13 +312,13 @@ Append this method to `TestSubagentOwnedLifecycleCleanup`.
         self.assertEqual(state["block"]["type"], "worker_failed")
 ```
 
-- [ ] **Step 2: Run the new test and verify failure**
+- [x] **Step 2: Run the new test and verify failure**
 
 Run: `python3 -m pytest tests/test_workflow.py::TestSubagentOwnedLifecycleCleanup::test_archive_change_finish_agent_cannot_claim_cleanup_complete -v`
 
 Expected: FAIL because `after-dispatch` currently accepts `pending_hooks_empty` / `cleanup_complete` during `archive_change`.
 
-- [ ] **Step 3: Add helper in `workflow.py`**
+- [x] **Step 3: Add helper in `workflow.py`**
 
 Add this helper near the other small dispatch helpers, before `cmd_after_dispatch`.
 
@@ -346,7 +346,7 @@ def _premature_archive_cleanup_evidence(agent, phase, agent_evidence):
     )
 ```
 
-- [ ] **Step 4: Use helper in `cmd_after_dispatch`**
+- [x] **Step 4: Use helper in `cmd_after_dispatch`**
 
 In `cmd_after_dispatch`, immediately after `agent_evidence`, `agent_blockers`, and `agent_recommended` are assigned, insert:
 
@@ -367,7 +367,7 @@ In `cmd_after_dispatch`, immediately after `agent_evidence`, `agent_blockers`, a
         })
 ```
 
-- [ ] **Step 5: Run focused tests**
+- [x] **Step 5: Run focused tests**
 
 Run: `python3 -m pytest tests/test_workflow.py -k SubagentOwnedLifecycleCleanup -v`
 
@@ -378,7 +378,7 @@ Expected: PASS.
 **Files:**
 - Modify: `tests/test_workflow.py`
 
-- [ ] **Step 1: Add a legacy repair regression test**
+- [x] **Step 1: Add a legacy repair regression test**
 
 Append this method to `TestSubagentOwnedLifecycleCleanup`.
 
@@ -419,7 +419,7 @@ Append this method to `TestSubagentOwnedLifecycleCleanup`.
         self.assertEqual(data["status"], "done")
 ```
 
-- [ ] **Step 2: Run legacy repair focused tests**
+- [x] **Step 2: Run legacy repair focused tests**
 
 Run: `python3 -m pytest tests/test_workflow.py -k "SubagentOwnedLifecycleCleanup or MemorySyncHook" -v`
 
@@ -432,7 +432,7 @@ Expected: PASS. This proves normal new runs avoid hook queues while old runs wit
 - Modify: `agents/dev-orchestrator.md`
 - Modify: `tests/test_wrapper_contracts.py`
 
-- [ ] **Step 1: Add prompt-contract tests**
+- [x] **Step 1: Add prompt-contract tests**
 
 In `tests/test_wrapper_contracts.py`, near the existing finish-agent prompt tests, replace `test_finish_agent_mentions_hooks` with these tests:
 
@@ -455,13 +455,13 @@ In `tests/test_wrapper_contracts.py`, near the existing finish-agent prompt test
         self.assertIn("legacy complete-hook", body.lower())
 ```
 
-- [ ] **Step 2: Run prompt tests and verify failure**
+- [x] **Step 2: Run prompt tests and verify failure**
 
 Run: `python3 -m pytest tests/test_wrapper_contracts.py -k "finish_agent_separates_archive or dev_orchestrator_describes_subagent_owned_cleanup" -v`
 
 Expected: FAIL until prompt text is updated.
 
-- [ ] **Step 3: Update `agents/finish-agent.md` archive responsibilities**
+- [x] **Step 3: Update `agents/finish-agent.md` archive responsibilities**
 
 Edit `agents/finish-agent.md` so the `archive_change` section says:
 
@@ -483,7 +483,7 @@ return cleanup-only evidence during archive_change, including
 Those belong to `post_archive_actions`.
 ```
 
-- [ ] **Step 4: Update `agents/finish-agent.md` post-archive responsibilities**
+- [x] **Step 4: Update `agents/finish-agent.md` post-archive responsibilities**
 
 Add or replace the cleanup section with:
 
@@ -524,7 +524,7 @@ Successful post_archive_actions evidence must include:
 ```
 ````
 
-- [ ] **Step 5: Update `agents/dev-orchestrator.md` routing guidance**
+- [x] **Step 5: Update `agents/dev-orchestrator.md` routing guidance**
 
 Add this routing rule near archive/post-archive dispatch guidance:
 
@@ -543,7 +543,7 @@ Use legacy complete-hook only when repairing a pre-existing run that already has
 `roadmap_*` runtime hooks.
 ```
 
-- [ ] **Step 6: Run prompt-contract tests**
+- [x] **Step 6: Run prompt-contract tests**
 
 Run: `python3 -m pytest tests/test_wrapper_contracts.py -k "finish_agent_separates_archive or dev_orchestrator_describes_subagent_owned_cleanup" -v`
 
@@ -555,19 +555,19 @@ Expected: PASS.
 - Modify: `skills/sdlc-project-bootstrap/templates/workflow/sdlc-main.yaml`
 - Modify as generated: `.opencode/`, `.claude/`, `.cursor/` derived copies
 
-- [ ] **Step 1: Run targeted derived-artifact check**
+- [x] **Step 1: Run targeted derived-artifact check**
 
 Run: `python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git`
 
 Expected: FAIL and list drift for workflow definitions/templates and agent copies changed in earlier tasks.
 
-- [ ] **Step 2: Fix derived artifacts**
+- [x] **Step 2: Fix derived artifacts**
 
 Run: `python3 scripts/sync_derived_artifacts.py --fix --changed-files-from-git`
 
 Expected: command exits 0 and updates only affected workflow template / distributed agent artifacts.
 
-- [ ] **Step 3: Re-run derived-artifact check**
+- [x] **Step 3: Re-run derived-artifact check**
 
 Run: `python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git`
 
@@ -578,37 +578,37 @@ Expected: PASS.
 **Files:**
 - Modify: `docs/superpowers/plans/2026-07-05-subagent-owned-post-archive-cleanup.md`
 
-- [ ] **Step 1: Run focused workflow regression**
+- [x] **Step 1: Run focused workflow regression**
 
 Run: `python3 -m pytest tests/test_workflow.py -k "SubagentOwnedLifecycleCleanup or MemorySyncHook or PostArchiveHooks" -v`
 
 Expected: PASS.
 
-- [ ] **Step 2: Run workflow regression file**
+- [x] **Step 2: Run workflow regression file**
 
 Run: `python3 -m pytest tests/test_workflow.py --tb=short -q`
 
 Expected: PASS.
 
-- [ ] **Step 3: Run prompt-contract regression**
+- [x] **Step 3: Run prompt-contract regression**
 
 Run: `python3 -m pytest tests/test_wrapper_contracts.py -v`
 
 Expected: PASS.
 
-- [ ] **Step 4: Run full test suite**
+- [x] **Step 4: Run full test suite**
 
 Run: `python3 -m pytest tests/ --tb=short -q`
 
 Expected: PASS.
 
-- [ ] **Step 5: Check plan checkbox sync**
+- [x] **Step 5: Check plan checkbox sync**
 
 Run: `python3 scripts/check_plan_checkboxes.py docs/superpowers/plans/2026-07-05-subagent-owned-post-archive-cleanup.md`
 
 Expected: PASS after the executor has checked off all completed steps in this file.
 
-- [ ] **Step 6: Inspect final changed files**
+- [x] **Step 6: Inspect final changed files**
 
 Run: `git status --short`
 

@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "run_id": "2026-07-05-subagent-owned-post-archive-cleanup",
+  "workflow": "sdlc-main",
+  "flow_type": "lightweight-flow",
+  "status": "running",
+  "current_phase": "archive_change",
+  "primary_subject": {
+    "type": "spec_change",
+    "id": "subagent-owned-post-archive-cleanup"
+  },
+  "context": {
+    "change_id": "subagent-owned-post-archive-cleanup"
+  },
+  "phase_readiness": {
+    "phase": "archive_change",
+    "ready": true,
+    "missing_required_inputs": []
+  },
+  "pending_hooks": [],
+  "completed_hooks": [],
+  "completed_phases": [
+    "apply_change"
+  ],
+  "gates": {},
+  "evidence": {
+    "spec_status": {
+      "classification": "missing",
+      "source": null
+    },
+    "lightweight_flow_confirmed": true,
+    "agent_result": {
+      "agent": "review-agent",
+      "status": "success",
+      "phase": "apply_change",
+      "slice_id": "default",
+      "flow_type": "lightweight-flow",
+      "evidence": {
+        "tasks_complete": true,
+        "tdd_passed": true,
+        "eval_passed_or_human_decision_recorded": true,
+        "review_complete": true,
+        "verification_passed": true,
+        "review_decision": "accepted",
+        "criteria_satisfied": "tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded"
+      },
+      "blockers": [],
+      "recommended_next_action": "complete_phase",
+      "recorded_at": "2026-07-05T23:40:05.311613"
+    },
+    "agent_results": {
+      "default": {
+        "implement-agent": {
+          "agent": "implement-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "tasks_complete": true,
+            "tdd_passed": true,
+            "focused_tests": [
+              {
+                "command": "python3 -m pytest tests/test_workflow.py -k test_post_archive_actions_rejects_false_positive_cleanup_evidence -v",
+                "result": "pass"
+              }
+            ]
+          },
+          "blockers": [],
+          "recommended_next_action": "dispatch_review_agent",
+          "recorded_at": "2026-07-05T23:35:55.222284"
+        },
+        "review-agent": {
+          "agent": "review-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "tasks_complete": true,
+            "tdd_passed": true,
+            "eval_passed_or_human_decision_recorded": true,
+            "review_complete": true,
+            "verification_passed": true,
+            "review_decision": "accepted",
+            "criteria_satisfied": "tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded"
+          },
+          "blockers": [],
+          "recommended_next_action": "complete_phase",
+          "recorded_at": "2026-07-05T23:40:05.311613"
+        }
+      }
+    },
+    "tasks_complete": true,
+    "tdd_passed": true,
+    "agent_phase": {
+      "agent_phase": "archive_change",
+      "agent": "finish-agent",
+      "flow_type": "lightweight-flow",
+      "dispatched_at": "2026-07-05T23:42:10.256070",
+      "slice_id": "default"
+    },
+    "eval_passed_or_human_decision_recorded": true
+  },
+  "block": null,
+  "updated_at": "2026-07-05T23:42:10.256177"
+}

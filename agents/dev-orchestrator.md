@@ -450,6 +450,19 @@ plan-agent → implement-agent → review-agent → finish-agent
 4. After review-agent success, complete phase and advance.
 5. Dispatch finish-agent for archive_change and post_archive_actions.
 
+### Subagent-Owned Cleanup
+
+Normal `sdlc-main` cleanup is owned by subagents, not by runtime `post_hooks`.
+After `archive_change` succeeds with `archive_path_exists`, complete the phase
+and advance to `post_archive_actions`. Dispatch `finish-agent` in
+`post_archive_actions` and use its cleanup evidence as the source of truth:
+`memory_sync_done`, `roadmap_done_checked`, `derived_artifacts_synced`,
+`post_hook_dirty_tree`, and `cleanup_complete`.
+
+Use legacy complete-hook only when repairing a pre-existing run that already has
+`pending_hooks`. Do not expect new normal-flow runs to enqueue `memory_sync` or
+`roadmap_*` runtime hooks.
+
 When dispatching `review-agent` for `apply_change`, include:
 - current phase `evidence_keys`
 - current phase `exit_criteria`

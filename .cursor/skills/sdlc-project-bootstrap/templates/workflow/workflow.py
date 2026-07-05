@@ -1545,6 +1545,56 @@ def _canonical_agent_name(agent):
     return CANONICAL_AGENT_NAMES.get(agent, agent)
 
 
+ARCHIVE_PHASE_CLEANUP_ONLY_EVIDENCE = {
+    "pending_hooks_empty",
+    "cleanup_complete",
+    "memory_sync_done",
+    "roadmap_done_checked",
+    "derived_artifacts_synced",
+    "post_hook_dirty_tree",
+}
+
+# post_archive_actions evidence keys that represent positive cleanup success.
+# These must be True when present; only post_hook_dirty_tree may be False
+# (it means the tree is clean).
+POSITIVE_CLEANUP_EVIDENCE_KEYS = {
+    "memory_sync_done",
+    "roadmap_done_checked",
+    "derived_artifacts_synced",
+    "cleanup_complete",
+}
+
+
+def _invalid_positive_cleanup_evidence(phase, evidence):
+    """Return positive cleanup evidence keys that are present but not True.
+
+    Only applies to post_archive_actions.  post_hook_dirty_tree may be False
+    (clean tree); the other cleanup evidence keys must be True to represent
+    successful cleanup.
+    """
+    if phase != "post_archive_actions":
+        return []
+    if not isinstance(evidence, dict):
+        return []
+    return sorted(
+        key for key in POSITIVE_CLEANUP_EVIDENCE_KEYS
+        if key in evidence and evidence[key] is not True
+    )
+
+
+def _premature_archive_cleanup_evidence(agent, phase, agent_evidence):
+    if _canonical_agent_name(agent) != "finish-agent":
+        return []
+    if phase != "archive_change":
+        return []
+    if not isinstance(agent_evidence, dict):
+        return []
+    return sorted(
+        key for key in ARCHIVE_PHASE_CLEANUP_ONLY_EVIDENCE
+        if key in agent_evidence
+    )
+
+
 def _phase_allows_agent(phase, agent):
     canonical = _canonical_agent_name(agent)
     allowed = PHASE_AGENT_MAP.get(phase)
@@ -1787,7 +1837,7 @@ def _missing_phase_evidence_keys(agent_evidence: Dict[str, Any], phase_def: Dict
     missing: List[str] = []
     for key in phase_def.get("evidence_keys", []):
         value = agent_evidence.get(key)
-        if value is None or value == "" or value is False:
+        if value is None or value == "":
             missing.append(key)
     return missing
 
@@ -1937,6 +1987,21 @@ def cmd_after_dispatch(root, args):
     agent_recommended = agent_result.get("recommended_next_action", "")
     slice_id = getattr(args, "slice_id", "") or "default"
 
+    premature_cleanup_keys = _premature_archive_cleanup_evidence(
+        canonical_agent,
+        phase,
+        agent_evidence,
+    )
+    if agent_status == "success" and premature_cleanup_keys:
+        agent_blockers.append({
+            "reason": "premature_cleanup_evidence",
+            "message": (
+                "finish-agent archive_change success claimed cleanup-only evidence "
+                f"before post_archive_actions: {', '.join(premature_cleanup_keys)}"
+            ),
+            "recommended_action": "dispatch_finish_agent_for_post_archive_actions",
+        })
+
     latest_result = {
         "agent": canonical_agent,
         "status": agent_status,
@@ -2040,6 +2105,17 @@ def cmd_after_dispatch(root, args):
                     "message": f"agent success is missing criteria_satisfied entries for: {', '.join(missing_exit_criteria)}",
                     "recommended_action": "resolve_failure",
                 })
+
+        invalid_positive = _invalid_positive_cleanup_evidence(phase, phase_evidence_view)
+        if invalid_positive:
+            agent_blockers.append({
+                "reason": "invalid_phase_evidence_values",
+                "message": (
+                    "post_archive_actions positive cleanup evidence must be True; "
+                    f"false/empty values for: {', '.join(invalid_positive)}"
+                ),
+                "recommended_action": "resolve_failure",
+            })
 
         if phase == "apply_change" and phase_evidence_view.get("eval_passed_or_human_decision_recorded"):
             # Require prior successful implement-agent verification evidence as
@@ -2183,17 +2259,23 @@ def cmd_complete_phase(root, args):
         run_evidence = state.get("evidence", {})
         missing = []
         empty_vals = []
+        invalid_positive = []
         for ek in evidence_keys:
             if ek not in run_evidence:
                 missing.append(ek)
-            elif not run_evidence[ek] or (isinstance(run_evidence[ek], str) and not run_evidence[ek].strip()):
+            elif run_evidence[ek] is None or (isinstance(run_evidence[ek], str) and not run_evidence[ek].strip()):
                 empty_vals.append(ek)
-        if missing or empty_vals:
+        invalid_positive = _invalid_positive_cleanup_evidence(current, run_evidence)
+        if missing or empty_vals or invalid_positive:
             parts = []
             if missing:
                 parts.append(f"missing evidence keys: {missing}")
             if empty_vals:
                 parts.append(f"empty evidence keys: {empty_vals}")
+            if invalid_positive:
+                parts.append(
+                    f"invalid positive cleanup evidence (must be True): {invalid_positive}"
+                )
             print(
                 json.dumps(
                     {"error": "; ".join(parts)},
@@ -2481,6 +2563,12 @@ def cmd_complete_hook(root, args):
     completed = state.setdefault("completed_hooks", [])
     if hook_name not in completed:
         completed.append(hook_name)
+
+    # Clear hook_blocked block when all pending hooks are resolved.
+    if not pending and state.get("block") and state.get("block", {}).get("type") == "hook_blocked":
+        state["block"] = None
+        if state.get("status") == "blocked":
+            state["status"] = "running"
 
     save_run_state(root, state)
     print(json.dumps(state, indent=2))
