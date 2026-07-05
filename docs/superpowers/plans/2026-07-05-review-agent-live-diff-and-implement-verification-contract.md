@@ -45,11 +45,11 @@ Expected files to inspect and potentially modify:
 
 **Purpose:** Lock the intended behavior before prompt changes. The tests should initially fail for missing protocol text and missing review-agent Git allow rules.
 
-- [ ] **Step 1: Inspect existing prompt-contract test helpers**
+- [x] **Step 1: Inspect existing prompt-contract test helpers**
 
 Find existing helpers in `tests/test_wrapper_contracts.py` for reading agent frontmatter and prompt bodies. Use existing helper patterns rather than creating unrelated parsing code.
 
-- [ ] **Step 2: Add review-agent Git permission tests**
+- [x] **Step 2: Add review-agent Git permission tests**
 
 Add tests that assert `review-agent` bash rules contain all of the following after the catch-all deny rule:
 
@@ -70,7 +70,7 @@ Assertions:
 - every required command value is `allow`;
 - every required command appears after `"*": deny`.
 
-- [ ] **Step 3: Add review-agent Live Change Review Protocol tests**
+- [x] **Step 3: Add review-agent Live Change Review Protocol tests**
 
 Add tests that inspect canonical `agents/review-agent.md` and assert it contains:
 
@@ -85,7 +85,7 @@ review_change_set_missing
 review_change_set_mismatch
 ```
 
-- [ ] **Step 4: Add review-agent Verification Reuse Protocol tests**
+- [x] **Step 4: Add review-agent Verification Reuse Protocol tests**
 
 Add tests that inspect canonical `agents/review-agent.md` and assert it contains:
 
@@ -99,7 +99,7 @@ broad regression
 
 Also assert the prompt does not say or imply that broad regression is default review behavior.
 
-- [ ] **Step 5: Add review-agent final JSON contract tests**
+- [x] **Step 5: Add review-agent final JSON contract tests**
 
 Add tests that inspect canonical `agents/review-agent.md` and assert it contains:
 
@@ -111,7 +111,7 @@ must be a JSON array
 Do not include handoff prose in the final response
 ```
 
-- [ ] **Step 6: Add implement-agent changed-file and full regression contract tests**
+- [x] **Step 6: Add implement-agent changed-file and full regression contract tests**
 
 Add tests that inspect canonical `agents/implement-agent.md` and assert it contains:
 
@@ -126,7 +126,7 @@ python3 -m pytest tests/ -v
 Do not return `status: success` until focused verification and full regression both pass
 ```
 
-- [ ] **Step 7: Add dev-orchestrator review dispatch contract tests**
+- [x] **Step 7: Add dev-orchestrator review dispatch contract tests**
 
 Add tests that inspect canonical `agents/dev-orchestrator.md` and assert it contains:
 
@@ -141,7 +141,7 @@ review_change_set_mismatch
 Do not use CodeGraph as the source of truth for uncommitted changes
 ```
 
-- [ ] **Step 8: Run focused tests and confirm expected failures**
+- [x] **Step 8: Run focused tests and confirm expected failures**
 
 Run:
 
@@ -164,7 +164,7 @@ Do not weaken the tests to pass against the current prompts.
 
 **Purpose:** Make implementation success depend on real changed-file evidence plus focused and full regression evidence.
 
-- [ ] **Step 1: Add Implementation Change-Set Handoff Contract section**
+- [x] **Step 1: Add Implementation Change-Set Handoff Contract section**
 
 Add a section near the existing output contract:
 
@@ -188,7 +188,7 @@ Rules:
 - If using a git worktree, report the exact `worktree_path` used for implementation.
 ```
 
-- [ ] **Step 2: Expand the JSON output example**
+- [x] **Step 2: Expand the JSON output example**
 
 Update the implement-agent output contract so `artifacts` includes:
 
@@ -221,7 +221,7 @@ Update the implement-agent output contract so `artifacts` includes:
 
 Keep the existing `handoff_path` and `raw_log_paths` fields.
 
-- [ ] **Step 3: Add Full Regression Gate section**
+- [x] **Step 3: Add Full Regression Gate section**
 
 Add this section to `agents/implement-agent.md`. The outer fence below intentionally uses four backticks so the inner bash fence renders correctly.
 
@@ -244,7 +244,7 @@ Rules:
 - Include the full regression command and result in `artifacts.verification_commands`.
 ````
 
-- [ ] **Step 4: Update success conditions**
+- [x] **Step 4: Update success conditions**
 
 Update the existing success requirements so success requires:
 
@@ -255,7 +255,7 @@ Update the existing success requirements so success requires:
 - no blockers remain;
 - changed-file evidence is complete.
 
-- [ ] **Step 5: Preserve implement-agent boundaries**
+- [x] **Step 5: Preserve implement-agent boundaries**
 
 Do not make implement-agent responsible for final review or approval. It still returns `recommended_next_action: dispatch_review_agent` on success.
 
@@ -268,7 +268,7 @@ Do not make implement-agent responsible for final review or approval. It still r
 
 **Purpose:** Make review diff-first, evidence-first, and targeted-test-only by default.
 
-- [ ] **Step 1: Add Git permission allow rules**
+- [x] **Step 1: Add Git permission allow rules**
 
 In `permission.bash`, add these specific allows after the existing Git allows or after `git log*`:
 
@@ -280,7 +280,7 @@ In `permission.bash`, add these specific allows after the existing Git allows or
 
 Preserve catch-all deny as the first bash rule.
 
-- [ ] **Step 2: Add Live Change Review Protocol**
+- [x] **Step 2: Add Live Change Review Protocol**
 
 Add a section under Tool Usage Policy:
 
@@ -309,7 +309,7 @@ Rules:
 - If the live change set contradicts implement-agent handoff evidence, return blocker `review_change_set_mismatch`.
 ```
 
-- [ ] **Step 3: Add Verification Reuse Protocol**
+- [x] **Step 3: Add Verification Reuse Protocol**
 
 Add:
 
@@ -340,7 +340,7 @@ When re-running tests:
 - If broad regression is needed, record the trigger explicitly.
 ```
 
-- [ ] **Step 4: Add Final Output Contract Discipline**
+- [x] **Step 4: Add Final Output Contract Discipline**
 
 Add:
 
@@ -359,7 +359,7 @@ Rules:
 - `recommended_next_action` must match the allowed enum.
 ```
 
-- [ ] **Step 5: Update output examples if needed**
+- [x] **Step 5: Update output examples if needed**
 
 Ensure review-agent examples use:
 
@@ -381,7 +381,7 @@ Do not leave any malformed array examples.
 
 **Purpose:** Ensure review-agent receives the exact implement-agent change set and cannot silently infer review scope.
 
-- [ ] **Step 1: Add Review Dispatch Change-Set Contract section**
+- [x] **Step 1: Add Review Dispatch Change-Set Contract section**
 
 Under dispatch lifecycle or near the implement-agent success -> review-agent handoff wording, add:
 
@@ -408,7 +408,7 @@ The review-agent task prompt MUST instruct review-agent to:
 - not use CodeGraph as the source of truth for uncommitted changes.
 ```
 
-- [ ] **Step 2: Update review-agent task description guidance**
+- [x] **Step 2: Update review-agent task description guidance**
 
 Where `dev-orchestrator` describes dispatching review-agent, include a concise task phrase such as:
 
@@ -416,7 +416,7 @@ Where `dev-orchestrator` describes dispatching review-agent, include a concise t
 Review the implement-agent live change set, validate verification evidence, and decide apply_change acceptance.
 ```
 
-- [ ] **Step 3: Preserve lifecycle hook behavior**
+- [x] **Step 3: Preserve lifecycle hook behavior**
 
 Do not bypass `before-dispatch` or `after-dispatch`. The new contract changes the task prompt content, not the workflow hook sequence.
 
@@ -428,7 +428,7 @@ Do not bypass `before-dispatch` or `after-dispatch`. The new contract changes th
 - Modify if needed: `tests/test_wrapper_contracts.py`
 - Generated/updated by script: `.opencode/agents/*`, `.claude/agents/*`, `.cursor/agents/*`
 
-- [ ] **Step 1: Run focused prompt-contract tests**
+- [x] **Step 1: Run focused prompt-contract tests**
 
 Run:
 
@@ -442,7 +442,7 @@ Expected:
 
 If tests fail because exact wording differs, prefer updating prompt wording to include the explicit contract terms rather than weakening the tests.
 
-- [ ] **Step 2: Sync derived agent artifacts**
+- [x] **Step 2: Sync derived agent artifacts**
 
 Run:
 
@@ -457,7 +457,7 @@ Expected:
 - Project-level derived agent copies are regenerated and activated.
 - Activated copies include valid `model` and `variant` frontmatter.
 
-- [ ] **Step 3: Check derived agent sync**
+- [x] **Step 3: Check derived agent sync**
 
 Run:
 
@@ -471,7 +471,7 @@ Expected:
 
 - PASS for all targets.
 
-- [ ] **Step 4: Run broader relevant tests**
+- [x] **Step 4: Run broader relevant tests**
 
 Run:
 
@@ -492,11 +492,11 @@ Expected:
 
 **Purpose:** Exercise the updated prompt behavior with a small local change before relying on it in a real apply_change flow.
 
-- [ ] **Step 1: Create a temporary uncommitted change in a safe scratch file**
+- [x] **Step 1: Create a temporary uncommitted change in a safe scratch file**
 
 Use a harmless test fixture or documentation scratch file. Do not use production source files unless needed.
 
-- [ ] **Step 2: Confirm live Git discovery commands expose the change**
+- [x] **Step 2: Confirm live Git discovery commands expose the change**
 
 Run:
 
@@ -511,7 +511,7 @@ Expected:
 
 - The live change appears in the appropriate command output.
 
-- [ ] **Step 3: Confirm review-agent prompt would require diff-first review**
+- [x] **Step 3: Confirm review-agent prompt would require diff-first review**
 
 Inspect `agents/review-agent.md` and `.opencode/agents/review-agent.md` to confirm the distributed copy contains:
 
@@ -521,7 +521,7 @@ Verification Reuse Protocol
 Final Output Contract Discipline
 ```
 
-- [ ] **Step 4: Clean up the temporary scratch change**
+- [x] **Step 4: Clean up the temporary scratch change**
 
 Revert or delete the temporary scratch change using the normal safe cleanup path.
 
@@ -532,7 +532,7 @@ Revert or delete the temporary scratch change using the normal safe cleanup path
 **Files:**
 - Read-only unless failures require fixes.
 
-- [ ] **Step 1: Run focused contract suite**
+- [x] **Step 1: Run focused contract suite**
 
 ```bash
 python3 -m pytest tests/test_wrapper_contracts.py -v
@@ -542,7 +542,7 @@ Expected:
 
 - PASS.
 
-- [ ] **Step 2: Run agent setup/distribution suites**
+- [x] **Step 2: Run agent setup/distribution suites**
 
 ```bash
 python3 -m pytest tests/test_install_agents.py tests/test_setup_agents.py -v
@@ -552,7 +552,7 @@ Expected:
 
 - PASS.
 
-- [ ] **Step 3: Run full project regression**
+- [x] **Step 3: Run full project regression**
 
 ```bash
 python3 -m pytest tests/ -v
@@ -564,7 +564,7 @@ Expected:
 
 This is required because this change modifies agent contracts and tests, and it establishes the policy that implement-agent must run full regression before success.
 
-- [ ] **Step 4: Check derived artifacts**
+- [x] **Step 4: Check derived artifacts**
 
 Run:
 
@@ -582,17 +582,17 @@ If this fails only because newly edited canonical agent files have not been redi
 
 ## Acceptance Checklist
 
-- [ ] `agents/implement-agent.md` requires changed-file evidence in success handoff.
-- [ ] `agents/implement-agent.md` requires focused verification plus full regression before success.
-- [ ] `agents/review-agent.md` can discover unstaged, staged, and untracked changes.
-- [ ] `agents/review-agent.md` states live Git is the source of truth for uncommitted review scope.
-- [ ] `agents/review-agent.md` constrains CodeGraph to post-diff structural understanding.
-- [ ] `agents/review-agent.md` defaults to inspecting implement-agent verification evidence instead of re-running broad tests.
-- [ ] `agents/review-agent.md` still permits targeted test re-runs when justified.
-- [ ] `agents/review-agent.md` requires exactly one valid JSON final response.
-- [ ] `agents/dev-orchestrator.md` forwards implement-agent change-set and verification evidence to review-agent.
-- [ ] `tests/test_wrapper_contracts.py` locks the new contracts.
-- [ ] `.opencode/`, `.claude/`, and `.cursor/` derived agent copies are synced.
-- [ ] Focused contract tests pass.
-- [ ] Agent setup/distribution checks pass.
-- [ ] Full project regression passes.
+- [x] `agents/implement-agent.md` requires changed-file evidence in success handoff.
+- [x]`agents/implement-agent.md` requires focused verification plus full regression before success.
+- [x]`agents/review-agent.md` can discover unstaged, staged, and untracked changes.
+- [x]`agents/review-agent.md` states live Git is the source of truth for uncommitted review scope.
+- [x]`agents/review-agent.md` constrains CodeGraph to post-diff structural understanding.
+- [x]`agents/review-agent.md` defaults to inspecting implement-agent verification evidence instead of re-running broad tests.
+- [x]`agents/review-agent.md` still permits targeted test re-runs when justified.
+- [x]`agents/review-agent.md` requires exactly one valid JSON final response.
+- [x]`agents/dev-orchestrator.md` forwards implement-agent change-set and verification evidence to review-agent.
+- [x]`tests/test_wrapper_contracts.py` locks the new contracts.
+- [x]`.opencode/`, `.claude/`, and `.cursor/` derived agent copies are synced.
+- [x]Focused contract tests pass.
+- [x]Agent setup/distribution checks pass.
+- [x]Full project regression passes.

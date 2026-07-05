@@ -342,7 +342,7 @@ Use these descriptions for the "Task" field in pre-dispatch announcements:
 |---|---|---|
 | plan-agent | create_change | Generate implementation plan for the spec change |
 | implement-agent | apply_change | Execute TDD red/green loops for the work package |
-| review-agent | apply_change | Perform code review and verify-before-complete checks |
+| review-agent | apply_change | Review the implement-agent live change set, validate verification evidence, and decide apply_change acceptance |
 | finish-agent | archive_change | Archive the change and run post-archive hooks |
 | finish-agent | post_archive_actions | Run post-archive cleanup and memory sync hooks |
 | roadmap-agent | review_roadmap | Review roadmap item and return review decision |
@@ -440,6 +440,30 @@ The review-agent must return an acceptance envelope that satisfies the
 `apply_change` phase contract, including
 `eval_passed_or_human_decision_recorded` when final acceptance is based on
 successful verification.
+
+## Review Dispatch Change-Set Contract
+
+When `implement-agent` succeeds and `after-dispatch` returns `dispatch_review_agent`, the review-agent task prompt MUST forward implement-agent change-set and verification evidence as the primary review target.
+
+Forward at minimum:
+- `artifacts.worktree_path`
+- `artifacts.repo_root`
+- `artifacts.base_ref`
+- `artifacts.changed_files[]`
+- `artifacts.diff_commands[]`
+- `artifacts.verification_commands[]`
+- `artifacts.handoff_path`
+
+The review-agent task prompt MUST instruct review-agent to:
+- verify the current worktree matches `worktree_path`;
+- validate live Git state against `changed_files`;
+- return blocker `review_change_set_missing` if change-set evidence is absent or empty for an implementation task;
+- return blocker `review_change_set_mismatch` if live Git state contradicts the handoff;
+- inspect implement-agent verification evidence before deciding whether any test re-run is necessary;
+- Do not use CodeGraph as the source of truth for uncommitted changes.
+
+The review-agent task description should be:
+`Review the implement-agent live change set, validate verification evidence, and decide apply_change acceptance.`
 
 ## Plan Approval Gate
 

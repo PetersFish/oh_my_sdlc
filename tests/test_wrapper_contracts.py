@@ -2330,5 +2330,190 @@ class TestApplyChangeEvidencePromptContracts(unittest.TestCase):
         self.assertIn("eval_passed_or_human_decision_recorded", body)
 
 
+class TestReviewAgentGitPermissions(unittest.TestCase):
+    """review-agent needs read-only Git allow rules for live change discovery."""
+
+    REQUIRED_GIT_RULES = (
+        "git status*",
+        "git diff*",
+        "git log*",
+        "git ls-files*",
+        "git check-ignore*",
+        "git worktree*",
+    )
+
+    def _bash_rules(self, target=".opencode"):
+        fm = _read_agent_frontmatter(target, "review-agent")
+        return fm["permission"].get("bash", {})
+
+    def test_required_git_commands_are_allowed(self):
+        bash_rules = self._bash_rules()
+        for command in self.REQUIRED_GIT_RULES:
+            self.assertEqual(
+                bash_rules.get(command),
+                "allow",
+                f"review-agent missing required git allow rule for {command}",
+            )
+
+    def test_required_git_commands_appear_after_catch_all_deny(self):
+        bash_rules = self._bash_rules()
+        keys = list(bash_rules.keys())
+        self.assertEqual(keys[0], "*", "review-agent: catch-all deny must be first bash rule")
+        self.assertEqual(bash_rules["*"], "deny")
+        deny_index = 0
+        for command in self.REQUIRED_GIT_RULES:
+            self.assertIn(command, keys, f"review-agent missing {command}")
+            self.assertGreater(
+                keys.index(command), deny_index,
+                f"review-agent: {command} must appear after catch-all deny",
+            )
+
+    def test_required_git_rules_present_in_all_distributed_copies(self):
+        for target in (".opencode", ".claude", ".cursor"):
+            bash_rules = self._bash_rules(target)
+            for command in self.REQUIRED_GIT_RULES:
+                self.assertEqual(
+                    bash_rules.get(command), "allow",
+                    f"review-agent ({target}): missing allow for {command}",
+                )
+
+
+class TestReviewAgentLiveChangeReviewProtocol(unittest.TestCase):
+    """review-agent prompt must establish live Git as the source of truth."""
+
+    def _body(self):
+        return (AGENTS_DIR / "review-agent.md").read_text(encoding="utf-8")
+
+    def test_prompt_contains_live_change_review_protocol_heading(self):
+        self.assertIn("Live Change Review Protocol", self._body())
+
+    def test_prompt_states_live_git_is_source_of_truth(self):
+        self.assertIn("live Git working tree is the source of truth", self._body())
+
+    def test_prompt_constrains_codegraph_to_after_live_change_set_known(self):
+        self.assertIn("CodeGraph may be used only after the live change set is known", self._body())
+
+    def test_prompt_lists_required_discovery_commands(self):
+        body = self._body()
+        self.assertIn("git diff --name-status", body)
+        self.assertIn("git diff --cached --name-status", body)
+        self.assertIn("git ls-files --others --exclude-standard", body)
+
+    def test_prompt_names_change_set_missing_and_mismatch_blockers(self):
+        body = self._body()
+        self.assertIn("review_change_set_missing", body)
+        self.assertIn("review_change_set_mismatch", body)
+
+
+class TestReviewAgentVerificationReuseProtocol(unittest.TestCase):
+    """review-agent must inspect implement-agent evidence before re-running tests."""
+
+    def _body(self):
+        return (AGENTS_DIR / "review-agent.md").read_text(encoding="utf-8")
+
+    def test_prompt_contains_verification_reuse_protocol_heading(self):
+        self.assertIn("Verification Reuse Protocol", self._body())
+
+    def test_prompt_states_review_agent_is_not_primary_test_executor(self):
+        self.assertIn("Review-agent is not the primary test executor", self._body())
+
+    def test_prompt_states_do_not_run_full_tests_by_default(self):
+        self.assertIn("Do not run full `tests/` by default", self._body())
+
+    def test_prompt_states_run_smallest_command_set_when_re_running(self):
+        self.assertIn("Run the smallest command set", self._body())
+
+    def test_prompt_mentions_broad_regression_not_default(self):
+        self.assertIn("broad regression", self._body())
+
+
+class TestReviewAgentFinalOutputContract(unittest.TestCase):
+    """review-agent final output must be exactly one valid JSON object."""
+
+    def _body(self):
+        return (AGENTS_DIR / "review-agent.md").read_text(encoding="utf-8")
+
+    def test_prompt_contains_final_output_contract_discipline_heading(self):
+        self.assertIn("Final Output Contract Discipline", self._body())
+
+    def test_prompt_requires_exactly_one_valid_json_object(self):
+        self.assertIn("exactly one valid JSON object", self._body())
+
+    def test_prompt_requires_design_artifact_paths_array(self):
+        self.assertIn("artifacts.design_artifact_paths", self._body())
+        self.assertIn("must be a JSON array", self._body())
+
+    def test_prompt_prohibits_handoff_prose_in_final_response(self):
+        self.assertIn("Do not include handoff prose in the final response", self._body())
+
+
+class TestImplementAgentChangeSetAndRegressionContract(unittest.TestCase):
+    """implement-agent must hand off changed-file evidence and run full regression."""
+
+    def _body(self):
+        return (AGENTS_DIR / "implement-agent.md").read_text(encoding="utf-8")
+
+    def test_prompt_contains_change_set_handoff_contract_heading(self):
+        self.assertIn("Implementation Change-Set Handoff Contract", self._body())
+
+    def test_prompt_requires_changed_files_field(self):
+        self.assertIn("changed_files", self._body())
+
+    def test_prompt_requires_worktree_path_field(self):
+        self.assertIn("worktree_path", self._body())
+
+    def test_prompt_requires_diff_commands_field(self):
+        self.assertIn("diff_commands", self._body())
+
+    def test_prompt_requires_verification_commands_field(self):
+        self.assertIn("verification_commands", self._body())
+
+    def test_prompt_contains_full_regression_gate_heading(self):
+        self.assertIn("Full Regression Gate", self._body())
+
+    def test_prompt_specifies_default_full_regression_command(self):
+        self.assertIn("python3 -m pytest tests/ -v", self._body())
+
+    def test_prompt_requires_full_regression_before_success(self):
+        self.assertIn(
+            "Do not return `status: success` until focused verification and full regression both pass",
+            self._body(),
+        )
+
+
+class TestDevOrchestratorReviewDispatchContract(unittest.TestCase):
+    """dev-orchestrator must forward implement-agent change-set to review-agent."""
+
+    def _body(self):
+        return (AGENTS_DIR / "dev-orchestrator.md").read_text(encoding="utf-8")
+
+    def test_prompt_contains_review_dispatch_change_set_contract_heading(self):
+        self.assertIn("Review Dispatch Change-Set Contract", self._body())
+
+    def test_prompt_forwards_changed_files(self):
+        self.assertIn("changed_files", self._body())
+
+    def test_prompt_forwards_worktree_path(self):
+        self.assertIn("worktree_path", self._body())
+
+    def test_prompt_forwards_diff_commands(self):
+        self.assertIn("diff_commands", self._body())
+
+    def test_prompt_forwards_verification_commands(self):
+        self.assertIn("verification_commands", self._body())
+
+    def test_prompt_names_change_set_missing_blocker(self):
+        self.assertIn("review_change_set_missing", self._body())
+
+    def test_prompt_names_change_set_mismatch_blocker(self):
+        self.assertIn("review_change_set_mismatch", self._body())
+
+    def test_prompt_prohibits_codegraph_as_source_of_truth_for_uncommitted_changes(self):
+        self.assertIn(
+            "Do not use CodeGraph as the source of truth for uncommitted changes",
+            self._body(),
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

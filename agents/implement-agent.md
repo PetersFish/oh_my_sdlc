@@ -127,6 +127,24 @@ Plan checkbox sync: when `artifacts.primary_design_path` matches
 section — check off each step as it completes and run the validation script
 before returning `tasks_complete: true`.
 
+## Implementation Change-Set Handoff Contract
+
+Before returning success, discover and report the implementation change set from the live worktree.
+
+Required artifact fields:
+- `worktree_path`
+- `repo_root`
+- `base_ref`
+- `changed_files[]`
+- `diff_commands[]`
+- `verification_commands[]`
+
+Rules:
+- If implementation changed files, `changed_files` must be non-empty.
+- Include unstaged tracked, staged, and untracked files.
+- Include `covered_by` or equivalent verification coverage for changed files when available.
+- If using a git worktree, report the exact `worktree_path` used for implementation.
+
 ## Output — Structured Evidence Envelope
 
 Return JSON:
@@ -146,6 +164,27 @@ Return JSON:
   },
   "artifacts": {
     "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/<slice_id>/implement-agent.md",
+    "worktree_path": "/path/to/worktree",
+    "repo_root": "/path/to/repo",
+    "base_ref": "HEAD",
+    "changed_files": [
+      {
+        "path": "path/to/file.py",
+        "status": "added|modified|deleted|renamed|untracked|staged",
+        "source": "git diff|git diff --cached|git ls-files --others",
+        "reason": "why this file changed",
+        "covered_by": ["python3 -m pytest ..."]
+      }
+    ],
+    "diff_commands": ["git diff -- path/to/file.py"],
+    "verification_commands": [
+      {
+        "command": "python3 -m pytest tests/ -v",
+        "scope": "full_regression",
+        "result": "pass",
+        "covers": ["tests/"]
+      }
+    ],
     "raw_log_paths": [
       {"path": "...", "kind": "pytest", "command": "...", "result": "pass"}
     ]
@@ -158,11 +197,30 @@ Return JSON:
 Return `success` only when ALL of the following are true:
 - Implementation tasks are complete.
 - TDD loop passed (all focused tests green).
+- Full regression passes or an explicitly approved skip exists.
 - Provider verification succeeded (for spec-flow).
 - No blockers remain.
+- Changed-file evidence is complete.
 
 For lightweight-flow, normal handoff from implementation to review-agent is a
 successful result, not a blocker.
+
+## Full Regression Gate
+
+After all focused tests for the implementation pass, run the project-level regression suite before returning success.
+
+Default full regression command:
+
+```bash
+python3 -m pytest tests/ -v
+```
+
+Rules:
+- Do not return `status: success` until focused verification and full regression both pass.
+- If full regression fails because of the current change, diagnose and fix it within the same implement-agent loop.
+- If full regression fails for a pre-existing or environment-related reason, return `status: blocked` with evidence.
+- If full regression is intentionally skipped, return `status: blocked` unless the user explicitly approved the skip.
+- Include the full regression command and result in `artifacts.verification_commands`.
 
 Blocked example when workflow context prevents safe execution:
 ```json

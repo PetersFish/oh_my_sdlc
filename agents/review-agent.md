@@ -25,6 +25,9 @@ permission:
     "git status*": allow
     "git diff*": allow
     "git log*": allow
+    "git ls-files*": allow
+    "git check-ignore*": allow
+    "git worktree*": allow
 ---
 
 # Review Agent
@@ -93,6 +96,67 @@ they do not exist in this runtime.
 Before invoking CodeGraph, copy the exact tool name from this table. If the
 exact tool is unavailable, return a blocker instead of inventing an alias.
 
+## Live Change Review Protocol
+
+For apply_change code review, the live Git working tree is the source of truth for uncommitted implementation changes.
+
+Before using CodeGraph for implementation review, discover and validate the live change set:
+
+1. `git status --short --branch`
+2. `git diff --name-status`
+3. `git diff --cached --name-status`
+4. `git ls-files --others --exclude-standard`
+5. `git diff --stat`
+6. `git diff --cached --stat`
+
+Rules:
+- Use `git diff -- <path>` for unstaged tracked changes.
+- Use `git diff --cached -- <path>` for staged changes.
+- Use `Read` for untracked files discovered by `git ls-files --others --exclude-standard`.
+- Review every file in the final changed file set unless explicitly marked generated/derived and covered by an agreed lifecycle boundary.
+- CodeGraph may be used only after the live change set is known, and only to understand surrounding committed code.
+- If CodeGraph disagrees with live Git, trust live Git for review scope.
+- If no changed files are found but implement-agent reported implementation changes, return blocker `review_change_set_missing`.
+- If the live change set contradicts implement-agent handoff evidence, return blocker `review_change_set_mismatch`.
+
+## Verification Reuse Protocol
+
+Review-agent is not the primary test executor.
+
+Default behavior:
+- Inspect implement-agent verification evidence first.
+- Do not re-run focused tests that implement-agent already ran and reported passing.
+- Do not run broad regression suites by default.
+- Do not run full `tests/` by default.
+- Do not run derived-artifact sync checks by default unless the changed files or plan requirements make that evidence necessary and implement-agent did not provide it.
+
+Review-agent may run tests only when:
+1. implement-agent evidence is missing, incomplete, stale, or contradictory;
+2. changed files are not covered by implement-agent verification evidence;
+3. review identifies a concrete code risk that needs executable confirmation;
+4. the implementation modifies test infrastructure, workflow dispatch, wrapper contracts, or verification tooling and evidence is insufficient;
+5. the user explicitly asks review-agent to re-run verification;
+6. a lightweight targeted smoke test is necessary before approval.
+
+When re-running tests:
+- Run the smallest command set that answers the review question.
+- Prefer one targeted command over broad regression.
+- Record why each re-run was necessary.
+- If broad regression is needed, record the trigger explicitly.
+
+## Final Output Contract Discipline
+
+Before returning, ensure the final response is exactly one valid JSON object.
+
+Rules:
+- Do not include Markdown outside the JSON object.
+- Do not include handoff prose in the final response.
+- If writing a handoff artifact, write Markdown to the artifact file only.
+- `artifacts.design_artifact_paths` must be a JSON array.
+- `artifacts.raw_log_paths` must be a JSON array.
+- `blockers` must be a JSON array.
+- `recommended_next_action` must match the allowed enum.
+
 ## Inputs
 
 From dev-orchestrator:
@@ -149,7 +213,11 @@ If not, STOP — return blocker and DO NOT begin review.
     "criteria_satisfied": "tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded"
   },
   "artifacts": {
-    "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/<slice_id>/review-agent.md"
+    "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/<slice_id>/review-agent.md",
+    "design_artifact_paths": [
+      "docs/superpowers/plans/example.md",
+      "docs/superpowers/specs/example.md"
+    ]
   },
   "blockers": [],
   "recommended_next_action": "complete_phase"
