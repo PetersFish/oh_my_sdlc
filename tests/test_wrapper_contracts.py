@@ -2503,6 +2503,93 @@ class TestImplementAgentChangeSetAndRegressionContract(unittest.TestCase):
         )
 
 
+class TestReviewAgentWorktreeGitCPermissions(unittest.TestCase):
+    """review-agent needs read-only `git -C *` allow rules for worktree-mode live change review."""
+
+    REQUIRED_GIT_C_RULES = (
+        "git -C * status*",
+        "git -C * diff*",
+        "git -C * log*",
+        "git -C * ls-files*",
+        "git -C * check-ignore*",
+        "git -C * rev-parse*",
+        "git -C * branch*",
+    )
+
+    def _bash_rules(self, target=".opencode"):
+        fm = _read_agent_frontmatter(target, "review-agent")
+        return fm["permission"].get("bash", {})
+
+    def test_required_git_c_commands_are_allowed(self):
+        bash_rules = self._bash_rules()
+        for command in self.REQUIRED_GIT_C_RULES:
+            self.assertEqual(
+                bash_rules.get(command),
+                "allow",
+                f"review-agent missing required git -C allow rule for {command}",
+            )
+
+    def test_required_git_c_commands_appear_after_catch_all_deny(self):
+        bash_rules = self._bash_rules()
+        keys = list(bash_rules.keys())
+        self.assertEqual(keys[0], "*", "review-agent: catch-all deny must be first bash rule")
+        self.assertEqual(bash_rules["*"], "deny")
+        deny_index = 0
+        for command in self.REQUIRED_GIT_C_RULES:
+            self.assertIn(command, keys, f"review-agent missing {command}")
+            self.assertGreater(
+                keys.index(command), deny_index,
+                f"review-agent: {command} must appear after catch-all deny",
+            )
+
+    def test_required_git_c_rules_present_in_all_distributed_copies(self):
+        for target in (".opencode", ".claude", ".cursor"):
+            bash_rules = self._bash_rules(target)
+            for command in self.REQUIRED_GIT_C_RULES:
+                self.assertEqual(
+                    bash_rules.get(command), "allow",
+                    f"review-agent ({target}): missing allow for {command}",
+                )
+
+
+class TestReviewAgentWorktreeModeLiveChangeReviewProtocol(unittest.TestCase):
+    """review-agent prompt must establish worktree-mode `git -C` source-of-truth rules."""
+
+    def _body(self):
+        return (AGENTS_DIR / "review-agent.md").read_text(encoding="utf-8")
+
+    def test_prompt_contains_worktree_mode_live_change_review_protocol_heading(self):
+        self.assertIn("Worktree-Mode Live Change Review Protocol", self._body())
+
+    def test_prompt_requires_explicit_worktree_path_as_source_of_truth(self):
+        body = self._body()
+        self.assertIn("worktree_path", body)
+        self.assertIn("implementation source of truth", body)
+
+    def test_prompt_requires_git_c_worktree_inspection(self):
+        body = self._body()
+        self.assertIn("git -C <worktree_path>", body)
+        self.assertIn("git -C <worktree_path> rev-parse --show-toplevel", body)
+
+    def test_prompt_forbids_shell_cwd_dependency_in_worktree_mode(self):
+        body = self._body()
+        self.assertIn("never rely on shell cwd", body)
+
+    def test_prompt_forbids_fallback_to_main_checkout_in_worktree_mode(self):
+        body = self._body()
+        self.assertIn("never fallback to the main", body)
+
+    def test_prompt_names_worktree_context_blockers(self):
+        body = self._body()
+        self.assertIn("missing_worktree_context", body)
+        self.assertIn("invalid_worktree_context", body)
+        self.assertIn("review_worktree_mismatch", body)
+
+    def test_prompt_preserves_plain_git_for_main_checkout_mode(self):
+        body = self._body()
+        self.assertIn("main-checkout mode", body)
+
+
 class TestDevOrchestratorReviewDispatchContract(unittest.TestCase):
     """dev-orchestrator must forward implement-agent change-set to review-agent."""
 

@@ -28,6 +28,13 @@ permission:
     "git ls-files*": allow
     "git check-ignore*": allow
     "git worktree*": allow
+    "git -C * status*": allow
+    "git -C * diff*": allow
+    "git -C * log*": allow
+    "git -C * ls-files*": allow
+    "git -C * check-ignore*": allow
+    "git -C * rev-parse*": allow
+    "git -C * branch*": allow
 ---
 
 # Review Agent
@@ -118,6 +125,69 @@ Rules:
 - If CodeGraph disagrees with live Git, trust live Git for review scope.
 - If no changed files are found but implement-agent reported implementation changes, return blocker `review_change_set_missing`.
 - If the live change set contradicts implement-agent handoff evidence, return blocker `review_change_set_mismatch`.
+
+## Worktree-Mode Live Change Review Protocol
+
+When implement-agent evidence or runtime context indicates worktree-mode
+(i.e., implementation was performed in an isolated git worktree), the
+explicit worktree path is the implementation source of truth — not the
+shell cwd, and not the main/control checkout.
+
+The worktree path is provided via `artifacts.worktree_path`,
+`context.worktree_path`, `runtime_context.worktree_path`, or
+implement-agent handoff evidence. Treat whichever is present or expected
+as the implementation source of truth.
+
+Before reviewing implementation changes in worktree-mode:
+
+1. Validate the worktree path exists using permitted read/file inspection
+   or `git -C <worktree_path> rev-parse --show-toplevel`.
+2. Confirm the returned top-level path matches the expected worktree path
+   or a normalized equivalent.
+3. Run live change-set discovery with `git -C <worktree_path>`:
+
+   ```bash
+   git -C <worktree_path> rev-parse --show-toplevel
+   git -C <worktree_path> status --short --branch
+   git -C <worktree_path> diff --name-status
+   git -C <worktree_path> diff --cached --name-status
+   git -C <worktree_path> ls-files --others --exclude-standard
+   git -C <worktree_path> diff --stat
+   git -C <worktree_path> diff --cached --stat
+   ```
+
+4. Compare live changed files with implement-agent handoff evidence.
+
+Worktree-mode rules:
+
+- You must never rely on shell cwd in worktree-mode. The active source of
+  truth must be explicit on every Git command via `git -C <worktree_path>`.
+- You must never fallback to the main/control checkout when worktree
+  context is expected.
+- Plain `git status` / `git diff` are forbidden in worktree-mode. They are
+  allowed only in main-checkout mode (see the Live Change Review Protocol
+  above) when no worktree evidence is expected.
+- Use changed file paths from worktree-aware Git output when reading
+  files. Do not treat main-checkout files as authoritative for
+  uncommitted implementation changes.
+
+Worktree-mode blockers:
+
+- `missing_worktree_context` — implementation evidence indicates
+  worktree-mode, but no worktree path is available.
+- `invalid_worktree_context` — provided worktree path does not exist or
+  is not a Git worktree.
+- `review_worktree_mismatch` — live worktree root or branch contradicts
+  implement-agent handoff/runtime evidence.
+- `review_change_set_missing` — no live changed files are found in the
+  expected worktree while implement-agent reported changes.
+- `review_change_set_mismatch` — live changed files contradict
+  implement-agent handoff evidence.
+
+If no worktree evidence is expected and the run is explicitly
+main-checkout mode, the Live Change Review Protocol above (plain Git
+read commands) remains the correct path. This preserves compatibility for
+small changes and non-worktree execution.
 
 ## Verification Reuse Protocol
 
