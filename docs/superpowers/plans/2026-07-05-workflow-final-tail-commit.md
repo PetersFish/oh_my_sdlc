@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Ensure completed SDLC workflow runs end with a deterministic final governance-artifact commit or a safe noop after all runtime state writes, hook completions, and active-to-history moves have finished.
+**Goal:** Ensure completed SDLC workflow runs end with a deterministic post-done governance-artifact commit or a safe noop after all runtime state writes, hook completions, and active-to-history moves have finished.
 
-**Architecture:** Keep `workflow.py` as the owner of final Git publishing through a new `final-commit` command. Keep `dev-orchestrator` as a routing coordinator that calls the workflow runtime command after advancing the captured run to done. Update `finish-agent` so it no longer claims to own the final workflow commit boundary. Add tests before implementation and sync canonical files into derived agent/template copies.
+**Architecture:** Keep `workflow.py` as the owner of final Git publishing through a new `final-commit` command. Keep `dev-orchestrator` as a routing coordinator that calls the workflow runtime command after advancing the captured run to done. Do not define finish-agent terminal ownership or branch decision behavior in this plan; those are owned by `2026-07-05-finish-agent-branch-decision-and-terminal-ownership` and runtime evidence invariants.
 
-**Tech Stack:** Python workflow runtime, Git subprocess calls, JSON CLI output, Markdown/YAML agent prompts, pytest workflow and prompt-contract tests, existing derived artifact sync scripts.
+**Tech Stack:** Python workflow runtime, Git subprocess calls, JSON CLI output, Markdown/YAML dev-orchestrator prompt, pytest workflow and prompt-contract tests, existing derived artifact sync scripts.
 
 ---
 
@@ -16,6 +16,8 @@ Expected files to inspect and potentially modify:
 
 - Read: `docs/superpowers/specs/2026-07-05-workflow-final-tail-commit.md`
   - Responsibility: source requirements for this plan.
+- Read as dependency: `docs/superpowers/specs/2026-07-05-finish-agent-branch-decision-and-terminal-ownership.md`
+  - Responsibility: finish lifecycle boundary; do not duplicate finish-agent terminal ownership requirements here.
 - Modify: `.ai/workflows/scripts/workflow.py`
   - Responsibility: add `final-commit` command, allowlist staging, structured JSON output, and argument parser wiring.
 - Modify: `skills/sdlc-project-bootstrap/templates/workflow/workflow.py`
@@ -23,19 +25,22 @@ Expected files to inspect and potentially modify:
 - Modify after sync or direct template propagation: `.opencode/skills/sdlc-project-bootstrap/templates/workflow/workflow.py`, `.claude/skills/sdlc-project-bootstrap/templates/workflow/workflow.py`, `.cursor/skills/sdlc-project-bootstrap/templates/workflow/workflow.py`
   - Responsibility: derived workflow runtime templates must match canonical template.
 - Modify: `agents/dev-orchestrator.md`
-  - Responsibility: add Final Tail Commit Protocol after finish-agent completion and run-done advancement.
-- Modify: `agents/finish-agent.md`
-  - Responsibility: clarify finish-agent does not own the final workflow artifact commit.
+  - Responsibility: add Final Tail Commit Protocol after run-done advancement.
 - Modify after agent sync: `.opencode/agents/dev-orchestrator.md`, `.claude/agents/dev-orchestrator.md`, `.cursor/agents/dev-orchestrator.md`
   - Responsibility: derived dev-orchestrator prompts reflect canonical prompt.
-- Modify after agent sync: `.opencode/agents/finish-agent.md`, `.claude/agents/finish-agent.md`, `.cursor/agents/finish-agent.md`
-  - Responsibility: derived finish-agent prompts reflect canonical prompt.
 - Modify: `tests/test_workflow.py`
   - Responsibility: runtime tests for `final-commit` behavior.
 - Modify if prompt-contract tests are kept separately: `tests/test_wrapper_contracts.py`
-  - Responsibility: prompt tests for dev-orchestrator and finish-agent final-tail-commit wording.
+  - Responsibility: prompt tests for dev-orchestrator final-tail-commit wording.
 - Read if needed: `AGENTS.md`
   - Responsibility: canonical-vs-derived update discipline and sync commands.
+
+Out of scope for this plan:
+
+- `agents/finish-agent.md` substantive changes.
+- `.opencode/.claude/.cursor` finish-agent distributed prompt updates.
+- Branch finish decision gates.
+- Finish-agent final evidence requirements.
 
 ---
 
@@ -63,7 +68,17 @@ workflow.py final-commit --run-id <run_id>
 
 returns non-success JSON and does not create a commit.
 
-Expected error names may be `run_not_found`, `history_run_not_found`, `run_not_done`, or a similarly explicit stable string. Prefer one stable value in the implementation.
+Expected stable error values may include:
+
+```text
+missing_run_id
+history_run_not_found
+invalid_run_json
+run_id_mismatch
+run_not_done
+```
+
+Prefer one stable value per failure mode.
 
 - [ ] **Step 3: Add test for noop when nothing allowlisted is dirty**
 
@@ -140,7 +155,24 @@ Assert:
 - other run changes remain dirty and appear in `residual_dirty_paths` unless covered by another allowlist rule;
 - final-commit does not stage all of `.ai/workflows/runs/history/` indiscriminately.
 
-- [ ] **Step 7: Add test for push only after successful commit**
+- [ ] **Step 7: Add test for committing Superpowers archive governance artifacts**
+
+After baseline commit, create or modify:
+
+```text
+docs/superpowers/archive/plans/2026-07-05-example.md
+docs/superpowers/archive/specs/2026-07-05-example.md
+```
+
+Run final-commit for a done run.
+
+Assert:
+
+- these archive paths are included in `staged_paths` when dirty;
+- unrelated files under `docs/superpowers/plans/` or `docs/superpowers/specs/` are not staged unless they were moved into the archive path and reported by Git as archived destination paths;
+- unrelated source files remain residual.
+
+- [ ] **Step 8: Add test for push only after successful commit**
 
 Use monkeypatch or the repository's existing command-runner abstraction if present. If no abstraction exists, introduce a small helper in `workflow.py` to execute Git commands so tests can stub push safely.
 
@@ -150,7 +182,7 @@ Assert:
 - `--push` does not invoke `git push` on noop;
 - push failure reports `status: failed`, `committed: true`, `pushed: false`, and preserves `commit_id`.
 
-- [ ] **Step 8: Run focused tests and confirm expected failures**
+- [ ] **Step 9: Run focused tests and confirm expected failures**
 
 Run:
 
@@ -218,6 +250,7 @@ def _final_commit_allowed_prefixes(run_id):
         ".ai/roadmap/",
         ".ai/memory/",
         "openspec/changes/archive/",
+        "docs/superpowers/archive/",
     ]
 ```
 
@@ -231,7 +264,8 @@ Rules:
 
 - `.ai/workflows/runs/history/<run_id>/...` is allowed.
 - Other run history directories are not allowed by the run-specific rule.
-- `current.json`, roadmap, memory, and archived spec paths are allowed if dirty.
+- `current.json`, roadmap, memory, archived OpenSpec paths, and archived Superpowers paths are allowed if dirty.
+- Active Superpowers source directories such as `docs/superpowers/plans/` and `docs/superpowers/specs/` are not broadly allowlisted.
 - All other paths are residual.
 
 - [ ] **Step 4: Add run completion precondition check**
@@ -334,28 +368,28 @@ Run the focused test and confirm it fails before prompt update.
 
 - [ ] **Step 2: Add Final Tail Commit Protocol section**
 
-Add a section near dispatch lifecycle / finish-agent handling:
+Add a section near dispatch lifecycle / terminal workflow handling:
 
 ```md
 ## Final Tail Commit Protocol
 
-When finish-agent succeeds and the workflow is ready to close, dev-orchestrator must not treat finish-agent commit evidence as the final repository state.
+After the workflow reaches `done`, dev-orchestrator must publish final workflow/governance artifacts through the runtime command, not direct Git commands.
 
 Required order:
 1. Capture the active `run_id` before advancing to `done`, because `advance` may clear `.ai/workflows/runs/current.json`.
-2. Call `after-dispatch` for `finish-agent` with the finish-agent JSON result.
-3. Call `complete-phase` with the exit criteria returned by `after-dispatch`.
-4. Complete all pending hooks required by the current phase.
-5. Call `advance` until the run reaches `done` and the active run is moved to history.
-6. Call `python3 .ai/workflows/scripts/workflow.py --root . final-commit --run-id <captured_run_id> --push`.
-7. Call `git status --short` and report clean status or `residual_dirty_paths`.
+2. Ensure finish lifecycle evidence has already been recorded according to the runtime context and finish lifecycle specs.
+3. Call `complete-phase` / `complete-hook` / `advance` as required until the run reaches `done` and the active run is moved to history.
+4. Call `python3 .ai/workflows/scripts/workflow.py --root . final-commit --run-id <captured_run_id> --push`.
+5. Call `git status --short` and report clean status or `residual_dirty_paths`.
 
 Do not run direct `git add`, `git commit`, or `git push`; final Git publishing is owned by `workflow.py final-commit`.
 ```
 
-- [ ] **Step 3: Update finish-agent success action table if needed**
+Do not define finish-agent branch decision or terminal ownership rules in this section; reference the finish lifecycle spec for those rules.
 
-Where the table says `finish-agent success -> complete_phase, then advance`, extend the downstream action to include final tail commit after done.
+- [ ] **Step 3: Update terminal success action table if needed**
+
+Where the table says a run reaches done after finish/hook completion, extend the downstream action to include final tail commit after done.
 
 Do not imply final-commit runs before hooks are completed.
 
@@ -369,68 +403,7 @@ python3 -m pytest tests/test_wrapper_contracts.py -k "dev_orchestrator" -v
 
 ---
 
-## Task 4: Update Finish-Agent Boundary Contract
-
-**Files:**
-- Modify: `agents/finish-agent.md`
-- Modify if prompt tests live here: `tests/test_wrapper_contracts.py`
-
-**Purpose:** Prevent finish-agent from claiming final commit ownership.
-
-- [ ] **Step 1: Add failing prompt-contract test**
-
-Add a test that asserts canonical `agents/finish-agent.md` contains:
-
-```text
-Final Commit Boundary
-final workflow artifact commit is owned by `workflow.py final-commit`
-finish-agent must not claim that its commit is the final workflow commit
-pre-final
-```
-
-Run focused test and confirm failure before prompt update.
-
-- [ ] **Step 2: Update frontmatter description**
-
-Change wording that currently says finish-agent performs final-looking post-cleanup commit/push.
-
-Target meaning:
-
-```text
-Performs archive and cleanup work. May prepare pre-final workflow artifacts. The final workflow artifact commit/push is owned by workflow.py final-commit after the run reaches done.
-```
-
-- [ ] **Step 3: Add Final Commit Boundary section**
-
-Add a section near Write Boundary or Flow Type Handling:
-
-```md
-## Final Commit Boundary
-
-`finish-agent` is not the final writer in the governed workflow. After it returns, `dev-orchestrator` and `workflow.py` may still record after-dispatch evidence, complete phases/hooks, advance the run, and move active run artifacts into history.
-
-Therefore:
-- finish-agent must not claim that its commit is the final workflow commit;
-- any finish-agent commit/push evidence is pre-final unless the workflow has already reached done and `workflow.py final-commit` has run;
-- the final workflow artifact commit is owned by `workflow.py final-commit` after dev-orchestrator advances the captured run to done;
-- finish-agent should report generated artifacts and dirty-tree evidence, but closure proof belongs to the final tail commit result.
-```
-
-- [ ] **Step 4: Adjust output evidence if needed**
-
-If the finish-agent JSON example still has `post_hook_dirty_tree: false`, keep it only as finish-agent-local evidence. Add text clarifying it is not a guarantee of final repository cleanliness after dev-orchestrator/runtime writes.
-
-- [ ] **Step 5: Run prompt-contract tests**
-
-Run:
-
-```bash
-python3 -m pytest tests/test_wrapper_contracts.py -k "finish_agent" -v
-```
-
----
-
-## Task 5: Sync Runtime Templates and Derived Agents
+## Task 4: Sync Runtime Templates and Derived Dev-Orchestrator
 
 **Files:**
 - Modify: `skills/sdlc-project-bootstrap/templates/workflow/workflow.py`
@@ -440,11 +413,8 @@ python3 -m pytest tests/test_wrapper_contracts.py -k "finish_agent" -v
 - Modify: `.opencode/agents/dev-orchestrator.md`
 - Modify: `.claude/agents/dev-orchestrator.md`
 - Modify: `.cursor/agents/dev-orchestrator.md`
-- Modify: `.opencode/agents/finish-agent.md`
-- Modify: `.claude/agents/finish-agent.md`
-- Modify: `.cursor/agents/finish-agent.md`
 
-**Purpose:** Keep canonical sources and generated/activated copies aligned.
+**Purpose:** Keep canonical sources and generated/activated copies aligned without touching finish-agent prompt copies for this plan.
 
 - [ ] **Step 1: Inspect existing sync commands**
 
@@ -470,18 +440,17 @@ skills/sdlc-project-bootstrap/templates/workflow/workflow.py
 .cursor/skills/sdlc-project-bootstrap/templates/workflow/workflow.py
 ```
 
-- [ ] **Step 3: Sync agent prompts**
+- [ ] **Step 3: Sync dev-orchestrator prompt**
 
-Propagate canonical agent prompt changes to:
+Propagate canonical dev-orchestrator prompt changes to:
 
 ```text
 .opencode/agents/dev-orchestrator.md
 .claude/agents/dev-orchestrator.md
 .cursor/agents/dev-orchestrator.md
-.opencode/agents/finish-agent.md
-.claude/agents/finish-agent.md
-.cursor/agents/finish-agent.md
 ```
+
+Do not edit or sync finish-agent prompt copies as part of this plan unless another already-approved spec requires it in the same work package.
 
 - [ ] **Step 4: Run derived artifact check**
 
@@ -500,7 +469,7 @@ python3 scripts/sync_derived_artifacts.py --check
 
 ---
 
-## Task 6: Full Verification
+## Task 5: Full Verification
 
 **Files:**
 - Read/modify as needed based on test failures.
@@ -553,7 +522,7 @@ Expected:
 
 ---
 
-## Task 7: Handoff and Acceptance Evidence
+## Task 6: Handoff and Acceptance Evidence
 
 **Files:**
 - Write workflow handoff if running inside governed workflow.
@@ -565,7 +534,7 @@ Expected:
 Report:
 
 - workflow runtime files changed;
-- agent prompt files changed;
+- dev-orchestrator prompt files changed;
 - derived/template files changed;
 - tests changed.
 
@@ -575,7 +544,7 @@ Include:
 
 - command syntax;
 - precondition checks;
-- allowlist paths;
+- allowlist paths, including `docs/superpowers/archive/`;
 - residual dirty path handling;
 - push semantics.
 
@@ -598,10 +567,10 @@ Acceptance checklist:
 - `workflow.py final-commit` exists and is parser-wired.
 - It rejects missing/not-done history runs.
 - It commits allowlisted workflow governance files after done.
+- It includes `docs/superpowers/archive/` in the governance allowlist.
 - It never uses `git add -A`.
 - It leaves unrelated dirty files unstaged and reports `residual_dirty_paths`.
 - It pushes only after a successful commit.
 - `dev-orchestrator` captures run id before done and calls final-commit after runtime closure.
-- `finish-agent` explicitly treats its commit evidence as pre-final.
-- Derived agent/template files are synced.
+- Derived workflow template and dev-orchestrator files are synced.
 - Focused and full tests pass.
