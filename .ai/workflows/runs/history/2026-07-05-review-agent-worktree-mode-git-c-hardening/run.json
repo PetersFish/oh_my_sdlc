@@ -1,0 +1,152 @@
+{
+  "version": 1,
+  "run_id": "2026-07-05-review-agent-worktree-mode-git-c-hardening",
+  "workflow": "sdlc-main",
+  "flow_type": "lightweight-flow",
+  "status": "done",
+  "current_phase": "done",
+  "primary_subject": {
+    "type": "spec_change",
+    "id": "review-agent-worktree-mode-git-c-hardening"
+  },
+  "context": {
+    "change_id": "review-agent-worktree-mode-git-c-hardening"
+  },
+  "phase_readiness": {
+    "phase": "done",
+    "ready": true,
+    "missing_required_inputs": []
+  },
+  "pending_hooks": [],
+  "completed_hooks": [
+    "roadmap_apply_start_if_ready",
+    "memory_sync",
+    "roadmap_done_if_relevant"
+  ],
+  "completed_phases": [
+    "apply_change",
+    "archive_change",
+    "post_archive_actions"
+  ],
+  "gates": {},
+  "evidence": {
+    "spec_status": {
+      "classification": "missing",
+      "source": null
+    },
+    "lightweight_flow_confirmed": true,
+    "agent_phase": {
+      "agent_phase": "archive_change",
+      "agent": "finish-agent",
+      "flow_type": "lightweight-flow",
+      "dispatched_at": "2026-07-05T20:08:18.732133"
+    },
+    "agent_result": {
+      "agent": "roadmap-agent",
+      "status": "success",
+      "phase": "apply_change",
+      "slice_id": "default",
+      "flow_type": "lightweight-flow",
+      "evidence": {
+        "roadmap_hook_executed": "roadmap_apply_start_if_ready",
+        "roadmap_item_id": null,
+        "item_status": "no_linked_item",
+        "transition_applied": false,
+        "reason": "No roadmap_item_id in run context and no roadmap item links to change_id review-agent-worktree-mode-git-c-hardening. Scanned all areas (workflow.sdlc-orchestrator, workflow.ai-evalops, skill.sdlc-roadmap) \u2014 19 items total, none match."
+      },
+      "blockers": [],
+      "recommended_next_action": "complete_hook_via_workflow",
+      "recorded_at": "2026-07-05T20:02:54.463744"
+    },
+    "agent_results": {
+      "default": {
+        "implement-agent": {
+          "agent": "implement-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "tasks_complete": true,
+            "tdd_passed": true,
+            "focused_tests": [
+              {
+                "command": "python3 -m pytest tests/test_wrapper_contracts.py -k \"WorktreeGitC or WorktreeModeLiveChange\" -v",
+                "result": "pass"
+              },
+              {
+                "command": "python3 -m pytest tests/test_wrapper_contracts.py -v",
+                "result": "pass"
+              },
+              {
+                "command": "python3 -m pytest tests/test_agent_config_lib.py -v",
+                "result": "pass"
+              },
+              {
+                "command": "python3 scripts/sync_derived_artifacts.py --check",
+                "result": "pass"
+              },
+              {
+                "command": "python3 scripts/check_plan_checkboxes.py docs/superpowers/plans/2026-07-05-review-agent-worktree-mode-git-c-hardening.md",
+                "result": "pass"
+              }
+            ]
+          },
+          "blockers": [],
+          "recommended_next_action": "dispatch_review_agent",
+          "recorded_at": "2026-07-05T19:56:12.694884"
+        },
+        "review-agent": {
+          "agent": "review-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "tasks_complete": true,
+            "tdd_passed": true,
+            "eval_passed_or_human_decision_recorded": true,
+            "review_complete": true,
+            "verification_passed": true,
+            "review_decision": "accepted",
+            "criteria_satisfied": "tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded"
+          },
+          "blockers": [],
+          "recommended_next_action": "complete_phase",
+          "recorded_at": "2026-07-05T20:00:18.600546"
+        },
+        "roadmap-agent": {
+          "agent": "roadmap-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "roadmap_hook_executed": "roadmap_apply_start_if_ready",
+            "roadmap_item_id": null,
+            "item_status": "no_linked_item",
+            "transition_applied": false,
+            "reason": "No roadmap_item_id in run context and no roadmap item links to change_id review-agent-worktree-mode-git-c-hardening. Scanned all areas (workflow.sdlc-orchestrator, workflow.ai-evalops, skill.sdlc-roadmap) \u2014 19 items total, none match."
+          },
+          "blockers": [],
+          "recommended_next_action": "complete_hook_via_workflow",
+          "recorded_at": "2026-07-05T20:02:54.463744"
+        }
+      }
+    },
+    "tasks_complete": true,
+    "tdd_passed": true,
+    "eval_passed_or_human_decision_recorded": true,
+    "roadmap_hook_resolution": "no_linked_item",
+    "archive_path_exists": true,
+    "pre_hook_commit_id": "c42b21151f443a5271c3bc18799d14c8f18e33c2",
+    "memory_sync_resolution": "synced",
+    "memory_sync_reason": "Agents module updated with new commit c42b211, session, and update note for review-agent worktree-mode git-C hardening. Sync history written at 20260705-121348.",
+    "roadmap_link": {
+      "count": 0,
+      "items": []
+    }
+  },
+  "block": null,
+  "updated_at": "2026-07-05T20:14:21.015942"
+}

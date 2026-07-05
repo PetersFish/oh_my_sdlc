@@ -10,10 +10,10 @@ summary: >-
 parent_id: root
 sync_status: synced
 evidence_mode: commit
-linked_commits: ["ab70b4f087524f9a1344fd561f8ae4c5b2653c09", "171d4a8c6e20f59618c4b0c91d5fb1c3e5eb7967"]
+linked_commits: ["ab70b4f087524f9a1344fd561f8ae4c5b2653c09", "171d4a8c6e20f59618c4b0c91d5fb1c3e5eb7967", "c42b21151f443a5271c3bc18799d14c8f18e33c2"]
 linked_specs: ["2026-07-05-review-agent-live-diff-and-implement-verification-contract"]
-linked_sessions: ["20260629-202700", "20260705-lifecycle-hardening-and-derived-sync", "2026-07-05-review-agent-live-diff-and-implement-verification-contract"]
-updated_at: 2026-07-05T12:10:00Z
+linked_sessions: ["20260629-202700", "20260705-lifecycle-hardening-and-derived-sync", "2026-07-05-review-agent-live-diff-and-implement-verification-contract", "2026-07-05-review-agent-worktree-mode-git-c-hardening"]
+updated_at: 2026-07-05T20:12:00Z
 confidence: high
 tags: [agents, prompts, sdlc, subagents, roadmap]
 owned_paths: [agents/]
@@ -69,3 +69,4 @@ drift during subagent dispatch.
 - 2026-07-02: Added `roadmap-agent`; `dev-orchestrator` routes governed roadmap hooks through lifecycle dispatch; `implement-agent` must return `blocked` instead of `success + blockers` when verification or sync follow-ups remain.
 - 2026-07-05: Lifecycle hardening — added `safe_delete.py` allow-rules to implement-agent and finish-agent; moved derived-drift ownership to finish-agent with Derived Artifact Sync section; implement-agent no longer treats distributed-copy drift as a default apply-change blocker; review-agent flags derived drift as a finish follow-up; permission-contract ordering locked via deny-first bash rules.
 - 2026-07-05: Review live diff and verification contract — implement-agent now required to deliver changed_files, worktree_path, diff_commands, verification_commands in success output; dev-orchestrator forwards implement-agent change-set and verification evidence to review-agent dispatch; review-agent establishes live Git change set before CodeGraph, inspects implement-agent verification evidence, only re-runs tests under explicit exception conditions; added 33 prompt-contract tests for new protocols.
+- 2026-07-05: Review-agent worktree-mode Git-C hardening — added 7 `git -C * <subcmd>` read-only bash allow rules (status, diff, log, ls-files, check-ignore, rev-parse, branch); added Worktree-Mode Live Change Review Protocol section requiring explicit worktree path as source of truth, `git -C <worktree_path>` for live inspection, no shell cwd dependency, and blockers for missing/invalid worktree context; added 10 static permission+protocol tests; plain Git commands preserved for main-checkout mode.
