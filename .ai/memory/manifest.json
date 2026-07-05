@@ -5,14 +5,14 @@
   "git": {
     "available": true,
     "has_commits": true,
-    "head": "8c986f1e72dbebb35ba0e93f1251a424f06231e0",
-    "last_synced_commit": "8c986f1e72dbebb35ba0e93f1251a424f06231e0",
-    "worktree_state": "dirty"
+    "head": "a14deecc9ed54eb73f0b0a05565e07b599e021c7",
+    "last_synced_commit": "a14deecc9ed54eb73f0b0a05565e07b599e021c7",
+    "worktree_state": "clean"
   },
   "pending_snapshots": [],
   "last_sync": {
-    "timestamp": "2026-07-05T05:13:48.096315Z",
-    "commit": "8c986f1e72dbebb35ba0e93f1251a424f06231e0",
-    "snapshot_id": "20260705-review-agent-live-diff-and-implement-verification-contract-delta"
+    "timestamp": "2026-07-05T07:53:08.551321Z",
+    "commit": "a14deecc9ed54eb73f0b0a05565e07b599e021c7",
+    "snapshot_id": ""
   }
 }

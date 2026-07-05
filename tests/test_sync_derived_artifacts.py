@@ -168,5 +168,334 @@ class TestSyncDerivedArtifacts(unittest.TestCase):
         self.assertIn("status", report)
 
 
+class TestIncrementalSync(unittest.TestCase):
+    """Changed-file aware incremental check/fix behavior."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _capture_calls(self):
+        calls = []
+
+        def fake_run(args, capture_output, text):
+            calls.append(args)
+            return CompletedProcess(args, 0, "OK", "")
+
+        return calls, fake_run
+
+    def test_incremental_fix_docs_only_runs_no_suites(self):
+        calls, fake_run = self._capture_calls()
+        with mock.patch.object(subprocess, "run", fake_run):
+            mod = _import_module()
+            rc, report = mod.run_aggregate(
+                self.tmp, mode="fix", json_output=True,
+                changed_files=["docs/superpowers/specs/example.md"],
+                incremental=True,
+            )
+        self.assertEqual(rc, 0)
+        self.assertEqual(calls, [], "no subprocess commands should run for docs-only changes")
+        self.assertEqual(report["scope"], "skipped")
+        self.assertEqual(report["affected"]["skills"], [])
+        self.assertFalse(report["affected"]["agents"])
+        self.assertFalse(report["affected"]["workflows"])
+
+    def test_incremental_check_docs_only_runs_no_suites(self):
+        calls, fake_run = self._capture_calls()
+        with mock.patch.object(subprocess, "run", fake_run):
+            mod = _import_module()
+            rc, report = mod.run_aggregate(
+                self.tmp, mode="check", json_output=True,
+                changed_files=["docs/superpowers/specs/example.md"],
+                incremental=True,
+            )
+        self.assertEqual(rc, 0)
+        self.assertEqual(calls, [])
+        self.assertEqual(report["scope"], "skipped")
+        # No workflow, agent, or skill checks
+        self.assertFalse(any("sync_templates.py" in " ".join(c) for c in calls))
+        self.assertFalse(any("setup_agents.py" in " ".join(c) for c in calls))
+        self.assertFalse(any("check_skill_distribution.py" in " ".join(c) for c in calls))
+
+    def test_incremental_fix_single_skill_installs_only_that_skill(self):
+        write_file(self.tmp, "skills/demo-skill/SKILL.md", "# demo\n")
+        write_file(self.tmp, "skills/other-skill/SKILL.md", "# other\n")
+        calls, fake_run = self._capture_calls()
+        with mock.patch.object(subprocess, "run", fake_run):
+            mod = _import_module()
+            rc, _ = mod.run_aggregate(
+                self.tmp, mode="fix", json_output=False,
+                changed_files=["skills/demo-skill/SKILL.md"],
+                incremental=True,
+            )
+        self.assertEqual(rc, 0)
+        demo_install_cmds = [
+            cmd for cmd in calls
+            if "install_skill.py" in " ".join(cmd) and "demo-skill" in " ".join(cmd)
+        ]
+        other_install_cmds = [
+            cmd for cmd in calls
+            if "install_skill.py" in " ".join(cmd) and "other-skill" in " ".join(cmd)
+        ]
+        self.assertEqual(len(demo_install_cmds), 3,
+                         f"expected exactly 3 install_skill.py commands for demo-skill, got {demo_install_cmds}")
+        self.assertEqual(other_install_cmds, [], "other-skill must not be installed")
+        self.assertFalse(any("setup_agents.py" in " ".join(cmd) for cmd in calls),
+                         "agent setup must not run for skill-only changes")
+        self.assertFalse(any("sync_templates.py" in " ".join(cmd) for cmd in calls),
+                         "workflow sync must not run for skill-only changes")
+
+    def test_incremental_fix_multi_skill_installs_only_affected_skills(self):
+        write_file(self.tmp, "skills/demo-skill/SKILL.md", "# demo\n")
+        write_file(self.tmp, "skills/other-skill/SKILL.md", "# other\n")
+        calls, fake_run = self._capture_calls()
+        with mock.patch.object(subprocess, "run", fake_run):
+            mod = _import_module()
+            rc, _ = mod.run_aggregate(
+                self.tmp, mode="fix", json_output=False,
+                changed_files=[
+                    "skills/demo-skill/SKILL.md",
+                    "skills/other-skill/templates/foo.md",
+                ],
+                incremental=True,
+            )
+        self.assertEqual(rc, 0)
+        for skill in ("demo-skill", "other-skill"):
+            skill_cmds = [
+                cmd for cmd in calls
+                if "install_skill.py" in " ".join(cmd) and f"--skill-name" in " ".join(cmd)
+                and skill in " ".join(cmd)
+            ]
+            self.assertEqual(len(skill_cmds), 3,
+                             f"expected 3 install commands for {skill}, got {skill_cmds}")
+        # No unrelated skill
+        for cmd in calls:
+            if "install_skill.py" in " ".join(cmd):
+                # Ensure the skill-name arg is one of the affected ones
+                idx = cmd.index("--skill-name")
+                self.assertIn(cmd[idx + 1], ("demo-skill", "other-skill"))
+
+    def test_incremental_check_single_skill_passes_skills_filter(self):
+        write_file(self.tmp, "skills/demo-skill/SKILL.md", "# demo\n")
+        calls, fake_run = self._capture_calls()
+        with mock.patch.object(subprocess, "run", fake_run):
+            mod = _import_module()
+            rc, _ = mod.run_aggregate(
+                self.tmp, mode="check", json_output=False,
+                changed_files=["skills/demo-skill/scripts/tool.py"],
+                incremental=True,
+            )
+        self.assertEqual(rc, 0)
+        skill_check_cmds = [
+            cmd for cmd in calls if "check_skill_distribution.py" in " ".join(cmd)
+        ]
+        self.assertEqual(len(skill_check_cmds), 1,
+                         f"expected exactly one skill distribution check, got {skill_check_cmds}")
+        self.assertIn("--skills", skill_check_cmds[0])
+        self.assertIn("demo-skill", skill_check_cmds[0])
+        self.assertFalse(any("setup_agents.py" in " ".join(cmd) for cmd in calls))
+        self.assertFalse(any("sync_templates.py" in " ".join(cmd) for cmd in calls))
+
+    def test_incremental_fix_agent_only_runs_agent_setup(self):
+        calls, fake_run = self._capture_calls()
+        with mock.patch.object(subprocess, "run", fake_run):
+            mod = _import_module()
+            rc, _ = mod.run_aggregate(
+                self.tmp, mode="fix", json_output=False,
+                changed_files=["agents/implement-agent.md"],
+                incremental=True,
+            )
+        self.assertEqual(rc, 0)
+        force_cmds = [
+            cmd for cmd in calls
+            if "setup_agents.py" in " ".join(cmd) and "--force" in cmd
+        ]
+        self.assertEqual(len(force_cmds), 3,
+                         f"expected 3 setup_agents.py --force commands, got {force_cmds}")
+        self.assertFalse(any("install_skill.py" in " ".join(cmd) for cmd in calls))
+        self.assertFalse(any("sync_templates.py" in " ".join(cmd) for cmd in calls))
+
+    def test_incremental_check_agent_only_runs_agent_checks(self):
+        calls, fake_run = self._capture_calls()
+        with mock.patch.object(subprocess, "run", fake_run):
+            mod = _import_module()
+            rc, _ = mod.run_aggregate(
+                self.tmp, mode="check", json_output=False,
+                changed_files=["agents/config/model-profiles.yaml"],
+                incremental=True,
+            )
+        self.assertEqual(rc, 0)
+        check_cmds = [
+            cmd for cmd in calls
+            if "setup_agents.py" in " ".join(cmd) and "--check" in cmd
+        ]
+        self.assertEqual(len(check_cmds), 3,
+                         f"expected 3 setup_agents.py --check commands, got {check_cmds}")
+        self.assertFalse(any("check_skill_distribution.py" in " ".join(cmd) for cmd in calls))
+        self.assertFalse(any("sync_templates.py" in " ".join(cmd) for cmd in calls))
+
+    def test_incremental_fix_workflow_only_runs_workflow_sync(self):
+        calls, fake_run = self._capture_calls()
+        with mock.patch.object(subprocess, "run", fake_run):
+            mod = _import_module()
+            rc, _ = mod.run_aggregate(
+                self.tmp, mode="fix", json_output=False,
+                changed_files=[".ai/workflows/scripts/workflow.py"],
+                incremental=True,
+            )
+        self.assertEqual(rc, 0)
+        sync_cmds = [
+            cmd for cmd in calls
+            if "sync_templates.py" in " ".join(cmd) and "--root" in " ".join(cmd)
+            and "--check" not in cmd and "--distribute" not in cmd
+        ]
+        dist_cmds = [cmd for cmd in calls if "--distribute" in cmd]
+        self.assertEqual(len(sync_cmds), 1, f"expected one workflow sync command, got {sync_cmds}")
+        self.assertEqual(len(dist_cmds), 1, f"expected one workflow distribute command, got {dist_cmds}")
+        self.assertFalse(any("setup_agents.py" in " ".join(cmd) for cmd in calls))
+        self.assertFalse(any("install_skill.py" in " ".join(cmd) for cmd in calls))
+
+    def test_incremental_check_workflow_only_runs_workflow_checks(self):
+        calls, fake_run = self._capture_calls()
+        with mock.patch.object(subprocess, "run", fake_run):
+            mod = _import_module()
+            rc, _ = mod.run_aggregate(
+                self.tmp, mode="check", json_output=False,
+                changed_files=[".ai/workflows/definitions/sdlc-main.yaml"],
+                incremental=True,
+            )
+        self.assertEqual(rc, 0)
+        check_cmds = [cmd for cmd in calls if "sync_templates.py" in " ".join(cmd) and "--check" in cmd and "--check-distributed" not in cmd]
+        check_dist_cmds = [cmd for cmd in calls if "--check-distributed" in cmd]
+        self.assertEqual(len(check_cmds), 1, f"expected one --check command, got {check_cmds}")
+        self.assertEqual(len(check_dist_cmds), 1, f"expected one --check-distributed command, got {check_dist_cmds}")
+        self.assertFalse(any("setup_agents.py" in " ".join(cmd) for cmd in calls))
+        self.assertFalse(any("check_skill_distribution.py" in " ".join(cmd) for cmd in calls))
+
+    def test_incremental_fix_sync_rule_change_falls_back_to_full(self):
+        calls, fake_run = self._capture_calls()
+        with mock.patch.object(subprocess, "run", fake_run):
+            mod = _import_module()
+            rc, report = mod.run_aggregate(
+                self.tmp, mode="fix", json_output=True,
+                changed_files=["scripts/sync_derived_artifacts.py"],
+                incremental=True,
+            )
+        self.assertEqual(rc, 0)
+        self.assertEqual(report["scope"], "full")
+        # Full-mode command categories present: workflow sync, distribute, agent force, skill install
+        self.assertTrue(any("sync_templates.py" in " ".join(cmd) and "--root" in " ".join(cmd)
+                            and "--check" not in cmd and "--distribute" not in cmd for cmd in calls))
+        self.assertTrue(any("--distribute" in cmd for cmd in calls))
+        self.assertTrue(any("setup_agents.py" in " ".join(cmd) and "--force" in cmd for cmd in calls))
+
+    def test_changed_files_from_git_collects_tracked_and_untracked(self):
+        mod = _import_module()
+        git_diff_output = "docs/foo.md\nskills/demo-skill/SKILL.md\n"
+        git_lsfiles_output = "agents/new-agent.md\nskills/demo-skill/SKILL.md\n"
+
+        def fake_run(args, capture_output, text):
+            if "diff" in " ".join(args) and "--name-only" in args:
+                return CompletedProcess(args, 0, git_diff_output, "")
+            if "ls-files" in " ".join(args) and "--others" in args:
+                return CompletedProcess(args, 0, git_lsfiles_output, "")
+            return CompletedProcess(args, 0, "", "")
+
+        with mock.patch.object(subprocess, "run", fake_run):
+            changed = mod.discover_changed_files_from_git(self.tmp)
+        # Deduplicated and deterministic
+        self.assertEqual(changed, sorted(set(changed)))
+        self.assertIn("docs/foo.md", changed)
+        self.assertIn("skills/demo-skill/SKILL.md", changed)
+        self.assertIn("agents/new-agent.md", changed)
+        # Duplicate skill path appears only once
+        self.assertEqual(changed.count("skills/demo-skill/SKILL.md"), 1)
+
+    def test_changed_files_from_git_error_when_discovery_fails(self):
+        mod = _import_module()
+
+        def fake_run(args, capture_output, text):
+            return CompletedProcess(args, 1, "", "git error")
+
+        with mock.patch.object(subprocess, "run", fake_run):
+            with self.assertRaises(Exception):
+                mod.discover_changed_files_from_git(self.tmp)
+
+    def test_incremental_fix_deleted_skill_returns_error_no_install(self):
+        """Task 3 Step 3: deleted/renamed skill directory must not blindly call
+        install_skill.py. The preflight must return a non-zero report listing
+        the missing skill name and must not run any install_skill.py subprocess
+        for that missing skill."""
+        # No skills/deleted-skill/ directory exists on disk.
+        calls, fake_run = self._capture_calls()
+        with mock.patch.object(subprocess, "run", fake_run):
+            mod = _import_module()
+            rc, report = mod.run_aggregate(
+                self.tmp, mode="fix", json_output=True,
+                changed_files=["skills/deleted-skill/SKILL.md"],
+                incremental=True,
+            )
+        # Non-zero return: missing canonical skill is a blocked/error state.
+        self.assertNotEqual(rc, 0,
+                            "incremental fix must not silently succeed for a "
+                            "deleted canonical skill directory")
+        # No install_skill.py subprocess calls for the missing skill.
+        install_cmds = [
+            cmd for cmd in calls
+            if "install_skill.py" in " ".join(cmd)
+            and "deleted-skill" in " ".join(cmd)
+        ]
+        self.assertEqual(install_cmds, [],
+                         f"expected no install_skill.py calls for missing "
+                         f"deleted-skill, got {install_cmds}")
+        # The missing skill name must appear in the JSON report.
+        self.assertIsNotNone(report, "JSON report must be emitted on error")
+        missing_skills = report.get("missing_skills", [])
+        self.assertIn("deleted-skill", missing_skills,
+                      f"deleted-skill must be listed in report.missing_skills, "
+                      f"got report={report}")
+
+    def test_incremental_fix_mixed_present_and_missing_skills_installs_only_present(self):
+        """When a change set contains both a present and a missing skill,
+        the present skill is installed normally and the missing skill is
+        reported without any install calls for it."""
+        write_file(self.tmp, "skills/present-skill/SKILL.md", "# present\n")
+        calls, fake_run = self._capture_calls()
+        with mock.patch.object(subprocess, "run", fake_run):
+            mod = _import_module()
+            rc, report = mod.run_aggregate(
+                self.tmp, mode="fix", json_output=True,
+                changed_files=[
+                    "skills/present-skill/SKILL.md",
+                    "skills/gone-skill/SKILL.md",
+                ],
+                incremental=True,
+            )
+        # Missing skill detected -> non-zero.
+        self.assertNotEqual(rc, 0)
+        # present-skill install commands exist (3 targets).
+        present_cmds = [
+            cmd for cmd in calls
+            if "install_skill.py" in " ".join(cmd)
+            and "present-skill" in " ".join(cmd)
+        ]
+        self.assertEqual(len(present_cmds), 3,
+                         f"expected 3 install commands for present-skill, "
+                         f"got {present_cmds}")
+        # gone-skill install commands must not exist.
+        gone_cmds = [
+            cmd for cmd in calls
+            if "install_skill.py" in " ".join(cmd)
+            and "gone-skill" in " ".join(cmd)
+        ]
+        self.assertEqual(gone_cmds, [],
+                         f"expected no install commands for missing gone-skill, "
+                         f"got {gone_cmds}")
+        self.assertIn("gone-skill", report.get("missing_skills", []))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
