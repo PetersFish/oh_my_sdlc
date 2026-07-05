@@ -18,6 +18,7 @@ This spec defines the finish-stage contract. It depends on the runtime context a
 - Define memory sync target ref rules for each branch finish outcome.
 - Ensure final agent evidence is recorded before active run is moved to history.
 - Make lightweight-flow archive evidence semantically accurate.
+- For completed lightweight-flow runs, archive the corresponding Superpowers spec and plan files into `docs/superpowers/archive/`.
 - Preserve main-checkout/non-worktree compatibility.
 
 **Non-Goals:**
@@ -27,6 +28,7 @@ This spec defines the finish-stage contract. It depends on the runtime context a
 - Do not redesign the whole workflow phase graph unless needed for finish gating.
 - Do not automate remote PR creation unless the user explicitly selects `create_pr` and required credentials/tooling exist.
 - Do not silently merge implementation commits into main.
+- Do not define the final workflow artifact Git commit; `workflow-final-tail-commit` owns the final commit boundary after the run reaches done.
 
 ## Covered Optimization Points
 
@@ -37,7 +39,7 @@ This spec covers or partially covers these optimization points from the run anal
 - **6. Finish-agent final evidence missing from run.json** — require evidence-before-finalize invariant with runtime support.
 - **7. Main and worktree commit responsibilities are confused** — define implementation vs workflow commit ownership.
 - **8. Memory sync commit target unclear** — define memory sync target by branch finish action.
-- **13. Lightweight-flow archive evidence naming misleading** — replace `archive_path_exists: true` with semantic fields.
+- **13. Lightweight-flow archive evidence naming misleading** — replace `archive_path_exists: true` with semantic archive evidence and archive Superpowers artifacts.
 - **14. Finish-agent prompt and skill inconsistent** — prompt must require blocker when branch decision is missing.
 - **17. Finish-agent should split branch decision and archive execution** — direct design.
 - **18. Runtime should prevent finish-agent from terminal finalize** — direct design.
@@ -176,6 +178,7 @@ workflow commits
   - run history
   - memory sync artifacts
   - roadmap lifecycle artifacts
+  - Superpowers spec/plan archive moves
   - control-plane archive/finalization records
   - live on main/control checkout
 ```
@@ -283,19 +286,69 @@ with semantic fields:
 
 For spec-flow, `archive_artifact_path` should point to the OpenSpec archive path when applicable.
 
+For lightweight-flow, `archive_artifact_path` should be `null` when there is no single archive artifact, and `archived_design_artifact_paths` must list the Superpowers spec/plan files moved into `docs/superpowers/archive/`.
+
 Workflow phase criteria may need to support either legacy `archive_path_exists` or new semantic archive criteria during migration.
 
-### Decision 11: Finish-Agent Prompt Must Match Skill Behavior
+### Decision 11: Lightweight-Flow Archives Superpowers Spec and Plan Files
+
+When a lightweight-flow run is completed, finish must archive the corresponding Superpowers design artifacts by moving them from active design directories into `docs/superpowers/archive/`.
+
+Source directories:
+
+```text
+docs/superpowers/specs/
+docs/superpowers/plans/
+```
+
+Destination directory:
+
+```text
+docs/superpowers/archive/
+```
+
+The archive operation must include the matching spec file and the matching plan file when both exist. Matching should use the runtime design artifact contract first:
+
+1. `primary_design_path`.
+2. `design_artifact_paths[]` with `kind=spec` or `kind=plan`.
+3. deterministic slug/date matching only as a fallback.
+
+The operation must preserve filenames unless a collision exists. If a destination filename already exists, finish must avoid overwriting by using a deterministic suffix or by returning a blocker that asks for manual resolution.
+
+The finish result must record:
+
+```json
+{
+  "archive_action_completed": true,
+  "archive_not_required_reason": "lightweight-flow",
+  "archived_design_artifact_paths": [
+    "docs/superpowers/archive/2026-07-05-example-design.md",
+    "docs/superpowers/archive/2026-07-05-example.md"
+  ],
+  "source_design_artifact_paths": [
+    "docs/superpowers/specs/2026-07-05-example-design.md",
+    "docs/superpowers/plans/2026-07-05-example.md"
+  ]
+}
+```
+
+If no matching Superpowers artifacts are found, finish must not silently claim archive success. It must either:
+
+- record `archive_action_completed: false` with a concrete `archive_not_required_reason` when the flow truly has no Superpowers artifacts; or
+- return a blocker such as `missing_lightweight_archive_artifacts` when artifacts were expected but unavailable.
+
+### Decision 12: Finish-Agent Prompt Must Match Skill Behavior
 
 The finish-agent prompt must hard-require:
 
 - If branch decision is required and missing, return blocker `missing_branch_finish_decision`.
 - Do not choose branch outcome silently.
 - Do not finalize workflow run state.
+- For lightweight-flow completion, archive matching Superpowers spec/plan files into `docs/superpowers/archive/` and record source/destination paths.
 - Return final JSON evidence and handoff artifact path.
 - Record which checkout/ref was used for each operation.
 
-### Decision 12: Dev-Orchestrator Owns User Branch Decision Collection
+### Decision 13: Dev-Orchestrator Owns User Branch Decision Collection
 
 When finish blocks with `missing_branch_finish_decision`, `dev-orchestrator` must ask the user to choose one of:
 
@@ -326,6 +379,7 @@ finish-agent checks branch_finish_decision
   |
   |- present -> execute selected branch finish action
                  archive/lightweight finish
+                 for lightweight-flow: move matching spec/plan files to docs/superpowers/archive/
                  return final evidence
   v
 after-dispatch records finish-agent evidence
@@ -335,19 +389,23 @@ dev-orchestrator/runtime completes phase/hooks
   |
   v
 terminal finalize moves active run to history only after evidence is recorded
+  |
+  v
+workflow.py final-commit commits final governance artifacts as defined by workflow-final-tail-commit
 ```
 
 ## Affected Files
 
 | File | Change |
 |---|---|
-| `.ai/workflows/scripts/workflow.py` | Gate support, final evidence before finalize, semantic archive evidence migration as needed. |
+| `.ai/workflows/scripts/workflow.py` | Gate support, final evidence before finalize, semantic archive evidence migration, lightweight-flow Superpowers artifact archive support as needed. |
 | `skills/sdlc-project-bootstrap/templates/workflow/workflow.py` | Keep runtime template in sync. |
 | `skills/sdlc-project-bootstrap/templates/workflow/sdlc-main.yaml` | Archive evidence criteria update or backward-compatible migration. |
+| `docs/superpowers/archive/` | Destination for archived lightweight-flow spec and plan files. |
 | `agents/dev-orchestrator.md` | Ask for branch finish decision, record it, and keep terminal ownership. |
-| `agents/finish-agent.md` | Require decision gate, forbid silent choice/finalize, return structured final evidence. |
+| `agents/finish-agent.md` | Require decision gate, archive lightweight-flow Superpowers artifacts, forbid silent choice/finalize, return structured final evidence. |
 | `.opencode/agents/*`, `.claude/agents/*`, `.cursor/agents/*` | Distributed copies generated from canonical agents. |
-| `tests/test_workflow.py` | Runtime tests for gate behavior, final evidence invariant, archive evidence migration. |
+| `tests/test_workflow.py` | Runtime tests for gate behavior, final evidence invariant, archive evidence migration, and lightweight-flow artifact archive moves. |
 | `tests/test_wrapper_contracts.py` | Prompt/permission contract tests for finish-agent and dev-orchestrator. |
 
 ## Acceptance Criteria
@@ -360,8 +418,11 @@ terminal finalize moves active run to history only after evidence is recorded
 - Completed history run retains `finish-agent` evidence in `agent_results`.
 - Implementation commits and workflow commits are described and recorded separately.
 - Memory sync records target ref and target commit according to branch decision.
-- Lightweight-flow uses `archive_action_completed`, `archive_artifact_path`, and `archive_not_required_reason` instead of misleading `archive_path_exists: true` for new runs.
+- Lightweight-flow uses `archive_action_completed`, `archive_artifact_path`, `archive_not_required_reason`, and `archived_design_artifact_paths` instead of misleading `archive_path_exists: true` for new runs.
+- Completed lightweight-flow runs move matching Superpowers spec and plan files from `docs/superpowers/specs/` and `docs/superpowers/plans/` into `docs/superpowers/archive/`.
+- Lightweight-flow archive evidence records both source and destination design artifact paths.
 - Existing legacy runs using `archive_path_exists` remain readable during migration.
+- Final workflow artifact commit after done remains owned by the `workflow-final-tail-commit` spec and is not redefined here.
 
 ## Risks / Trade-offs
 
@@ -372,3 +433,7 @@ terminal finalize moves active run to history only after evidence is recorded
 **Memory sync semantics may need more ref plumbing:** Required to avoid syncing feature and main implicitly or recording misleading commit targets.
 
 **Archive evidence migration may touch workflow criteria:** Use a backward-compatible transition so existing runs and tests do not break abruptly.
+
+**Superpowers artifact matching can be ambiguous:** Prefer `primary_design_path` and `design_artifact_paths[]` over filename inference. If multiple matches exist, block instead of guessing.
+
+**Archive moves are workflow commits, not implementation commits:** Moving spec/plan files into `docs/superpowers/archive/` should be treated as governance artifact cleanup and committed by the final workflow artifact commit boundary, not silently mixed into implementation branch semantics unless explicitly required by the chosen branch action.
