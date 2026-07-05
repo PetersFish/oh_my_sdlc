@@ -1,0 +1,148 @@
+{
+  "version": 1,
+  "run_id": "2026-07-05-roadmap-agent-primary-subject-gating",
+  "workflow": "sdlc-main",
+  "flow_type": "lightweight-flow",
+  "status": "done",
+  "current_phase": "done",
+  "primary_subject": {
+    "type": "spec_change",
+    "id": "roadmap-agent-primary-subject-gating"
+  },
+  "context": {
+    "change_id": "roadmap-agent-primary-subject-gating"
+  },
+  "phase_readiness": {
+    "phase": "done",
+    "ready": true,
+    "missing_required_inputs": []
+  },
+  "pending_hooks": [],
+  "completed_hooks": [
+    "memory_sync"
+  ],
+  "completed_phases": [
+    "apply_change",
+    "archive_change",
+    "post_archive_actions"
+  ],
+  "gates": {},
+  "evidence": {
+    "spec_status": {
+      "classification": "missing",
+      "source": null
+    },
+    "lightweight_flow_confirmed": true,
+    "agent_phase": {
+      "agent_phase": "post_archive_actions",
+      "agent": "finish-agent",
+      "flow_type": "lightweight-flow",
+      "dispatched_at": "2026-07-05T22:19:37.132706"
+    },
+    "agent_result": {
+      "agent": "finish-agent",
+      "status": "success",
+      "phase": "post_archive_actions",
+      "slice_id": "default",
+      "flow_type": "lightweight-flow",
+      "evidence": {
+        "archive_path_exists": "true",
+        "pending_hooks_empty": "true",
+        "pre_hook_commit_id": "4628303f404cddab2ededf1adfae61bdd18ff431",
+        "pre_hook_pushed": true,
+        "post_hook_commit_id": null,
+        "post_hook_pushed": false,
+        "post_hook_dirty_tree": false
+      },
+      "blockers": [],
+      "recommended_next_action": "complete_phase",
+      "recorded_at": "2026-07-05T22:22:20.717667"
+    },
+    "agent_results": {
+      "default": {
+        "implement-agent": {
+          "agent": "implement-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "tasks_complete": true,
+            "tdd_passed": true,
+            "focused_tests": [
+              {
+                "command": "python3 -m pytest tests/test_workflow.py -k \"RoadmapHookFiltering\" -v",
+                "result": "pass"
+              },
+              {
+                "command": "python3 -m pytest tests/test_workflow.py -k \"before_dispatch_blocks_roadmap_agent_for_spec_change or before_dispatch_allows_roadmap_agent_for_roadmap_item\" -v",
+                "result": "pass"
+              },
+              {
+                "command": "python3 -m pytest tests/test_workflow.py -k \"roadmap_agent or roadmap_hook or roadmap\" -v",
+                "result": "pass"
+              },
+              {
+                "command": "python3 -m pytest tests/test_wrapper_contracts.py -k \"primary_subject_roadmap_gating or maps_review_roadmap\" -v",
+                "result": "pass"
+              }
+            ]
+          },
+          "blockers": [],
+          "recommended_next_action": "dispatch_review_agent",
+          "recorded_at": "2026-07-05T21:07:13.688711"
+        },
+        "review-agent": {
+          "agent": "review-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "tasks_complete": true,
+            "tdd_passed": true,
+            "eval_passed_or_human_decision_recorded": true,
+            "review_complete": true,
+            "verification_passed": true,
+            "review_decision": "accepted",
+            "criteria_satisfied": "tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded"
+          },
+          "blockers": [],
+          "recommended_next_action": "complete_phase",
+          "recorded_at": "2026-07-05T21:12:50.935821"
+        },
+        "finish-agent": {
+          "agent": "finish-agent",
+          "status": "success",
+          "phase": "post_archive_actions",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "archive_path_exists": "true",
+            "pending_hooks_empty": "true",
+            "pre_hook_commit_id": "4628303f404cddab2ededf1adfae61bdd18ff431",
+            "pre_hook_pushed": true,
+            "post_hook_commit_id": null,
+            "post_hook_pushed": false,
+            "post_hook_dirty_tree": false
+          },
+          "blockers": [],
+          "recommended_next_action": "complete_phase",
+          "recorded_at": "2026-07-05T22:22:20.717667"
+        }
+      }
+    },
+    "tasks_complete": true,
+    "tdd_passed": true,
+    "eval_passed_or_human_decision_recorded": true,
+    "archive_path_exists": "true",
+    "memory_sync_resolution": "synced",
+    "memory_sync_reason": "",
+    "roadmap_link": {
+      "count": 0,
+      "items": []
+    }
+  },
+  "block": null,
+  "updated_at": "2026-07-05T22:22:28.458538"
+}
