@@ -17,12 +17,16 @@
     "ready": true,
     "missing_required_inputs": []
   },
-  "pending_hooks": [],
+  "pending_hooks": [
+    "memory_sync",
+    "roadmap_done_if_relevant"
+  ],
   "completed_hooks": [
     "roadmap_apply_start_if_ready"
   ],
   "completed_phases": [
-    "apply_change"
+    "apply_change",
+    "archive_change"
   ],
   "gates": {},
   "evidence": {
@@ -35,24 +39,26 @@
       "agent_phase": "archive_change",
       "agent": "finish-agent",
       "flow_type": "lightweight-flow",
-      "dispatched_at": "2026-07-05T12:01:42.933300"
+      "dispatched_at": "2026-07-05T13:10:00.923776"
     },
     "agent_result": {
-      "agent": "roadmap-agent",
+      "agent": "finish-agent",
       "status": "success",
-      "phase": "apply_change",
+      "phase": "archive_change",
       "slice_id": "default",
       "flow_type": "lightweight-flow",
       "evidence": {
-        "roadmap_hook_executed": "roadmap_apply_start_if_ready",
-        "roadmap_item_id": null,
-        "item_status": "no_linked_item",
-        "transition_applied": false,
-        "detail": "No roadmap item found for change_id review-agent-live-diff-and-implement-verification-contract. Searched .ai/roadmap/index.json (all items) and all area item files \u2014 zero matches. Lightweight-flow change with no linked roadmap item."
+        "archive_path_exists": "true",
+        "pending_hooks_empty": "true",
+        "pre_hook_commit_id": "171d4a8c6e20f59618c4b0c91d5fb1c3e5eb7967",
+        "pre_hook_pushed": true,
+        "post_hook_commit_id": "3d30eae3eec48e327524d1ebeaaefded3f4af538",
+        "post_hook_pushed": true,
+        "post_hook_dirty_tree": false
       },
       "blockers": [],
-      "recommended_next_action": "complete_hook_via_workflow",
-      "recorded_at": "2026-07-05T12:01:00.283547"
+      "recommended_next_action": "complete_phase",
+      "recorded_at": "2026-07-05T12:07:48.289136"
     },
     "agent_results": {
       "default": {
@@ -127,14 +133,34 @@
           "blockers": [],
           "recommended_next_action": "complete_hook_via_workflow",
           "recorded_at": "2026-07-05T12:01:00.283547"
+        },
+        "finish-agent": {
+          "agent": "finish-agent",
+          "status": "success",
+          "phase": "archive_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "archive_path_exists": "true",
+            "pending_hooks_empty": "true",
+            "pre_hook_commit_id": "171d4a8c6e20f59618c4b0c91d5fb1c3e5eb7967",
+            "pre_hook_pushed": true,
+            "post_hook_commit_id": "3d30eae3eec48e327524d1ebeaaefded3f4af538",
+            "post_hook_pushed": true,
+            "post_hook_dirty_tree": false
+          },
+          "blockers": [],
+          "recommended_next_action": "complete_phase",
+          "recorded_at": "2026-07-05T12:07:48.289136"
         }
       }
     },
     "tasks_complete": true,
     "tdd_passed": true,
     "eval_passed_or_human_decision_recorded": true,
-    "roadmap_hook_resolution": "no_linked_item"
+    "roadmap_hook_resolution": "no_linked_item",
+    "archive_path_exists": "true"
   },
   "block": null,
-  "updated_at": "2026-07-05T12:01:42.933534"
+  "updated_at": "2026-07-05T13:10:00.923861"
 }
