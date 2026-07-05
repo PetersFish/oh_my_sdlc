@@ -78,6 +78,13 @@ Workflow run context must distinguish two execution modes:
 }
 ```
 
+Field meaning:
+
+- `base_branch` is the human branch name used as the integration baseline, for example `main`.
+- `feature_branch` is the branch being implemented/reviewed.
+- `parent_ref` is the exact baseline commit/ref from which the implementation branch or worktree was created. Prefer a commit SHA when available. It is the stable reference for review diffs such as `git diff <parent_ref>...HEAD`.
+- Do not use `base_ref` in new contracts; it is ambiguous between branch name and commit. Use `base_branch` for the branch name and `parent_ref` for the exact baseline ref/commit.
+
 Allowed values:
 
 ```text
@@ -144,6 +151,7 @@ Runtime should provide or extend a command to record execution context, for exam
 python3 .ai/workflows/scripts/workflow.py --root . record-context --key execution_mode --value worktree
 python3 .ai/workflows/scripts/workflow.py --root . record-context --key worktree_path --value <path>
 python3 .ai/workflows/scripts/workflow.py --root . record-context --key feature_branch --value <branch>
+python3 .ai/workflows/scripts/workflow.py --root . record-context --key parent_ref --value <commit-or-ref>
 ```
 
 If an aggregate command is added, it must validate mode-specific requirements before writing.
@@ -181,7 +189,8 @@ This prevents correctly structured agent JSON from being persisted under `defaul
           "artifacts": {
             "worktree_path": "...",
             "repo_root": "...",
-            "base_ref": "...",
+            "base_branch": "main",
+            "parent_ref": "...",
             "feature_branch": "...",
             "changed_files": [],
             "diff_commands": [],
@@ -208,7 +217,8 @@ For implementation work packages, `implement-agent` should return these artifact
   "artifacts": {
     "worktree_path": "...",
     "repo_root": "...",
-    "base_ref": "...",
+    "base_branch": "main",
+    "parent_ref": "...",
     "feature_branch": "...",
     "changed_files": [],
     "diff_commands": [],
@@ -218,6 +228,8 @@ For implementation work packages, `implement-agent` should return these artifact
   }
 }
 ```
+
+`base_branch` is the branch name; `parent_ref` is the exact baseline commit/ref. New agent results must not use `base_ref`.
 
 `review-agent` should return:
 
@@ -248,19 +260,16 @@ For implementation work packages, `implement-agent` should return these artifact
 
 A workflow run must not be moved from active to history before the final lifecycle worker's result is persisted.
 
-Accepted implementation options:
+Use **Option B**: modify existing terminal commands so they refuse to finalize unless the latest required final lifecycle agent result has already been recorded.
 
-Option A — add a single atomic command:
+Required behavior:
 
-```bash
-workflow.py finalize-after-dispatch --agent finish-agent --value '<json-result>' --slice-id <slice-id>
-```
+- `workflow.py advance`, `workflow.py done`, or any existing terminal movement path that can move active runs to history must validate required final evidence before performing the move.
+- For `archive_change` / `post_archive_actions`, the required final lifecycle evidence must include the relevant `finish-agent` result in `evidence.agent_results[<slice_id>]["finish-agent"]`.
+- The validation must happen inside existing terminal commands instead of adding a new atomic `finalize-after-dispatch` command.
+- If required evidence is missing, terminal commands must return a structured blocker/error and leave the active run in place.
 
-This command records the agent result, validates terminal conditions, then moves active run to history.
-
-Option B — modify existing terminal commands so they refuse to finalize unless the latest required final agent result has been recorded.
-
-Either option must prevent a history `run.json` from reaching `status=done` while missing the relevant final `finish-agent` result for `archive_change` / `post_archive_actions`.
+This must prevent a history `run.json` from reaching `status=done` while missing the relevant final `finish-agent` result for `archive_change` / `post_archive_actions`.
 
 ### Decision 10: Backward Compatibility for Existing Runs
 
@@ -271,6 +280,7 @@ Migration behavior:
 - Missing `execution_mode` -> interpret as `main_checkout`.
 - Missing `agent_results[...][...].artifacts` -> treat as empty artifacts.
 - Existing `slice_id=default` records remain readable, but new records should use the corrected fallback order.
+- Legacy agent artifacts containing `base_ref` remain readable as historical evidence, but new outputs should use `base_branch` and `parent_ref`.
 
 ## Flow
 
@@ -289,23 +299,25 @@ after-dispatch
   |- reads result JSON
   |- resolves slice_id using fallback order
   |- persists evidence + artifacts
-  |- returns next workflow command
   v
-terminal movement only after final agent evidence is persisted
+terminal command
+  |- validates required final lifecycle evidence exists
+  |- refuses terminal movement if required evidence is missing
+  |- moves active run to history only after validation passes
 ```
 
 ## Affected Files
 
 | File | Change |
 |---|---|
-| `.ai/workflows/scripts/workflow.py` | Add execution context handling, runtime_context output, slice fallback, artifact persistence, final evidence invariant. |
+| `.ai/workflows/scripts/workflow.py` | Add execution context handling, runtime_context output, slice fallback, artifact persistence, and Option B terminal evidence validation in existing terminal commands. |
 | `skills/sdlc-project-bootstrap/templates/workflow/workflow.py` | Keep bootstrap runtime template in sync. |
 | `agents/dev-orchestrator.md` | Require dispatch prompts to forward runtime_context and avoid path inference from prose. |
 | `agents/implement-agent.md` | Return minimum artifact envelope when implementation changes are made. |
 | `agents/review-agent.md` | Prefer runtime_context and artifact worktree fields for source-of-truth selection. |
 | `agents/finish-agent.md` | Return final artifacts; do not rely on prose-only handoff evidence. |
 | `.opencode/agents/*`, `.claude/agents/*`, `.cursor/agents/*` | Distributed copies generated from canonical agents. |
-| `tests/test_workflow.py` | Runtime tests for execution_mode validation, before-dispatch runtime_context, after-dispatch slice fallback, artifact persistence, and final evidence invariant. |
+| `tests/test_workflow.py` | Runtime tests for execution_mode validation, before-dispatch runtime_context, after-dispatch slice fallback, artifact persistence, and Option B terminal evidence validation. |
 | `tests/test_wrapper_contracts.py` | Agent JSON artifact contract and distributed prompt checks. |
 
 ## Acceptance Criteria
@@ -315,6 +327,8 @@ terminal movement only after final agent evidence is persisted
 - `before-dispatch` output includes `runtime_context`.
 - `after-dispatch` uses the slice fallback order: CLI > agent result > dispatch intent > change_id > default.
 - `after-dispatch` persists agent `artifacts` under both latest result and `agent_results[slice][agent]`.
+- New agent artifacts use `base_branch` and `parent_ref`, not ambiguous `base_ref`.
+- Existing terminal commands refuse to move active runs to history when required final lifecycle evidence is missing.
 - A final history `run.json` cannot be marked done while missing required final lifecycle agent evidence.
 - Historical runs without `execution_mode` remain valid.
 
@@ -324,6 +338,6 @@ terminal movement only after final agent evidence is persisted
 
 **Backward compatibility can hide missing worktree context:** Only default to `main_checkout` when no worktree-specific evidence is present. If `execution_mode=worktree`, missing required worktree fields must block.
 
-**Atomic finalize may overlap finish-agent lifecycle changes:** This spec should define the invariant. The finish lifecycle spec can decide the exact orchestration policy and branch decision gate.
+**Terminal command validation may block legacy closure paths:** Keep validation scoped to active terminal movement and provide backward-compatible handling for historical runs already in history.
 
 **Artifacts may duplicate handoff content:** Persist only machine-readable artifact references and command lists, not full markdown handoff bodies.
