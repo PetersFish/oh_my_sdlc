@@ -18,7 +18,7 @@ This spec defines the finish-stage contract. It depends on the runtime context a
 - Define memory sync target ref rules for each branch finish outcome.
 - Ensure final agent evidence is recorded before active run is moved to history.
 - Make lightweight-flow archive evidence semantically accurate.
-- For completed lightweight-flow runs, archive the corresponding Superpowers spec and plan files into `docs/superpowers/archive/`.
+- For completed lightweight-flow runs, archive the corresponding Superpowers spec and plan files into typed archive subdirectories under `docs/superpowers/archive/`.
 - Preserve main-checkout/non-worktree compatibility.
 
 **Non-Goals:**
@@ -286,25 +286,26 @@ with semantic fields:
 
 For spec-flow, `archive_artifact_path` should point to the OpenSpec archive path when applicable.
 
-For lightweight-flow, `archive_artifact_path` should be `null` when there is no single archive artifact, and `archived_design_artifact_paths` must list the Superpowers spec/plan files moved into `docs/superpowers/archive/`.
+For lightweight-flow, `archive_artifact_path` should be `null` when there is no single archive artifact, and `archived_design_artifact_paths` must list the Superpowers spec/plan files moved into their typed archive directories under `docs/superpowers/archive/`.
 
 Workflow phase criteria may need to support either legacy `archive_path_exists` or new semantic archive criteria during migration.
 
-### Decision 11: Lightweight-Flow Archives Superpowers Spec and Plan Files
+### Decision 11: Lightweight-Flow Archives Superpowers Spec and Plan Files Into Typed Subdirectories
 
-When a lightweight-flow run is completed, finish must archive the corresponding Superpowers design artifacts by moving them from active design directories into `docs/superpowers/archive/`.
+When a lightweight-flow run is completed, finish must archive the corresponding Superpowers design artifacts by moving them from active design directories into matching typed archive subdirectories.
 
-Source directories:
+Source-to-destination mapping:
 
 ```text
-docs/superpowers/specs/
-docs/superpowers/plans/
+docs/superpowers/plans/<filename>.md -> docs/superpowers/archive/plans/<filename>.md
+docs/superpowers/specs/<filename>.md -> docs/superpowers/archive/specs/<filename>.md
 ```
 
-Destination directory:
+Required archive directories:
 
 ```text
-docs/superpowers/archive/
+docs/superpowers/archive/plans/
+docs/superpowers/archive/specs/
 ```
 
 The archive operation must include the matching spec file and the matching plan file when both exist. Matching should use the runtime design artifact contract first:
@@ -322,11 +323,11 @@ The finish result must record:
   "archive_action_completed": true,
   "archive_not_required_reason": "lightweight-flow",
   "archived_design_artifact_paths": [
-    "docs/superpowers/archive/2026-07-05-example-design.md",
-    "docs/superpowers/archive/2026-07-05-example.md"
+    "docs/superpowers/archive/specs/2026-07-05-example.md",
+    "docs/superpowers/archive/plans/2026-07-05-example.md"
   ],
   "source_design_artifact_paths": [
-    "docs/superpowers/specs/2026-07-05-example-design.md",
+    "docs/superpowers/specs/2026-07-05-example.md",
     "docs/superpowers/plans/2026-07-05-example.md"
   ]
 }
@@ -344,7 +345,7 @@ The finish-agent prompt must hard-require:
 - If branch decision is required and missing, return blocker `missing_branch_finish_decision`.
 - Do not choose branch outcome silently.
 - Do not finalize workflow run state.
-- For lightweight-flow completion, archive matching Superpowers spec/plan files into `docs/superpowers/archive/` and record source/destination paths.
+- For lightweight-flow completion, archive matching Superpowers plan files into `docs/superpowers/archive/plans/` and matching Superpowers spec files into `docs/superpowers/archive/specs/`, then record source/destination paths.
 - Return final JSON evidence and handoff artifact path.
 - Record which checkout/ref was used for each operation.
 
@@ -379,7 +380,8 @@ finish-agent checks branch_finish_decision
   |
   |- present -> execute selected branch finish action
                  archive/lightweight finish
-                 for lightweight-flow: move matching spec/plan files to docs/superpowers/archive/
+                 for lightweight-flow: move matching plan files to docs/superpowers/archive/plans/
+                 for lightweight-flow: move matching spec files to docs/superpowers/archive/specs/
                  return final evidence
   v
 after-dispatch records finish-agent evidence
@@ -401,9 +403,10 @@ workflow.py final-commit commits final governance artifacts as defined by workfl
 | `.ai/workflows/scripts/workflow.py` | Gate support, final evidence before finalize, semantic archive evidence migration, lightweight-flow Superpowers artifact archive support as needed. |
 | `skills/sdlc-project-bootstrap/templates/workflow/workflow.py` | Keep runtime template in sync. |
 | `skills/sdlc-project-bootstrap/templates/workflow/sdlc-main.yaml` | Archive evidence criteria update or backward-compatible migration. |
-| `docs/superpowers/archive/` | Destination for archived lightweight-flow spec and plan files. |
+| `docs/superpowers/archive/plans/` | Destination for archived lightweight-flow plan files. |
+| `docs/superpowers/archive/specs/` | Destination for archived lightweight-flow spec files. |
 | `agents/dev-orchestrator.md` | Ask for branch finish decision, record it, and keep terminal ownership. |
-| `agents/finish-agent.md` | Require decision gate, archive lightweight-flow Superpowers artifacts, forbid silent choice/finalize, return structured final evidence. |
+| `agents/finish-agent.md` | Require decision gate, archive lightweight-flow Superpowers artifacts into typed subdirectories, forbid silent choice/finalize, return structured final evidence. |
 | `.opencode/agents/*`, `.claude/agents/*`, `.cursor/agents/*` | Distributed copies generated from canonical agents. |
 | `tests/test_workflow.py` | Runtime tests for gate behavior, final evidence invariant, archive evidence migration, and lightweight-flow artifact archive moves. |
 | `tests/test_wrapper_contracts.py` | Prompt/permission contract tests for finish-agent and dev-orchestrator. |
@@ -419,7 +422,8 @@ workflow.py final-commit commits final governance artifacts as defined by workfl
 - Implementation commits and workflow commits are described and recorded separately.
 - Memory sync records target ref and target commit according to branch decision.
 - Lightweight-flow uses `archive_action_completed`, `archive_artifact_path`, `archive_not_required_reason`, and `archived_design_artifact_paths` instead of misleading `archive_path_exists: true` for new runs.
-- Completed lightweight-flow runs move matching Superpowers spec and plan files from `docs/superpowers/specs/` and `docs/superpowers/plans/` into `docs/superpowers/archive/`.
+- Completed lightweight-flow runs move matching Superpowers plan files from `docs/superpowers/plans/` into `docs/superpowers/archive/plans/`.
+- Completed lightweight-flow runs move matching Superpowers spec files from `docs/superpowers/specs/` into `docs/superpowers/archive/specs/`.
 - Lightweight-flow archive evidence records both source and destination design artifact paths.
 - Existing legacy runs using `archive_path_exists` remain readable during migration.
 - Final workflow artifact commit after done remains owned by the `workflow-final-tail-commit` spec and is not redefined here.
@@ -436,4 +440,4 @@ workflow.py final-commit commits final governance artifacts as defined by workfl
 
 **Superpowers artifact matching can be ambiguous:** Prefer `primary_design_path` and `design_artifact_paths[]` over filename inference. If multiple matches exist, block instead of guessing.
 
-**Archive moves are workflow commits, not implementation commits:** Moving spec/plan files into `docs/superpowers/archive/` should be treated as governance artifact cleanup and committed by the final workflow artifact commit boundary, not silently mixed into implementation branch semantics unless explicitly required by the chosen branch action.
+**Archive moves are workflow commits, not implementation commits:** Moving spec/plan files into typed `docs/superpowers/archive/` subdirectories should be treated as governance artifact cleanup and committed by the final workflow artifact commit boundary, not silently mixed into implementation branch semantics unless explicitly required by the chosen branch action.
