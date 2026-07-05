@@ -47,9 +47,7 @@ Expected files to inspect and potentially modify:
 
 - [ ] **Step 1: Inspect existing prompt-contract test helpers**
 
-Find existing helpers in `tests/test_wrapper_contracts.py` for reading agent frontmatter and prompt bodies.
-
-Use existing helper patterns rather than creating unrelated parsing code.
+Find existing helpers in `tests/test_wrapper_contracts.py` for reading agent frontmatter and prompt bodies. Use existing helper patterns rather than creating unrelated parsing code.
 
 - [ ] **Step 2: Add review-agent Git permission tests**
 
@@ -225,9 +223,9 @@ Keep the existing `handoff_path` and `raw_log_paths` fields.
 
 - [ ] **Step 3: Add Full Regression Gate section**
 
-Add:
+Add this section to `agents/implement-agent.md`. The outer fence below intentionally uses four backticks so the inner bash fence renders correctly.
 
-```md
+````md
 ## Full Regression Gate
 
 After all focused tests for the implementation pass, run the project-level regression suite before returning success.
@@ -244,9 +242,7 @@ Rules:
 - If full regression fails for a pre-existing or environment-related reason, return `status: blocked` with evidence.
 - If full regression is intentionally skipped, return `status: blocked` unless the user explicitly approved the skip.
 - Include the full regression command and result in `artifacts.verification_commands`.
-```
-
-Ensure nested Markdown fences are valid in the final file.
+````
 
 - [ ] **Step 4: Update success conditions**
 
