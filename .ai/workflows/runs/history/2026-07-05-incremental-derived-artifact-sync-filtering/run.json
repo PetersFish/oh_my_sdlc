@@ -3,8 +3,8 @@
   "run_id": "2026-07-05-incremental-derived-artifact-sync-filtering",
   "workflow": "sdlc-main",
   "flow_type": "lightweight-flow",
-  "status": "running",
-  "current_phase": "archive_change",
+  "status": "done",
+  "current_phase": "done",
   "primary_subject": {
     "type": "spec_change",
     "id": "incremental-derived-artifact-sync-filtering"
@@ -13,7 +13,7 @@
     "change_id": "incremental-derived-artifact-sync-filtering"
   },
   "phase_readiness": {
-    "phase": "archive_change",
+    "phase": "done",
     "ready": true,
     "missing_required_inputs": []
   },
@@ -25,7 +25,8 @@
   ],
   "completed_phases": [
     "apply_change",
-    "archive_change"
+    "archive_change",
+    "post_archive_actions"
   ],
   "gates": {},
   "evidence": {
@@ -123,8 +124,12 @@
     "roadmap_hook_resolution": "no_linked_item",
     "archive_path_exists": true,
     "memory_sync_resolution": "synced",
-    "memory_sync_reason": "Memory sync completed via sdlc-repository-memory-sync: detect_state, reconcile_pending, validate_memory, rebuild_index (31 entries), update_manifest to a14deec, sync history written at 20260705-075308"
+    "memory_sync_reason": "Memory sync completed via sdlc-repository-memory-sync: detect_state, reconcile_pending, validate_memory, rebuild_index (31 entries), update_manifest to a14deec, sync history written at 20260705-075308",
+    "roadmap_link": {
+      "count": 0,
+      "items": []
+    }
   },
   "block": null,
-  "updated_at": "2026-07-05T15:56:34.932911"
+  "updated_at": "2026-07-05T15:57:29.914157"
 }
