@@ -5,14 +5,14 @@
   "git": {
     "available": true,
     "has_commits": true,
-    "head": "b39987940396746093b243fbe6789115c2cfd12f",
-    "last_synced_commit": "b39987940396746093b243fbe6789115c2cfd12f",
+    "head": "23df06a08cbcf69f747677cd1947767343c5bcb9",
+    "last_synced_commit": "23df06a08cbcf69f747677cd1947767343c5bcb9",
     "worktree_state": "dirty"
   },
   "pending_snapshots": [],
   "last_sync": {
-    "timestamp": "2026-07-05T15:47:16.573002Z",
-    "commit": "b39987940396746093b243fbe6789115c2cfd12f",
-    "snapshot_id": "2026-07-05-subagent-owned-post-archive-cleanup"
+    "timestamp": "2026-07-08T10:43:05.735742Z",
+    "commit": "23df06a08cbcf69f747677cd1947767343c5bcb9",
+    "snapshot_id": "2026-07-08-worktree-verification-hygiene-and-derived-artifact-dry-run"
   }
 }
