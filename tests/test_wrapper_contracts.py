@@ -2701,5 +2701,229 @@ class TestDevOrchestratorReviewDispatchContract(unittest.TestCase):
         )
 
 
+class TestWorktreeVerificationHygienePromptContracts(unittest.TestCase):
+    """Prompt-contract tests for worktree verification hygiene and derived artifact dry-run.
+
+    These tests prove the agent prompts document:
+    - --dry-run as the preferred derived sync smoke mode
+    - producer-owned cleanup for transient artifacts
+    - structured verification_summary with accepted pre-existing failures
+    - constrained git restore for known safe derived paths
+    - review-agent accepting structured hygiene evidence
+    """
+
+    def _read_agent_body(self, agent_name):
+        path = _agent_path(".opencode", agent_name)
+        with open(path) as f:
+            content = f.read()
+        idx = content.find("\n---", 3)
+        if idx == -1:
+            return ""
+        return content[idx + 4:]
+
+    # --- implement-agent: --dry-run preference ---
+
+    def test_implement_agent_prefers_dry_run_for_derived_sync_smoke(self):
+        body = self._read_agent_body("implement-agent")
+        self.assertIn("--dry-run", body,
+                       "implement-agent must prefer --dry-run for derived sync smoke checks")
+
+    def test_implement_agent_documents_dry_run_smoke_command(self):
+        body = self._read_agent_body("implement-agent")
+        self.assertIn("sync_derived_artifacts.py --dry-run", body,
+                       "implement-agent must document the --dry-run smoke command")
+
+    # --- implement-agent: producer-owned cleanup ---
+
+    def test_implement_agent_states_producer_owned_cleanup(self):
+        body = self._read_agent_body("implement-agent")
+        lower = body.lower()
+        self.assertIn("producer-owned cleanup", lower,
+                      "implement-agent must state producer-owned cleanup requirement")
+        self.assertIn("transient", lower,
+                      "implement-agent must mention transient artifacts cleanup")
+
+    def test_implement_agent_requires_smoke_tests_use_dry_run_unless_repair(self):
+        body = self._read_agent_body("implement-agent")
+        lower = body.lower()
+        # Must guide that smoke tests use --dry-run unless explicitly repairing drift
+        self.assertIn("dry-run", lower)
+        self.assertIn("repair", lower)
+
+    # --- implement-agent: verification summary schema ---
+
+    def test_implement_agent_documents_verification_summary_status_values(self):
+        body = self._read_agent_body("implement-agent")
+        self.assertIn("verification_summary", body,
+                      "implement-agent must document verification_summary schema")
+        self.assertIn("pass_with_accepted_preexisting_failures", body,
+                      "implement-agent must document pass_with_accepted_preexisting_failures status")
+
+    def test_implement_agent_documents_accepted_failure_evidence_fields(self):
+        body = self._read_agent_body("implement-agent")
+        # Accepted pre-existing failures must include test id, reason, confirmation
+        self.assertIn("accepted_preexisting_failures", body)
+        self.assertIn("test", body)
+        self.assertIn("reason", body)
+        self.assertIn("confirmation", body)
+
+    # --- implement-agent: constrained git restore ---
+
+    def test_implement_agent_documents_constrained_git_restore(self):
+        body = self._read_agent_body("implement-agent")
+        self.assertIn("git restore", body,
+                      "implement-agent must document constrained git restore for known safe derived paths")
+
+    # --- review-agent: accept structured hygiene evidence ---
+
+    def test_review_agent_accepts_pass_with_accepted_preexisting_failures(self):
+        body = self._read_agent_body("review-agent")
+        self.assertIn("pass_with_accepted_preexisting_failures", body,
+                      "review-agent must accept pass_with_accepted_preexisting_failures")
+
+    def test_review_agent_does_not_bounce_known_hygiene_noise_with_evidence(self):
+        body = self._read_agent_body("review-agent")
+        lower = body.lower()
+        self.assertIn("hydration", lower,
+                      "review-agent must reference hydration evidence")
+        self.assertIn("dry-run", lower,
+                      "review-agent must reference dry-run evidence")
+
+    def test_review_agent_requires_accepted_failures_be_scoped_and_named(self):
+        body = self._read_agent_body("review-agent")
+        self.assertIn("accepted_preexisting_failures", body)
+        # Must require failures be scoped and confirmed unrelated to implementation
+        self.assertIn("scoped", body.lower())
+        self.assertIn("confirmed", body.lower())
+
+    def test_review_agent_rejects_broad_environment_statements(self):
+        body = self._read_agent_body("review-agent")
+        # Broad statements like "all tests passed except environment" must not be acceptable
+        self.assertIn("all tests passed except environment", body)
+
+
+class TestSyncDerivedArtifactsDryRunCLI(unittest.TestCase):
+    """CLI-level tests for sync_derived_artifacts.py --dry-run flag."""
+
+    def _run_cli(self, *args):
+        script = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "..", "scripts", "sync_derived_artifacts.py",
+        )
+        return subprocess.run(
+            [sys.executable, script, *args],
+            capture_output=True, text=True, check=False,
+        )
+
+    def test_cli_accepts_dry_run_flag(self):
+        """The CLI must accept --dry-run without error."""
+        result = self._run_cli("--dry-run", "--check", "--json")
+        # Should not error with "unrecognized arguments"
+        self.assertNotIn("unrecognized arguments", result.stderr,
+                         f"--dry-run flag not accepted: {result.stderr}")
+        self.assertNotIn("error:", result.stderr.lower(),
+                         f"--dry-run flag caused error: {result.stderr}")
+
+    def test_cli_dry_run_with_changed_file(self):
+        """The CLI must accept --dry-run --changed-file --json and produce JSON."""
+        result = self._run_cli(
+            "--dry-run", "--fix", "--changed-file", "docs/superpowers/specs/example.md", "--json",
+        )
+        # Should produce valid JSON output (docs-only change = skipped scope, rc=0)
+        self.assertEqual(result.returncode, 0,
+                         f"--dry-run --fix --changed-file failed: {result.stderr}")
+        try:
+            report = json.loads(result.stdout)
+            self.assertTrue(report.get("dry_run", False),
+                            f"dry_run must be true in CLI output: {report}")
+        except json.JSONDecodeError:
+            self.fail(f"--dry-run CLI did not produce valid JSON: {result.stdout}")
+
+
+class TestWorktreeHydrationScript(unittest.TestCase):
+    """Tests for .ai/workflows/scripts/hydrate_workspace.py."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _script_path(self):
+        return os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "..", ".ai", "workflows", "scripts", "hydrate_workspace.py",
+        )
+
+    def _run_hydrate(self, root, *extra_args):
+        script = self._script_path()
+        cmd = [sys.executable, script, "--root", root] + list(extra_args)
+        return subprocess.run(cmd, capture_output=True, text=True, check=False)
+
+    def test_hydrate_script_exists(self):
+        self.assertTrue(os.path.isfile(self._script_path()),
+                        "hydrate_workspace.py must exist")
+
+    def test_hydrate_creates_evalops_case_directories(self):
+        """Hydration must create case inbox/accepted/rejected dirs under eval targets."""
+        # Create a target manifest to simulate an eval target
+        target_dir = os.path.join(self.tmp, ".ai", "evals", "targets", "skill.demo-evalops")
+        os.makedirs(target_dir)
+        with open(os.path.join(target_dir, "manifest.yaml"), "w") as f:
+            f.write("target_id: skill.demo-evalops\n")
+
+        result = self._run_hydrate(self.tmp)
+        self.assertEqual(result.returncode, 0,
+                         f"hydration failed: {result.stderr}")
+
+        for subdir in ("cases/inbox", "cases/accepted", "cases/rejected"):
+            path = os.path.join(target_dir, subdir)
+            self.assertTrue(os.path.isdir(path),
+                            f"hydration must create {subdir}, but it was not found")
+
+    def test_hydrate_does_not_create_workflow_run_state(self):
+        """Hydration must NOT create workflow run state directories."""
+        result = self._run_hydrate(self.tmp)
+        self.assertEqual(result.returncode, 0)
+
+        for forbidden in (
+            ".ai/workflows/runs/active",
+            ".ai/workflows/runs/current.json",
+            ".ai/workflows/runs/history",
+        ):
+            path = os.path.join(self.tmp, forbidden)
+            self.assertFalse(os.path.exists(path),
+                             f"hydration must not create {forbidden}")
+
+    def test_hydrate_is_idempotent(self):
+        """Running hydration twice must be safe and not error."""
+        target_dir = os.path.join(self.tmp, ".ai", "evals", "targets", "skill.demo-evalops")
+        os.makedirs(target_dir)
+        with open(os.path.join(target_dir, "manifest.yaml"), "w") as f:
+            f.write("target_id: skill.demo-evalops\n")
+
+        result1 = self._run_hydrate(self.tmp)
+        self.assertEqual(result1.returncode, 0,
+                         f"first hydration failed: {result1.stderr}")
+
+        result2 = self._run_hydrate(self.tmp)
+        self.assertEqual(result2.returncode, 0,
+                         f"second hydration failed: {result2.stderr}")
+
+    def test_hydrate_reports_created_directories(self):
+        """Hydration output must report what directories it created."""
+        target_dir = os.path.join(self.tmp, ".ai", "evals", "targets", "skill.demo-evalops")
+        os.makedirs(target_dir)
+        with open(os.path.join(target_dir, "manifest.yaml"), "w") as f:
+            f.write("target_id: skill.demo-evalops\n")
+
+        result = self._run_hydrate(self.tmp)
+        # Output should mention created directories
+        combined = result.stdout + result.stderr
+        self.assertIn("cases", combined.lower(),
+                      f"hydration output must report created directories: {combined}")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

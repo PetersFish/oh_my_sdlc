@@ -298,6 +298,98 @@ failing focused tests, or provider/apply failures.
 
 - Do not treat distributed-copy drift as a default apply-change blocker; report it for finish-phase closure.
 
+## Verification Summary Schema
+
+Use `verification_summary.status` values in evidence and handoffs:
+
+- `pass` — all verification passed.
+- `fail` — verification failed.
+- `pass_with_accepted_preexisting_failures` — verification passed except for
+  explicitly accepted pre-existing/environment failures.
+
+When `pass_with_accepted_preexisting_failures` is used, the evidence must
+include an `accepted_preexisting_failures` array where each entry has:
+
+- `test`: exact test id (e.g., `tests/test_evalops_root.py::TestTargetWorkspace::test_workspace_has_required_directories`)
+- `reason`: why this failure is pre-existing/environmental (e.g., `worktree lacks generated evalops fixture dirs`)
+- `confirmation`: how it was confirmed unrelated to the implementation (e.g., `passes on main checkout or passes after hydration`)
+- `owner`: category (e.g., `environment_fixture`)
+
+Broad statements such as `all tests passed except environment` are NOT
+acceptable evidence. Each accepted failure must be individually scoped, named,
+and confirmed.
+
+Example:
+
+```json
+{
+  "verification_summary": {
+    "status": "pass_with_accepted_preexisting_failures",
+    "full_regression": {
+      "command": "python3 -m pytest tests/ -v",
+      "passed": 1038,
+      "failed": 1,
+      "accepted_preexisting_failures": [
+        {
+          "test": "tests/test_evalops_root.py::TestTargetWorkspace::test_workspace_has_required_directories",
+          "reason": "worktree lacks generated evalops fixture dirs",
+          "confirmation": "passes on main checkout or passes after hydration",
+          "owner": "environment_fixture"
+        }
+      ]
+    }
+  }
+}
+```
+
+## Producer-Owned Cleanup
+
+Any test, script, or smoke command that creates transient artifacts must
+isolate or clean them before returning success. This applies at three levels:
+
+1. **Unit tests:** use temporary directories, monkeypatch/subprocess stubs, or
+   cleanup fixtures so repository state is identical before and after the test.
+2. **Smoke tests:** use `--dry-run` for derived-artifact sync smoke checks
+   unless the task explicitly intends to repair drift:
+   ```bash
+   python3 scripts/sync_derived_artifacts.py --dry-run --changed-file <path> --json
+   ```
+   Use real `--fix` only when the work package intends to repair or update
+   distributed artifacts.
+3. **Agents:** if an agent intentionally runs a mutating command, the resulting
+   artifacts must be included as intentional changes or accidental churn must be
+   restored before returning success.
+
+A test suite that leaves `.skill-install.json` churn behind is failing its own
+cleanup contract, even if assertions pass.
+
+## Constrained Restore for Derived Artifacts
+
+If real derived-artifact churn appears during development, do not hand-edit
+`.skill-install.json` field-by-field. Use a constrained restore path for known
+safe derived artifacts:
+
+```bash
+git restore -- <known-safe-derived-path>
+```
+
+The allowlist should be as narrow as practical — specific `.skill-install.json`
+files under known distribution targets. The default expectation is prevention
+or test-owned cleanup, not after-the-fact restore.
+
+## Workspace Hydration
+
+Before running tests that depend on runtime fixture directories (e.g.,
+`.ai/evals/targets/*/cases/inbox`), run workspace hydration if the worktree
+lacks these directories:
+
+```bash
+python3 .ai/workflows/scripts/hydrate_workspace.py --root <worktree_path>
+```
+
+Hydration is idempotent and creates only required non-Git runtime fixture
+directories. It does NOT copy workflow run state into the worktree.
+
 Failed example when OpenSpec apply cannot produce the requested artifact:
 ```json
 {

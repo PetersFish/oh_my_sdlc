@@ -497,5 +497,207 @@ class TestIncrementalSync(unittest.TestCase):
         self.assertIn("gone-skill", report.get("missing_skills", []))
 
 
+class TestDryRunMode(unittest.TestCase):
+    """--dry-run exercises classification, suite selection, command planning, and
+    JSON report construction without mutating distributed outputs or .skill-install.json."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _capture_calls(self):
+        calls = []
+
+        def fake_run(args, capture_output, text):
+            calls.append(args)
+            return CompletedProcess(args, 0, "OK", "")
+
+        return calls, fake_run
+
+    def test_dry_run_does_not_invoke_mutating_subprocesses(self):
+        """--dry-run must not invoke any subprocess that mutates distributed artifacts."""
+        write_file(self.tmp, "skills/demo-skill/SKILL.md", "# demo\n")
+        calls, fake_run = self._capture_calls()
+        with mock.patch.object(subprocess, "run", fake_run):
+            mod = _import_module()
+            rc, report = mod.run_aggregate(
+                self.tmp, mode="fix", json_output=True,
+                changed_files=["skills/demo-skill/SKILL.md"],
+                incremental=True, dry_run=True,
+            )
+        self.assertEqual(rc, 0)
+        # No mutating subprocess should be invoked in dry-run mode
+        self.assertEqual(calls, [],
+                         f"--dry-run must not invoke subprocesses, got: {calls}")
+
+    def test_dry_run_report_marks_dry_run_true(self):
+        """--dry-run JSON report must include dry_run: true."""
+        write_file(self.tmp, "skills/demo-skill/SKILL.md", "# demo\n")
+        calls, fake_run = self._capture_calls()
+        with mock.patch.object(subprocess, "run", fake_run):
+            mod = _import_module()
+            rc, report = mod.run_aggregate(
+                self.tmp, mode="fix", json_output=True,
+                changed_files=["skills/demo-skill/SKILL.md"],
+                incremental=True, dry_run=True,
+            )
+        self.assertEqual(rc, 0)
+        self.assertTrue(report.get("dry_run", False),
+                        f"report must include dry_run: true, got: {report}")
+
+    def test_dry_run_report_includes_affected_domains(self):
+        """--dry-run report must include affected domains from classification."""
+        write_file(self.tmp, "skills/demo-skill/SKILL.md", "# demo\n")
+        calls, fake_run = self._capture_calls()
+        with mock.patch.object(subprocess, "run", fake_run):
+            mod = _import_module()
+            rc, report = mod.run_aggregate(
+                self.tmp, mode="fix", json_output=True,
+                changed_files=["skills/demo-skill/SKILL.md", "agents/implement-agent.md"],
+                incremental=True, dry_run=True,
+            )
+        self.assertEqual(rc, 0)
+        affected = report.get("affected", {})
+        self.assertIn("demo-skill", affected.get("skills", []),
+                      f"dry-run report must include affected skills, got: {affected}")
+        self.assertTrue(affected.get("agents"),
+                        f"dry-run report must include affected agents, got: {affected}")
+
+    def test_dry_run_report_includes_planned_suites_or_commands(self):
+        """--dry-run report must include planned suites/commands without executing them."""
+        write_file(self.tmp, "skills/demo-skill/SKILL.md", "# demo\n")
+        calls, fake_run = self._capture_calls()
+        with mock.patch.object(subprocess, "run", fake_run):
+            mod = _import_module()
+            rc, report = mod.run_aggregate(
+                self.tmp, mode="fix", json_output=True,
+                changed_files=["skills/demo-skill/SKILL.md"],
+                incremental=True, dry_run=True,
+            )
+        self.assertEqual(rc, 0)
+        # dry-run must report the planned commands/suites even though not executed
+        planned = report.get("planned_suites") or report.get("planned_commands") or report.get("suites")
+        self.assertIsNotNone(planned,
+                             f"dry-run report must include planned suites/commands, got keys: {list(report.keys())}")
+        self.assertGreater(len(planned), 0,
+                           "dry-run report must include at least one planned suite/command")
+
+    def test_dry_run_report_includes_skipped_writes(self):
+        """--dry-run report must indicate that writes were skipped."""
+        write_file(self.tmp, "skills/demo-skill/SKILL.md", "# demo\n")
+        calls, fake_run = self._capture_calls()
+        with mock.patch.object(subprocess, "run", fake_run):
+            mod = _import_module()
+            rc, report = mod.run_aggregate(
+                self.tmp, mode="fix", json_output=True,
+                changed_files=["skills/demo-skill/SKILL.md"],
+                incremental=True, dry_run=True,
+            )
+        self.assertEqual(rc, 0)
+        skipped = report.get("skipped_writes")
+        self.assertIsNotNone(skipped,
+                             f"dry-run report must include skipped_writes, got keys: {list(report.keys())}")
+        self.assertTrue(skipped,
+                        "dry-run report must indicate writes were skipped")
+
+    def test_dry_run_does_not_write_skill_install_json(self):
+        """--dry-run must not create or modify .skill-install.json in distribution targets."""
+        # Pre-create a .skill-install.json with known content to detect modification
+        for target in (".opencode/skills", ".claude/skills", ".cursor/skills"):
+            install_path = os.path.join(self.tmp, target, "demo-skill", ".skill-install.json")
+            os.makedirs(os.path.dirname(install_path), exist_ok=True)
+            with open(install_path, "w", encoding="utf-8") as f:
+                json.dump({"installed_at": "before", "marker": "preserved"}, f)
+
+        write_file(self.tmp, "skills/demo-skill/SKILL.md", "# demo\n")
+        calls, fake_run = self._capture_calls()
+        with mock.patch.object(subprocess, "run", fake_run):
+            mod = _import_module()
+            rc, report = mod.run_aggregate(
+                self.tmp, mode="fix", json_output=True,
+                changed_files=["skills/demo-skill/SKILL.md"],
+                incremental=True, dry_run=True,
+            )
+        self.assertEqual(rc, 0)
+
+        # .skill-install.json files must be unchanged
+        for target in (".opencode/skills", ".claude/skills", ".cursor/skills"):
+            install_path = os.path.join(self.tmp, target, "demo-skill", ".skill-install.json")
+            with open(install_path, encoding="utf-8") as f:
+                content = json.load(f)
+            self.assertEqual(content.get("marker"), "preserved",
+                             f".skill-install.json in {target} was mutated by --dry-run")
+
+    def test_dry_run_check_mode_also_non_mutating(self):
+        """--dry-run with check mode must not invoke subprocess checks."""
+        calls, fake_run = self._capture_calls()
+        with mock.patch.object(subprocess, "run", fake_run):
+            mod = _import_module()
+            rc, report = mod.run_aggregate(
+                self.tmp, mode="check", json_output=True,
+                changed_files=["skills/demo-skill/SKILL.md"],
+                incremental=True, dry_run=True,
+            )
+        self.assertEqual(rc, 0)
+        self.assertEqual(calls, [],
+                         f"--dry-run check must not invoke subprocesses, got: {calls}")
+        self.assertTrue(report.get("dry_run", False))
+
+    def test_dry_run_full_mode_non_mutating(self):
+        """--dry-run with full mode (no changed files) must not invoke subprocesses."""
+        calls, fake_run = self._capture_calls()
+        with mock.patch.object(subprocess, "run", fake_run):
+            mod = _import_module()
+            rc, report = mod.run_aggregate(
+                self.tmp, mode="fix", json_output=True,
+                dry_run=True,
+            )
+        self.assertEqual(rc, 0)
+        self.assertEqual(calls, [],
+                         f"--dry-run full mode must not invoke subprocesses, got: {calls}")
+        self.assertTrue(report.get("dry_run", False))
+
+    def test_dry_run_scope_is_preserved(self):
+        """--dry-run must preserve the same scope classification as non-dry-run."""
+        calls, fake_run = self._capture_calls()
+        with mock.patch.object(subprocess, "run", fake_run):
+            mod = _import_module()
+            rc, report = mod.run_aggregate(
+                self.tmp, mode="fix", json_output=True,
+                changed_files=["docs/superpowers/specs/example.md"],
+                incremental=True, dry_run=True,
+            )
+        self.assertEqual(rc, 0)
+        self.assertEqual(report["scope"], "skipped",
+                         "dry-run docs-only must report skipped scope")
+
+    def test_backward_compat_check_still_runs_subprocesses(self):
+        """Existing --check behavior (non-dry-run) must remain backward compatible."""
+        calls, fake_run = self._capture_calls()
+        with mock.patch.object(subprocess, "run", fake_run):
+            mod = _import_module()
+            rc, _ = mod.run_aggregate(
+                self.tmp, mode="check", json_output=False,
+            )
+        self.assertEqual(rc, 0)
+        self.assertGreater(len(calls), 0,
+                           "non-dry-run check must still invoke subprocesses")
+
+    def test_backward_compat_fix_still_runs_subprocesses(self):
+        """Existing --fix behavior (non-dry-run) must remain backward compatible."""
+        calls, fake_run = self._capture_calls()
+        with mock.patch.object(subprocess, "run", fake_run):
+            mod = _import_module()
+            rc, _ = mod.run_aggregate(
+                self.tmp, mode="fix", json_output=False,
+            )
+        self.assertEqual(rc, 0)
+        self.assertGreater(len(calls), 0,
+                           "non-dry-run fix must still invoke subprocesses")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
