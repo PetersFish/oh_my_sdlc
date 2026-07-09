@@ -6,10 +6,10 @@ summary: SDLC lifecycle management skills covering project bootstrap, OpenSpec i
 parent_id: skills
 sync_status: synced
 evidence_mode: discovery
-linked_commits: [c23d413, c590d26]
+linked_commits: [c23d413, c590d26, ab06a0287f43ec7e50b280ce1bddd2cdc39d3aad]
 linked_specs: [add-project-bootstrap-skill, sdlc-repository-memory-sync, sdlc-repository-memory-load, sdlc-repository-memory-init, sdlc-repository-memory-reset, sdlc-openspec-memory-sync, add-sdlc-roadmap-skill, simplify-sdlc-routing-schemas, standardize-ai-evalops-target-workspaces, add-eval-matrix-runner]
-linked_sessions: []
-updated_at: 2026-06-14T07:00:00Z
+linked_sessions: ["2026-07-09-workflow-runtime-execution-context-and-agent-result-integrity"]
+updated_at: 2026-07-09T00:00:00Z
 confidence: high
 tags: [sdlc, openspec, bootstrap, memory, workflow, orchestration, roadmap, evalops]
 owned_paths:
@@ -98,3 +98,4 @@ Updated after `add-project-bootstrap-skill`: added bootstrap/init ownership and 
 Updated after `simplify-sdlc-routing-schemas`: added sdlc-orchestrator and sdlc-roadmap ownership; removed sdd-plus-superpowers custom schema; OpenSpec defaults to package-provided spec-driven; schema installation step removed from sdlc-openspec-init.
 Updated after `standardize-ai-evalops-target-workspaces`: added sdlc-evalops ownership; recorded 3 Promptfoo eval pitfalls (grader model selection, max_tokens sizing, assertion design).
 Updated after `add-eval-matrix-runner` and `strengthen-sdlc-orchestrator-routing-compliance`: sdlc-evalops gained run-eval-matrix.py, run-promptfoo-eval.py, and model-matrix.yaml template; sdlc-orchestrator gained post-archive roadmap sync gate.
+Updated after `workflow-runtime-execution-context-and-agent-result-integrity`: workflow.py gained runtime context assembly (`_MAIN_CHECKOUT_AGENTS`, `_assemble_runtime_context()`), `cmd_ensure_context()`, `cmd_after_dispatch()` with result_contract validation, `_store_result_contract()`, and superpowers_direct no-workflow policy; agent prompts now require `runtime_context` block and return `missing_runtime_context` blocker when absent; tests expanded from 37 to 81 with runtime context, result contract, and agent contract compliance tests.

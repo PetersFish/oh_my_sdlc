@@ -5,14 +5,14 @@
   "git": {
     "available": true,
     "has_commits": true,
-    "head": "23df06a08cbcf69f747677cd1947767343c5bcb9",
-    "last_synced_commit": "23df06a08cbcf69f747677cd1947767343c5bcb9",
+    "head": "ab06a0287f43ec7e50b280ce1bddd2cdc39d3aad",
+    "last_synced_commit": "ab06a0287f43ec7e50b280ce1bddd2cdc39d3aad",
     "worktree_state": "dirty"
   },
   "pending_snapshots": [],
   "last_sync": {
-    "timestamp": "2026-07-08T10:43:05.735742Z",
-    "commit": "23df06a08cbcf69f747677cd1947767343c5bcb9",
-    "snapshot_id": "2026-07-08-worktree-verification-hygiene-and-derived-artifact-dry-run"
+    "timestamp": "2026-07-09T10:17:45.344433Z",
+    "commit": "ab06a0287f43ec7e50b280ce1bddd2cdc39d3aad",
+    "snapshot_id": "20260709-workflow-runtime-execution-context"
   }
 }

@@ -1,0 +1,514 @@
+{
+  "version": 1,
+  "run_id": "2026-07-09-workflow-runtime-execution-context-and-agent-result-integrity",
+  "workflow": "sdlc-main",
+  "flow_type": "lightweight-flow",
+  "status": "running",
+  "current_phase": "post_archive_actions",
+  "primary_subject": {
+    "type": "spec_change",
+    "id": "workflow-runtime-execution-context-and-agent-result-integrity"
+  },
+  "context": {
+    "change_id": "workflow-runtime-execution-context-and-agent-result-integrity"
+  },
+  "phase_readiness": {
+    "phase": "post_archive_actions",
+    "ready": true,
+    "missing_required_inputs": []
+  },
+  "pending_hooks": [],
+  "completed_hooks": [],
+  "completed_phases": [
+    "apply_change",
+    "archive_change"
+  ],
+  "gates": {},
+  "evidence": {
+    "spec_status": {
+      "classification": "missing",
+      "source": null
+    },
+    "lightweight_flow_confirmed": true,
+    "agent_phase": {
+      "agent_phase": "post_archive_actions",
+      "agent": "finish-agent",
+      "flow_type": "lightweight-flow",
+      "dispatched_at": "2026-07-09T18:14:29.440519",
+      "slice_id": "default"
+    },
+    "agent_result": {
+      "agent": "finish-agent",
+      "status": "success",
+      "phase": "archive_change",
+      "slice_id": "default",
+      "flow_type": "lightweight-flow",
+      "evidence": {
+        "archive_path_exists": true
+      },
+      "artifacts": {
+        "handoff_path": ".ai/workflows/runs/active/2026-07-09-workflow-runtime-execution-context-and-agent-result-integrity/handoffs/default/finish-agent.md"
+      },
+      "blockers": [],
+      "recommended_next_action": "complete_phase",
+      "recorded_at": "2026-07-09T18:14:06.113905"
+    },
+    "agent_results": {
+      "default": {
+        "implement-agent": {
+          "agent": "implement-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "tasks_complete": true,
+            "tdd_passed": true,
+            "focused_tests": [
+              {
+                "command": "python3 -m pytest tests/test_workflow.py::TestTerminalEvidenceValidation -v",
+                "result": "pass"
+              },
+              {
+                "command": "python3 -m pytest tests/test_wrapper_contracts.py::TestExecutionContextArtifactContract -v",
+                "result": "pass"
+              }
+            ]
+          },
+          "artifacts": {
+            "handoff_path": ".ai/workflows/runs/active/2026-07-09-workflow-runtime-execution-context-and-agent-result-integrity/handoffs/default/implement-agent.md",
+            "worktree_path": "/Users/yuping/Documents/workspace/oh_my_skills",
+            "repo_root": "/Users/yuping/Documents/workspace/oh_my_skills",
+            "base_branch": "main",
+            "parent_ref": "635baaffaceb4f71b1c0d9c04c3a793e4df1e23b",
+            "changed_files": [
+              {
+                "path": ".ai/workflows/scripts/workflow.py",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Execution context handling, runtime_context output, slice fallback, artifact persistence, Option B terminal evidence validation",
+                "covered_by": [
+                  "python3 -m pytest tests/test_workflow.py -v",
+                  "python3 -m pytest tests/ -v"
+                ]
+              },
+              {
+                "path": "skills/sdlc-project-bootstrap/templates/workflow/workflow.py",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Synced from live workflow.py",
+                "covered_by": [
+                  "python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git"
+                ]
+              },
+              {
+                "path": "agents/dev-orchestrator.md",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Spec Decision: forward runtime_context to dispatched agents; forward base_branch/parent_ref instead of ambiguous base_ref",
+                "covered_by": [
+                  "python3 -m pytest tests/test_wrapper_contracts.py::TestExecutionContextArtifactContract -v"
+                ]
+              },
+              {
+                "path": "agents/implement-agent.md",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Spec Decision: return base_branch/parent_ref instead of ambiguous base_ref in artifact envelope",
+                "covered_by": [
+                  "python3 -m pytest tests/test_wrapper_contracts.py::TestExecutionContextArtifactContract -v"
+                ]
+              },
+              {
+                "path": "agents/review-agent.md",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Spec Decision: prefer runtime_context for source-of-truth selection; review artifact envelope",
+                "covered_by": [
+                  "python3 -m pytest tests/test_wrapper_contracts.py::TestExecutionContextArtifactContract -v"
+                ]
+              },
+              {
+                "path": "agents/finish-agent.md",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Spec Decision: final artifact envelope in both success examples + output discipline",
+                "covered_by": [
+                  "python3 -m pytest tests/test_wrapper_contracts.py::TestExecutionContextArtifactContract -v"
+                ]
+              },
+              {
+                "path": "tests/test_workflow.py",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Runtime tests for execution context, runtime_context, slice fallback, terminal evidence validation",
+                "covered_by": [
+                  "python3 -m pytest tests/test_workflow.py -v"
+                ]
+              },
+              {
+                "path": "tests/test_wrapper_contracts.py",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Prompt-contract tests for review/finish artifact envelopes and runtime_context preference",
+                "covered_by": [
+                  "python3 -m pytest tests/test_wrapper_contracts.py -v"
+                ]
+              },
+              {
+                "path": "docs/superpowers/plans/2026-07-05-workflow-runtime-execution-context-and-agent-result-integrity.md",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Plan checkboxes synced to reflect completed steps"
+              },
+              {
+                "path": ".opencode/agents/dev-orchestrator.md",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Synced from canonical agents/dev-orchestrator.md",
+                "covered_by": [
+                  "python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git"
+                ]
+              },
+              {
+                "path": ".opencode/agents/implement-agent.md",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Synced from canonical agents/implement-agent.md",
+                "covered_by": [
+                  "python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git"
+                ]
+              },
+              {
+                "path": ".opencode/agents/review-agent.md",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Synced from canonical agents/review-agent.md",
+                "covered_by": [
+                  "python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git"
+                ]
+              },
+              {
+                "path": ".opencode/agents/finish-agent.md",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Synced from canonical agents/finish-agent.md",
+                "covered_by": [
+                  "python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git"
+                ]
+              },
+              {
+                "path": ".opencode/agents/.agent-install.json",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Synced agent metadata",
+                "covered_by": [
+                  "python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git"
+                ]
+              },
+              {
+                "path": ".claude/agents/dev-orchestrator.md",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Synced from canonical agents/dev-orchestrator.md",
+                "covered_by": [
+                  "python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git"
+                ]
+              },
+              {
+                "path": ".claude/agents/implement-agent.md",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Synced from canonical agents/implement-agent.md",
+                "covered_by": [
+                  "python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git"
+                ]
+              },
+              {
+                "path": ".claude/agents/review-agent.md",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Synced from canonical agents/review-agent.md",
+                "covered_by": [
+                  "python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git"
+                ]
+              },
+              {
+                "path": ".claude/agents/finish-agent.md",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Synced from canonical agents/finish-agent.md",
+                "covered_by": [
+                  "python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git"
+                ]
+              },
+              {
+                "path": ".claude/agents/.agent-install.json",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Synced agent metadata",
+                "covered_by": [
+                  "python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git"
+                ]
+              },
+              {
+                "path": ".cursor/agents/dev-orchestrator.md",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Synced from canonical agents/dev-orchestrator.md",
+                "covered_by": [
+                  "python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git"
+                ]
+              },
+              {
+                "path": ".cursor/agents/implement-agent.md",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Synced from canonical agents/implement-agent.md",
+                "covered_by": [
+                  "python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git"
+                ]
+              },
+              {
+                "path": ".cursor/agents/review-agent.md",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Synced from canonical agents/review-agent.md",
+                "covered_by": [
+                  "python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git"
+                ]
+              },
+              {
+                "path": ".cursor/agents/finish-agent.md",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Synced from canonical agents/finish-agent.md",
+                "covered_by": [
+                  "python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git"
+                ]
+              },
+              {
+                "path": ".cursor/agents/.agent-install.json",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Synced agent metadata",
+                "covered_by": [
+                  "python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git"
+                ]
+              },
+              {
+                "path": ".opencode/skills/sdlc-project-bootstrap/templates/workflow/workflow.py",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Synced from canonical workflow template",
+                "covered_by": [
+                  "python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git"
+                ]
+              },
+              {
+                "path": ".opencode/skills/sdlc-project-bootstrap/.skill-install.json",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Synced skill metadata",
+                "covered_by": [
+                  "python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git"
+                ]
+              },
+              {
+                "path": ".claude/skills/sdlc-project-bootstrap/templates/workflow/workflow.py",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Synced from canonical workflow template",
+                "covered_by": [
+                  "python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git"
+                ]
+              },
+              {
+                "path": ".claude/skills/sdlc-project-bootstrap/.skill-install.json",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Synced skill metadata",
+                "covered_by": [
+                  "python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git"
+                ]
+              },
+              {
+                "path": ".cursor/skills/sdlc-project-bootstrap/templates/workflow/workflow.py",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Synced from canonical workflow template",
+                "covered_by": [
+                  "python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git"
+                ]
+              },
+              {
+                "path": ".cursor/skills/sdlc-project-bootstrap/.skill-install.json",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Synced skill metadata",
+                "covered_by": [
+                  "python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git"
+                ]
+              },
+              {
+                "path": ".ai/workflows/runs/current.json",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Workflow runtime pointer \u2014 runtime state, not implementation; restore to {} before commit by finish phase"
+              },
+              {
+                "path": ".ai/workflows/runs/active/2026-07-09-workflow-runtime-execution-context-and-agent-result-integrity/",
+                "status": "untracked",
+                "source": "git ls-files --others",
+                "reason": "Active workflow-run directory (run.json, handoffs, logs) \u2014 runtime state, not implementation"
+              }
+            ],
+            "diff_commands": [
+              "git diff -- .ai/workflows/scripts/workflow.py",
+              "git diff -- skills/sdlc-project-bootstrap/templates/workflow/workflow.py",
+              "git diff -- agents/dev-orchestrator.md",
+              "git diff -- agents/implement-agent.md",
+              "git diff -- agents/review-agent.md",
+              "git diff -- agents/finish-agent.md",
+              "git diff -- tests/test_workflow.py",
+              "git diff -- tests/test_wrapper_contracts.py",
+              "git diff -- docs/superpowers/plans/2026-07-05-workflow-runtime-execution-context-and-agent-result-integrity.md",
+              "git diff -- .opencode/agents/dev-orchestrator.md .opencode/agents/implement-agent.md .opencode/agents/review-agent.md .opencode/agents/finish-agent.md .opencode/agents/.agent-install.json",
+              "git diff -- .claude/agents/dev-orchestrator.md .claude/agents/implement-agent.md .claude/agents/review-agent.md .claude/agents/finish-agent.md .claude/agents/.agent-install.json",
+              "git diff -- .cursor/agents/dev-orchestrator.md .cursor/agents/implement-agent.md .cursor/agents/review-agent.md .cursor/agents/finish-agent.md .cursor/agents/.agent-install.json",
+              "git diff -- .opencode/skills/sdlc-project-bootstrap/templates/workflow/workflow.py .opencode/skills/sdlc-project-bootstrap/.skill-install.json",
+              "git diff -- .claude/skills/sdlc-project-bootstrap/templates/workflow/workflow.py .claude/skills/sdlc-project-bootstrap/.skill-install.json",
+              "git diff -- .cursor/skills/sdlc-project-bootstrap/templates/workflow/workflow.py .cursor/skills/sdlc-project-bootstrap/.skill-install.json",
+              "git diff -- .ai/workflows/runs/current.json",
+              "git ls-files --others --exclude-standard -- .ai/workflows/runs/active/2026-07-09-workflow-runtime-execution-context-and-agent-result-integrity/"
+            ],
+            "verification_commands": [
+              {
+                "command": "python3 -m pytest tests/test_workflow.py::TestTerminalEvidenceValidation -v",
+                "scope": "focused",
+                "result": "pass",
+                "covers": [
+                  "tests/test_workflow.py"
+                ]
+              },
+              {
+                "command": "python3 -m pytest tests/test_wrapper_contracts.py::TestExecutionContextArtifactContract -v",
+                "scope": "focused",
+                "result": "pass",
+                "covers": [
+                  "tests/test_wrapper_contracts.py",
+                  "agents/dev-orchestrator.md",
+                  "agents/implement-agent.md",
+                  "agents/review-agent.md",
+                  "agents/finish-agent.md"
+                ]
+              },
+              {
+                "command": "python3 -m pytest tests/ -v",
+                "scope": "full_regression",
+                "result": "pass",
+                "covers": [
+                  "tests/"
+                ]
+              },
+              {
+                "command": "python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git",
+                "scope": "derived_drift",
+                "result": "pass",
+                "covers": [
+                  ".opencode/",
+                  ".claude/",
+                  ".cursor/",
+                  "skills/sdlc-project-bootstrap/templates/workflow/workflow.py"
+                ]
+              },
+              {
+                "command": "git status --short",
+                "scope": "change_set_discovery",
+                "result": "pass",
+                "covers": [
+                  "worktree change-set validation"
+                ]
+              }
+            ],
+            "raw_log_paths": [],
+            "history_handoff_paths": [
+              ".ai/workflows/runs/active/2026-07-09-workflow-runtime-execution-context-and-agent-result-integrity/handoffs/default/history/implement-agent-20260709T100420004228Z.md"
+            ]
+          },
+          "blockers": [],
+          "recommended_next_action": "dispatch_review_agent",
+          "recorded_at": "2026-07-09T18:04:20.000364"
+        },
+        "review-agent": {
+          "agent": "review-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "tasks_complete": true,
+            "tdd_passed": true,
+            "eval_passed_or_human_decision_recorded": true,
+            "review_complete": true,
+            "verification_passed": true,
+            "review_decision": "accepted",
+            "criteria_satisfied": "tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded"
+          },
+          "artifacts": {
+            "handoff_path": ".ai/workflows/runs/active/2026-07-09-workflow-runtime-execution-context-and-agent-result-integrity/handoffs/default/review-agent.md",
+            "worktree_path": "/Users/yuping/Documents/workspace/oh_my_skills",
+            "reviewed_changed_files": [
+              ".ai/workflows/scripts/workflow.py",
+              "agents/dev-orchestrator.md",
+              "agents/implement-agent.md",
+              "agents/review-agent.md",
+              "agents/finish-agent.md",
+              "tests/test_workflow.py",
+              "tests/test_wrapper_contracts.py",
+              "docs/superpowers/plans/2026-07-05-workflow-runtime-execution-context-and-agent-result-integrity.md",
+              "skills/sdlc-project-bootstrap/templates/workflow/workflow.py"
+            ],
+            "design_artifact_paths": [
+              "/Users/yuping/Documents/workspace/oh_my_skills/docs/superpowers/plans/2026-07-05-workflow-runtime-execution-context-and-agent-result-integrity.md",
+              "/Users/yuping/Documents/workspace/oh_my_skills/docs/superpowers/specs/2026-07-05-workflow-runtime-execution-context-and-agent-result-integrity.md"
+            ],
+            "raw_log_paths": [],
+            "history_handoff_paths": [
+              ".ai/workflows/runs/active/2026-07-09-workflow-runtime-execution-context-and-agent-result-integrity/handoffs/default/history/review-agent-20260709T101209833082Z.md"
+            ]
+          },
+          "blockers": [],
+          "recommended_next_action": "complete_phase",
+          "recorded_at": "2026-07-09T18:12:09.829722"
+        },
+        "finish-agent": {
+          "agent": "finish-agent",
+          "status": "success",
+          "phase": "archive_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "archive_path_exists": true
+          },
+          "artifacts": {
+            "handoff_path": ".ai/workflows/runs/active/2026-07-09-workflow-runtime-execution-context-and-agent-result-integrity/handoffs/default/finish-agent.md"
+          },
+          "blockers": [],
+          "recommended_next_action": "complete_phase",
+          "recorded_at": "2026-07-09T18:14:06.113905"
+        }
+      }
+    },
+    "tasks_complete": true,
+    "tdd_passed": true,
+    "eval_passed_or_human_decision_recorded": true,
+    "archive_path_exists": true,
+    "roadmap_link": {
+      "count": 0,
+      "items": []
+    }
+  },
+  "block": null,
+  "updated_at": "2026-07-09T18:14:29.440743"
+}
