@@ -2513,6 +2513,39 @@ class TestReviewAgentFinalOutputContract(unittest.TestCase):
         self.assertIn("Do not include handoff prose in the final response", self._body())
 
 
+class TestFinishAgentFinalOutputContract(unittest.TestCase):
+    """finish-agent final output must be consumable by workflow after-dispatch."""
+
+    def _body(self):
+        return (AGENTS_DIR / "finish-agent.md").read_text(encoding="utf-8")
+
+    def test_prompt_contains_final_output_contract_discipline_heading(self):
+        self.assertIn("Final Output Contract Discipline", self._body())
+
+    def test_prompt_requires_exactly_one_valid_json_object(self):
+        self.assertIn("exactly one valid JSON object", self._body())
+
+    def test_prompt_says_thought_json_does_not_satisfy_contract(self):
+        body = self._body()
+        self.assertIn("final response body", body)
+        self.assertIn("reasoning/thoughts", body)
+        self.assertIn("does not satisfy the contract", body)
+
+    def test_prompt_prohibits_markdown_fences_in_final_response(self):
+        self.assertIn("Do not wrap the JSON object in a fenced code block", self._body())
+
+    def test_prompt_requires_post_archive_actions_cleanup_evidence(self):
+        body = self._body()
+        for key in (
+            "memory_sync_done: true",
+            "roadmap_done_checked: true",
+            "derived_artifacts_synced: true",
+            "post_hook_dirty_tree: false",
+            "cleanup_complete: true",
+        ):
+            self.assertIn(key, body)
+
+
 class TestImplementAgentChangeSetAndRegressionContract(unittest.TestCase):
     """implement-agent must hand off changed-file evidence and run full regression."""
 

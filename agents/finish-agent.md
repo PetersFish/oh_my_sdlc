@@ -394,6 +394,27 @@ Commit checkpoint evidence (recorded during `post_archive_actions` cleanup):
 `pending_hooks_empty` is legacy repair evidence only. Do not emit it in
 normal-flow `archive_change` or `post_archive_actions` success output.
 
+## Final Output Contract Discipline
+
+Before returning, ensure the final response is exactly one valid JSON object.
+The workflow parent can only consume the final response body; JSON written in
+reasoning/thoughts, logs, or handoff Markdown does not satisfy the contract.
+
+Rules:
+- Do not include Markdown outside the JSON object.
+- Do not wrap the JSON object in a fenced code block.
+- Do not include handoff prose in the final response.
+- If writing a handoff artifact, write Markdown to the artifact file only.
+- `evidence` must include the phase-specific evidence keys listed above.
+- For `post_archive_actions` success, include `memory_sync_done: true`,
+  `roadmap_done_checked: true`, `derived_artifacts_synced: true`,
+  `post_hook_dirty_tree: false`, and `cleanup_complete: true` in the final
+  JSON response body.
+- `artifacts.handoff_path` must point to the handoff artifact when one is
+  written.
+- `blockers` must be a JSON array.
+- `recommended_next_action` must match the allowed enum.
+
 ## Handoff Artifact
 
 Write at `.ai/workflows/runs/active/<run_id>/handoffs/<slice_id>/finish-agent.md`.
