@@ -3,8 +3,8 @@
   "run_id": "2026-07-09-workflow-runtime-execution-context-and-agent-result-integrity",
   "workflow": "sdlc-main",
   "flow_type": "lightweight-flow",
-  "status": "running",
-  "current_phase": "post_archive_actions",
+  "status": "done",
+  "current_phase": "done",
   "primary_subject": {
     "type": "spec_change",
     "id": "workflow-runtime-execution-context-and-agent-result-integrity"
@@ -13,7 +13,7 @@
     "change_id": "workflow-runtime-execution-context-and-agent-result-integrity"
   },
   "phase_readiness": {
-    "phase": "post_archive_actions",
+    "phase": "done",
     "ready": true,
     "missing_required_inputs": []
   },
@@ -21,7 +21,8 @@
   "completed_hooks": [],
   "completed_phases": [
     "apply_change",
-    "archive_change"
+    "archive_change",
+    "post_archive_actions"
   ],
   "gates": {},
   "evidence": {
@@ -40,18 +41,26 @@
     "agent_result": {
       "agent": "finish-agent",
       "status": "success",
-      "phase": "archive_change",
+      "phase": "post_archive_actions",
       "slice_id": "default",
       "flow_type": "lightweight-flow",
       "evidence": {
-        "archive_path_exists": true
+        "memory_sync_done": true,
+        "roadmap_done_checked": true,
+        "derived_artifacts_synced": true,
+        "post_hook_dirty_tree": false,
+        "cleanup_complete": true,
+        "pre_hook_commit_id": "ab06a0287f43ec7e50b280ce1bddd2cdc39d3aad",
+        "pre_hook_pushed": true,
+        "post_hook_commit_id": "e280e0d8ee5b14ee8f112bfe630bdc3ee7093ecb",
+        "post_hook_pushed": true
       },
       "artifacts": {
         "handoff_path": ".ai/workflows/runs/active/2026-07-09-workflow-runtime-execution-context-and-agent-result-integrity/handoffs/default/finish-agent.md"
       },
       "blockers": [],
       "recommended_next_action": "complete_phase",
-      "recorded_at": "2026-07-09T18:14:06.113905"
+      "recorded_at": "2026-07-09T18:20:04.097782"
     },
     "agent_results": {
       "default": {
@@ -485,18 +494,26 @@
         "finish-agent": {
           "agent": "finish-agent",
           "status": "success",
-          "phase": "archive_change",
+          "phase": "post_archive_actions",
           "slice_id": "default",
           "flow_type": "lightweight-flow",
           "evidence": {
-            "archive_path_exists": true
+            "memory_sync_done": true,
+            "roadmap_done_checked": true,
+            "derived_artifacts_synced": true,
+            "post_hook_dirty_tree": false,
+            "cleanup_complete": true,
+            "pre_hook_commit_id": "ab06a0287f43ec7e50b280ce1bddd2cdc39d3aad",
+            "pre_hook_pushed": true,
+            "post_hook_commit_id": "e280e0d8ee5b14ee8f112bfe630bdc3ee7093ecb",
+            "post_hook_pushed": true
           },
           "artifacts": {
             "handoff_path": ".ai/workflows/runs/active/2026-07-09-workflow-runtime-execution-context-and-agent-result-integrity/handoffs/default/finish-agent.md"
           },
           "blockers": [],
           "recommended_next_action": "complete_phase",
-          "recorded_at": "2026-07-09T18:14:06.113905"
+          "recorded_at": "2026-07-09T18:20:04.097782"
         }
       }
     },
@@ -507,8 +524,13 @@
     "roadmap_link": {
       "count": 0,
       "items": []
-    }
+    },
+    "memory_sync_done": true,
+    "roadmap_done_checked": true,
+    "derived_artifacts_synced": true,
+    "post_hook_dirty_tree": false,
+    "cleanup_complete": true
   },
   "block": null,
-  "updated_at": "2026-07-09T18:14:29.440743"
+  "updated_at": "2026-07-09T18:20:10.332035"
 }
