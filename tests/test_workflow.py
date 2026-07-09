@@ -498,6 +498,21 @@ class TestAdvanceGuarded(FixtureBase):
             "gates": {},
             "evidence": {
                 "archive_path": "openspec/changes/archive/2026-06-22-advance-done",
+                "agent_phase": {"slice_id": "default"},
+                "agent_results": {
+                    "default": {
+                        "finish-agent": {
+                            "agent": "finish-agent",
+                            "status": "success",
+                            "phase": "post_archive_actions",
+                            "slice_id": "default",
+                            "flow_type": "spec-flow",
+                            "evidence": {},
+                            "artifacts": {},
+                            "blockers": [],
+                        }
+                    }
+                },
             },
             "block": None,
             "updated_at": "2026-06-20T00:00:00",
@@ -708,6 +723,21 @@ class TestSubagentOwnedLifecycleCleanup(FixtureBase):
             "derived_artifacts_synced": True,
             "post_hook_dirty_tree": False,
             "cleanup_complete": True,
+            "agent_phase": {"slice_id": "default"},
+            "agent_results": {
+                "default": {
+                    "finish-agent": {
+                        "agent": "finish-agent",
+                        "status": "success",
+                        "phase": "post_archive_actions",
+                        "slice_id": "default",
+                        "flow_type": "lightweight-flow",
+                        "evidence": {},
+                        "artifacts": {},
+                        "blockers": [],
+                    }
+                }
+            },
         }
         self._write_current_state(state)
 
@@ -1056,6 +1086,19 @@ class TestPostArchiveHooks(FixtureBase):
         ]
         state["status"] = "running"
         state["block"] = None
+        state.setdefault("evidence", {}).setdefault("agent_results", {})["default"] = {
+            "finish-agent": {
+                "agent": "finish-agent",
+                "status": "success",
+                "phase": "post_archive_actions",
+                "slice_id": "default",
+                "flow_type": "spec-flow",
+                "evidence": {},
+                "artifacts": {},
+                "blockers": [],
+            }
+        }
+        state.setdefault("evidence", {}).setdefault("agent_phase", {})["slice_id"] = "default"
         self._write_current_state(state)
 
         rc, out3, _ = run_workflow(self.tmp, "done")
@@ -1294,6 +1337,22 @@ class TestDone(FixtureBase):
             "post_archive_actions",
         ]
         state["status"] = "running"
+        # Record finish-agent evidence so terminal validation passes.
+        state.setdefault("evidence", {}).setdefault("agent_results", {})["default"] = {
+            "finish-agent": {
+                "agent": "finish-agent",
+                "status": "success",
+                "phase": "post_archive_actions",
+                "slice_id": "default",
+                "flow_type": "spec-flow",
+                "evidence": {},
+                "artifacts": {},
+                "blockers": [],
+            }
+        }
+        # Mirror before-dispatch: record the dispatch intent slice_id so
+        # terminal validation resolves the relevant slice as "default".
+        state.setdefault("evidence", {}).setdefault("agent_phase", {})["slice_id"] = "default"
         self._write_current_state(state)
 
     def test_done_clears_active_and_pointer(self):
@@ -1834,6 +1893,19 @@ class TestGateLedger(FixtureBase):
         ]
         state["gates"] = {"evalops": {"status": "passed"}}
         state["status"] = "running"
+        state.setdefault("evidence", {}).setdefault("agent_results", {})["default"] = {
+            "finish-agent": {
+                "agent": "finish-agent",
+                "status": "success",
+                "phase": "post_archive_actions",
+                "slice_id": "default",
+                "flow_type": "spec-flow",
+                "evidence": {},
+                "artifacts": {},
+                "blockers": [],
+            }
+        }
+        state.setdefault("evidence", {}).setdefault("agent_phase", {})["slice_id"] = "default"
         self._write_current_state(state)
 
         rc, out, _ = run_workflow(self.tmp, "done")
@@ -3611,6 +3683,19 @@ class TestConcurrentRuns(FixtureBase):
             "post_archive_actions",
         ]
         state["status"] = "running"
+        state.setdefault("evidence", {}).setdefault("agent_results", {})["default"] = {
+            "finish-agent": {
+                "agent": "finish-agent",
+                "status": "success",
+                "phase": "post_archive_actions",
+                "slice_id": "default",
+                "flow_type": "spec-flow",
+                "evidence": {},
+                "artifacts": {},
+                "blockers": [],
+            }
+        }
+        state.setdefault("evidence", {}).setdefault("agent_phase", {})["slice_id"] = "default"
         self._write_current_state(state)
 
         rc, out, _ = run_workflow(self.tmp, "done")
@@ -6748,6 +6833,617 @@ class TestExitCriteriaEvidenceKeySatisfaction(FixtureBase):
             str(data.get("blockers", [])),
             "Empty criteria_satisfied with truthy evidence keys should pass via evidence key path",
         )
+
+
+class TestExecutionContextAndRuntimeContext(FixtureBase):
+    """Tests for execution_mode context storage, validation, record-context,
+    before-dispatch runtime_context output, and after-dispatch slice fallback /
+    artifact persistence.
+
+    Covers Tasks 1-3 of the workflow-runtime-execution-context plan:
+    - execution_mode defaults to main_checkout for legacy runs
+    - main_checkout does not require worktree fields
+    - worktree mode records and exposes worktree metadata
+    - base_ref is not required in new outputs; base_branch/parent_ref preferred
+    - before-dispatch emits runtime_context derived from state.context
+    - after-dispatch slice fallback order: CLI > agent result > dispatch intent > change_id > default
+    - after-dispatch persists artifacts under evidence.agent_result and agent_results[slice][agent]
+    """
+
+    def _create_apply_change_run(self, change_id="exec-ctx-demo"):
+        self._make_roadmap_item("RM-EXEC-001", "ready", openspec_change=change_id)
+        run_workflow(
+            self.tmp, "start",
+            subject_type="roadmap_item",
+            subject_id="RM-EXEC-001",
+        )
+        state = self._read_current_state()
+        state["current_phase"] = "apply_change"
+        # Ensure context.change_id is set for runtime_context output.
+        state.setdefault("context", {}).setdefault("change_id", change_id)
+        self._write_current_state(state)
+
+    # --- Task 1: execution_mode storage and validation ---
+
+    def test_legacy_run_without_execution_mode_defaults_to_main_checkout(self):
+        """A run state without execution_mode is interpreted as main_checkout."""
+        self._create_apply_change_run()
+        state = self._read_current_state()
+        # Legacy run has no execution_mode
+        state.get("context", {}).pop("execution_mode", None)
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="implement-agent",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        # before-dispatch should expose runtime_context.execution_mode == main_checkout
+        self.assertIn("runtime_context", data)
+        self.assertEqual(data["runtime_context"]["execution_mode"], "main_checkout")
+
+    def test_main_checkout_run_does_not_require_worktree_fields(self):
+        """main_checkout mode runs without worktree_path or feature_branch."""
+        self._create_apply_change_run()
+        state = self._read_current_state()
+        state.setdefault("context", {})["execution_mode"] = "main_checkout"
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="implement-agent",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["runtime_context"]["execution_mode"], "main_checkout")
+        # worktree fields should be absent or empty in main_checkout mode
+        rt = data["runtime_context"]
+        self.assertFalse(rt.get("worktree_path"))
+        self.assertFalse(rt.get("feature_branch"))
+
+    def test_worktree_mode_records_and_exposes_all_fields(self):
+        """worktree mode records control_root, worktree_path, base_branch,
+        feature_branch, parent_ref and exposes them in runtime_context."""
+        self._create_apply_change_run()
+        state = self._read_current_state()
+        state.setdefault("context", {}).update({
+            "execution_mode": "worktree",
+            "control_root": "/path/to/control",
+            "worktree_path": "/path/to/control/.worktrees/exec-ctx-demo",
+            "base_branch": "main",
+            "feature_branch": "feature/exec-ctx-demo",
+            "parent_ref": "abc123def456",
+        })
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="implement-agent",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        rt = data["runtime_context"]
+        self.assertEqual(rt["execution_mode"], "worktree")
+        self.assertEqual(rt["control_root"], "/path/to/control")
+        self.assertEqual(rt["worktree_path"], "/path/to/control/.worktrees/exec-ctx-demo")
+        self.assertEqual(rt["base_branch"], "main")
+        self.assertEqual(rt["feature_branch"], "feature/exec-ctx-demo")
+        self.assertEqual(rt["parent_ref"], "abc123def456")
+
+    def test_base_ref_not_required_in_new_outputs(self):
+        """New outputs use base_branch and parent_ref; base_ref is not required."""
+        self._create_apply_change_run()
+        state = self._read_current_state()
+        state.setdefault("context", {}).update({
+            "execution_mode": "worktree",
+            "control_root": "/ctrl",
+            "worktree_path": "/ctrl/.worktrees/x",
+            "base_branch": "main",
+            "feature_branch": "feature/x",
+            "parent_ref": "deadbeef",
+        })
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="implement-agent",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        rt = data["runtime_context"]
+        self.assertIn("base_branch", rt)
+        self.assertIn("parent_ref", rt)
+        # base_ref is not a canonical field in new runtime_context
+        self.assertNotIn("base_ref", rt)
+
+    def test_invalid_execution_mode_is_rejected(self):
+        """An invalid execution_mode value should be rejected."""
+        self._create_apply_change_run()
+        state = self._read_current_state()
+        state.setdefault("context", {})["execution_mode"] = "bogus_mode"
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="implement-agent",
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [b["reason"] for b in data.get("blockers", [])]
+        self.assertIn("invalid_execution_mode", reasons)
+
+    # --- Task 6: record-context validates mode-specific requirements ---
+
+    def test_record_context_sets_execution_mode(self):
+        """record-context can set execution_mode to main_checkout."""
+        self._create_apply_change_run()
+        rc, out, _ = run_workflow(
+            self.tmp, "record-context",
+            key="execution_mode",
+            value="main_checkout",
+        )
+        self.assertEqual(rc, 0)
+        state = self._read_current_state()
+        self.assertEqual(state["context"]["execution_mode"], "main_checkout")
+
+    def test_record_context_rejects_invalid_execution_mode(self):
+        """record-context rejects an invalid execution_mode value."""
+        self._create_apply_change_run()
+        rc, out, _ = run_workflow(
+            self.tmp, "record-context",
+            key="execution_mode",
+            value="bogus_mode",
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertIn("error", data)
+
+    def test_record_context_worktree_mode_requires_worktree_fields(self):
+        """Setting execution_mode=worktree via record-context requires worktree_path
+        and feature_branch before the context change is committed."""
+        self._create_apply_change_run()
+        # Setting worktree mode without required fields should be rejected
+        rc, out, _ = run_workflow(
+            self.tmp, "record-context",
+            key="execution_mode",
+            value="worktree",
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertIn("error", data)
+
+    # --- Task 2: before-dispatch runtime_context output ---
+
+    def test_before_dispatch_includes_runtime_context_with_change_id(self):
+        """before-dispatch output includes runtime_context with change_id."""
+        self._create_apply_change_run()
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="implement-agent",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertIn("runtime_context", data)
+        rt = data["runtime_context"]
+        self.assertEqual(rt["execution_mode"], "main_checkout")
+        self.assertIn("change_id", rt)
+        self.assertEqual(rt["change_id"], "exec-ctx-demo")
+
+    def test_before_dispatch_runtime_context_includes_parent_ref_when_recorded(self):
+        """parent_ref appears in runtime_context when recorded; base_branch stays branch name."""
+        self._create_apply_change_run()
+        state = self._read_current_state()
+        state.setdefault("context", {}).update({
+            "execution_mode": "worktree",
+            "control_root": "/ctrl",
+            "worktree_path": "/ctrl/.worktrees/x",
+            "base_branch": "main",
+            "feature_branch": "feature/x",
+            "parent_ref": "abc123",
+        })
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="implement-agent",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        rt = data["runtime_context"]
+        self.assertEqual(rt["parent_ref"], "abc123")
+        self.assertEqual(rt["base_branch"], "main")
+
+    # --- Task 3: after-dispatch slice fallback and artifact persistence ---
+
+    def test_after_dispatch_slice_fallback_uses_agent_result_slice_id(self):
+        """When CLI omits --slice-id but agent result includes slice_id,
+        after-dispatch uses the agent result's slice_id (fallback order 2)."""
+        self._create_apply_change_run()
+        agent_result = json.dumps({
+            "status": "success",
+            "slice_id": "from-agent-result",
+            "evidence": {"focused_tests": [{"command": "pytest -k x", "result": "pass"}]},
+            "blockers": [],
+            "artifacts": {"handoff_path": ".ai/workflows/runs/run-1/handoffs/from-agent-result/implement-agent.md"},
+        })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="implement-agent",
+            value=agent_result,
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["slice_id"], "from-agent-result")
+        state = self._read_current_state()
+        agent_results = state.get("evidence", {}).get("agent_results", {})
+        self.assertIn("from-agent-result", agent_results)
+        self.assertIn("implement-agent", agent_results["from-agent-result"])
+
+    def test_after_dispatch_slice_fallback_uses_dispatch_intent_slice_id(self):
+        """When neither CLI nor agent result include slice_id, after-dispatch
+        uses the dispatch intent slice_id from state evidence (fallback order 3)."""
+        self._create_apply_change_run()
+        # Record a dispatch intent with a slice_id
+        run_workflow(
+            self.tmp, "before-dispatch",
+            agent="implement-agent",
+            slice_id="from-dispatch-intent",
+        )
+        agent_result = json.dumps({
+            "status": "success",
+            "evidence": {"focused_tests": [{"command": "pytest -k x", "result": "pass"}]},
+            "blockers": [],
+            "artifacts": {"handoff_path": ".ai/workflows/runs/run-1/handoffs/from-dispatch-intent/implement-agent.md"},
+        })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="implement-agent",
+            value=agent_result,
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["slice_id"], "from-dispatch-intent")
+
+    def test_after_dispatch_slice_fallback_uses_change_id(self):
+        """When CLI, agent result, and dispatch intent all omit slice_id,
+        after-dispatch uses context.change_id (fallback order 4)."""
+        self._create_apply_change_run(change_id="ctx-change-id")
+        agent_result = json.dumps({
+            "status": "success",
+            "evidence": {"focused_tests": [{"command": "pytest -k x", "result": "pass"}]},
+            "blockers": [],
+            "artifacts": {"handoff_path": ".ai/workflows/runs/run-1/handoffs/ctx-change-id/implement-agent.md"},
+        })
+        # No before-dispatch to set dispatch_intent slice_id
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="implement-agent",
+            value=agent_result,
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["slice_id"], "ctx-change-id")
+
+    def test_after_dispatch_persists_artifacts_under_agent_result(self):
+        """after-dispatch persists artifacts under latest evidence.agent_result."""
+        self._create_apply_change_run()
+        agent_result = json.dumps({
+            "status": "success",
+            "evidence": {"focused_tests": [{"command": "pytest -k x", "result": "pass"}]},
+            "blockers": [],
+            "artifacts": {
+                "handoff_path": ".ai/workflows/runs/run-1/handoffs/slice-art/implement-agent.md",
+                "worktree_path": "/path/to/worktree",
+                "repo_root": "/path/to/repo",
+                "base_branch": "main",
+                "parent_ref": "abc123",
+                "feature_branch": "feature/x",
+                "changed_files": [{"path": "src/x.py", "status": "modified"}],
+                "diff_commands": ["git diff -- src/x.py"],
+                "verification_commands": [{"command": "pytest", "scope": "full_regression", "result": "pass"}],
+            },
+        })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="implement-agent",
+            slice_id="slice-art",
+            value=agent_result,
+        )
+        self.assertEqual(rc, 0)
+        state = self._read_current_state()
+        latest = state.get("evidence", {}).get("agent_result", {})
+        self.assertIn("artifacts", latest)
+        arts = latest["artifacts"]
+        self.assertEqual(arts["worktree_path"], "/path/to/worktree")
+        self.assertEqual(arts["base_branch"], "main")
+        self.assertEqual(arts["parent_ref"], "abc123")
+        self.assertEqual(arts["feature_branch"], "feature/x")
+        self.assertNotIn("base_ref", arts)
+
+    def test_after_dispatch_persists_artifacts_under_agent_results_by_slice(self):
+        """after-dispatch persists artifacts under evidence.agent_results[slice][agent]."""
+        self._create_apply_change_run()
+        agent_result = json.dumps({
+            "status": "success",
+            "evidence": {"focused_tests": [{"command": "pytest -k x", "result": "pass"}]},
+            "blockers": [],
+            "artifacts": {
+                "handoff_path": ".ai/workflows/runs/run-1/handoffs/slice-by/implement-agent.md",
+                "worktree_path": "/wt",
+                "base_branch": "main",
+                "parent_ref": "deadbeef",
+            },
+        })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="implement-agent",
+            slice_id="slice-by",
+            value=agent_result,
+        )
+        self.assertEqual(rc, 0)
+        state = self._read_current_state()
+        per_slice = state.get("evidence", {}).get("agent_results", {}).get("slice-by", {}).get("implement-agent", {})
+        self.assertIn("artifacts", per_slice)
+        self.assertEqual(per_slice["artifacts"]["base_branch"], "main")
+        self.assertEqual(per_slice["artifacts"]["parent_ref"], "deadbeef")
+
+    def test_after_dispatch_does_not_emit_base_ref_in_new_artifacts(self):
+        """New agent artifact persistence must not rely on base_ref."""
+        self._create_apply_change_run()
+        agent_result = json.dumps({
+            "status": "success",
+            "evidence": {"focused_tests": [{"command": "pytest -k x", "result": "pass"}]},
+            "blockers": [],
+            "artifacts": {
+                "handoff_path": ".ai/workflows/runs/run-1/handoffs/no-baseref/implement-agent.md",
+                "base_branch": "main",
+                "parent_ref": "abc123",
+            },
+        })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="implement-agent",
+            slice_id="no-baseref",
+            value=agent_result,
+        )
+        self.assertEqual(rc, 0)
+        state = self._read_current_state()
+        latest = state.get("evidence", {}).get("agent_result", {})
+        arts = latest.get("artifacts", {})
+        self.assertNotIn("base_ref", arts)
+
+
+class TestTerminalEvidenceValidation(FixtureBase):
+    """Tests for Option B terminal evidence validation (Task 4/9).
+
+    Terminal commands (advance, done) must refuse to move active runs to history
+    when required final lifecycle evidence is missing.  For archive_change /
+    post_archive_actions completion, the relevant finish-agent result must be
+    recorded in evidence.agent_results[slice][finish-agent] before terminal movement.
+    """
+
+    def _prepare_post_archive_done_state(self, change_id="terminal-evidence-demo"):
+        """Prepare a run at post_archive_actions phase ready for done."""
+        self._make_openspec_archive(change_id)
+        run_workflow(
+            self.tmp, "start",
+            subject_type="spec_change",
+            subject_id=change_id,
+        )
+        run_workflow(
+            self.tmp, "complete-hook",
+            hook="roadmap_done_if_relevant",
+        )
+        run_workflow(
+            self.tmp, "complete-hook",
+            hook="memory_sync",
+            resolution="synced",
+        )
+        state = self._read_current_state()
+        state["current_phase"] = "done"
+        state["completed_phases"] = [
+            "input", "load_memory", "brainstorm", "decide_intent",
+            "create_change", "apply_change", "archive_change",
+            "post_archive_actions",
+        ]
+        state["status"] = "running"
+        self._write_current_state(state)
+
+    def _record_finish_agent_result(self, slice_id="default", status="success"):
+        """Record a finish-agent result in agent_results via after-dispatch.
+
+        Preserves the done phase state by saving and restoring current_phase
+        around the after-dispatch call, since after-dispatch reads the phase
+        from state when --phase is not provided.
+
+        Also records the dispatch intent slice_id in ``evidence.agent_phase``
+        to mirror what ``before-dispatch`` would set for the finish-agent
+        dispatch, so terminal validation can resolve the relevant slice.
+        """
+        state = self._read_current_state()
+        saved_phase = state.get("current_phase", "done")
+        # Temporarily set phase to post_archive_actions for the after-dispatch.
+        state["current_phase"] = "post_archive_actions"
+        state["status"] = "running"
+        state["block"] = None
+        # Mirror before-dispatch: record the dispatch intent slice_id.
+        state.setdefault("evidence", {}).setdefault("agent_phase", {})["slice_id"] = slice_id
+        self._write_current_state(state)
+
+        result = json.dumps({
+            "status": status,
+            "phase": "post_archive_actions",
+            "slice_id": slice_id,
+            "flow_type": "spec-flow",
+            "evidence": {
+                "memory_sync_done": True,
+                "roadmap_done_checked": True,
+                "derived_artifacts_synced": True,
+                "post_hook_dirty_tree": False,
+                "cleanup_complete": True,
+                "pending_hooks_empty": True,
+                "criteria_satisfied": "pending_hooks_empty,memory_sync_done,roadmap_done_checked,derived_artifacts_synced,post_hook_dirty_tree,cleanup_complete",
+            },
+            "blockers": [],
+            "artifacts": {"handoff_path": ".ai/workflows/runs/run-1/handoffs/default/finish-agent.md"},
+            "recommended_next_action": "complete_phase",
+        })
+        run_workflow(
+            self.tmp, "after-dispatch",
+            agent="finish-agent",
+            slice_id=slice_id,
+            value=result,
+        )
+
+        # Restore the done phase for terminal commands.
+        state = self._read_current_state()
+        state["current_phase"] = saved_phase
+        state["status"] = "running"
+        state["block"] = None
+        self._write_current_state(state)
+
+    def test_done_refuses_terminal_move_without_finish_agent_evidence(self):
+        """done must refuse to move the run to history when finish-agent evidence
+        is missing from agent_results."""
+        self._prepare_post_archive_done_state()
+        # No finish-agent after-dispatch recorded
+        rc, out, _ = run_workflow(self.tmp, "done")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertIn("error", data)
+        self.assertIn("finish-agent", str(data))
+        # Active run must remain in place
+        state = self._read_current_state()
+        self.assertIsNotNone(state)
+        self.assertNotEqual(state.get("status"), "done")
+
+    def test_done_proceeds_when_finish_agent_evidence_present(self):
+        """done can proceed when finish-agent evidence is present in agent_results."""
+        self._prepare_post_archive_done_state()
+        self._record_finish_agent_result()
+
+        rc, out, _ = run_workflow(self.tmp, "done")
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "done")
+
+    def test_advance_refuses_terminal_move_without_finish_agent_evidence(self):
+        """advance to done must refuse terminal movement when finish-agent
+        evidence is missing."""
+        self._prepare_post_archive_done_state()
+        # Set up so advance will move to done (current_phase post_archive_actions
+        # is terminal).  Mark the phase complete so advance reaches the
+        # terminal movement path where finish-agent validation runs.
+        state = self._read_current_state()
+        state["current_phase"] = "post_archive_actions"
+        state["status"] = "running"
+        state["pending_hooks"] = []
+        state["block"] = None
+        state["completed_phases"] = [
+            "input", "load_memory", "brainstorm", "decide_intent",
+            "create_change", "apply_change", "archive_change",
+            "post_archive_actions",
+        ]
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(self.tmp, "advance")
+        # advance to done should refuse because finish-agent evidence missing
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertIn("error", data)
+        self.assertIn("finish-agent", str(data))
+
+    def test_advance_proceeds_when_finish_agent_evidence_present(self):
+        """advance to done proceeds when finish-agent evidence is present."""
+        self._prepare_post_archive_done_state()
+        self._record_finish_agent_result()
+        # Set up for advance: mark post_archive_actions complete.
+        state = self._read_current_state()
+        state["current_phase"] = "post_archive_actions"
+        state["status"] = "running"
+        state["pending_hooks"] = []
+        state["block"] = None
+        state["completed_phases"] = [
+            "input", "load_memory", "brainstorm", "decide_intent",
+            "create_change", "apply_change", "archive_change",
+            "post_archive_actions",
+        ]
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(self.tmp, "advance")
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "done")
+
+    def test_terminal_validation_does_not_break_historical_runs(self):
+        """Historical runs already in history without finish-agent evidence
+        remain readable and are not re-validated."""
+        self._prepare_post_archive_done_state()
+        # Manually move a run to history without finish-agent evidence
+        run_id = self._read_current_state()["run_id"]
+        state = self._read_current_state()
+        state["status"] = "done"
+        state["current_phase"] = "done"
+        history_dir = os.path.join(self.tmp, ".ai", "workflows", "runs", "history", run_id)
+        os.makedirs(history_dir, exist_ok=True)
+        with open(os.path.join(history_dir, "run.json"), "w") as f:
+            json.dump(state, f)
+        # Reading history should work (governance-check reads history)
+        history = self._read_history(run_id)
+        self.assertIsNotNone(history)
+        self.assertEqual(history["status"], "done")
+
+    def test_done_refuses_when_finish_agent_evidence_only_under_unrelated_slice(self):
+        """Spec Decision 9: terminal movement requires the relevant finish-agent
+        result.  A successful finish-agent result recorded only under an
+        unrelated slice must NOT satisfy terminal validation.
+
+        The relevant slice is the dispatch intent slice
+        (``evidence.agent_phase.slice_id``), which records the slice under which
+        finish-agent was dispatched.  When finish-agent success exists only under
+        a different slice, ``done`` must refuse terminal movement.
+        """
+        self._prepare_post_archive_done_state()
+        # Record finish-agent success under an unrelated slice.
+        self._record_finish_agent_result(slice_id="unrelated-slice")
+        # Set the dispatch intent slice_id to the expected/relevant slice so
+        # the unrelated-slice evidence does not satisfy validation.
+        state = self._read_current_state()
+        state.setdefault("evidence", {}).setdefault("agent_phase", {})["slice_id"] = "relevant-slice"
+        state["current_phase"] = "done"
+        state["status"] = "running"
+        state["block"] = None
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(self.tmp, "done")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertIn("error", data)
+        self.assertIn("finish-agent", str(data))
+        # Active run must remain in place
+        state = self._read_current_state()
+        self.assertIsNotNone(state)
+        self.assertNotEqual(state.get("status"), "done")
+
+    def test_done_proceeds_when_finish_agent_evidence_under_relevant_slice(self):
+        """When finish-agent success is recorded under the dispatch-intent
+        (relevant) slice, terminal movement proceeds even if an unrelated slice
+        also has stale evidence."""
+        self._prepare_post_archive_done_state()
+        # Record finish-agent success under the relevant slice.
+        self._record_finish_agent_result(slice_id="relevant-slice")
+        state = self._read_current_state()
+        state.setdefault("evidence", {}).setdefault("agent_phase", {})["slice_id"] = "relevant-slice"
+        state["current_phase"] = "done"
+        state["status"] = "running"
+        state["block"] = None
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(self.tmp, "done")
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "done")
 
 
 if __name__ == "__main__":

@@ -152,7 +152,10 @@ must NOT appear in `archive_change` success output.
     "archive_path_exists": true
   },
   "artifacts": {
-    "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/<slice_id>/finish-agent.md"
+    "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/<slice_id>/finish-agent.md",
+    "worktree_path": "...",
+    "feature_branch": "...",
+    "branch_finish_action": "..."
   },
   "blockers": [],
   "recommended_next_action": "complete_phase"
@@ -174,12 +177,32 @@ must NOT appear in `archive_change` success output.
     "cleanup_complete": true
   },
   "artifacts": {
-    "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/<slice_id>/finish-agent.md"
+    "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/<slice_id>/finish-agent.md",
+    "worktree_path": "...",
+    "feature_branch": "...",
+    "branch_finish_action": "..."
   },
   "blockers": [],
   "recommended_next_action": "complete_phase"
 }
 ```
+
+Final artifacts (Spec Decision 8):
+
+- `artifacts.worktree_path`: the implementation source of truth the finish
+  work was performed against.  For `worktree` execution mode, this is the
+  feature worktree path from `runtime_context.worktree_path`; for
+  `main_checkout` it is the control root path.
+- `artifacts.feature_branch`: the branch being finished (from
+  `runtime_context.feature_branch` or `context.feature_branch`).
+- `artifacts.branch_finish_action`: the chosen branch finish action
+  (for example `merge`, `rebase-merge`, `squash-merge`, `pr`, or `keep-branch`)
+  recorded by `finishing-a-development-branch` for lightweight-flow, or
+  `archive` for spec-flow archive_change.
+- `artifacts.handoff_path`: the finish-agent handoff artifact path.
+
+Do not rely on prose-only handoff evidence for these values.  Prefer
+`runtime_context` fields when available.
 
 Blocked example when preconditions are unresolved:
 ```json
@@ -414,6 +437,11 @@ Rules:
   JSON response body.
 - `artifacts.handoff_path` must point to the handoff artifact when one is
   written.
+- `artifacts.worktree_path`, `artifacts.feature_branch`, and
+  `artifacts.branch_finish_action` must be populated in success output
+  (Spec Decision 8 final artifact contract).  Do not rely on prose-only
+  handoff evidence for these values; prefer `runtime_context` fields when
+  available.
 - `blockers` must be a JSON array.
 - `recommended_next_action` must match the allowed enum.
 

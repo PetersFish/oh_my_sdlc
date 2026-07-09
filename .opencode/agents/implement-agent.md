@@ -136,7 +136,8 @@ Before returning success, discover and report the implementation change set from
 Required artifact fields:
 - `worktree_path`
 - `repo_root`
-- `base_ref`
+- `base_branch`
+- `parent_ref`
 - `changed_files[]`
 - `diff_commands[]`
 - `verification_commands[]`
@@ -146,6 +147,9 @@ Rules:
 - Include unstaged tracked, staged, and untracked files.
 - Include `covered_by` or equivalent verification coverage for changed files when available.
 - If using a git worktree, report the exact `worktree_path` used for implementation.
+- Use `base_branch` for the human branch name (e.g. `main`) and `parent_ref`
+  for the exact baseline commit/ref (prefer a commit SHA).  Do not use the
+  ambiguous `base_ref` field in new artifacts.
 
 ## Output — Structured Evidence Envelope
 
@@ -168,7 +172,8 @@ Return JSON:
     "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/<slice_id>/implement-agent.md",
     "worktree_path": "/path/to/worktree",
     "repo_root": "/path/to/repo",
-    "base_ref": "HEAD",
+    "base_branch": "main",
+    "parent_ref": "<commit-sha-or-ref>",
     "changed_files": [
       {
         "path": "path/to/file.py",

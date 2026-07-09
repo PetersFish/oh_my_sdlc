@@ -263,6 +263,14 @@ python3 .ai/workflows/scripts/workflow.py --root . before-dispatch \
 
 If blocked, surface the blocker reason and DO NOT proceed.
 
+`before-dispatch` output includes a `runtime_context` object derived from the
+run context.  Forward `runtime_context` to the dispatched agent so it does not
+need to infer source-of-truth paths from prose.  `runtime_context` includes
+`execution_mode` (`main_checkout` or `worktree`), `change_id`, and — when
+worktree mode is active — `control_root`, `worktree_path`, `base_branch`,
+`feature_branch`, and `parent_ref`.  Agents should consume `runtime_context`
+as the canonical execution source of truth.
+
 ### after_dispatch — records evidence AFTER agent completes
 
 ```
@@ -482,7 +490,8 @@ When `implement-agent` succeeds and `after-dispatch` returns `dispatch_review_ag
 Forward at minimum:
 - `artifacts.worktree_path`
 - `artifacts.repo_root`
-- `artifacts.base_ref`
+- `artifacts.base_branch`
+- `artifacts.parent_ref`
 - `artifacts.changed_files[]`
 - `artifacts.diff_commands[]`
 - `artifacts.verification_commands[]`

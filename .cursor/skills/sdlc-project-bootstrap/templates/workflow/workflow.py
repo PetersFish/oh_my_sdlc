@@ -75,6 +75,45 @@ RUN_STATE_KEYS = {
 VALID_FLOW_TYPES = {"spec-flow", "lightweight-flow"}
 VALID_SUBJECT_TYPES = {"spec_change", "roadmap_item"}
 
+VALID_EXECUTION_MODES = {"main_checkout", "worktree"}
+
+WORKTREE_REQUIRED_FIELDS = ("control_root", "worktree_path", "feature_branch")
+
+
+def _resolve_execution_mode(context):
+    """Return the effective execution_mode for a run context.
+
+    Missing execution_mode is interpreted as ``main_checkout`` for legacy
+    compatibility (Spec Decision 1 / Decision 10).
+    """
+    mode = (context or {}).get("execution_mode")
+    if not mode:
+        return "main_checkout"
+    return mode
+
+
+def _build_runtime_context(context):
+    """Build the canonical runtime_context dict derived from state.context.
+
+    Includes execution_mode for both main_checkout and worktree runs, worktree
+    fields only when available/relevant, and change_id.  Agents should not
+    infer source-of-truth paths from prose when runtime_context is available
+    (Spec Decision 4).
+    """
+    context = context or {}
+    rt = {
+        "execution_mode": _resolve_execution_mode(context),
+        "change_id": context.get("change_id", ""),
+    }
+    for field in (
+        "control_root", "worktree_path", "base_branch",
+        "feature_branch", "parent_ref",
+    ):
+        value = context.get(field)
+        if value:
+            rt[field] = value
+    return rt
+
 
 def _read_pointer(root):
     pointer_path = _resolve_path(root, ".ai/workflows/runs/current.json")
@@ -247,6 +286,62 @@ def _finalize_run_to_history(root, state):
     return state
 
     return state
+
+
+def _missing_terminal_finish_agent_evidence(state):
+    """Return a structured blocker dict if the required final lifecycle
+    finish-agent evidence is missing before terminal movement (Spec Decision 9).
+
+    For archive_change / post_archive_actions completion, the relevant
+    finish-agent result must be recorded in ``evidence.agent_results`` before
+    an active run can be moved to history.  Returns ``None`` when evidence is
+    sufficient.
+
+    The relevant slice is resolved using the same fallback order as
+    after-dispatch minus the CLI/agent-result sources (which are not available
+    at terminal time): dispatch intent slice_id
+    (``evidence.agent_phase.slice_id``), then ``context.change_id``, then
+    ``default``.  A successful finish-agent result recorded only under an
+    unrelated slice does NOT satisfy validation (Spec Decision 9 requires the
+    relevant slice's evidence).
+
+    This validation is scoped to active terminal movement only; historical
+    runs already in history are not re-validated.
+    """
+    completed = state.get("completed_phases", []) or []
+    requires_finish = (
+        "archive_change" in completed or "post_archive_actions" in completed
+    )
+    if not requires_finish:
+        return None
+
+    dispatch_intent_slice_id = (
+        state.get("evidence", {}).get("agent_phase", {}).get("slice_id", "")
+    ) or ""
+    change_id = state.get("context", {}).get("change_id", "") or ""
+    relevant_slice_id = (
+        dispatch_intent_slice_id
+        or change_id
+        or "default"
+    )
+
+    agent_results = state.get("evidence", {}).get("agent_results", {}) or {}
+    by_agent = agent_results.get(relevant_slice_id, {}) or {}
+    finish_result = by_agent.get("finish-agent") or by_agent.get("finish_agent")
+    if finish_result and finish_result.get("status") == "success":
+        return None
+
+    return {
+        "error": (
+            "terminal movement refused: required finish-agent evidence is missing "
+            f"for slice '{relevant_slice_id}'. Record the finish-agent result via "
+            "after-dispatch under the relevant slice before moving the active run "
+            "to history."
+        ),
+        "reason": "missing_finish_agent_evidence",
+        "agent": "finish-agent",
+        "slice_id": relevant_slice_id,
+    }
 
 
 def validate_run_state(state):
@@ -1716,6 +1811,8 @@ def cmd_before_dispatch(root, args):
     current_phase = state.get("current_phase", "")
     phase = args.phase or current_phase
     flow_type = state.get("flow_type", "")
+    context = state.get("context", {}) or {}
+    execution_mode = _resolve_execution_mode(context)
 
     blocker_reasons = []
     if agent not in VALID_AGENT_NAMES:
@@ -1742,6 +1839,28 @@ def cmd_before_dispatch(root, args):
             "message": f"flow_type '{flow_type}' is not a valid value",
             "recommended_action": f"flow_type must be one of: {sorted(VALID_FLOW_TYPES)}",
         })
+    if execution_mode not in VALID_EXECUTION_MODES:
+        blocker_reasons.append({
+            "reason": "invalid_execution_mode",
+            "message": f"execution_mode '{execution_mode}' is not a valid value",
+            "recommended_action": f"execution_mode must be one of: {sorted(VALID_EXECUTION_MODES)}",
+        })
+    elif execution_mode == "worktree":
+        missing_worktree_fields = [
+            f for f in WORKTREE_REQUIRED_FIELDS if not context.get(f)
+        ]
+        if missing_worktree_fields:
+            blocker_reasons.append({
+                "reason": "missing_worktree_context",
+                "message": (
+                    "execution_mode=worktree requires: "
+                    + ", ".join(missing_worktree_fields)
+                ),
+                "recommended_action": (
+                    "record required worktree context fields via "
+                    "workflow.py record-context before dispatching agents"
+                ),
+            })
     allow_replan = _allows_replan_from_apply_change(state, canonical_agent)
     allow_blocked_dispatch = _allows_blocked_dispatch(state, canonical_agent)
     if state.get("status") == "blocked" and agent not in {"finish-agent", "finish_agent"} and not (allow_replan or allow_blocked_dispatch):
@@ -1802,6 +1921,7 @@ def cmd_before_dispatch(root, args):
         "artifacts": {},
         "blockers": [],
         "recommended_next_action": "execute_agent",
+        "runtime_context": _build_runtime_context(context),
     }
     print(json.dumps(result, indent=2))
 
@@ -1985,7 +2105,27 @@ def cmd_after_dispatch(root, args):
     agent_evidence = agent_result.get("evidence", {})
     agent_blockers = agent_result.get("blockers", [])
     agent_recommended = agent_result.get("recommended_next_action", "")
-    slice_id = getattr(args, "slice_id", "") or "default"
+    agent_artifacts = agent_result.get("artifacts") or {}
+
+    # Slice id fallback order (Spec Decision 6):
+    # 1. CLI --slice-id
+    # 2. agent_result.slice_id
+    # 3. state.evidence.agent_phase.slice_id (dispatch intent)
+    # 4. state.context.change_id
+    # 5. "default"
+    cli_slice_id = getattr(args, "slice_id", "") or ""
+    agent_slice_id = agent_result.get("slice_id", "") or ""
+    dispatch_intent_slice_id = (
+        state.get("evidence", {}).get("agent_phase", {}).get("slice_id", "")
+    ) or ""
+    change_id = state.get("context", {}).get("change_id", "") or ""
+    slice_id = (
+        cli_slice_id
+        or agent_slice_id
+        or dispatch_intent_slice_id
+        or change_id
+        or "default"
+    )
 
     premature_cleanup_keys = _premature_archive_cleanup_evidence(
         canonical_agent,
@@ -2009,6 +2149,7 @@ def cmd_after_dispatch(root, args):
         "slice_id": slice_id,
         "flow_type": flow_type,
         "evidence": agent_evidence,
+        "artifacts": agent_artifacts,
         "blockers": agent_blockers,
         "recommended_next_action": agent_recommended,
         "recorded_at": _ts(),
@@ -2209,7 +2350,15 @@ def cmd_record_evidence(root, args):
 
 
 def cmd_record_context(root, args):
-    """Write a key into the run's context dict (e.g., change_id for roadmap promotion)."""
+    """Write a key into the run's context dict (e.g., change_id for roadmap promotion).
+
+    Validates execution_mode-specific requirements before committing context
+    changes (Spec Decision 5):
+    - execution_mode must be one of VALID_EXECUTION_MODES when set.
+    - When execution_mode is set to ``worktree``, required worktree fields
+      (control_root, worktree_path, feature_branch) must already be present
+      in the context after the write.
+    """
     state = load_run_state(root)
     if not state:
         print(json.dumps({"error": "no active run"}, indent=2))
@@ -2220,7 +2369,49 @@ def cmd_record_context(root, args):
     if args.value is None:
         print(json.dumps({"error": "value required for record-context"}, indent=2))
         sys.exit(1)
-    state.setdefault("context", {})[args.key] = args.value
+
+    context = state.setdefault("context", {})
+
+    # Validate execution_mode value when the key being set is execution_mode.
+    if args.key == "execution_mode":
+        if args.value not in VALID_EXECUTION_MODES:
+            print(
+                json.dumps(
+                    {
+                        "error": (
+                            f"invalid execution_mode: {args.value!r}; "
+                            f"must be one of {sorted(VALID_EXECUTION_MODES)}"
+                        )
+                    },
+                    indent=2,
+                )
+            )
+            sys.exit(1)
+
+    # Apply the write to a tentative context for validation.
+    tentative_context = dict(context)
+    tentative_context[args.key] = args.value
+
+    # When execution_mode is worktree, require worktree fields to be present.
+    effective_mode = _resolve_execution_mode(tentative_context)
+    if effective_mode == "worktree":
+        missing = [f for f in WORKTREE_REQUIRED_FIELDS if not tentative_context.get(f)]
+        if missing:
+            print(
+                json.dumps(
+                    {
+                        "error": (
+                            "execution_mode=worktree requires context fields: "
+                            + ", ".join(missing)
+                            + ". Record them before or together with execution_mode."
+                        )
+                    },
+                    indent=2,
+                )
+            )
+            sys.exit(1)
+
+    context[args.key] = args.value
     save_run_state(root, state)
     print(json.dumps(state, indent=2))
 
@@ -2729,6 +2920,13 @@ def cmd_advance(root, args):
                 print(json.dumps(state, indent=2))
                 sys.exit(1)
 
+        # Option B: refuse terminal movement when required final lifecycle
+        # finish-agent evidence is missing (Spec Decision 9).
+        finish_blocker = _missing_terminal_finish_agent_evidence(state)
+        if finish_blocker:
+            print(json.dumps(finish_blocker, indent=2))
+            sys.exit(1)
+
         state["status"] = "done"
         run_id = state["run_id"]
         active_dir = _resolve_path(root, f".ai/workflows/runs/active/{run_id}")
@@ -2826,6 +3024,13 @@ def cmd_done(root, args):
 
     if state.get("status") == "blocked":
         print(json.dumps({"error": "run is blocked, cannot complete"}, indent=2))
+        sys.exit(1)
+
+    # Option B: refuse terminal movement when required final lifecycle
+    # finish-agent evidence is missing (Spec Decision 9).
+    finish_blocker = _missing_terminal_finish_agent_evidence(state)
+    if finish_blocker:
+        print(json.dumps(finish_blocker, indent=2))
         sys.exit(1)
 
     state["status"] = "done"

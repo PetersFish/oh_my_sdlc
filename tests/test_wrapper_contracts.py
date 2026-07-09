@@ -2925,5 +2925,95 @@ class TestWorktreeHydrationScript(unittest.TestCase):
                       f"hydration output must report created directories: {combined}")
 
 
+class TestExecutionContextArtifactContract(unittest.TestCase):
+    """Prompt-contract tests for execution context artifact naming.
+
+    New agent artifacts must use ``base_branch`` and ``parent_ref`` instead of
+    the ambiguous ``base_ref``.  dev-orchestrator must forward
+    ``runtime_context`` and avoid path inference from prose.
+    """
+
+    def test_implement_agent_uses_base_branch_and_parent_ref_not_base_ref(self):
+        body = (AGENTS_DIR / "implement-agent.md").read_text(encoding="utf-8")
+        self.assertIn("base_branch", body)
+        self.assertIn("parent_ref", body)
+        # The Required artifact fields list must not include base_ref.
+        required_fields_idx = body.find("Required artifact fields:")
+        self.assertGreater(required_fields_idx, -1)
+        required_block = body[required_fields_idx:required_fields_idx + 400]
+        self.assertNotIn("`base_ref`", required_block)
+        # The JSON example must not use base_ref.
+        json_block_idx = body.find('"artifacts"')
+        json_block = body[json_block_idx:json_block_idx + 600]
+        self.assertNotIn('"base_ref"', json_block)
+
+    def test_dev_orchestrator_forwards_runtime_context(self):
+        body = (AGENTS_DIR / "dev-orchestrator.md").read_text(encoding="utf-8")
+        self.assertIn("runtime_context", body)
+        self.assertIn("execution_mode", body)
+
+    def test_dev_orchestrator_forwards_base_branch_and_parent_ref(self):
+        body = (AGENTS_DIR / "dev-orchestrator.md").read_text(encoding="utf-8")
+        self.assertIn("base_branch", body)
+        self.assertIn("parent_ref", body)
+        # The review dispatch change-set forward list must not use base_ref.
+        forward_idx = body.find("Forward at minimum:")
+        self.assertGreater(forward_idx, -1)
+        forward_block = body[forward_idx:forward_idx + 400]
+        self.assertNotIn("base_ref", forward_block)
+
+    def test_review_agent_returns_review_artifact_envelope(self):
+        """Spec Decision 8: review-agent must return worktree_path,
+        reviewed_changed_files, and handoff_path in artifacts."""
+        body = (AGENTS_DIR / "review-agent.md").read_text(encoding="utf-8")
+        output_idx = body.find("## Output")
+        self.assertGreater(output_idx, -1)
+        output_block = body[output_idx:output_idx + 1200]
+        self.assertIn("worktree_path", output_block)
+        self.assertIn("reviewed_changed_files", output_block)
+        self.assertIn("handoff_path", output_block)
+
+    def test_review_agent_prefers_runtime_context_for_source_of_truth(self):
+        """Spec Decision 4: review-agent should prefer runtime_context for
+        source-of-truth selection rather than inferring from prose."""
+        body = (AGENTS_DIR / "review-agent.md").read_text(encoding="utf-8")
+        self.assertIn("runtime_context", body)
+        self.assertIn("runtime_context.worktree_path", body)
+
+    def test_finish_agent_returns_final_artifact_envelope(self):
+        """Spec Decision 8: finish-agent must return worktree_path,
+        feature_branch, branch_finish_action, and handoff_path in artifacts."""
+        body = (AGENTS_DIR / "finish-agent.md").read_text(encoding="utf-8")
+        # Both archive_change and post_archive_actions success examples must
+        # include the final artifact fields.
+        for field in ("worktree_path", "feature_branch", "branch_finish_action", "handoff_path"):
+            self.assertIn(field, body, f"finish-agent.md missing final artifact field: {field}")
+        # The archive_change success example block must include the fields.
+        archive_idx = body.find("archive_change` success example")
+        self.assertGreater(archive_idx, -1)
+        archive_block = body[archive_idx:archive_idx + 900]
+        self.assertIn("worktree_path", archive_block)
+        self.assertIn("feature_branch", archive_block)
+        self.assertIn("branch_finish_action", archive_block)
+        # The post_archive_actions success example block must include them too.
+        post_idx = body.find("post_archive_actions` success example")
+        self.assertGreater(post_idx, -1)
+        post_block = body[post_idx:post_idx + 900]
+        self.assertIn("worktree_path", post_block)
+        self.assertIn("feature_branch", post_block)
+        self.assertIn("branch_finish_action", post_block)
+
+    def test_finish_agent_final_artifact_contract_in_output_discipline(self):
+        """The Final Output Contract Discipline section must require the final
+        artifact fields in success output."""
+        body = (AGENTS_DIR / "finish-agent.md").read_text(encoding="utf-8")
+        discipline_idx = body.find("## Final Output Contract Discipline")
+        self.assertGreater(discipline_idx, -1)
+        discipline_block = body[discipline_idx:]
+        self.assertIn("worktree_path", discipline_block)
+        self.assertIn("feature_branch", discipline_block)
+        self.assertIn("branch_finish_action", discipline_block)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

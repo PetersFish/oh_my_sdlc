@@ -154,10 +154,15 @@ When implement-agent evidence or runtime context indicates worktree-mode
 explicit worktree path is the implementation source of truth — not the
 shell cwd, and not the main/control checkout.
 
-The worktree path is provided via `artifacts.worktree_path`,
-`context.worktree_path`, `runtime_context.worktree_path`, or
-implement-agent handoff evidence. Treat whichever is present or expected
-as the implementation source of truth.
+Prefer the most explicit runtime context field available, in this order:
+
+1. `runtime_context.worktree_path` (emitted by `before-dispatch`)
+2. `artifacts.worktree_path` (returned by implement-agent)
+3. `context.worktree_path`
+4. implement-agent handoff evidence
+
+Agents should not infer source-of-truth paths from prose when
+`runtime_context` is available.
 
 Before reviewing implementation changes in worktree-mode:
 
@@ -305,6 +310,8 @@ If not, STOP — return blocker and DO NOT begin review.
   },
   "artifacts": {
     "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/<slice_id>/review-agent.md",
+    "worktree_path": "...",
+    "reviewed_changed_files": [],
     "design_artifact_paths": [
       "docs/superpowers/plans/example.md",
       "docs/superpowers/specs/example.md"
@@ -318,6 +325,13 @@ If not, STOP — return blocker and DO NOT begin review.
 When `review-agent` is the final acceptance worker for `apply_change`, it must
 mirror the active phase contract in its success envelope rather than emitting
 review-only evidence.
+
+`artifacts.worktree_path` is the implementation source of truth the review was
+performed against (the live worktree path when `runtime_context.execution_mode`
+is `worktree`, or the control root path for `main_checkout`).  It MUST be
+populated when implementation changes exist.  `artifacts.reviewed_changed_files`
+is the list of changed file paths actually reviewed against the implement-agent
+change set.  Do not rely on prose-only handoff evidence for these values.
 
 Blocked example when review finds an executable issue that implement-agent must fix:
 ```json
