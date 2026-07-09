@@ -10,6 +10,9 @@ Composes existing repository scripts behind a single check/fix contract:
             distribute to project-level workflow template copies, force-install
             + activate agents in all project-level targets, and re-install
             every canonical skill to .opencode/, .claude/, and .cursor/.
+  --dry-run exercise classification, suite selection, command planning, and
+            JSON report construction without invoking subprocesses or
+            mutating distributed outputs / .skill-install.json.
   --json    emit a structured report instead of plain text.
 
 The first version intentionally excludes .ai/memory/, EvalOps exports,
@@ -375,6 +378,7 @@ def run_aggregate(
     json_output: bool = False,
     changed_files: list[str] | None = None,
     incremental: bool = False,
+    dry_run: bool = False,
 ) -> tuple[int, dict | None]:
     """Run the aggregate sync in check or fix mode.
 
@@ -384,6 +388,13 @@ def run_aggregate(
     When `incremental` is True, `changed_files` is classified into affected
     domains and only the selected suites/steps are run. When `incremental` is
     False (default), the full current behavior runs.
+
+    When `dry_run` is True, classification, suite selection, command planning,
+    and JSON report construction are exercised, but no subprocesses are
+    invoked and no writes are performed to distributed outputs or
+    ``.skill-install.json``.  The report includes ``dry_run: true``,
+    ``planned_suites`` with the commands that would have run, and
+    ``skipped_writes: true``.
 
     Incremental fix mode preflights affected skill directories: a missing
     canonical skill directory (deleted/renamed) is reported in
@@ -421,6 +432,48 @@ def run_aggregate(
         suites = _check_suites(root_path) if mode == "check" else _fix_steps(root_path)
         scope = "full"
 
+    if dry_run:
+        # Dry-run: build planned suite records without invoking subprocesses.
+        planned_suites = [
+            {
+                "name": s["name"],
+                "command": s["command"],
+                "returncode": None,
+                "stdout": "",
+                "stderr": "",
+            }
+            for s in suites
+        ]
+
+        # Missing affected skills still force a non-zero exit in dry-run.
+        overall_rc = 1 if missing_skills else 0
+
+        if scope == "skipped":
+            status = "skipped"
+        elif missing_skills:
+            status = "error"
+        else:
+            status = "ok"
+
+        report = {
+            "mode": mode,
+            "scope": scope,
+            "status": status,
+            "returncode": overall_rc,
+            "dry_run": True,
+            "affected": affected.to_report() if affected is not None else None,
+            "missing_skills": missing_skills,
+            "planned_suites": planned_suites,
+            "skipped_writes": True,
+            "suites": [],
+        }
+
+        if json_output:
+            return overall_rc, report
+
+        _print_plain_text_dry_run(mode, scope, status, affected, planned_suites, overall_rc, missing_skills)
+        return overall_rc, None
+
     results = []
     overall_rc = 0
     for suite in suites:
@@ -453,6 +506,7 @@ def run_aggregate(
         "scope": scope,
         "status": status,
         "returncode": overall_rc,
+        "dry_run": False,
         "affected": affected.to_report() if affected is not None else None,
         "missing_skills": missing_skills,
         "suites": results,
@@ -463,6 +517,50 @@ def run_aggregate(
 
     _print_plain_text(mode, scope, status, affected, results, overall_rc, missing_skills)
     return overall_rc, None
+
+
+def _print_plain_text_dry_run(
+    mode: str,
+    scope: str,
+    status: str,
+    affected: Affected | None,
+    planned_suites: list[dict],
+    overall_rc: int,
+    missing_skills: list[str] | None = None,
+) -> None:
+    missing_skills = missing_skills or []
+    if missing_skills:
+        print(f"ERROR: missing canonical skill directories: {', '.join(missing_skills)}", file=sys.stderr)
+        print("  these skills were reported as changed but their canonical "
+              "skills/<name>/ directory is absent (deleted/renamed).", file=sys.stderr)
+        print("  install_skill.py would NOT be called for the missing skills.", file=sys.stderr)
+        return
+
+    if scope == "skipped":
+        print("DRY-RUN SKIPPED: no derived-artifact domains affected by the current change set")
+        if affected is not None and affected.skipped_paths:
+            print(f"  skipped paths: {', '.join(sorted(affected.skipped_paths))}")
+        return
+
+    if scope == "full" and affected is not None:
+        print(f"DRY-RUN FULL: sync-rule change selected full mode ({affected.reason})")
+
+    if scope == "incremental" and affected is not None:
+        selected = []
+        if affected.workflows:
+            selected.append("workflows")
+        if affected.agents:
+            selected.append("agents")
+        if affected.skills:
+            selected.append(f"skills: {', '.join(sorted(affected.skills))}")
+        print(f"DRY-RUN INCREMENTAL: selected domains: {', '.join(selected)} ({len(planned_suites)} planned {mode} suites)")
+
+    if scope == "full" and affected is None:
+        print(f"DRY-RUN FULL: {len(planned_suites)} {mode} suites planned")
+
+    print(f"DRY-RUN OK: {len(planned_suites)} {mode} suites planned, no writes performed")
+    for s in planned_suites:
+        print(f"  PLAN {s['name']}: {' '.join(s['command'])}")
 
 
 def _print_plain_text(
@@ -540,6 +638,11 @@ def main() -> int:
         action="store_true",
         help="explicit full mode alias (default when no changed-file options are given)",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="exercise classification, suite selection, and report generation without mutating outputs",
+    )
     args = parser.parse_args()
 
     if args.check and args.fix:
@@ -574,6 +677,7 @@ def main() -> int:
         json_output=args.json,
         changed_files=changed_files,
         incremental=incremental,
+        dry_run=args.dry_run,
     )
     if args.json and report is not None:
         print(json.dumps(report, indent=2))

@@ -83,6 +83,25 @@ Load these skills before acting:
   must not degrade to bash exploration.
 - Review may note derived drift as a finish follow-up, but should not reject otherwise-sufficient implementation evidence solely for project-level redistribution lag.
 
+## Verification Summary Acceptance
+
+Review-agent may accept `pass_with_accepted_preexisting_failures` from
+implement-agent evidence when:
+
+- Each accepted failure is clearly scoped with an exact test id.
+- Each accepted failure is named with a concrete reason.
+- Each accepted failure is confirmed unrelated to the implementation.
+- Hydration was run or was not required.
+- `--dry-run` was used for derived sync smoke checks.
+
+Broad statements such as `all tests passed except environment` are NOT
+acceptable evidence. Do not accept unscoped environment failure claims.
+
+If implement-agent provides structured evidence that hydration was run or not
+required, `--dry-run` was used for derived sync smoke checks, and any remaining
+failure is listed in `accepted_preexisting_failures` with a concrete test id
+and reason, do not bounce the task back solely for that known hygiene issue.
+
 ### CodeGraph Tool Names
 
 CodeGraph MCP tools in opencode are exposed with the server prefix. Use the
