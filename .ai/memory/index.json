@@ -726,6 +726,44 @@
       "confidence": "high",
       "status": "synced",
       "parent_id": "root"
+    },
+    {
+      "id": "decisions/workflow-runtime-modularization",
+      "type": "decisions",
+      "path": "decisions/workflow-runtime-modularization.md",
+      "title": "Workflow Runtime Modularization — sibling package behind script facade",
+      "summary": "Split monolithic workflow.py into a sibling workflow_runtime/ package while keeping workflow.py as the executable CLI facade. Modules follow a strict dependency direction; state writes confined to state.py.",
+      "tags": [
+        "workflow",
+        "runtime",
+        "modularization",
+        "architecture",
+        "refactor",
+        "cli-facade"
+      ],
+      "updated_at": "2026-07-12T00:00:00Z",
+      "confidence": "high",
+      "status": "synced",
+      "parent_id": "root"
+    },
+    {
+      "id": "architecture/workflow-runtime-architecture",
+      "type": "architecture",
+      "path": "architecture/workflow-runtime-architecture.md",
+      "title": "Workflow Runtime Module Architecture",
+      "summary": "workflow_runtime/ package behind a thin workflow.py CLI facade. Modules: core, state, definitions, domains, policies, dispatch, lifecycle, governance, cli. state.py is sole run-state writer; domains.py is read-only.",
+      "tags": [
+        "workflow",
+        "runtime",
+        "architecture",
+        "modules",
+        "cli-facade",
+        "state-io"
+      ],
+      "updated_at": "2026-07-12T00:00:00Z",
+      "confidence": "high",
+      "status": "synced",
+      "parent_id": "root"
     }
   ],
   "excluded_paths": [
