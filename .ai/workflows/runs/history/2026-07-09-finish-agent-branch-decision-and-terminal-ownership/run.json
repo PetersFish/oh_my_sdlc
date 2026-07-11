@@ -3,8 +3,8 @@
   "run_id": "2026-07-09-finish-agent-branch-decision-and-terminal-ownership",
   "workflow": "sdlc-main",
   "flow_type": "lightweight-flow",
-  "status": "running",
-  "current_phase": "post_archive_actions",
+  "status": "done",
+  "current_phase": "done",
   "primary_subject": {
     "type": "spec_change",
     "id": "finish-agent-branch-decision-and-terminal-ownership"
@@ -13,7 +13,7 @@
     "change_id": "finish-agent-branch-decision-and-terminal-ownership"
   },
   "phase_readiness": {
-    "phase": "post_archive_actions",
+    "phase": "done",
     "ready": true,
     "missing_required_inputs": []
   },
@@ -21,7 +21,8 @@
   "completed_hooks": [],
   "completed_phases": [
     "apply_change",
-    "archive_change"
+    "archive_change",
+    "post_archive_actions"
   ],
   "gates": {},
   "evidence": {
@@ -40,21 +41,19 @@
     "agent_result": {
       "agent": "finish-agent",
       "status": "success",
-      "phase": "archive_change",
+      "phase": "post_archive_actions",
       "slice_id": "default",
       "flow_type": "lightweight-flow",
       "evidence": {
-        "archive_action_completed": false,
-        "archive_artifact_path": null,
-        "archive_not_required_reason": "missing_lightweight_archive_artifacts",
-        "archived_design_artifact_paths": [
-          "docs/superpowers/archive/plans/2026-07-05-finish-agent-branch-decision-and-terminal-ownership.md",
-          "docs/superpowers/archive/specs/2026-07-05-finish-agent-branch-decision-and-terminal-ownership.md"
-        ],
-        "source_design_artifact_paths": [
-          "docs/superpowers/plans/2026-07-05-finish-agent-branch-decision-and-terminal-ownership.md",
-          "docs/superpowers/specs/2026-07-05-finish-agent-branch-decision-and-terminal-ownership.md"
-        ]
+        "memory_sync_done": true,
+        "roadmap_done_checked": true,
+        "derived_artifacts_synced": true,
+        "post_hook_dirty_tree": false,
+        "cleanup_complete": true,
+        "pre_hook_commit_id": "80f8c9d74076fbabbed088e45edb33f1be91c437",
+        "pre_hook_pushed": true,
+        "post_hook_commit_id": "85958b40e8f18e914ff2d19cdf8d65cfb7e860ef",
+        "post_hook_pushed": true
       },
       "artifacts": {
         "handoff_path": ".ai/workflows/runs/active/2026-07-09-finish-agent-branch-decision-and-terminal-ownership/handoffs/default/finish-agent.md",
@@ -62,15 +61,9 @@
         "feature_branch": "",
         "branch_finish_action": "archive"
       },
-      "blockers": [
-        {
-          "reason": "missing_lightweight_archive_artifacts",
-          "message": "finish-agent reported archive success but expected Superpowers design artifacts were not found on disk: docs/superpowers/plans/2026-07-05-finish-agent-branch-decision-and-terminal-ownership.md, docs/superpowers/specs/2026-07-05-finish-agent-branch-decision-and-terminal-ownership.md",
-          "recommended_action": "surface_error"
-        }
-      ],
+      "blockers": [],
       "recommended_next_action": "complete_phase",
-      "recorded_at": "2026-07-09T20:01:11.494179"
+      "recorded_at": "2026-07-11T14:45:50.706773"
     },
     "agent_results": {
       "default": {
@@ -295,21 +288,19 @@
         "finish-agent": {
           "agent": "finish-agent",
           "status": "success",
-          "phase": "archive_change",
+          "phase": "post_archive_actions",
           "slice_id": "default",
           "flow_type": "lightweight-flow",
           "evidence": {
-            "archive_action_completed": false,
-            "archive_artifact_path": null,
-            "archive_not_required_reason": "missing_lightweight_archive_artifacts",
-            "archived_design_artifact_paths": [
-              "docs/superpowers/archive/plans/2026-07-05-finish-agent-branch-decision-and-terminal-ownership.md",
-              "docs/superpowers/archive/specs/2026-07-05-finish-agent-branch-decision-and-terminal-ownership.md"
-            ],
-            "source_design_artifact_paths": [
-              "docs/superpowers/plans/2026-07-05-finish-agent-branch-decision-and-terminal-ownership.md",
-              "docs/superpowers/specs/2026-07-05-finish-agent-branch-decision-and-terminal-ownership.md"
-            ]
+            "memory_sync_done": true,
+            "roadmap_done_checked": true,
+            "derived_artifacts_synced": true,
+            "post_hook_dirty_tree": false,
+            "cleanup_complete": true,
+            "pre_hook_commit_id": "80f8c9d74076fbabbed088e45edb33f1be91c437",
+            "pre_hook_pushed": true,
+            "post_hook_commit_id": "85958b40e8f18e914ff2d19cdf8d65cfb7e860ef",
+            "post_hook_pushed": true
           },
           "artifacts": {
             "handoff_path": ".ai/workflows/runs/active/2026-07-09-finish-agent-branch-decision-and-terminal-ownership/handoffs/default/finish-agent.md",
@@ -317,15 +308,9 @@
             "feature_branch": "",
             "branch_finish_action": "archive"
           },
-          "blockers": [
-            {
-              "reason": "missing_lightweight_archive_artifacts",
-              "message": "finish-agent reported archive success but expected Superpowers design artifacts were not found on disk: docs/superpowers/plans/2026-07-05-finish-agent-branch-decision-and-terminal-ownership.md, docs/superpowers/specs/2026-07-05-finish-agent-branch-decision-and-terminal-ownership.md",
-              "recommended_action": "surface_error"
-            }
-          ],
+          "blockers": [],
           "recommended_next_action": "complete_phase",
-          "recorded_at": "2026-07-09T20:01:11.494179"
+          "recorded_at": "2026-07-11T14:45:50.706773"
         }
       }
     },
@@ -336,8 +321,13 @@
     "roadmap_link": {
       "count": 0,
       "items": []
-    }
+    },
+    "memory_sync_done": true,
+    "roadmap_done_checked": true,
+    "derived_artifacts_synced": true,
+    "post_hook_dirty_tree": false,
+    "cleanup_complete": true
   },
   "block": null,
-  "updated_at": "2026-07-11T14:39:42.175593"
+  "updated_at": "2026-07-11T14:45:50.760332"
 }
