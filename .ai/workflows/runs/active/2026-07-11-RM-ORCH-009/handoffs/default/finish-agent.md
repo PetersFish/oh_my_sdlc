@@ -1,83 +1,86 @@
-# Finish-Agent Handoff — archive_change
+# Finish-Agent Handoff — post_archive_actions
 
-- **run_id:** 2026-07-11-RM-ORCH-009
-- **phase:** archive_change
-- **flow_type:** spec-flow
-- **slice_id:** default
-- **change_id:** modularize-workflow-runtime
-- **primary_subject:** roadmap_item RM-ORCH-009
-- **execution_mode:** main_checkout
-- **timestamp:** 2026-07-12T00:04:0Z
+- run_id: 2026-07-11-RM-ORCH-009
+- phase: post_archive_actions
+- flow_type: spec-flow
+- slice_id: default
+- change_id: modularize-workflow-runtime
+- primary_subject: RM-ORCH-009 (roadmap_item)
+- execution_mode: main_checkout
 
-## Preconditions verified
+## Pre-Checks
 
-- implement-agent evidence: `verification_passed: true`, `tasks_complete: true`, `tdd_passed: true`
-- review-agent evidence: `review_complete: true`, `review_decision: "accepted"`, `criteria_satisfied: tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded`
-- OpenSpec change `modularize-workflow-runtime` status: ✓ Complete (all artifacts `done`)
-- Tasks: all 45 task items `- [x]` complete
+- implement-agent verification evidence: present (accepted by review-agent).
+- review-agent completion evidence: present (apply_change accepted).
+- archive_change: completed successfully.
+  - archive path: `openspec/changes/archive/2026-07-11-modularize-workflow-runtime/`
+  - synced main spec: `openspec/specs/workflow-runtime-modularity/spec.md`
 
-## Resolved wrapper dispatch contract
+## Pre-Cleanup Commit Checkpoint
 
-```json
-{
-  "module": "spec",
-  "capability": "archive",
-  "provider": "openspec",
-  "dispatch": {"kind": "skill", "target": "openspec-archive-change"},
-  "verifier": {"target": "openspec.archive"},
-  "result_contract": "spec_change"
-}
-```
+- Tree was dirty with implementation + archive changes (164 files).
+- Staged all, committed as `f04a9d6` ("chore: pre-cleanup checkpoint — modularize-workflow-runtime archive and implementation changes complete").
+- Pushed to `origin/main` (aa535af..f04a9d6).
+- pre_hook_commit_id: `f04a9d6`
+- pre_hook_pushed: true
 
-## Branch finish decision
+## Roadmap Done (RM-ORCH-009)
 
-Not required. `runtime_context.execution_mode` is `main_checkout`; no feature branch or worktree is present (current branch is `main`). No branch-affecting action was taken.
+- Item found at `.ai/roadmap/areas/workflow.sdlc-orchestrator/items/RM-ORCH-009-workflow-runtime-modularization.md` with prior status `ready` (apply-start transition had not been recorded; archive had already completed).
+- Per governed post-archive gate, marked item done:
+  - `status: ready -> done`
+  - `completed_at: 2026-07-12`
+  - `openspec_change: null -> modularize-workflow-runtime`
+  - Filled `# Completion Notes` with accomplishments, deferrals (RM-ORCH-010), and memory note.
+- Appended changelog entry (action `done`, 2026-07-12T00:00:00Z).
+- Ran `rebuild_index.py` (19 items rebuilt) and `validate.py` (OK: all checks passed).
 
-## Archive execution
+## OpenSpec Memory Sync
 
-1. Invoked `openspec-archive-change` skill (resolved dispatch target).
-2. `openspec status --change modularize-workflow-runtime --json` → `isComplete: true`, all artifacts `done`.
-3. Delta spec assessment: capability `workflow-runtime-modularity` is a new capability (ADDED Requirements), no existing main spec.
-4. User selected "Sync now" → invoked `openspec-sync-specs` → created `openspec/specs/workflow-runtime-modularity/spec.md` with Purpose + 6 ADDED requirements.
-5. Performed archive via `openspec archive modularize-workflow-runtime -y --skip-specs` (spec sync already applied).
-   - Result: `Change 'modularize-workflow-runtime' archived as '2026-07-11-modularize-workflow-runtime'.`
+- Memory manifest exists at `.ai/memory/manifest.json`; hydrated context.
+- Archived change artifacts read from `openspec/changes/archive/2026-07-11-modularize-workflow-runtime/` (proposal.md, design.md).
+- Wrote durable memory:
+  - `decisions/workflow-runtime-modularization.md` — decision: sibling `workflow_runtime/` package behind thin `workflow.py` facade, module responsibilities, dependency direction, state-write confinement, bootstrap parity, non-goals.
+  - `architecture/workflow-runtime-architecture.md` — module map, dependency direction, invariants, tests, bootstrap sync references.
+- Updated `.ai/memory/index.json` with both new entries (decisions + architecture).
+- Updated `.ai/memory/manifest.json` git head + last_sync to pre-cleanup commit `f04a9d6`.
+- Resolution: `synced`.
 
-## Provider verifier result (openspec.archive)
+## Derived Artifact Sync
 
-- Archived directory exists: `openspec/changes/archive/2026-07-11-modularize-workflow-runtime/` (`.openspec.yaml`, `design.md`, `proposal.md`, `specs/`, `tasks.md`).
-- `openspec list` → "No active changes found." (change removed from active set).
-- Original `openspec/changes/modularize-workflow-runtime/` no longer exists (moved, not copied).
-- Verifier target `openspec.archive`: PASS.
+- Incremental check (`--changed-files-from-git`): SKIPPED — only memory/roadmap paths affected (excluded domains).
+- Full check (`scripts/sync_derived_artifacts.py --check`): `OK: all 6 check suites in sync`.
+- No fix required. Pre-commit hook during commits confirmed: all governed files, distributed copies, skill distributions, and agents in sync.
 
-## Archive evidence
+## Post-Cleanup Commit Checkpoint
 
-- `archive_action_completed`: true
-- `archive_artifact_path`: `openspec/changes/archive/2026-07-11-modularize-workflow-runtime/`
-- `archive_not_required_reason`: null (spec-flow, archive performed)
-- `archived_design_artifact_paths`:
-  - `openspec/changes/archive/2026-07-11-modularize-workflow-runtime/proposal.md`
-  - `openspec/changes/archive/2026-07-11-modularize-workflow-runtime/design.md`
-  - `openspec/changes/archive/2026-07-11-modularize-workflow-runtime/specs/workflow-runtime-modularity/spec.md`
-  - `openspec/changes/archive/2026-07-11-modularize-workflow-runtime/tasks.md`
-- `source_design_artifact_paths`:
-  - `openspec/changes/modularize-workflow-runtime/proposal.md`
-  - `openspec/changes/modularize-workflow-runtime/design.md`
-  - `openspec/changes/modularize-workflow-runtime/specs/workflow-runtime-modularity/spec.md`
-  - `openspec/changes/modularize-workflow-runtime/tasks.md`
-- Spec sync: `openspec/specs/workflow-runtime-modularity/spec.md` created (new capability).
+- After memory + roadmap sync, tree had 7 generated files (memory index/manifest, roadmap item/changelog/index, two new memory docs).
+- Staged all, committed as `d59628f` ("chore: post-cleanup checkpoint — sync-generated memory, roadmap, derived artifacts").
+- Pushed to `origin/main` (f04a9d6..d59628f).
+- post_hook_commit_id: `d59628f`
+- post_hook_pushed: true
 
-## Scope boundary
+## Final Tree State
 
-This phase is `archive_change` only. No `post_archive_actions` cleanup (memory sync, roadmap done check, derived artifact sync, dirty-tree commit) was performed in this phase — that is a separate dispatch.
+- `git status --short --branch`: clean, `## main...origin/main` (not ahead, not behind).
+- post_hook_dirty_tree: false
+
+## Branch Finish
+
+- execution_mode: main_checkout (no feature branch/worktree). No branch_finish_decision required — work was performed on `main` directly.
+- branch_finish_action: `keep-branch` (trivially; main_checkout, no feature branch to merge/PR/discard).
 
 ## Artifacts
 
-- **handoff_path:** `.ai/workflows/runs/active/2026-07-11-RM-ORCH-009/handoffs/default/finish-agent.md`
-- **worktree_path:** `/Users/yuping/Documents/workspace/oh_my_skills` (main_checkout — control root)
-- **feature_branch:** `main`
-- **branch_finish_action:** `archive` (spec-flow provider archive; no branch-affecting action)
-- **raw_log_paths:** `.ai/workflows/runs/active/2026-07-11-RM-ORCH-009/logs/default/finish-agent/archive.log`
+- handoff_path: `.ai/workflows/runs/active/2026-07-11-RM-ORCH-009/handoffs/default/finish-agent.md`
+- worktree_path: `/Users/yuping/Documents/workspace/oh_my_skills` (main_checkout control root)
+- feature_branch: `main`
+- branch_finish_action: `keep-branch`
 
-## Recommended next action
+## Cleanup Evidence Summary
 
-`complete_phase` — dev-orchestrator/runtime should advance the workflow to `post_archive_actions` for cleanup (memory sync, roadmap done check, derived artifact sync).
+- memory_sync_done: true
+- roadmap_done_checked: true (RM-ORCH-009 marked done)
+- derived_artifacts_synced: true (all 6 suites in sync)
+- post_hook_dirty_tree: false
+- cleanup_complete: true
