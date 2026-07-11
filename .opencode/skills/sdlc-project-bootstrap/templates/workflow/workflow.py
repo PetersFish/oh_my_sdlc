@@ -154,6 +154,43 @@ def _resolve_branch_finish_decision(context):
     return decision, "ok"
 
 
+def _is_branch_decision_block(block):
+    """Return True when *block* is the runtime-owned branch-decision gate block.
+
+    Recognition is based on the structured block shape emitted by
+    ``cmd_before_dispatch``: type ``user_decision_required`` with
+    ``ask_user_branch_finish_decision`` in ``next_allowed``.  This avoids
+    broad message matching and ensures only runtime-owned decision blocks
+    are eligible for reconciliation.
+    """
+    if not isinstance(block, dict):
+        return False
+    if block.get("type") != "user_decision_required":
+        return False
+    return "ask_user_branch_finish_decision" in block.get("next_allowed", [])
+
+
+def _should_reconcile_branch_decision_block(state, tentative_context, recorded_key):
+    """Return True when recording *tentative_context* under *recorded_key* validly
+    resolves the persisted branch-decision block (Spec: repair-workflow-decision-block-unlock).
+
+    All of the following must hold:
+    1. The run is currently ``blocked``.
+    2. The recorded key is exactly ``branch_finish_decision``.
+    3. The tentative context resolves to decision status ``ok``.
+    4. The persisted block represents the branch-decision gate.
+    """
+    if recorded_key != "branch_finish_decision":
+        return False
+    if state.get("status") != "blocked":
+        return False
+    block = state.get("block")
+    if not _is_branch_decision_block(block):
+        return False
+    _, decision_status = _resolve_branch_finish_decision(tentative_context)
+    return decision_status == "ok"
+
+
 def _archive_lightweight_superpowers_artifacts(root, state, agent_evidence):
     """Move Superpowers plan/spec design artifacts into typed archive dirs.
 
@@ -2693,6 +2730,13 @@ def cmd_record_context(root, args):
             sys.exit(1)
 
     context[args.key] = args.value
+
+    # Reconcile stale branch-decision blocks when a corrected valid
+    # branch_finish_decision is recorded (Spec: repair-workflow-decision-block-unlock).
+    if _should_reconcile_branch_decision_block(state, context, args.key):
+        state["status"] = "running"
+        state["block"] = None
+
     save_run_state(root, state)
     print(json.dumps(state, indent=2))
 

@@ -1,0 +1,339 @@
+{
+  "version": 1,
+  "run_id": "2026-07-11-repair-workflow-decision-block-unlock",
+  "workflow": "sdlc-main",
+  "flow_type": "spec-flow",
+  "status": "running",
+  "current_phase": "post_archive_actions",
+  "primary_subject": {
+    "type": "spec_change",
+    "id": "repair-workflow-decision-block-unlock"
+  },
+  "context": {
+    "change_id": "repair-workflow-decision-block-unlock"
+  },
+  "phase_readiness": {
+    "phase": "post_archive_actions",
+    "ready": true,
+    "missing_required_inputs": []
+  },
+  "pending_hooks": [],
+  "completed_hooks": [],
+  "completed_phases": [
+    "create_change",
+    "apply_change",
+    "archive_change"
+  ],
+  "gates": {},
+  "evidence": {
+    "spec_status": {
+      "classification": "in-progress",
+      "source": "active"
+    },
+    "roadmap_link": {
+      "count": 0,
+      "items": []
+    },
+    "agent_phase": {
+      "agent_phase": "post_archive_actions",
+      "agent": "finish-agent",
+      "flow_type": "spec-flow",
+      "dispatched_at": "2026-07-11T18:56:07.429982"
+    },
+    "agent_result": {
+      "agent": "finish-agent",
+      "status": "success",
+      "phase": "archive_change",
+      "slice_id": "default",
+      "flow_type": "spec-flow",
+      "evidence": {
+        "archive_action_completed": true,
+        "archive_artifact_path": "openspec/changes/archive/2026-07-11-repair-workflow-decision-block-unlock",
+        "archive_path_exists": true,
+        "provider_verification": {
+          "target": "openspec.archive",
+          "verified": true,
+          "active_changes_remaining": 0
+        },
+        "specs_synced": true
+      },
+      "artifacts": {
+        "handoff_path": ".ai/workflows/runs/active/2026-07-11-repair-workflow-decision-block-unlock/handoffs/default/finish-agent.md",
+        "worktree_path": "/Users/yuping/Documents/workspace/oh_my_skills",
+        "feature_branch": "main",
+        "branch_finish_action": "archive"
+      },
+      "blockers": [],
+      "recommended_next_action": "complete_phase",
+      "recorded_at": "2026-07-11T18:55:49.137512"
+    },
+    "agent_results": {
+      "default": {
+        "plan-agent": {
+          "agent": "plan-agent",
+          "status": "success",
+          "phase": "create_change",
+          "slice_id": "default",
+          "flow_type": "spec-flow",
+          "evidence": {
+            "change_id": "repair-workflow-decision-block-unlock",
+            "spec_artifacts_done": true,
+            "criteria_satisfied": "spec_artifacts_done",
+            "plan_produced": true,
+            "user_confirmation_required": true,
+            "provider_verification": {
+              "target": "openspec.create",
+              "verified": true,
+              "schema": "spec-driven",
+              "is_complete": true,
+              "apply_requires": [
+                "tasks"
+              ],
+              "artifacts_present_and_parsible": true,
+              "artifact_statuses": {
+                "proposal": "done",
+                "design": "done",
+                "specs": "done",
+                "tasks": "done"
+              }
+            },
+            "plan_summary": {
+              "objective": "Ensure a valid corrected branch decision clears only its stale decision block and allows the previously blocked workflow run to proceed.",
+              "approach": "Reconcile decision-specific blocked state atomically in record-context after validating the tentative context. Preserve invalid corrections and unrelated blocks.",
+              "key_steps": [
+                "Add executable regressions for missing-to-valid and invalid-to-valid recovery.",
+                "Add negative coverage for invalid corrections, unrelated blocks, and no-gate main-checkout runs.",
+                "Implement narrow structured block recognition and atomic state normalization.",
+                "Run focused and full workflow tests.",
+                "Synchronize and verify live, canonical, and distributed workflow copies."
+              ],
+              "focused_tests": [
+                "Corrected valid decision changes persisted state to running with block null.",
+                "Finish-agent dispatch succeeds after correction instead of returning run_is_blocked.",
+                "Invalid correction remains blocked.",
+                "Valid decision does not clear an unrelated block.",
+                "Main checkout without a branch gate is not spuriously unblocked."
+              ],
+              "open_decisions": []
+            }
+          },
+          "artifacts": {
+            "change_id": "repair-workflow-decision-block-unlock",
+            "primary_design_path": "openspec/changes/repair-workflow-decision-block-unlock/proposal.md",
+            "design_artifact_paths": [
+              {
+                "kind": "proposal",
+                "path": "openspec/changes/repair-workflow-decision-block-unlock/proposal.md",
+                "source": "openspec"
+              },
+              {
+                "kind": "design",
+                "path": "openspec/changes/repair-workflow-decision-block-unlock/design.md",
+                "source": "openspec"
+              },
+              {
+                "kind": "spec",
+                "path": "openspec/changes/repair-workflow-decision-block-unlock/specs/sdlc-workflow-engine/spec.md",
+                "source": "openspec"
+              },
+              {
+                "kind": "tasks",
+                "path": "openspec/changes/repair-workflow-decision-block-unlock/tasks.md",
+                "source": "openspec"
+              }
+            ],
+            "handoff_path": ".ai/workflows/runs/active/2026-07-11-repair-workflow-decision-block-unlock/handoffs/default/plan-agent.md"
+          },
+          "blockers": [],
+          "recommended_next_action": "await_user_plan_approval",
+          "recorded_at": "2026-07-11T18:20:40.686955"
+        },
+        "implement-agent": {
+          "agent": "implement-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "spec-flow",
+          "evidence": {
+            "tasks_complete": true,
+            "tdd_passed": true,
+            "focused_tests": [
+              {
+                "command": "python3 -m pytest tests/test_workflow.py -v -k unrelated_context_key_does_not_clear",
+                "result": "pass"
+              },
+              {
+                "command": "python3 -m pytest tests/test_workflow.py -v -k branch_finish_decision",
+                "result": "pass"
+              }
+            ],
+            "provider_verification": {
+              "provider": "openspec.apply",
+              "state": "all_done",
+              "progress": {
+                "total": 17,
+                "complete": 17,
+                "remaining": 0
+              },
+              "verified": true
+            },
+            "review_blockers_addressed": true
+          },
+          "artifacts": {
+            "handoff_path": ".ai/workflows/runs/active/2026-07-11-repair-workflow-decision-block-unlock/handoffs/default/implement-agent.md",
+            "worktree_path": "/Users/yuping/Documents/workspace/oh_my_skills",
+            "repo_root": "/Users/yuping/Documents/workspace/oh_my_skills",
+            "base_branch": "main",
+            "parent_ref": "0ce32c0",
+            "changed_files": [
+              {
+                "path": ".ai/workflows/scripts/workflow.py",
+                "status": "modified"
+              },
+              {
+                "path": "tests/test_workflow.py",
+                "status": "modified"
+              },
+              {
+                "path": "skills/sdlc-project-bootstrap/templates/workflow/workflow.py",
+                "status": "modified"
+              },
+              {
+                "path": ".opencode/skills/sdlc-project-bootstrap/templates/workflow/workflow.py",
+                "status": "modified"
+              },
+              {
+                "path": ".claude/skills/sdlc-project-bootstrap/templates/workflow/workflow.py",
+                "status": "modified"
+              },
+              {
+                "path": ".cursor/skills/sdlc-project-bootstrap/templates/workflow/workflow.py",
+                "status": "modified"
+              },
+              {
+                "path": "openspec/changes/repair-workflow-decision-block-unlock/tasks.md",
+                "status": "untracked"
+              },
+              {
+                "path": "openspec/changes/repair-workflow-decision-block-unlock/proposal.md",
+                "status": "untracked"
+              },
+              {
+                "path": "openspec/changes/repair-workflow-decision-block-unlock/design.md",
+                "status": "untracked"
+              },
+              {
+                "path": "openspec/changes/repair-workflow-decision-block-unlock/specs/sdlc-workflow-engine/spec.md",
+                "status": "untracked"
+              }
+            ],
+            "diff_commands": [
+              "git diff -- .ai/workflows/scripts/workflow.py",
+              "git diff -- tests/test_workflow.py",
+              "git status --porcelain -uall"
+            ],
+            "verification_commands": [
+              {
+                "command": "python3 -m pytest tests/test_workflow.py -v",
+                "scope": "full_regression",
+                "result": "pass"
+              },
+              {
+                "command": "python3 -m pytest tests/test_workflow.py -v -k unrelated_context_key_does_not_clear",
+                "scope": "focused",
+                "result": "pass"
+              },
+              {
+                "command": "openspec instructions apply --change repair-workflow-decision-block-unlock --json",
+                "scope": "provider_apply_verification",
+                "result": "pass"
+              }
+            ],
+            "history_handoff_paths": [
+              ".ai/workflows/runs/active/2026-07-11-repair-workflow-decision-block-unlock/handoffs/default/history/implement-agent-20260711T105141374531Z.md"
+            ]
+          },
+          "blockers": [],
+          "recommended_next_action": "dispatch_review_agent",
+          "recorded_at": "2026-07-11T18:51:41.371767"
+        },
+        "review-agent": {
+          "agent": "review-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "spec-flow",
+          "evidence": {
+            "tasks_complete": true,
+            "tdd_passed": true,
+            "eval_passed_or_human_decision_recorded": true,
+            "review_complete": true,
+            "verification_passed": true,
+            "review_decision": "accepted",
+            "criteria_satisfied": "tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded"
+          },
+          "artifacts": {
+            "handoff_path": ".ai/workflows/runs/active/2026-07-11-repair-workflow-decision-block-unlock/handoffs/default/review-agent.md",
+            "worktree_path": "/Users/yuping/Documents/workspace/oh_my_skills",
+            "reviewed_changed_files": [
+              ".ai/workflows/scripts/workflow.py",
+              "tests/test_workflow.py",
+              "skills/sdlc-project-bootstrap/templates/workflow/workflow.py",
+              "openspec/changes/repair-workflow-decision-block-unlock/tasks.md"
+            ],
+            "history_handoff_paths": [
+              ".ai/workflows/runs/active/2026-07-11-repair-workflow-decision-block-unlock/handoffs/default/history/review-agent-20260711T105302631680Z.md"
+            ]
+          },
+          "blockers": [],
+          "recommended_next_action": "complete_phase",
+          "recorded_at": "2026-07-11T18:53:02.628822"
+        },
+        "finish-agent": {
+          "agent": "finish-agent",
+          "status": "success",
+          "phase": "archive_change",
+          "slice_id": "default",
+          "flow_type": "spec-flow",
+          "evidence": {
+            "archive_action_completed": true,
+            "archive_artifact_path": "openspec/changes/archive/2026-07-11-repair-workflow-decision-block-unlock",
+            "archive_path_exists": true,
+            "provider_verification": {
+              "target": "openspec.archive",
+              "verified": true,
+              "active_changes_remaining": 0
+            },
+            "specs_synced": true
+          },
+          "artifacts": {
+            "handoff_path": ".ai/workflows/runs/active/2026-07-11-repair-workflow-decision-block-unlock/handoffs/default/finish-agent.md",
+            "worktree_path": "/Users/yuping/Documents/workspace/oh_my_skills",
+            "feature_branch": "main",
+            "branch_finish_action": "archive"
+          },
+          "blockers": [],
+          "recommended_next_action": "complete_phase",
+          "recorded_at": "2026-07-11T18:55:49.137512"
+        }
+      }
+    },
+    "spec_artifacts_done": {
+      "approved_by_user": true,
+      "primary_design_path": "openspec/changes/repair-workflow-decision-block-unlock/proposal.md",
+      "design_artifact_paths": [
+        "openspec/changes/repair-workflow-decision-block-unlock/proposal.md",
+        "openspec/changes/repair-workflow-decision-block-unlock/design.md",
+        "openspec/changes/repair-workflow-decision-block-unlock/specs/sdlc-workflow-engine/spec.md",
+        "openspec/changes/repair-workflow-decision-block-unlock/tasks.md"
+      ]
+    },
+    "tasks_complete": true,
+    "tdd_passed": true,
+    "eval_passed_or_human_decision_recorded": true,
+    "archive_action_completed": true,
+    "archive_path": "openspec/changes/archive/2026-07-11-repair-workflow-decision-block-unlock"
+  },
+  "block": null,
+  "updated_at": "2026-07-11T18:56:07.430423"
+}

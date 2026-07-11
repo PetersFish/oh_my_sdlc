@@ -1,7 +1,7 @@
 ---
 id: RM-ORCH-009
 title: "Workflow Runtime Modularization"
-status: idea
+status: ready
 stage: v2
 priority: p1
 order: 48

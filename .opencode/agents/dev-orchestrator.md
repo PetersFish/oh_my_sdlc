@@ -19,6 +19,8 @@ permission:
     "*": deny
     "python3 .ai/workflows/scripts/workflow.py *": allow
     "python3 skills/_lib/resolve_dispatch_cli.py *": allow
+    "python3 skills/_lib/provider_verifiers.py *": allow
+    "python3 skills/_lib/result_contracts.py *": allow
     "git status*": allow
     "git diff*": allow
     "git log*": allow

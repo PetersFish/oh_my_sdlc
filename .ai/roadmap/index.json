@@ -189,7 +189,7 @@
     },
     {
       "id": "RM-ORCH-009",
-      "status": "idea",
+      "status": "ready",
       "title": "Workflow Runtime Modularization",
       "stage": "v2",
       "priority": "p1",

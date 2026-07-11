@@ -7655,6 +7655,312 @@ class TestBranchFinishDecisionGate(FixtureBase):
         self.assertIn("missing_branch_finish_decision", reasons)
 
 
+class TestBranchFinishDecisionBlockReconciliation(FixtureBase):
+    """Tests for reconciling stale branch-decision blocks when a corrected
+    valid branch_finish_decision is recorded (Spec: repair-workflow-decision-block-unlock).
+
+    When a run is blocked due to a missing or invalid branch_finish_decision,
+    recording a corrected valid decision through record-context SHALL
+    reconcile the stale block: set status to running and clear the block,
+    allowing normal guarded dispatch/advance to proceed.
+
+    Unrelated blocks must be preserved. Invalid corrections must remain
+    blocked. Main-checkout runs without a feature branch must not spuriously
+    unblock.
+    """
+
+    ALLOWED_DECISIONS = ("merge_local", "create_pr", "keep_branch", "discard")
+
+    def _write_worktree_blocked_state(
+        self,
+        change_id="repair-block",
+        decision_block=None,
+    ):
+        """Write a worktree run at archive_change that is blocked by a
+        branch-decision gate (missing or invalid decision)."""
+        if decision_block is None:
+            decision_block = {
+                "type": "user_decision_required",
+                "message": (
+                    "finish requires explicit branch_finish_decision before "
+                    "branch-affecting actions"
+                ),
+                "next_allowed": ["ask_user_branch_finish_decision"],
+            }
+        state = {
+            "version": 1,
+            "run_id": f"2026-07-11-{change_id}",
+            "workflow": "sdlc-main",
+            "flow_type": "lightweight-flow",
+            "status": "blocked",
+            "current_phase": "archive_change",
+            "primary_subject": {"type": "spec_change", "id": change_id},
+            "context": {
+                "change_id": change_id,
+                "execution_mode": "worktree",
+                "control_root": self.tmp,
+                "worktree_path": os.path.join(self.tmp, "wt"),
+                "feature_branch": f"feature/{change_id}",
+                "base_branch": "main",
+                "parent_ref": "abc123",
+            },
+            "phase_readiness": {
+                "phase": "archive_change",
+                "ready": True,
+                "missing_required_inputs": [],
+            },
+            "pending_hooks": [],
+            "completed_hooks": [],
+            "completed_phases": ["apply_change"],
+            "gates": {},
+            "evidence": {},
+            "block": decision_block,
+            "updated_at": "2026-07-11T00:00:00",
+        }
+        self._write_current_state(state)
+        return state
+
+    def _write_main_checkout_blocked_state(self, change_id="main-nogate"):
+        """Write a main-checkout run at archive_change blocked by an
+        unrelated block (no feature branch, so no decision gate)."""
+        unrelated_block = {
+            "type": "worker_failed",
+            "message": "agent failed",
+            "next_allowed": ["resolve"],
+        }
+        state = {
+            "version": 1,
+            "run_id": f"2026-07-11-{change_id}",
+            "workflow": "sdlc-main",
+            "flow_type": "lightweight-flow",
+            "status": "blocked",
+            "current_phase": "archive_change",
+            "primary_subject": {"type": "spec_change", "id": change_id},
+            "context": {
+                "change_id": change_id,
+                "execution_mode": "main_checkout",
+            },
+            "phase_readiness": {
+                "phase": "archive_change",
+                "ready": True,
+                "missing_required_inputs": [],
+            },
+            "pending_hooks": [],
+            "completed_hooks": [],
+            "completed_phases": ["apply_change"],
+            "gates": {},
+            "evidence": {},
+            "block": unrelated_block,
+            "updated_at": "2026-07-11T00:00:00",
+        }
+        self._write_current_state(state)
+        return state
+
+    # -- Task 1.1: missing decision -> valid decision clears block ----------
+
+    def test_corrected_valid_branch_finish_decision_clears_missing_decision_block(self):
+        """A run blocked by a missing branch_finish_decision must transition to
+        running with block=None when a valid decision is recorded via
+        record-context. Before the fix, record-context preserves status=blocked
+        and the block unchanged."""
+        self._write_worktree_blocked_state(change_id="repair-missing")
+        rc, out, _ = run_workflow(
+            self.tmp, "record-context",
+            key="branch_finish_decision",
+            value="merge_local",
+        )
+        self.assertEqual(rc, 0)
+        state = self._read_current_state()
+        self.assertEqual(state["status"], "running")
+        self.assertIsNone(state["block"])
+
+    # -- Task 1.2: after reconciliation, guarded dispatch succeeds ----------
+
+    def test_corrected_valid_branch_finish_decision_allows_dispatch(self):
+        """After recording a valid decision that clears the missing-decision
+        block, before-dispatch for finish-agent must succeed (status=dispatched)
+        without run_is_blocked. Before the fix, the stale blocked-state guard
+        rejects the run."""
+        self._write_worktree_blocked_state(change_id="repair-dispatch")
+        run_workflow(
+            self.tmp, "record-context",
+            key="branch_finish_decision",
+            value="create_pr",
+        )
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="finish-agent",
+            phase="archive_change",
+            slice_id="default",
+        )
+        self.assertEqual(rc, 0, f"dispatch should succeed after valid correction: {out}")
+        data = json.loads(out)
+        self.assertEqual(data["status"], "dispatched")
+        reasons = [b.get("reason") for b in data.get("blockers", [])]
+        self.assertNotIn("run_is_blocked", reasons)
+
+    # -- Task 1.3: invalid decision -> valid decision clears block ----------
+
+    def test_corrected_valid_branch_finish_decision_clears_invalid_decision_block(self):
+        """A run blocked by an invalid branch_finish_decision must transition to
+        running with block=None when the decision is replaced with each
+        representative allowed value. Before the fix, record-context preserves
+        the blocked state."""
+        for decision in self.ALLOWED_DECISIONS:
+            change_id = f"repair-invalid-{decision}"
+            # Block: invalid decision already in context
+            block = {
+                "type": "user_decision_required",
+                "message": (
+                    "branch_finish_decision 'merge_into_dev' is not one of: "
+                    "['create_pr', 'discard', 'keep_branch', 'merge_local']"
+                ),
+                "next_allowed": ["ask_user_branch_finish_decision"],
+            }
+            state = self._write_worktree_blocked_state(change_id=change_id, decision_block=block)
+            state["context"]["branch_finish_decision"] = "merge_into_dev"
+            self._write_current_state(state)
+            rc, out, _ = run_workflow(
+                self.tmp, "record-context",
+                key="branch_finish_decision",
+                value=decision,
+            )
+            self.assertEqual(rc, 0)
+            saved = self._read_current_state()
+            self.assertEqual(
+                saved["status"], "running",
+                f"decision {decision}: status should be running",
+            )
+            self.assertIsNone(
+                saved["block"],
+                f"decision {decision}: block should be None",
+            )
+            # Guarded dispatch must succeed
+            rc, out, _ = run_workflow(
+                self.tmp, "before-dispatch",
+                agent="finish-agent",
+                phase="archive_change",
+                slice_id="default",
+            )
+            self.assertEqual(rc, 0, f"dispatch failed for {decision}: {out}")
+            data = json.loads(out)
+            self.assertEqual(data["status"], "dispatched")
+
+    # -- Task 1.4: invalid correction preserves block ----------------------
+
+    def test_invalid_branch_finish_decision_correction_preserves_block(self):
+        """Recording another invalid value must preserve the blocked status and
+        the branch-decision block. This protects the no-silent-default contract."""
+        block = {
+            "type": "user_decision_required",
+            "message": (
+                "finish requires explicit branch_finish_decision before "
+                "branch-affecting actions"
+            ),
+            "next_allowed": ["ask_user_branch_finish_decision"],
+        }
+        state = self._write_worktree_blocked_state(change_id="repair-still-invalid", decision_block=block)
+        original_block = dict(state["block"])
+        rc, out, _ = run_workflow(
+            self.tmp, "record-context",
+            key="branch_finish_decision",
+            value="merge_into_dev",
+        )
+        self.assertEqual(rc, 0)
+        saved = self._read_current_state()
+        self.assertEqual(saved["status"], "blocked")
+        self.assertIsNotNone(saved["block"])
+        self.assertEqual(saved["block"]["type"], original_block["type"])
+        self.assertEqual(saved["block"]["message"], original_block["message"])
+
+    # -- Task 1.5: unrelated block preserved -------------------------------
+
+    def test_valid_branch_finish_decision_preserves_unrelated_block(self):
+        """Recording an allowed decision while a worker/hook/domain block is
+        active must update the context but preserve the unrelated block
+        byte-for-byte."""
+        unrelated_blocks = [
+            {
+                "type": "worker_failed",
+                "message": "agent failed",
+                "next_allowed": ["resolve"],
+            },
+            {
+                "type": "hook_blocked",
+                "message": "pending hooks remain: ['memory_sync']",
+                "next_allowed": ["resolve", "record-evidence", "block"],
+            },
+            {
+                "type": "domain_state_mismatch",
+                "message": "domain state out of sync",
+                "next_allowed": ["resolve"],
+            },
+        ]
+        for i, unrelated_block in enumerate(unrelated_blocks):
+            change_id = f"repair-unrelated-{i}"
+            state = self._write_worktree_blocked_state(change_id=change_id, decision_block=unrelated_block)
+            original_block = dict(state["block"])
+            rc, out, _ = run_workflow(
+                self.tmp, "record-context",
+                key="branch_finish_decision",
+                value="keep_branch",
+            )
+            self.assertEqual(rc, 0)
+            saved = self._read_current_state()
+            self.assertEqual(saved["status"], "blocked")
+            self.assertIsNotNone(saved["block"])
+            self.assertEqual(saved["block"], original_block)
+            # Context was still updated
+            self.assertEqual(saved["context"]["branch_finish_decision"], "keep_branch")
+
+    # -- Task 1.6: main checkout without gate does not spuriously unblock ----
+
+    def test_branch_finish_decision_does_not_unblock_when_gate_not_required(self):
+        """A main-checkout run without a feature branch does not require the
+        branch-finish decision gate. Recording a branch_finish_decision while an
+        unrelated block is active must preserve the unrelated blocked state."""
+        self._write_main_checkout_blocked_state(change_id="repair-main-nogate")
+        saved_before = self._read_current_state()
+        original_block = dict(saved_before["block"])
+        rc, out, _ = run_workflow(
+            self.tmp, "record-context",
+            key="branch_finish_decision",
+            value="discard",
+        )
+        self.assertEqual(rc, 0)
+        saved = self._read_current_state()
+        self.assertEqual(saved["status"], "blocked")
+        self.assertIsNotNone(saved["block"])
+        self.assertEqual(saved["block"], original_block)
+        self.assertEqual(saved["context"]["branch_finish_decision"], "discard")
+
+    def test_unrelated_context_key_does_not_clear_branch_decision_block(self):
+        """Recording a context key other than branch_finish_decision must not
+        reconcile the branch-decision block, even if context.branch_finish_decision
+        is already valid.  Without the key guard, any unrelated context write
+        (e.g. recording change_id or execution_mode) would spuriously clear the
+        block because _should_reconcile_branch_decision_block only inspected the
+        tentative context, not the recorded key."""
+        # Start with a run blocked by a missing branch_finish_decision.
+        state = self._write_worktree_blocked_state(change_id="repair-unrelated-key")
+        # Pre-populate a valid decision in context but leave the block intact.
+        state["context"]["branch_finish_decision"] = "merge_local"
+        self._write_current_state(state)
+        original_block = dict(state["block"])
+        # Record an unrelated key — must NOT trigger reconciliation.
+        rc, out, _ = run_workflow(
+            self.tmp, "record-context",
+            key="change_id",
+            value="repair-unrelated-key",
+        )
+        self.assertEqual(rc, 0)
+        saved = self._read_current_state()
+        self.assertEqual(saved["status"], "blocked")
+        self.assertIsNotNone(saved["block"])
+        self.assertEqual(saved["block"]["type"], original_block["type"])
+        self.assertEqual(saved["block"]["message"], original_block["message"])
+
+
 class TestLightweightFlowArchiveMoves(FixtureBase):
     """Tests for lightweight-flow Superpowers archive moves (Spec Decision 11).
 

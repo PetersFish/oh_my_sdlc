@@ -1,0 +1,118 @@
+{
+  "version": 1,
+  "run_id": "2026-07-11-RM-ORCH-009",
+  "workflow": "sdlc-main",
+  "flow_type": "spec-flow",
+  "status": "blocked",
+  "current_phase": "review_decision",
+  "primary_subject": {
+    "type": "roadmap_item",
+    "id": "RM-ORCH-009"
+  },
+  "context": {
+    "review_decision": "review_passed"
+  },
+  "phase_readiness": {
+    "phase": "review_decision",
+    "ready": true,
+    "missing_required_inputs": []
+  },
+  "pending_hooks": [],
+  "completed_hooks": [],
+  "completed_phases": [
+    "review_roadmap",
+    "review_decision"
+  ],
+  "gates": {},
+  "evidence": {
+    "agent_phase": {
+      "agent_phase": "review_roadmap",
+      "agent": "roadmap-agent",
+      "flow_type": "spec-flow",
+      "dispatched_at": "2026-07-11T16:29:22.529492"
+    },
+    "agent_result": {
+      "agent": "roadmap-agent",
+      "status": "success",
+      "phase": "review_roadmap",
+      "slice_id": "default",
+      "flow_type": "spec-flow",
+      "evidence": {
+        "roadmap_hook_executed": "roadmap_review",
+        "roadmap_item_id": "RM-ORCH-009",
+        "item_status": "ready",
+        "transition_applied": true,
+        "roadmap_review_decision": "passed",
+        "open_questions": [
+          {
+            "id": "OQ-1",
+            "question": "Should modules live beside workflow.py under .ai/workflows/scripts/, or should bootstrap templates use a package directory?",
+            "reason": "Design-level placement decision for OpenSpec proposal/design."
+          },
+          {
+            "id": "OQ-2",
+            "question": "How much of tests/test_workflow.py should remain end-to-end versus gaining module-level unit tests?",
+            "reason": "Test-strategy decision for OpenSpec proposal/design."
+          }
+        ]
+      },
+      "artifacts": {
+        "handoff_path": ".ai/workflows/runs/active/2026-07-11-RM-ORCH-009/handoffs/default/roadmap-agent.md",
+        "raw_log_paths": []
+      },
+      "blockers": [],
+      "recommended_next_action": "ask_user_next_step",
+      "recorded_at": "2026-07-11T16:31:00.537544"
+    },
+    "agent_results": {
+      "default": {
+        "roadmap-agent": {
+          "agent": "roadmap-agent",
+          "status": "success",
+          "phase": "review_roadmap",
+          "slice_id": "default",
+          "flow_type": "spec-flow",
+          "evidence": {
+            "roadmap_hook_executed": "roadmap_review",
+            "roadmap_item_id": "RM-ORCH-009",
+            "item_status": "ready",
+            "transition_applied": true,
+            "roadmap_review_decision": "passed",
+            "open_questions": [
+              {
+                "id": "OQ-1",
+                "question": "Should modules live beside workflow.py under .ai/workflows/scripts/, or should bootstrap templates use a package directory?",
+                "reason": "Design-level placement decision for OpenSpec proposal/design."
+              },
+              {
+                "id": "OQ-2",
+                "question": "How much of tests/test_workflow.py should remain end-to-end versus gaining module-level unit tests?",
+                "reason": "Test-strategy decision for OpenSpec proposal/design."
+              }
+            ]
+          },
+          "artifacts": {
+            "handoff_path": ".ai/workflows/runs/active/2026-07-11-RM-ORCH-009/handoffs/default/roadmap-agent.md",
+            "raw_log_paths": []
+          },
+          "blockers": [],
+          "recommended_next_action": "ask_user_next_step",
+          "recorded_at": "2026-07-11T16:31:00.537544"
+        }
+      }
+    }
+  },
+  "block": {
+    "type": "user_decision_required",
+    "message": "unknown branch: passed",
+    "next_allowed": [
+      "resolve",
+      "block"
+    ],
+    "allowed_branches": [
+      "review_passed",
+      "review_failed"
+    ]
+  },
+  "updated_at": "2026-07-11T17:57:05.864082"
+}
