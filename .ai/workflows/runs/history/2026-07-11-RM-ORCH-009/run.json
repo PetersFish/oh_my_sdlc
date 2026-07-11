@@ -1,0 +1,452 @@
+{
+  "version": 1,
+  "run_id": "2026-07-11-RM-ORCH-009",
+  "workflow": "sdlc-main",
+  "flow_type": "spec-flow",
+  "status": "done",
+  "current_phase": "done",
+  "primary_subject": {
+    "type": "roadmap_item",
+    "id": "RM-ORCH-009"
+  },
+  "context": {
+    "review_decision": "review_passed",
+    "change_id": "modularize-workflow-runtime"
+  },
+  "phase_readiness": {
+    "phase": "done",
+    "ready": true,
+    "missing_required_inputs": []
+  },
+  "pending_hooks": [],
+  "completed_hooks": [],
+  "completed_phases": [
+    "review_roadmap",
+    "review_decision",
+    "create_change",
+    "apply_change",
+    "archive_change",
+    "post_archive_actions"
+  ],
+  "gates": {},
+  "evidence": {
+    "agent_phase": {
+      "agent_phase": "post_archive_actions",
+      "agent": "finish-agent",
+      "flow_type": "spec-flow",
+      "dispatched_at": "2026-07-12T00:05:58.022840"
+    },
+    "agent_result": {
+      "agent": "finish-agent",
+      "status": "success",
+      "phase": "post_archive_actions",
+      "slice_id": "modularize-workflow-runtime",
+      "flow_type": "spec-flow",
+      "evidence": {
+        "memory_sync_done": true,
+        "roadmap_done_checked": true,
+        "derived_artifacts_synced": true,
+        "post_hook_dirty_tree": false,
+        "cleanup_complete": true,
+        "pre_hook_commit_id": "f04a9d6",
+        "pre_hook_pushed": true,
+        "post_hook_commit_id": "d59628f",
+        "post_hook_pushed": true
+      },
+      "artifacts": {
+        "handoff_path": ".ai/workflows/runs/active/2026-07-11-RM-ORCH-009/handoffs/default/finish-agent.md",
+        "worktree_path": "/Users/yuping/Documents/workspace/oh_my_skills",
+        "feature_branch": "main",
+        "branch_finish_action": "keep-branch",
+        "raw_log_paths": []
+      },
+      "blockers": [],
+      "recommended_next_action": "complete_phase",
+      "recorded_at": "2026-07-12T00:17:42.506138"
+    },
+    "agent_results": {
+      "default": {
+        "roadmap-agent": {
+          "agent": "roadmap-agent",
+          "status": "success",
+          "phase": "review_roadmap",
+          "slice_id": "default",
+          "flow_type": "spec-flow",
+          "evidence": {
+            "roadmap_hook_executed": "roadmap_review",
+            "roadmap_item_id": "RM-ORCH-009",
+            "item_status": "ready",
+            "transition_applied": true,
+            "roadmap_review_decision": "passed",
+            "open_questions": [
+              {
+                "id": "OQ-1",
+                "question": "Should modules live beside workflow.py under .ai/workflows/scripts/, or should bootstrap templates use a package directory?",
+                "reason": "Design-level placement decision for OpenSpec proposal/design."
+              },
+              {
+                "id": "OQ-2",
+                "question": "How much of tests/test_workflow.py should remain end-to-end versus gaining module-level unit tests?",
+                "reason": "Test-strategy decision for OpenSpec proposal/design."
+              }
+            ]
+          },
+          "artifacts": {
+            "handoff_path": ".ai/workflows/runs/active/2026-07-11-RM-ORCH-009/handoffs/default/roadmap-agent.md",
+            "raw_log_paths": []
+          },
+          "blockers": [],
+          "recommended_next_action": "ask_user_next_step",
+          "recorded_at": "2026-07-11T16:31:00.537544"
+        },
+        "plan-agent": {
+          "agent": "plan-agent",
+          "status": "success",
+          "phase": "create_change",
+          "slice_id": "default",
+          "flow_type": "spec-flow",
+          "evidence": {
+            "spec_artifacts_done": true,
+            "criteria_satisfied": "spec_artifacts_done",
+            "plan_produced": true,
+            "user_confirmation_required": true,
+            "plan_summary": {
+              "objective": "Modularize the workflow runtime while preserving the workflow.py CLI facade, persisted state contract, and all observable behavior.",
+              "approach": "Create a sibling workflow_runtime package with acyclic responsibility-based modules, retain end-to-end CLI tests as authoritative, add focused module tests, and extend bootstrap synchronization to the complete nested runtime inventory.",
+              "key_steps": [
+                "Establish the existing workflow test baseline and add failing import-contract tests.",
+                "Extract core, state, definition, and read-only domain modules in dependency order.",
+                "Extract policy, dispatch, lifecycle, governance, and CLI responsibilities.",
+                "Reduce workflow.py to a stable facade delegating to workflow_runtime.cli.",
+                "Update bootstrap installation and template/distribution synchronization for nested modules.",
+                "Run focused, full workflow, repository-wide, and derived-artifact verification."
+              ],
+              "focused_tests": [
+                "Fresh-process imports detect circular dependencies.",
+                "State pointer and active/history round trips preserve paths and schema.",
+                "Definition validation and policy metadata behavior remain unchanged.",
+                "Domain loaders and governance checks remain read-only.",
+                "Existing workflow.py subprocess scenarios preserve outputs, exit codes, and state effects.",
+                "Bootstrapped runtimes execute and nested template drift is detected."
+              ],
+              "open_decisions": []
+            },
+            "focused_tests": [
+              {
+                "command": "python3 -m pytest tests/test_workflow_modules.py tests/test_workflow.py -v",
+                "result": "N/A - planning only"
+              },
+              {
+                "command": "python3 -m pytest tests/ -v",
+                "result": "N/A - planning only"
+              },
+              {
+                "command": "python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git",
+                "result": "N/A - planning only"
+              }
+            ],
+            "provider_verification": {
+              "target": "openspec.create",
+              "change_id": "modularize-workflow-runtime",
+              "is_complete": true,
+              "artifact_statuses": {
+                "proposal": "done",
+                "design": "done",
+                "specs": "done",
+                "tasks": "done"
+              }
+            }
+          },
+          "artifacts": {
+            "primary_design_path": "openspec/changes/modularize-workflow-runtime/proposal.md",
+            "design_artifact_paths": [
+              {
+                "kind": "proposal",
+                "path": "openspec/changes/modularize-workflow-runtime/proposal.md",
+                "source": "openspec"
+              },
+              {
+                "kind": "design",
+                "path": "openspec/changes/modularize-workflow-runtime/design.md",
+                "source": "openspec"
+              },
+              {
+                "kind": "spec",
+                "path": "openspec/changes/modularize-workflow-runtime/specs/workflow-runtime-modularity/spec.md",
+                "source": "openspec"
+              },
+              {
+                "kind": "tasks",
+                "path": "openspec/changes/modularize-workflow-runtime/tasks.md",
+                "source": "openspec"
+              }
+            ],
+            "handoff_path": ".ai/workflows/runs/active/2026-07-11-RM-ORCH-009/handoffs/default/plan-agent.md"
+          },
+          "blockers": [],
+          "recommended_next_action": "await_user_plan_approval",
+          "recorded_at": "2026-07-11T21:01:49.275286"
+        },
+        "implement-agent": {
+          "agent": "implement-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "spec-flow",
+          "evidence": {
+            "tasks_complete": true,
+            "tdd_passed": true,
+            "verification_passed": true,
+            "focused_tests": [
+              {
+                "command": "python3 -m pytest tests/test_sync_templates.py::TestSyncTemplatesDistributed::test_sync_removes_extra_runtime_module_in_canonical tests/test_sync_templates.py::TestSyncTemplatesDistributed::test_distribute_removes_extra_runtime_module_in_distributed -v",
+                "result": "pass"
+              }
+            ],
+            "verification_summary": {
+              "status": "pass",
+              "full_regression": {
+                "command": "python3 -m pytest tests/ -v",
+                "passed": 1201,
+                "failed": 0
+              }
+            }
+          },
+          "artifacts": {
+            "handoff_path": ".ai/workflows/runs/active/2026-07-11-RM-ORCH-009/handoffs/default/implement-agent.md",
+            "worktree_path": "/Users/yuping/Documents/workspace/oh_my_skills",
+            "repo_root": "/Users/yuping/Documents/workspace/oh_my_skills",
+            "base_branch": "main",
+            "parent_ref": "aa535af56ab5ec2b185bc63c1335b461f8bf8883",
+            "changed_files": [
+              {
+                "path": "tests/test_sync_templates.py",
+                "status": "modified"
+              },
+              {
+                "path": "skills/sdlc-project-bootstrap/scripts/sync_templates.py",
+                "status": "modified"
+              },
+              {
+                "path": ".opencode/skills/sdlc-project-bootstrap/scripts/sync_templates.py",
+                "status": "modified"
+              },
+              {
+                "path": ".claude/skills/sdlc-project-bootstrap/scripts/sync_templates.py",
+                "status": "modified"
+              },
+              {
+                "path": ".cursor/skills/sdlc-project-bootstrap/scripts/sync_templates.py",
+                "status": "modified"
+              },
+              {
+                "path": ".ai/workflows/scripts/workflow.py",
+                "status": "modified"
+              },
+              {
+                "path": ".ai/workflows/scripts/workflow_runtime/",
+                "status": "untracked"
+              },
+              {
+                "path": "skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/",
+                "status": "untracked"
+              },
+              {
+                "path": ".opencode/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/",
+                "status": "untracked"
+              },
+              {
+                "path": ".claude/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/",
+                "status": "untracked"
+              },
+              {
+                "path": ".cursor/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/",
+                "status": "untracked"
+              },
+              {
+                "path": "openspec/changes/modularize-workflow-runtime/",
+                "status": "untracked"
+              },
+              {
+                "path": "tests/test_workflow_modules.py",
+                "status": "untracked"
+              }
+            ],
+            "diff_commands": [
+              "git diff -- tests/test_sync_templates.py",
+              "git diff -- skills/sdlc-project-bootstrap/scripts/sync_templates.py",
+              "git diff -- .opencode/skills/sdlc-project-bootstrap/scripts/sync_templates.py",
+              "git diff -- .claude/skills/sdlc-project-bootstrap/scripts/sync_templates.py",
+              "git diff -- .cursor/skills/sdlc-project-bootstrap/scripts/sync_templates.py"
+            ],
+            "verification_commands": [
+              {
+                "command": "python3 -m pytest tests/test_sync_templates.py::TestSyncTemplatesDistributed::test_sync_removes_extra_runtime_module_in_canonical tests/test_sync_templates.py::TestSyncTemplatesDistributed::test_distribute_removes_extra_runtime_module_in_distributed -v",
+                "scope": "focused",
+                "result": "pass"
+              },
+              {
+                "command": "python3 -m pytest tests/ -v",
+                "scope": "full_regression",
+                "result": "pass"
+              },
+              {
+                "command": "python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py --root . --check",
+                "scope": "live_drift_check",
+                "result": "pass"
+              },
+              {
+                "command": "python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py --root . --check-distributed",
+                "scope": "distributed_drift_check",
+                "result": "pass"
+              },
+              {
+                "command": "python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git",
+                "scope": "derived_artifact_sync_check",
+                "result": "pass"
+              }
+            ],
+            "raw_log_paths": [
+              {
+                "path": ".ai/workflows/runs/active/2026-07-11-RM-ORCH-009/handoffs/default/implement-agent.md",
+                "kind": "handoff",
+                "command": "write handoff",
+                "result": "pass"
+              }
+            ],
+            "history_handoff_paths": [
+              ".ai/workflows/runs/active/2026-07-11-RM-ORCH-009/handoffs/default/history/implement-agent-20260711T160108702178Z.md"
+            ]
+          },
+          "blockers": [],
+          "recommended_next_action": "dispatch_review_agent",
+          "recorded_at": "2026-07-12T00:01:08.699064"
+        },
+        "review-agent": {
+          "agent": "review-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "spec-flow",
+          "evidence": {
+            "tasks_complete": true,
+            "tdd_passed": true,
+            "eval_passed_or_human_decision_recorded": true,
+            "review_complete": true,
+            "verification_passed": true,
+            "review_decision": "accepted",
+            "review_blockers": [],
+            "criteria_satisfied": "tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded"
+          },
+          "artifacts": {
+            "handoff_path": ".ai/workflows/runs/active/2026-07-11-RM-ORCH-009/handoffs/default/review-agent.md",
+            "worktree_path": "/Users/yuping/Documents/workspace/oh_my_skills",
+            "reviewed_changed_files": [
+              "tests/test_sync_templates.py",
+              "skills/sdlc-project-bootstrap/scripts/sync_templates.py",
+              ".opencode/skills/sdlc-project-bootstrap/scripts/sync_templates.py",
+              ".claude/skills/sdlc-project-bootstrap/scripts/sync_templates.py",
+              ".cursor/skills/sdlc-project-bootstrap/scripts/sync_templates.py"
+            ],
+            "design_artifact_paths": [
+              "openspec/changes/modularize-workflow-runtime/specs/workflow-runtime-modularity/spec.md",
+              "openspec/changes/modularize-workflow-runtime/tasks.md",
+              "openspec/changes/modularize-workflow-runtime/design.md",
+              "openspec/changes/modularize-workflow-runtime/proposal.md"
+            ],
+            "raw_log_paths": [],
+            "history_handoff_paths": [
+              ".ai/workflows/runs/active/2026-07-11-RM-ORCH-009/handoffs/default/history/review-agent-20260711T160333914739Z.md"
+            ]
+          },
+          "blockers": [],
+          "recommended_next_action": "complete_phase",
+          "recorded_at": "2026-07-12T00:03:33.912240"
+        },
+        "finish-agent": {
+          "agent": "finish-agent",
+          "status": "success",
+          "phase": "post_archive_actions",
+          "slice_id": "default",
+          "flow_type": "spec-flow",
+          "evidence": {
+            "memory_sync_done": true,
+            "roadmap_done_checked": true,
+            "derived_artifacts_synced": true,
+            "post_hook_dirty_tree": false,
+            "cleanup_complete": true,
+            "pre_hook_commit_id": "f04a9d6",
+            "pre_hook_pushed": true,
+            "post_hook_commit_id": "d59628f",
+            "post_hook_pushed": true
+          },
+          "artifacts": {
+            "handoff_path": ".ai/workflows/runs/active/2026-07-11-RM-ORCH-009/handoffs/default/finish-agent.md",
+            "worktree_path": "/Users/yuping/Documents/workspace/oh_my_skills",
+            "feature_branch": "main",
+            "branch_finish_action": "keep-branch",
+            "raw_log_paths": []
+          },
+          "blockers": [],
+          "recommended_next_action": "complete_phase",
+          "recorded_at": "2026-07-12T00:09:48.083356"
+        }
+      },
+      "modularize-workflow-runtime": {
+        "finish-agent": {
+          "agent": "finish-agent",
+          "status": "success",
+          "phase": "post_archive_actions",
+          "slice_id": "modularize-workflow-runtime",
+          "flow_type": "spec-flow",
+          "evidence": {
+            "memory_sync_done": true,
+            "roadmap_done_checked": true,
+            "derived_artifacts_synced": true,
+            "post_hook_dirty_tree": false,
+            "cleanup_complete": true,
+            "pre_hook_commit_id": "f04a9d6",
+            "pre_hook_pushed": true,
+            "post_hook_commit_id": "d59628f",
+            "post_hook_pushed": true
+          },
+          "artifacts": {
+            "handoff_path": ".ai/workflows/runs/active/2026-07-11-RM-ORCH-009/handoffs/default/finish-agent.md",
+            "worktree_path": "/Users/yuping/Documents/workspace/oh_my_skills",
+            "feature_branch": "main",
+            "branch_finish_action": "keep-branch",
+            "raw_log_paths": []
+          },
+          "blockers": [],
+          "recommended_next_action": "complete_phase",
+          "recorded_at": "2026-07-12T00:17:42.506138"
+        }
+      }
+    },
+    "spec_status": {
+      "classification": "in-progress",
+      "source": "active"
+    },
+    "roadmap_link": {
+      "count": 0,
+      "items": []
+    },
+    "spec_artifacts_done": true,
+    "plan_user_approved": {
+      "approved": true,
+      "change_id": "modularize-workflow-runtime"
+    },
+    "tasks_complete": true,
+    "tdd_passed": true,
+    "eval_passed_or_human_decision_recorded": true,
+    "archive_action_completed": true,
+    "archive_path": "openspec/changes/archive/2026-07-11-modularize-workflow-runtime",
+    "memory_sync_done": true,
+    "roadmap_done_checked": true,
+    "derived_artifacts_synced": true,
+    "post_hook_dirty_tree": false,
+    "cleanup_complete": true
+  },
+  "block": null,
+  "updated_at": "2026-07-12T00:17:42.508723"
+}
