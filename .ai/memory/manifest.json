@@ -5,14 +5,14 @@
   "git": {
     "available": true,
     "has_commits": true,
-    "head": "80f8c9d74076fbabbed088e45edb33f1be91c437",
-    "last_synced_commit": "80f8c9d74076fbabbed088e45edb33f1be91c437",
-    "worktree_state": "clean"
+    "head": "b368a7f731ea3cf734827fee0b5484b72eb9319b",
+    "last_synced_commit": "b368a7f731ea3cf734827fee0b5484b72eb9319b",
+    "worktree_state": "dirty"
   },
   "pending_snapshots": [],
   "last_sync": {
-    "timestamp": "2026-07-11T00:00:00.000000Z",
-    "commit": "80f8c9d74076fbabbed088e45edb33f1be91c437",
-    "snapshot_id": "20260711-finish-agent-branch-decision"
+    "timestamp": "2026-07-11T08:03:26.613182Z",
+    "commit": "b368a7f731ea3cf734827fee0b5484b72eb9319b",
+    "snapshot_id": "20260711-workflow-final-tail-commit"
   }
 }

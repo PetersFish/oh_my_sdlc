@@ -6,10 +6,10 @@ summary: SDLC lifecycle management skills covering project bootstrap, OpenSpec i
 parent_id: skills
 sync_status: synced
 evidence_mode: discovery
-linked_commits: [c23d413, c590d26, ab06a0287f43ec7e50b280ce1bddd2cdc39d3aad]
+linked_commits: [c23d413, c590d26, ab06a0287f43ec7e50b280ce1bddd2cdc39d3aad, b368a7f731ea3cf734827fee0b5484b72eb9319b]
 linked_specs: [add-project-bootstrap-skill, sdlc-repository-memory-sync, sdlc-repository-memory-load, sdlc-repository-memory-init, sdlc-repository-memory-reset, sdlc-openspec-memory-sync, add-sdlc-roadmap-skill, simplify-sdlc-routing-schemas, standardize-ai-evalops-target-workspaces, add-eval-matrix-runner]
-linked_sessions: ["2026-07-09-workflow-runtime-execution-context-and-agent-result-integrity"]
-updated_at: 2026-07-09T00:00:00Z
+linked_sessions: ["2026-07-09-workflow-runtime-execution-context-and-agent-result-integrity", "2026-07-11-workflow-final-tail-commit"]
+updated_at: 2026-07-11T00:00:00Z
 confidence: high
 tags: [sdlc, openspec, bootstrap, memory, workflow, orchestration, roadmap, evalops]
 owned_paths:
@@ -99,3 +99,4 @@ Updated after `simplify-sdlc-routing-schemas`: added sdlc-orchestrator and sdlc-
 Updated after `standardize-ai-evalops-target-workspaces`: added sdlc-evalops ownership; recorded 3 Promptfoo eval pitfalls (grader model selection, max_tokens sizing, assertion design).
 Updated after `add-eval-matrix-runner` and `strengthen-sdlc-orchestrator-routing-compliance`: sdlc-evalops gained run-eval-matrix.py, run-promptfoo-eval.py, and model-matrix.yaml template; sdlc-orchestrator gained post-archive roadmap sync gate.
 Updated after `workflow-runtime-execution-context-and-agent-result-integrity`: workflow.py gained runtime context assembly (`_MAIN_CHECKOUT_AGENTS`, `_assemble_runtime_context()`), `cmd_ensure_context()`, `cmd_after_dispatch()` with result_contract validation, `_store_result_contract()`, and superpowers_direct no-workflow policy; agent prompts now require `runtime_context` block and return `missing_runtime_context` blocker when absent; tests expanded from 37 to 81 with runtime context, result contract, and agent contract compliance tests.
+Updated after `workflow-final-tail-commit`: workflow.py (canonical template under skills/sdlc-project-bootstrap/templates/workflow/) gained `cmd_final_commit` and `final-commit` command for publishing governance artifacts after a run reaches done; stages only allowlisted paths (history run dir, current.json, .ai/roadmap/, .ai/memory/, openspec/changes/archive/, docs/superpowers/archive/), commits with explicit pathspecs (never `git add -A`), optionally pushes, and reports residual dirty paths; tests expanded with 11 final-commit tests.
