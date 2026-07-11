@@ -19,11 +19,22 @@ DIRS = [
     ".ai/workflows/runs",
     ".ai/workflows/runs/history",
     ".ai/workflows/scripts",
+    ".ai/workflows/scripts/workflow_runtime",
 ]
 
 COPIES = [
     ("workflow/workflow.py", ".ai/workflows/scripts/workflow.py"),
     ("workflow/sdlc-main.yaml", ".ai/workflows/definitions/sdlc-main.yaml"),
+    ("workflow/workflow_runtime/__init__.py", ".ai/workflows/scripts/workflow_runtime/__init__.py"),
+    ("workflow/workflow_runtime/core.py", ".ai/workflows/scripts/workflow_runtime/core.py"),
+    ("workflow/workflow_runtime/state.py", ".ai/workflows/scripts/workflow_runtime/state.py"),
+    ("workflow/workflow_runtime/definitions.py", ".ai/workflows/scripts/workflow_runtime/definitions.py"),
+    ("workflow/workflow_runtime/domains.py", ".ai/workflows/scripts/workflow_runtime/domains.py"),
+    ("workflow/workflow_runtime/policies.py", ".ai/workflows/scripts/workflow_runtime/policies.py"),
+    ("workflow/workflow_runtime/dispatch.py", ".ai/workflows/scripts/workflow_runtime/dispatch.py"),
+    ("workflow/workflow_runtime/lifecycle.py", ".ai/workflows/scripts/workflow_runtime/lifecycle.py"),
+    ("workflow/workflow_runtime/governance.py", ".ai/workflows/scripts/workflow_runtime/governance.py"),
+    ("workflow/workflow_runtime/cli.py", ".ai/workflows/scripts/workflow_runtime/cli.py"),
 ]
 
 

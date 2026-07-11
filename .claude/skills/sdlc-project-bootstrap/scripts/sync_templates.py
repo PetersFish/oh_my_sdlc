@@ -26,6 +26,16 @@ from pathlib import Path
 GOVERNED = [
     (".ai/workflows/scripts/workflow.py", "workflow/workflow.py"),
     (".ai/workflows/definitions/sdlc-main.yaml", "workflow/sdlc-main.yaml"),
+    (".ai/workflows/scripts/workflow_runtime/__init__.py", "workflow/workflow_runtime/__init__.py"),
+    (".ai/workflows/scripts/workflow_runtime/core.py", "workflow/workflow_runtime/core.py"),
+    (".ai/workflows/scripts/workflow_runtime/state.py", "workflow/workflow_runtime/state.py"),
+    (".ai/workflows/scripts/workflow_runtime/definitions.py", "workflow/workflow_runtime/definitions.py"),
+    (".ai/workflows/scripts/workflow_runtime/domains.py", "workflow/workflow_runtime/domains.py"),
+    (".ai/workflows/scripts/workflow_runtime/policies.py", "workflow/workflow_runtime/policies.py"),
+    (".ai/workflows/scripts/workflow_runtime/dispatch.py", "workflow/workflow_runtime/dispatch.py"),
+    (".ai/workflows/scripts/workflow_runtime/lifecycle.py", "workflow/workflow_runtime/lifecycle.py"),
+    (".ai/workflows/scripts/workflow_runtime/governance.py", "workflow/workflow_runtime/governance.py"),
+    (".ai/workflows/scripts/workflow_runtime/cli.py", "workflow/workflow_runtime/cli.py"),
 ]
 
 # Project-level distributed skill directories (canonical -> these)
@@ -37,6 +47,16 @@ DISTRIBUTED_DIRS = [
 
 SKILL_NAME = "sdlc-project-bootstrap"
 TEMPLATES_SUBDIR = "templates"
+
+# Subdirectory under templates/workflow/ that contains governed runtime modules.
+RUNTIME_SUBDIR = "workflow_runtime"
+
+# Set of expected .py filenames in the workflow_runtime tree, derived from GOVERNED.
+_GOVERNED_RUNTIME_FILES = {
+    os.path.basename(live_rel)
+    for live_rel, tmpl_rel in GOVERNED
+    if tmpl_rel.startswith(f"workflow/{RUNTIME_SUBDIR}/")
+}
 
 
 def _hash(path: Path) -> str:
@@ -54,6 +74,38 @@ def _default_templates_dir(root: Path) -> str:
     return str(_canonical_templates_dir(root))
 
 
+def _list_runtime_py_files(directory: Path) -> set[str]:
+    """Return the set of .py filenames present in a workflow_runtime directory.
+
+    Returns an empty set if the directory does not exist.
+    """
+    if not directory.is_dir():
+        return set()
+    return {f.name for f in directory.iterdir() if f.is_file() and f.suffix == ".py"}
+
+
+def _detect_extra_runtime_files(
+    live_runtime_dir: Path, tmpl_runtime_dir: Path
+) -> list[str]:
+    """Detect extra .py files in live or canonical workflow_runtime trees that
+    are not in the governed set.
+
+    Returns a list of drift description strings.
+    """
+    extras = []
+    live_files = _list_runtime_py_files(live_runtime_dir)
+    tmpl_files = _list_runtime_py_files(tmpl_runtime_dir)
+
+    live_extras = live_files - _GOVERNED_RUNTIME_FILES
+    tmpl_extras = tmpl_files - _GOVERNED_RUNTIME_FILES
+
+    for fname in sorted(live_extras):
+        extras.append(f"extra: .ai/workflows/scripts/workflow_runtime/{fname}")
+    for fname in sorted(tmpl_extras):
+        extras.append(f"extra: workflow/workflow_runtime/{fname}")
+    return extras
+
+
 def check_drift(root: Path, templates: Path) -> tuple[list[str], list[str]]:
     drifted = []
     in_sync = []
@@ -64,7 +116,27 @@ def check_drift(root: Path, templates: Path) -> tuple[list[str], list[str]]:
             drifted.append(f"{live_rel} -> {tmpl_rel}")
         else:
             in_sync.append(f"{live_rel} -> {tmpl_rel}")
+
+    # Detect extra .py files in workflow_runtime trees not in the governed set.
+    live_runtime_dir = root / ".ai" / "workflows" / "scripts" / RUNTIME_SUBDIR
+    tmpl_runtime_dir = templates / "workflow" / RUNTIME_SUBDIR
+    extras = _detect_extra_runtime_files(live_runtime_dir, tmpl_runtime_dir)
+    drifted.extend(extras)
+
     return drifted, in_sync
+
+
+def _remove_extra_runtime_files(directory: Path) -> list[str]:
+    """Remove extra .py files from a workflow_runtime directory that are not
+    in the governed set. Returns a list of removed relative filenames."""
+    removed = []
+    if not directory.is_dir():
+        return removed
+    for f in directory.iterdir():
+        if f.is_file() and f.suffix == ".py" and f.name not in _GOVERNED_RUNTIME_FILES:
+            f.unlink()
+            removed.append(f.name)
+    return removed
 
 
 def sync_files(root: Path, templates: Path) -> tuple[list[str], list[str]]:
@@ -82,6 +154,12 @@ def sync_files(root: Path, templates: Path) -> tuple[list[str], list[str]]:
             synced.append(f"{live_rel} -> {tmpl_rel}")
         else:
             unchanged.append(f"{live_rel} -> {tmpl_rel}")
+
+    # Remove extra .py files in canonical workflow_runtime not in the live tree.
+    tmpl_runtime_dir = templates / "workflow" / RUNTIME_SUBDIR
+    removed = _remove_extra_runtime_files(tmpl_runtime_dir)
+    for fname in removed:
+        synced.append(f"removed extra canonical: workflow/{RUNTIME_SUBDIR}/{fname}")
     return synced, unchanged
 
 
@@ -102,6 +180,17 @@ def check_distributed(root: Path, templates: Path) -> tuple[list[str], list[str]
                 drifted.append(f"{dist_dir_rel}/{tmpl_rel}")
             else:
                 in_sync.append(f"{dist_dir_rel}/{tmpl_rel}")
+
+    # Detect extra .py files in distributed workflow_runtime trees.
+    canonical_runtime_dir = templates / "workflow" / RUNTIME_SUBDIR
+    canonical_files = _list_runtime_py_files(canonical_runtime_dir)
+    for dist_dir_rel in DISTRIBUTED_DIRS:
+        dist_runtime_dir = root / dist_dir_rel / "workflow" / RUNTIME_SUBDIR
+        dist_files = _list_runtime_py_files(dist_runtime_dir)
+        dist_extras = dist_files - _GOVERNED_RUNTIME_FILES
+        for fname in sorted(dist_extras):
+            drifted.append(f"extra: {dist_dir_rel}/workflow/{RUNTIME_SUBDIR}/{fname}")
+
     return drifted, in_sync
 
 
@@ -121,6 +210,15 @@ def distribute_to_all(root: Path, templates: Path) -> tuple[list[str], list[str]
                 synced.append(f"{dist_dir_rel}/{tmpl_rel}")
             else:
                 unchanged.append(f"{dist_dir_rel}/{tmpl_rel}")
+
+    # Remove extra .py files in distributed workflow_runtime trees not in canonical.
+    for dist_dir_rel in DISTRIBUTED_DIRS:
+        dist_runtime_dir = root / dist_dir_rel / "workflow" / RUNTIME_SUBDIR
+        removed = _remove_extra_runtime_files(dist_runtime_dir)
+        for fname in removed:
+            synced.append(
+                f"removed extra {dist_dir_rel}/workflow/{RUNTIME_SUBDIR}/{fname}"
+            )
     return synced, unchanged
 
 

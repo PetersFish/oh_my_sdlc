@@ -51,6 +51,13 @@ def _make_canonical_templates(tmp):
                "# canonical workflow\n")
     write_file(tmp, "skills/sdlc-project-bootstrap/templates/workflow/sdlc-main.yaml",
                "# canonical yaml\n")
+    # Also create workflow_runtime module files in canonical templates.
+    for mod in ["__init__.py", "core.py", "state.py", "definitions.py",
+                "domains.py", "policies.py", "dispatch.py", "lifecycle.py",
+                "governance.py", "cli.py"]:
+        write_file(tmp,
+                   f"skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/{mod}",
+                   f"# canonical {mod}\n")
 
 
 def _make_distributed_copies(tmp, wf_content="# canonical workflow\n",
@@ -61,6 +68,13 @@ def _make_distributed_copies(tmp, wf_content="# canonical workflow\n",
                    wf_content)
         write_file(tmp, f"{d}/skills/sdlc-project-bootstrap/templates/workflow/sdlc-main.yaml",
                    yaml_content)
+        # Also create workflow_runtime module files in distributed copies.
+        for mod in ["__init__.py", "core.py", "state.py", "definitions.py",
+                    "domains.py", "policies.py", "dispatch.py", "lifecycle.py",
+                    "governance.py", "cli.py"]:
+            write_file(tmp,
+                       f"{d}/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/{mod}",
+                       f"# canonical {mod}\n")
 
 
 def run_sync(root, *extra_args):
@@ -199,6 +213,13 @@ class TestSyncTemplatesDistributed(unittest.TestCase):
                    "# canonical workflow\n")
         write_file(self.tmp, ".ai/workflows/definitions/sdlc-main.yaml",
                    "# canonical yaml\n")
+        # Create live workflow_runtime files matching canonical
+        for mod in ["__init__.py", "core.py", "state.py", "definitions.py",
+                    "domains.py", "policies.py", "dispatch.py", "lifecycle.py",
+                    "governance.py", "cli.py"]:
+            write_file(self.tmp,
+                       f".ai/workflows/scripts/workflow_runtime/{mod}",
+                       f"# canonical {mod}\n")
 
     def tearDown(self):
         shutil.rmtree(self.tmp)
@@ -259,6 +280,216 @@ class TestSyncTemplatesDistributed(unittest.TestCase):
         content = read_file(self.tmp,
                             ".cursor/skills/sdlc-project-bootstrap/templates/workflow/workflow.py")
         self.assertEqual(content, "# canonical workflow\n")
+
+    def test_sync_templates_detects_missing_nested_runtime_module(self):
+        """--check detects missing nested workflow_runtime module files in
+        canonical templates when live files have them but templates don't."""
+        # Make the existing governed files identical so only nested module drift shows.
+        write_file(self.tmp, "templates/workflow/workflow.py", "# live workflow\n")
+        write_file(self.tmp, "templates/workflow/sdlc-main.yaml", "# live yaml\n")
+        # Add a live workflow_runtime module file.
+        write_file(self.tmp, ".ai/workflows/scripts/workflow_runtime/__init__.py",
+                   "# live init\n")
+        # Canonical template does NOT have the nested module — check should
+        # detect it as drift (missing from canonical).
+        rc, stdout, _ = run_sync(self.tmp, "--check", "--templates",
+                                 os.path.join(self.tmp, "templates"))
+        self.assertNotEqual(rc, 0,
+                            "Missing nested runtime module in canonical must cause drift")
+
+    def test_distributed_check_detects_stale_nested_runtime_module(self):
+        """--check-distributed detects stale nested workflow_runtime module
+        in distributed copies."""
+        # Add nested module to canonical and all distributed copies.
+        write_file(self.tmp,
+                    "skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/__init__.py",
+                    "# canonical init\n")
+        for d in DISTRIBUTED_DIRS:
+            write_file(self.tmp,
+                        f"{d}/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/__init__.py",
+                        "# canonical init\n")
+        # Now make one distributed copy stale.
+        write_file(self.tmp,
+                    ".opencode/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/__init__.py",
+                    "# stale init\n")
+        rc, stdout, _ = run_sync(self.tmp, "--check-distributed")
+        self.assertNotEqual(rc, 0,
+                            "Stale nested runtime module in distributed copy must cause drift")
+
+    def test_check_detects_extra_runtime_module_in_canonical(self):
+        """--check detects an extra .py file in canonical templates that is
+        not in the live workflow_runtime tree (extra-file drift)."""
+        # Make all governed files identical so only extra-file drift shows.
+        for mod in ["__init__.py", "core.py", "state.py", "definitions.py",
+                     "domains.py", "policies.py", "dispatch.py", "lifecycle.py",
+                     "governance.py", "cli.py"]:
+            write_file(self.tmp,
+                        f"skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/{mod}",
+                        f"# canonical {mod}\n")
+            write_file(self.tmp,
+                        f".ai/workflows/scripts/workflow_runtime/{mod}",
+                        f"# canonical {mod}\n")
+        write_file(self.tmp,
+                    "skills/sdlc-project-bootstrap/templates/workflow/workflow.py",
+                    "# canonical workflow\n")
+        write_file(self.tmp,
+                    "skills/sdlc-project-bootstrap/templates/workflow/sdlc-main.yaml",
+                    "# canonical yaml\n")
+        write_file(self.tmp, ".ai/workflows/scripts/workflow.py", "# canonical workflow\n")
+        write_file(self.tmp, ".ai/workflows/definitions/sdlc-main.yaml", "# canonical yaml\n")
+        # Add an extra .py file in canonical templates that is NOT in the live tree.
+        write_file(self.tmp,
+                    "skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/extra_module.py",
+                    "# extra file\n")
+        rc, stdout, _ = run_sync(self.tmp, "--check")
+        self.assertNotEqual(rc, 0,
+                            "Extra .py file in canonical templates must cause drift")
+        combined = stdout.lower()
+        self.assertIn("extra", combined,
+                       f"Drift report should mention extra file, got: {stdout!r}")
+
+    def test_check_detects_extra_runtime_module_in_live(self):
+        """--check detects an extra .py file in live workflow_runtime that is
+        not in the canonical templates (extra-file drift from live side)."""
+        # Make all governed files identical.
+        for mod in ["__init__.py", "core.py", "state.py", "definitions.py",
+                     "domains.py", "policies.py", "dispatch.py", "lifecycle.py",
+                     "governance.py", "cli.py"]:
+            write_file(self.tmp,
+                        f"skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/{mod}",
+                        f"# canonical {mod}\n")
+            write_file(self.tmp,
+                        f".ai/workflows/scripts/workflow_runtime/{mod}",
+                        f"# canonical {mod}\n")
+        write_file(self.tmp,
+                    "skills/sdlc-project-bootstrap/templates/workflow/workflow.py",
+                    "# canonical workflow\n")
+        write_file(self.tmp,
+                    "skills/sdlc-project-bootstrap/templates/workflow/sdlc-main.yaml",
+                    "# canonical yaml\n")
+        write_file(self.tmp, ".ai/workflows/scripts/workflow.py", "# canonical workflow\n")
+        write_file(self.tmp, ".ai/workflows/definitions/sdlc-main.yaml", "# canonical yaml\n")
+        # Add an extra .py file in live tree that is NOT in canonical templates.
+        write_file(self.tmp,
+                    ".ai/workflows/scripts/workflow_runtime/rogue_module.py",
+                    "# rogue file\n")
+        rc, stdout, _ = run_sync(self.tmp, "--check")
+        self.assertNotEqual(rc, 0,
+                            "Extra .py file in live tree must cause drift")
+        combined = stdout.lower()
+        self.assertIn("extra", combined,
+                       f"Drift report should mention extra file, got: {stdout!r}")
+
+    def test_check_distributed_detects_extra_runtime_module(self):
+        """--check-distributed detects an extra .py file in a distributed copy
+        that is not in the canonical templates."""
+        # Make all governed files identical.
+        for mod in ["__init__.py", "core.py", "state.py", "definitions.py",
+                     "domains.py", "policies.py", "dispatch.py", "lifecycle.py",
+                     "governance.py", "cli.py"]:
+            write_file(self.tmp,
+                        f"skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/{mod}",
+                        f"# canonical {mod}\n")
+            for d in DISTRIBUTED_DIRS:
+                write_file(self.tmp,
+                            f"{d}/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/{mod}",
+                            f"# canonical {mod}\n")
+        # Add an extra .py file in one distributed copy.
+        write_file(self.tmp,
+                    ".opencode/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/extra_dist.py",
+                    "# extra dist file\n")
+        rc, stdout, _ = run_sync(self.tmp, "--check-distributed")
+        self.assertNotEqual(rc, 0,
+                            "Extra .py file in distributed copy must cause drift")
+        combined = stdout.lower()
+        self.assertIn("extra", combined,
+                       f"Drift report should mention extra file, got: {stdout!r}")
+
+
+    def test_sync_removes_extra_runtime_module_in_canonical(self):
+        """Live-to-canonical sync removes an extra .py file in the canonical
+        workflow_runtime tree that is not in the live tree, restoring parity."""
+        # All governed files identical except for an extra in canonical.
+        for mod in ["__init__.py", "core.py", "state.py", "definitions.py",
+                     "domains.py", "policies.py", "dispatch.py", "lifecycle.py",
+                     "governance.py", "cli.py"]:
+            write_file(self.tmp,
+                        f"skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/{mod}",
+                        f"# canonical {mod}\n")
+            write_file(self.tmp,
+                        f".ai/workflows/scripts/workflow_runtime/{mod}",
+                        f"# canonical {mod}\n")
+        write_file(self.tmp,
+                    "skills/sdlc-project-bootstrap/templates/workflow/workflow.py",
+                    "# canonical workflow\n")
+        write_file(self.tmp,
+                    "skills/sdlc-project-bootstrap/templates/workflow/sdlc-main.yaml",
+                    "# canonical yaml\n")
+        write_file(self.tmp, ".ai/workflows/scripts/workflow.py", "# canonical workflow\n")
+        write_file(self.tmp, ".ai/workflows/definitions/sdlc-main.yaml", "# canonical yaml\n")
+        # Inject an extra .py file in canonical templates.
+        write_file(self.tmp,
+                    "skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/orphan.py",
+                    "# orphan\n")
+        # Precondition: check detects the extra.
+        rc_pre, _, _ = run_sync(self.tmp, "--check")
+        self.assertNotEqual(rc_pre, 0,
+                            "Pre-sync check should detect the extra canonical file")
+        # Mutating repair: sync live -> canonical.
+        rc_sync, _, _ = run_sync(self.tmp)
+        self.assertEqual(rc_sync, 0,
+                         "sync should succeed and remove the extra canonical file")
+        # Postcondition: the extra file must be gone.
+        extra_path = os.path.join(
+            self.tmp,
+            "skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/orphan.py",
+        )
+        self.assertFalse(os.path.exists(extra_path),
+                         "Extra canonical runtime module must be removed by sync")
+        # Postcondition: subsequent read-only check passes.
+        rc_post, stdout_post, _ = run_sync(self.tmp, "--check")
+        self.assertEqual(rc_post, 0,
+                         f"After sync, --check should pass, got stdout={stdout_post!r}")
+
+    def test_distribute_removes_extra_runtime_module_in_distributed(self):
+        """Canonical-to-distribution removes an extra .py file in a distributed
+        workflow_runtime tree that is not in the canonical tree, restoring
+        parity across all CLI copies."""
+        # All governed files identical across canonical and distributed.
+        for mod in ["__init__.py", "core.py", "state.py", "definitions.py",
+                     "domains.py", "policies.py", "dispatch.py", "lifecycle.py",
+                     "governance.py", "cli.py"]:
+            write_file(self.tmp,
+                        f"skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/{mod}",
+                        f"# canonical {mod}\n")
+            for d in DISTRIBUTED_DIRS:
+                write_file(self.tmp,
+                            f"{d}/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/{mod}",
+                            f"# canonical {mod}\n")
+        # Inject an extra .py file in one distributed copy.
+        write_file(self.tmp,
+                    ".opencode/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/stale_extra.py",
+                    "# stale extra\n")
+        # Precondition: check-distributed detects the extra.
+        rc_pre, _, _ = run_sync(self.tmp, "--check-distributed")
+        self.assertNotEqual(rc_pre, 0,
+                            "Pre-distribute check should detect the extra distributed file")
+        # Mutating repair: distribute canonical -> distributed.
+        rc_dist, _, _ = run_sync(self.tmp, "--distribute")
+        self.assertEqual(rc_dist, 0,
+                         "distribute should succeed and remove the extra distributed file")
+        # Postcondition: the extra file must be gone in all distributed copies.
+        for d in DISTRIBUTED_DIRS:
+            extra_path = os.path.join(
+                self.tmp,
+                f"{d}/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/stale_extra.py",
+            )
+            self.assertFalse(os.path.exists(extra_path),
+                             f"Extra runtime module in {d} must be removed by distribute")
+        # Postcondition: subsequent read-only distributed check passes.
+        rc_post, stdout_post, _ = run_sync(self.tmp, "--check-distributed")
+        self.assertEqual(rc_post, 0,
+                         f"After distribute, --check-distributed should pass, got stdout={stdout_post!r}")
 
 
 CHECK_SKILL_DIST = os.path.join(

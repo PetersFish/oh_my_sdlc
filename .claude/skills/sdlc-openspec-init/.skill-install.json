@@ -5,7 +5,7 @@
   "source_ref": "HEAD",
   "status": "stable",
   "target": "/Users/yuping/Documents/workspace/oh_my_skills/.claude/skills/sdlc-openspec-init",
-  "installed_at": "2026-07-05T05:42:38.287393Z",
+  "installed_at": "2026-07-11T15:58:03.818479Z",
   "backport_policy": "review-required",
   "payload_hash": "1536f07f6c7bf296c328f706ec1427d9cd9debe1408ca6cb998a7f89c35777ca",
   "files": [

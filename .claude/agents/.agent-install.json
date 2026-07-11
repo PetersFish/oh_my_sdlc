@@ -1,7 +1,7 @@
 {
   "source_repo": "/Users/yuping/Documents/workspace/oh_my_skills",
-  "source_ref": "0ce32c024aeeafb41a9cc1509fe50bdeb1499f25",
-  "installed_at": "2026-07-11T10:39:56.831517+00:00",
+  "source_ref": "aa535af56ab5ec2b185bc63c1335b461f8bf8883",
+  "installed_at": "2026-07-11T15:58:02.166298+00:00",
   "status": "stable",
   "files": {
     "dev-orchestrator.md": "802738ea057419e8996efc2b9dd31aa6deacb966ce9d9cbacd0d620a66746681",

@@ -84,6 +84,31 @@ class TestInitFoundations(unittest.TestCase):
         self.assertEqual(len(report["created"]), 0)
         self.assertGreaterEqual(len(report["already_present"]), 2)
 
+    def test_init_foundations_installs_executable_modular_workflow_runtime(self):
+        """init_foundations installs the workflow_runtime package directory
+        with all module files, and the bootstrapped workflow.py status or
+        validate invocation succeeds."""
+        rc, _, stderr = run_init(self.tmp)
+        self.assertEqual(rc, 0, f"init should succeed, got stderr={stderr!r}")
+        # The workflow_runtime package directory must exist.
+        pkg_dir = os.path.join(self.tmp, ".ai", "workflows", "scripts", "workflow_runtime")
+        self.assertTrue(os.path.isdir(pkg_dir),
+                        "workflow_runtime package directory must be installed")
+        # All expected module files must be present.
+        for mod in ["__init__.py", "core.py", "state.py", "definitions.py",
+                     "domains.py", "policies.py", "dispatch.py", "lifecycle.py",
+                     "governance.py", "cli.py"]:
+            self.assertTrue(os.path.isfile(os.path.join(pkg_dir, mod)),
+                            f"workflow_runtime/{mod} must be installed")
+        # The bootstrapped workflow.py must be executable.
+        result = subprocess.run(
+            [sys.executable, os.path.join(self.tmp, ".ai", "workflows", "scripts", "workflow.py"),
+             "--root", self.tmp, "validate"],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(result.returncode, 0,
+                         f"validate should succeed, got stderr={result.stderr!r}")
+
     def test_missing_template_source(self):
         """--templates <nonexistent> exits 2."""
         rc, _, stderr = run_init(self.tmp, "--templates",

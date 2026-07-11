@@ -5,7 +5,7 @@
   "source_ref": "HEAD",
   "status": "stable",
   "target": "/Users/yuping/Documents/workspace/oh_my_skills/.cursor/skills/meta-skill-lifecycle-governance",
-  "installed_at": "2026-07-05T05:42:37.626880Z",
+  "installed_at": "2026-07-11T15:58:03.137783Z",
   "backport_policy": "review-required",
   "payload_hash": "384ec55b1bb4ed21bee78857d5b31546a6e370d6a31097ef1716cd7f8946f13c",
   "files": [

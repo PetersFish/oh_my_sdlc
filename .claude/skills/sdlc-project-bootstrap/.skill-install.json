@@ -5,15 +5,25 @@
   "source_ref": "HEAD",
   "status": "stable",
   "target": "/Users/yuping/Documents/workspace/oh_my_skills/.claude/skills/sdlc-project-bootstrap",
-  "installed_at": "2026-07-11T07:53:55.652614Z",
+  "installed_at": "2026-07-11T15:58:04.045711Z",
   "backport_policy": "review-required",
-  "payload_hash": "eddc344690252d176e25e759ab17031ed9bd02ab3115f0cb1b12795882d6e2cc",
+  "payload_hash": "09e9994248c5b20c47a740f9f33440f21639df100bba55c7a774a69b79672368",
   "files": [
     "SKILL.md",
     "scripts/init_foundations.py",
     "scripts/sync_templates.py",
     "templates/AGENTS.md",
     "templates/workflow/sdlc-main.yaml",
-    "templates/workflow/workflow.py"
+    "templates/workflow/workflow.py",
+    "templates/workflow/workflow_runtime/__init__.py",
+    "templates/workflow/workflow_runtime/cli.py",
+    "templates/workflow/workflow_runtime/core.py",
+    "templates/workflow/workflow_runtime/definitions.py",
+    "templates/workflow/workflow_runtime/dispatch.py",
+    "templates/workflow/workflow_runtime/domains.py",
+    "templates/workflow/workflow_runtime/governance.py",
+    "templates/workflow/workflow_runtime/lifecycle.py",
+    "templates/workflow/workflow_runtime/policies.py",
+    "templates/workflow/workflow_runtime/state.py"
   ]
 }
