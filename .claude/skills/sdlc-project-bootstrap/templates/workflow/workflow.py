@@ -36,6 +36,8 @@ VALID_GATE_STATUSES = {"required", "passed", "not_required", "user_exception", "
 
 VALID_MEMORY_SYNC_RESOLUTIONS = {"synced", "not_needed", "user_deferred"}
 
+VALID_BRANCH_FINISH_DECISIONS = {"merge_local", "create_pr", "keep_branch", "discard"}
+
 
 def _make_run_id(subject_type, subject_id):
     today = datetime.date.today().isoformat()
@@ -113,6 +115,187 @@ def _build_runtime_context(context):
         if value:
             rt[field] = value
     return rt
+
+
+def _branch_finish_decision_required(context):
+    """Return True when a branch_finish_decision gate is required (Spec Dec 1,3).
+
+    The gate is required when a feature branch/worktree is present, regardless
+    of execution_mode.  Main-checkout mode without a feature branch does not
+    require the gate by default.
+    """
+    context = context or {}
+    execution_mode = _resolve_execution_mode(context)
+    if execution_mode == "worktree":
+        return True
+    # Main-checkout still requires the gate when context.feature_branch is set.
+    if context.get("feature_branch"):
+        return True
+    return False
+
+
+def _resolve_branch_finish_decision(context):
+    """Return the recorded branch_finish_decision or empty string.
+
+    Validates the value against the allowed set when present.  Returns
+    ``("", "missing")`` when required and absent, ``(value, "invalid")`` when
+    present but not in the allowed set, or ``(value, "ok")`` when valid.
+    """
+    context = context or {}
+    decision = context.get("branch_finish_decision", "") or ""
+    if not _branch_finish_decision_required(context):
+        return decision, "not_required"
+    if not decision:
+        return "", "missing"
+    if decision not in VALID_BRANCH_FINISH_DECISIONS:
+        return decision, "invalid"
+    return decision, "ok"
+
+
+def _archive_lightweight_superpowers_artifacts(root, state, agent_evidence):
+    """Move Superpowers plan/spec design artifacts into typed archive dirs.
+
+    Called during after-dispatch for finish-agent archive_change success on
+    lightweight-flow runs.  Uses the source/destination paths reported by
+    finish-agent in ``archived_design_artifact_paths`` and
+    ``source_design_artifact_paths``.  Falls back to deriving destinations
+    from ``context.primary_design_path`` and ``context.design_artifact_paths``
+    when finish-agent did not report explicit paths.
+
+    Collision handling: if a destination file already exists, it is preserved
+    (not overwritten) and a deterministic suffix is used for the new file.
+
+    Returns a dict with keys ``moved`` (list of (src, dst) tuples),
+    ``skipped`` (list of src paths that were missing on disk and whose
+    archive destination was also absent), and ``already_archived`` (list of
+    (src, dst) tuples where the source was absent but the destination
+    already existed, indicating a prior archive move succeeded).
+    """
+    moved = []
+    skipped = []
+    already_archived = []
+    if not isinstance(agent_evidence, dict):
+        return {"moved": moved, "skipped": skipped, "already_archived": already_archived}
+
+    context = state.get("context", {}) or {}
+    archived_paths = list(agent_evidence.get("archived_design_artifact_paths") or [])
+    source_paths = list(agent_evidence.get("source_design_artifact_paths") or [])
+
+    # When finish-agent did not report explicit paths, derive them from the
+    # runtime design artifact contract (primary_design_path + design_artifact_paths).
+    if not archived_paths and not source_paths:
+        primary = context.get("primary_design_path") or ""
+        design_artifacts = context.get("design_artifact_paths") or []
+        if primary:
+            source_paths.append(primary)
+        for entry in design_artifacts:
+            if isinstance(entry, dict):
+                kind = entry.get("kind", "")
+                p = entry.get("path", "")
+                if p and kind in ("plan", "spec"):
+                    source_paths.append(p)
+
+    # Normalize every source path to a repo-relative POSIX string so the
+    # governed runtime contract (which may supply ABSOLUTE design artifact
+    # paths) is classified correctly.  Absolute paths under the repo root are
+    # converted to repo-relative; paths already repo-relative pass through.
+    # Non-superpowers and outside-repo paths are dropped later by
+    # _archive_dst_for() returning None.
+    def _to_repo_rel(p):
+        if not p:
+            return ""
+        p_norm = os.path.normpath(p)
+        if os.path.isabs(p_norm) and root:
+            root_abs = os.path.normpath(root)
+            try:
+                rel = os.path.relpath(p_norm, root_abs)
+            except ValueError:
+                return p_norm
+            # If the path is outside the repo root, relpath yields a "../..."
+            # string; leave it so _archive_dst_for() drops it as non-superpowers.
+            return rel
+        return p_norm
+
+    source_paths = [_to_repo_rel(s) for s in source_paths if _to_repo_rel(s)]
+
+    # Derive archive destinations for any source lacking one:
+    # plans/<file> -> archive/plans/<file>, specs/<file> -> archive/specs/<file>.
+    def _archive_dst_for(src):
+        src_norm = os.path.normpath(src)
+        if src_norm.startswith("docs/superpowers/plans/"):
+            fname = os.path.basename(src_norm)
+            return f"docs/superpowers/archive/plans/{fname}"
+        if src_norm.startswith("docs/superpowers/specs/"):
+            fname = os.path.basename(src_norm)
+            return f"docs/superpowers/archive/specs/{fname}"
+        return None
+
+    if not archived_paths:
+        archived_paths = []
+    for src in source_paths:
+        archived_paths.append(_archive_dst_for(src))
+    # Drop None destinations (non-superpowers paths) by aligning the two lists.
+    paired = [(s, d) for s, d in zip(source_paths, archived_paths) if d]
+    source_paths = [s for s, _ in paired]
+    archived_paths = [d for _, d in paired]
+
+    # Deterministic slug/date fallback (Spec Decision 11 / Task 8): if only a
+    # plan or only a spec is known, look for a matching counterpart file with
+    # the same slug/date filename in the sibling active superpowers directory.
+    # This catches runs where the runtime contract only carried the plan
+    # primary path but a matching spec exists on disk.
+    def _has_kind(kind):
+        prefix = f"docs/superpowers/{'plans' if kind == 'plan' else 'specs'}/"
+        return any(os.path.normpath(s).startswith(prefix) for s in source_paths)
+
+    def _add_counterpart(kind):
+        other_kind = "spec" if kind == "plan" else "plan"
+        other_dir = f"docs/superpowers/{other_kind}s"
+        # Derive the slug/date filename from the known plan/spec source.
+        known_prefix = f"docs/superpowers/{kind}s/"
+        fname = None
+        for s in source_paths:
+            s_norm = os.path.normpath(s)
+            if s_norm.startswith(known_prefix):
+                fname = os.path.basename(s_norm)
+                break
+        if not fname:
+            return
+        candidate_src = f"{other_dir}/{fname}"
+        candidate_abs = _resolve_path(root, candidate_src)
+        if os.path.exists(candidate_abs):
+            source_paths.append(candidate_src)
+            archived_paths.append(_archive_dst_for(candidate_src))
+
+    if _has_kind("plan") and not _has_kind("spec"):
+        _add_counterpart("plan")
+    elif _has_kind("spec") and not _has_kind("plan"):
+        _add_counterpart("spec")
+
+    for src_rel, dst_rel in zip(source_paths, archived_paths):
+        src_abs = _resolve_path(root, src_rel)
+        dst_abs = _resolve_path(root, dst_rel)
+        if not os.path.exists(src_abs):
+            if os.path.exists(dst_abs):
+                already_archived.append((src_rel, dst_rel))
+            else:
+                skipped.append(src_rel)
+            continue
+        _ensure_dir(os.path.dirname(dst_abs))
+        # Collision handling: do not overwrite existing destination.
+        if os.path.exists(dst_abs):
+            stem, ext = os.path.splitext(dst_abs)
+            counter = 1
+            candidate = f"{stem}-{counter}{ext}"
+            while os.path.exists(candidate):
+                counter += 1
+                candidate = f"{stem}-{counter}{ext}"
+            dst_abs = candidate
+            dst_rel = os.path.relpath(dst_abs, root) if root else dst_abs
+        shutil.move(src_abs, dst_abs)
+        moved.append((src_rel, dst_rel))
+
+    return {"moved": moved, "skipped": skipped, "already_archived": already_archived}
 
 
 def _read_pointer(root):
@@ -1883,6 +2066,30 @@ def cmd_before_dispatch(root, args):
             "recommended_action": "continue the non-roadmap workflow path without dispatching roadmap-agent",
         })
 
+    # Branch finish decision gate (Spec Decision 1-3): finish-agent must have
+    # an explicit branch_finish_decision before branch-affecting actions when
+    # a feature branch/worktree is present.
+    if canonical_agent == "finish-agent" and phase in ("archive_change", "post_archive_actions"):
+        decision, status = _resolve_branch_finish_decision(context)
+        if status == "missing":
+            blocker_reasons.append({
+                "reason": "missing_branch_finish_decision",
+                "message": (
+                    "finish requires explicit branch_finish_decision before "
+                    "branch-affecting actions"
+                ),
+                "recommended_action": "ask_user_branch_finish_decision",
+            })
+        elif status == "invalid":
+            blocker_reasons.append({
+                "reason": "invalid_branch_finish_decision",
+                "message": (
+                    f"branch_finish_decision {decision!r} is not one of: "
+                    f"{sorted(VALID_BRANCH_FINISH_DECISIONS)}"
+                ),
+                "recommended_action": "ask_user_branch_finish_decision",
+            })
+
     if blocker_reasons:
         blocker = {
             "agent": agent,
@@ -1893,7 +2100,14 @@ def cmd_before_dispatch(root, args):
             "evidence": {},
             "artifacts": {},
             "blockers": blocker_reasons,
-            "recommended_next_action": "resolve_blockers",
+            "recommended_next_action": (
+                "ask_user_branch_finish_decision"
+                if any(b.get("reason") in (
+                    "missing_branch_finish_decision",
+                    "invalid_branch_finish_decision",
+                ) for b in blocker_reasons)
+                else "resolve_blockers"
+            ),
         }
         print(json.dumps(blocker, indent=2))
         sys.exit(1)
@@ -1958,6 +2172,10 @@ def _missing_phase_evidence_keys(agent_evidence: Dict[str, Any], phase_def: Dict
     for key in phase_def.get("evidence_keys", []):
         value = agent_evidence.get(key)
         if value is None or value == "":
+            # Backward-compat alias: legacy archive_path_exists satisfies
+            # archive_action_completed evidence key (Spec Decision 10).
+            if key == "archive_action_completed" and agent_evidence.get("archive_path_exists"):
+                continue
             missing.append(key)
     return missing
 
@@ -1970,6 +2188,17 @@ def _missing_exit_criteria(phase_evidence_view: Dict[str, Any], phase_def: Dict[
         value = phase_evidence_view.get(key)
         if value is not None and value != "" and value is not False:
             satisfied.add(key)
+    # Backward-compat alias: legacy archive_path_exists satisfies
+    # archive_action_completed (Spec Decision 10 migration).  Both the
+    # criteria_satisfied string declaration and a truthy evidence value
+    # for archive_path_exists count.
+    if "archive_action_completed" in required:
+        if "archive_path_exists" in satisfied:
+            satisfied.add("archive_action_completed")
+        else:
+            legacy_val = phase_evidence_view.get("archive_path_exists")
+            if legacy_val is not None and legacy_val != "" and legacy_val is not False:
+                satisfied.add("archive_action_completed")
     return sorted(required - satisfied)
 
 
@@ -2209,6 +2438,56 @@ def cmd_after_dispatch(root, args):
             current_change_id = state.get("context", {}).get("change_id", "")
             if agent_change_id != current_change_id:
                 state.setdefault("context", {})["change_id"] = agent_change_id
+
+    # Lightweight-flow Superpowers archive moves (Spec Decision 11): when
+    # finish-agent succeeds at archive_change for a lightweight-flow run,
+    # move matching Superpowers plan/spec files into typed archive dirs.
+    if (
+        agent_status == "success"
+        and canonical_agent == "finish-agent"
+        and phase == "archive_change"
+        and flow_type == "lightweight-flow"
+    ):
+        archive_result = _archive_lightweight_superpowers_artifacts(
+            root, state, agent_evidence
+        )
+        if archive_result["moved"]:
+            # Update the agent evidence with actual moved paths so downstream
+            # consumers see the real source/destination pairs.
+            agent_evidence["archived_design_artifact_paths"] = [
+                dst for _, dst in archive_result["moved"]
+            ]
+            agent_evidence["source_design_artifact_paths"] = [
+                src for src, _ in archive_result["moved"]
+            ]
+        elif archive_result.get("already_archived"):
+            # finish-agent already moved the files; record the confirmed
+            # archive destinations so downstream evidence stays consistent.
+            agent_evidence["archived_design_artifact_paths"] = [
+                dst for _, dst in archive_result["already_archived"]
+            ]
+            agent_evidence["source_design_artifact_paths"] = [
+                src for src, _ in archive_result["already_archived"]
+            ]
+        # Spec Decision 11: if expected Superpowers artifacts were missing on
+        # disk (the helper recorded them as skipped), the runtime must not
+        # allow archive_action_completed=true to stand.  Flip the semantic
+        # evidence to false and add a blocker so phase completion cannot pass
+        # while the expected files never moved.
+        if archive_result["skipped"]:
+            agent_evidence["archive_action_completed"] = False
+            agent_evidence["archive_not_required_reason"] = (
+                "missing_lightweight_archive_artifacts"
+            )
+            agent_blockers.append({
+                "reason": "missing_lightweight_archive_artifacts",
+                "message": (
+                    "finish-agent reported archive success but expected "
+                    "Superpowers design artifacts were not found on disk: "
+                    + ", ".join(archive_result["skipped"])
+                ),
+                "recommended_action": "surface_error",
+            })
 
     next_cmd = "complete-phase"
     recommended_next_action = agent_recommended or "complete_phase"
@@ -2453,6 +2732,10 @@ def cmd_complete_phase(root, args):
         invalid_positive = []
         for ek in evidence_keys:
             if ek not in run_evidence:
+                # Backward-compat alias: legacy archive_path_exists satisfies
+                # archive_action_completed evidence key (Spec Decision 10).
+                if ek == "archive_action_completed" and run_evidence.get("archive_path_exists"):
+                    continue
                 missing.append(ek)
             elif run_evidence[ek] is None or (isinstance(run_evidence[ek], str) and not run_evidence[ek].strip()):
                 empty_vals.append(ek)
@@ -3583,6 +3866,10 @@ def _calc_readiness(state, wf):
 def _check_exit_criteria(state, phase_def, supplied):
     satisfied = set(supplied.split(",") if supplied else [])
     required = set(phase_def.get("exit_criteria", []))
+    # Backward-compat alias: legacy archive_path_exists satisfies
+    # archive_action_completed (Spec Decision 10 migration).
+    if "archive_action_completed" in required and "archive_path_exists" in satisfied:
+        satisfied.add("archive_action_completed")
     return required.issubset(satisfied)
 
 

@@ -463,15 +463,41 @@ plan-agent → implement-agent → review-agent → finish-agent
 ### Subagent-Owned Cleanup
 
 Normal `sdlc-main` cleanup is owned by subagents, not by runtime `post_hooks`.
-After `archive_change` succeeds with `archive_path_exists`, complete the phase
-and advance to `post_archive_actions`. Dispatch `finish-agent` in
+After `archive_change` succeeds with `archive_action_completed`, complete the
+phase and advance to `post_archive_actions`. Dispatch `finish-agent` in
 `post_archive_actions` and use its cleanup evidence as the source of truth:
 `memory_sync_done`, `roadmap_done_checked`, `derived_artifacts_synced`,
 `post_hook_dirty_tree`, and `cleanup_complete`.
 
+Legacy `archive_path_exists` remains accepted for backward compatibility
+during migration.
+
 Use legacy complete-hook only when repairing a pre-existing run that already has
 `pending_hooks`. Do not expect new normal-flow runs to enqueue `memory_sync` or
 `roadmap_*` runtime hooks.
+
+### Branch Finish Decision Collection
+
+When `finish-agent` blocks with `missing_branch_finish_decision`,
+`dev-orchestrator` MUST ask the user to choose one of (Spec Decision 13):
+
+- `merge_local` — Merge the feature branch into the base branch locally.
+  Implementation commits become part of base/main.
+- `create_pr` — Push the feature branch and prepare or create a PR if
+  tooling is available. Implementation commits remain on the feature branch.
+- `keep_branch` — Push or preserve the feature branch without merging.
+  Implementation commits are NOT in main.
+- `discard` — Discard the feature branch/worktree only after explicit
+  confirmation. Implementation commits are NOT merged.
+
+Present a concise explanation of consequences for each option. After the user
+selects, record the decision via
+`workflow.py record-context --key branch_finish_decision --value <decision>`
+before redispatching `finish-agent`.
+
+You MUST NOT silently choose a branch outcome. The runtime gate enforces this:
+`before-dispatch` for `finish-agent` returns `missing_branch_finish_decision`
+when the decision is required and absent.
 
 When dispatching `review-agent` for `apply_change`, include:
 - current phase `evidence_keys`

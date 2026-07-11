@@ -7446,5 +7446,1054 @@ class TestTerminalEvidenceValidation(FixtureBase):
         self.assertEqual(data["status"], "done")
 
 
+class TestBranchFinishDecisionGate(FixtureBase):
+    """Tests for the branch_finish_decision gate (Spec Decision 1-3).
+
+    When a run has implementation changes on a feature branch or worktree,
+    finish-agent must require an explicit branch_finish_decision before
+    branch-affecting actions.  The gate is enforced at before-dispatch for
+    finish-agent during archive_change.
+    """
+
+    ALLOWED_DECISIONS = ("merge_local", "create_pr", "keep_branch", "discard")
+
+    def _write_worktree_archive_ready_state(self, change_id="branch-gate"):
+        """Write a run at archive_change phase with a worktree feature branch."""
+        state = {
+            "version": 1,
+            "run_id": f"2026-07-09-{change_id}",
+            "workflow": "sdlc-main",
+            "flow_type": "lightweight-flow",
+            "status": "running",
+            "current_phase": "archive_change",
+            "primary_subject": {"type": "spec_change", "id": change_id},
+            "context": {
+                "change_id": change_id,
+                "execution_mode": "worktree",
+                "control_root": self.tmp,
+                "worktree_path": os.path.join(self.tmp, "wt"),
+                "feature_branch": f"feature/{change_id}",
+                "base_branch": "main",
+                "parent_ref": "abc123",
+            },
+            "phase_readiness": {
+                "phase": "archive_change",
+                "ready": True,
+                "missing_required_inputs": [],
+            },
+            "pending_hooks": [],
+            "completed_hooks": [],
+            "completed_phases": ["apply_change"],
+            "gates": {},
+            "evidence": {},
+            "block": None,
+            "updated_at": "2026-07-09T00:00:00",
+        }
+        self._write_current_state(state)
+        return state
+
+    def _write_main_checkout_archive_ready_state(self, change_id="main-no-gate"):
+        """Write a main-checkout run at archive_change with no feature branch."""
+        state = {
+            "version": 1,
+            "run_id": f"2026-07-09-{change_id}",
+            "workflow": "sdlc-main",
+            "flow_type": "lightweight-flow",
+            "status": "running",
+            "current_phase": "archive_change",
+            "primary_subject": {"type": "spec_change", "id": change_id},
+            "context": {
+                "change_id": change_id,
+                "execution_mode": "main_checkout",
+            },
+            "phase_readiness": {
+                "phase": "archive_change",
+                "ready": True,
+                "missing_required_inputs": [],
+            },
+            "pending_hooks": [],
+            "completed_hooks": [],
+            "completed_phases": ["apply_change"],
+            "gates": {},
+            "evidence": {},
+            "block": None,
+            "updated_at": "2026-07-09T00:00:00",
+        }
+        self._write_current_state(state)
+        return state
+
+    def test_worktree_finish_blocked_without_branch_finish_decision(self):
+        """A worktree/feature-branch finish cannot proceed without an explicit
+        branch_finish_decision. before-dispatch for finish-agent must return a
+        blocker with reason missing_branch_finish_decision."""
+        self._write_worktree_archive_ready_state()
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="finish-agent",
+            phase="archive_change",
+            slice_id="default",
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "blocked")
+        reasons = [b.get("reason") for b in data.get("blockers", [])]
+        self.assertIn("missing_branch_finish_decision", reasons)
+        # recommended_next_action should point to user branch decision
+        self.assertEqual(
+            data.get("recommended_next_action"),
+            "ask_user_branch_finish_decision",
+        )
+
+    def test_missing_decision_blocker_message_and_action(self):
+        """The missing_branch_finish_decision blocker must carry the message
+        and recommended_action per the spec."""
+        self._write_worktree_archive_ready_state()
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="finish-agent",
+            phase="archive_change",
+        )
+        data = json.loads(out)
+        blockers = data.get("blockers", [])
+        branch_blockers = [
+            b for b in blockers
+            if b.get("reason") == "missing_branch_finish_decision"
+        ]
+        self.assertTrue(branch_blockers, "missing_branch_finish_decision blocker not emitted")
+        b = branch_blockers[0]
+        self.assertIn("branch_finish_decision", b.get("message", ""))
+        self.assertEqual(
+            b.get("recommended_action"),
+            "ask_user_branch_finish_decision",
+        )
+
+    def test_allowed_branch_finish_decisions(self):
+        """Each allowed decision value, when recorded in context, must allow
+        finish-agent before-dispatch to proceed."""
+        for decision in self.ALLOWED_DECISIONS:
+            self._write_worktree_archive_ready_state(change_id=f"allowed-{decision}")
+            run_workflow(
+                self.tmp, "record-context",
+                key="branch_finish_decision",
+                value=decision,
+            )
+            rc, out, _ = run_workflow(
+                self.tmp, "before-dispatch",
+                agent="finish-agent",
+                phase="archive_change",
+                slice_id="default",
+            )
+            self.assertEqual(rc, 0, f"decision {decision} should be allowed")
+            data = json.loads(out)
+            self.assertEqual(data["status"], "dispatched")
+            reasons = [b.get("reason") for b in data.get("blockers", [])]
+            self.assertNotIn("missing_branch_finish_decision", reasons)
+
+    def test_invalid_branch_finish_decision_blocked(self):
+        """An invalid branch_finish_decision value must be rejected."""
+        self._write_worktree_archive_ready_state()
+        run_workflow(
+            self.tmp, "record-context",
+            key="branch_finish_decision",
+            value="merge_into_dev",
+        )
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="finish-agent",
+            phase="archive_change",
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [b.get("reason") for b in data.get("blockers", [])]
+        self.assertIn("invalid_branch_finish_decision", reasons)
+
+    def test_no_silent_default_branch_action(self):
+        """No default branch finish action is silently selected. An empty
+        branch_finish_decision context must block (not default to keep_branch)."""
+        self._write_worktree_archive_ready_state()
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="finish-agent",
+            phase="archive_change",
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "blocked")
+        reasons = [b.get("reason") for b in data.get("blockers", [])]
+        self.assertIn("missing_branch_finish_decision", reasons)
+
+    def test_main_checkout_without_feature_branch_does_not_require_gate(self):
+        """Main-checkout mode without a feature branch does not require the
+        branch_finish_decision gate by default."""
+        self._write_main_checkout_archive_ready_state()
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="finish-agent",
+            phase="archive_change",
+            slice_id="default",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "dispatched")
+        reasons = [b.get("reason") for b in data.get("blockers", [])]
+        self.assertNotIn("missing_branch_finish_decision", reasons)
+
+    def test_main_checkout_with_feature_branch_requires_gate(self):
+        """If context.feature_branch is recorded, the gate is required even
+        when execution_mode is main_checkout."""
+        state = self._write_main_checkout_archive_ready_state(change_id="main-with-branch")
+        state["context"]["feature_branch"] = "feature/main-with-branch"
+        self._write_current_state(state)
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="finish-agent",
+            phase="archive_change",
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [b.get("reason") for b in data.get("blockers", [])]
+        self.assertIn("missing_branch_finish_decision", reasons)
+
+
+class TestLightweightFlowArchiveMoves(FixtureBase):
+    """Tests for lightweight-flow Superpowers archive moves (Spec Decision 11).
+
+    Completed lightweight-flow runs must move matching Superpowers plan and
+    spec files into typed archive subdirectories.
+    """
+
+    def _make_superpowers_spec(self, filename, content="# Spec\n"):
+        specs_dir = os.path.join(self.tmp, "docs", "superpowers", "specs")
+        os.makedirs(specs_dir, exist_ok=True)
+        path = os.path.join(specs_dir, filename)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(content)
+        return path
+
+    def _write_lightweight_archive_ready_state(
+        self,
+        change_id="lw-archive",
+        with_plan=True,
+        with_spec=True,
+    ):
+        """Write a lightweight-flow run at archive_change with design artifacts."""
+        plan_filename = f"{change_id}.md"
+        spec_filename = f"{change_id}.md"
+        primary_design_path = None
+        design_artifact_paths = []
+        if with_plan:
+            primary_design_path = f"docs/superpowers/plans/{plan_filename}"
+            self._make_superpowers_plan(plan_filename, content=f"# Plan {change_id}\n")
+        if with_spec:
+            spec_path = f"docs/superpowers/specs/{spec_filename}"
+            design_artifact_paths.append({"kind": "spec", "path": spec_path})
+            self._make_superpowers_spec(spec_filename, content=f"# Spec {change_id}\n")
+        if with_plan:
+            design_artifact_paths.append({"kind": "plan", "path": primary_design_path})
+        state = {
+            "version": 1,
+            "run_id": f"2026-07-09-{change_id}",
+            "workflow": "sdlc-main",
+            "flow_type": "lightweight-flow",
+            "status": "running",
+            "current_phase": "archive_change",
+            "primary_subject": {"type": "spec_change", "id": change_id},
+            "context": {
+                "change_id": change_id,
+                "execution_mode": "main_checkout",
+            },
+            "phase_readiness": {
+                "phase": "archive_change",
+                "ready": True,
+                "missing_required_inputs": [],
+            },
+            "pending_hooks": [],
+            "completed_hooks": [],
+            "completed_phases": ["apply_change"],
+            "gates": {},
+            "evidence": {},
+            "block": None,
+            "updated_at": "2026-07-09T00:00:00",
+        }
+        if primary_design_path:
+            state["context"]["primary_design_path"] = primary_design_path
+        if design_artifact_paths:
+            state["context"]["design_artifact_paths"] = design_artifact_paths
+        self._write_current_state(state)
+        return state
+
+    def test_finish_agent_archive_moves_plan_to_archive_plans(self):
+        """finish-agent archive execution moves plan files to
+        docs/superpowers/archive/plans/."""
+        self._write_lightweight_archive_ready_state(change_id="2026-07-05-move-plan")
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="finish-agent",
+            phase="archive_change",
+            slice_id="default",
+            value=json.dumps({
+                "agent": "finish-agent",
+                "status": "success",
+                "phase": "archive_change",
+                "flow_type": "lightweight-flow",
+                "slice_id": "default",
+                "evidence": {
+                    "archive_action_completed": True,
+                    "archive_not_required_reason": "lightweight-flow",
+                    "archive_artifact_path": None,
+                    "archived_design_artifact_paths": [
+                        "docs/superpowers/archive/plans/2026-07-05-move-plan.md",
+                        "docs/superpowers/archive/specs/2026-07-05-move-plan.md",
+                    ],
+                    "source_design_artifact_paths": [
+                        "docs/superpowers/plans/2026-07-05-move-plan.md",
+                        "docs/superpowers/specs/2026-07-05-move-plan.md",
+                    ],
+                },
+                "artifacts": {
+                    "handoff_path": ".ai/workflows/runs/active/x/handoffs/default/finish-agent.md",
+                    "worktree_path": self.tmp,
+                    "feature_branch": "",
+                    "branch_finish_action": "archive",
+                },
+                "blockers": [],
+                "recommended_next_action": "complete_phase",
+            }),
+        )
+        self.assertEqual(rc, 0)
+        # The runtime should have performed the file moves described by finish-agent.
+        archived_plan = os.path.join(
+            self.tmp, "docs", "superpowers", "archive", "plans",
+            "2026-07-05-move-plan.md",
+        )
+        self.assertTrue(
+            os.path.exists(archived_plan),
+            "plan file was not moved to docs/superpowers/archive/plans/",
+        )
+        source_plan = os.path.join(
+            self.tmp, "docs", "superpowers", "plans",
+            "2026-07-05-move-plan.md",
+        )
+        self.assertFalse(
+            os.path.exists(source_plan),
+            "source plan file was not removed from docs/superpowers/plans/",
+        )
+
+    def test_finish_agent_archive_moves_spec_to_archive_specs(self):
+        """finish-agent archive execution moves spec files to
+        docs/superpowers/archive/specs/."""
+        self._write_lightweight_archive_ready_state(change_id="2026-07-05-move-spec")
+        run_workflow(
+            self.tmp, "after-dispatch",
+            agent="finish-agent",
+            phase="archive_change",
+            slice_id="default",
+            value=json.dumps({
+                "agent": "finish-agent",
+                "status": "success",
+                "phase": "archive_change",
+                "flow_type": "lightweight-flow",
+                "slice_id": "default",
+                "evidence": {
+                    "archive_action_completed": True,
+                    "archive_not_required_reason": "lightweight-flow",
+                    "archive_artifact_path": None,
+                    "archived_design_artifact_paths": [
+                        "docs/superpowers/archive/plans/2026-07-05-move-spec.md",
+                        "docs/superpowers/archive/specs/2026-07-05-move-spec.md",
+                    ],
+                    "source_design_artifact_paths": [
+                        "docs/superpowers/plans/2026-07-05-move-spec.md",
+                        "docs/superpowers/specs/2026-07-05-move-spec.md",
+                    ],
+                },
+                "artifacts": {
+                    "handoff_path": ".ai/workflows/runs/active/x/handoffs/default/finish-agent.md",
+                    "worktree_path": self.tmp,
+                    "feature_branch": "",
+                    "branch_finish_action": "archive",
+                },
+                "blockers": [],
+                "recommended_next_action": "complete_phase",
+            }),
+        )
+        archived_spec = os.path.join(
+            self.tmp, "docs", "superpowers", "archive", "specs",
+            "2026-07-05-move-spec.md",
+        )
+        self.assertTrue(
+            os.path.exists(archived_spec),
+            "spec file was not moved to docs/superpowers/archive/specs/",
+        )
+        source_spec = os.path.join(
+            self.tmp, "docs", "superpowers", "specs",
+            "2026-07-05-move-spec.md",
+        )
+        self.assertFalse(
+            os.path.exists(source_spec),
+            "source spec file was not removed from docs/superpowers/specs/",
+        )
+
+    def test_archive_collision_not_silently_overwritten(self):
+        """An existing destination file must not be overwritten silently."""
+        change_id = "2026-07-05-collision"
+        self._write_lightweight_archive_ready_state(change_id=change_id)
+        # Pre-create the archive destination with different content.
+        archive_dir = os.path.join(
+            self.tmp, "docs", "superpowers", "archive", "plans"
+        )
+        os.makedirs(archive_dir, exist_ok=True)
+        existing = os.path.join(archive_dir, f"{change_id}.md")
+        with open(existing, "w", encoding="utf-8") as f:
+            f.write("# Existing archived plan\n")
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="finish-agent",
+            phase="archive_change",
+            slice_id="default",
+            value=json.dumps({
+                "agent": "finish-agent",
+                "status": "success",
+                "phase": "archive_change",
+                "flow_type": "lightweight-flow",
+                "slice_id": "default",
+                "evidence": {
+                    "archive_action_completed": True,
+                    "archive_not_required_reason": "lightweight-flow",
+                    "archive_artifact_path": None,
+                    "archived_design_artifact_paths": [
+                        f"docs/superpowers/archive/plans/{change_id}.md",
+                        f"docs/superpowers/archive/specs/{change_id}.md",
+                    ],
+                    "source_design_artifact_paths": [
+                        f"docs/superpowers/plans/{change_id}.md",
+                        f"docs/superpowers/specs/{change_id}.md",
+                    ],
+                },
+                "artifacts": {
+                    "handoff_path": ".ai/workflows/runs/active/x/handoffs/default/finish-agent.md",
+                    "worktree_path": self.tmp,
+                    "feature_branch": "",
+                    "branch_finish_action": "archive",
+                },
+                "blockers": [],
+                "recommended_next_action": "complete_phase",
+            }),
+        )
+        # The existing destination must be preserved (collision handled).
+        with open(existing, "r", encoding="utf-8") as f:
+            self.assertEqual(f.read(), "# Existing archived plan\n")
+
+    def test_missing_artifacts_returns_blocker(self):
+        """When artifacts were expected but unavailable, finish must return a
+        blocker rather than silently claiming archive success."""
+        change_id = "2026-07-05-missing-artifacts"
+        # Write state pointing at design paths that do not exist on disk.
+        state = self._write_lightweight_archive_ready_state(change_id=change_id, with_plan=False, with_spec=False)
+        state["context"]["primary_design_path"] = f"docs/superpowers/plans/{change_id}.md"
+        state["context"]["design_artifact_paths"] = [
+            {"kind": "plan", "path": f"docs/superpowers/plans/{change_id}.md"},
+            {"kind": "spec", "path": f"docs/superpowers/specs/{change_id}.md"},
+        ]
+        self._write_current_state(state)
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="finish-agent",
+            phase="archive_change",
+            slice_id="default",
+            value=json.dumps({
+                "agent": "finish-agent",
+                "status": "blocked",
+                "phase": "archive_change",
+                "flow_type": "lightweight-flow",
+                "slice_id": "default",
+                "evidence": {
+                    "archive_action_completed": False,
+                },
+                "artifacts": {},
+                "blockers": [
+                    {"reason": "missing_lightweight_archive_artifacts",
+                     "message": "Expected Superpowers design artifacts not found."},
+                ],
+                "recommended_next_action": "surface_error",
+            }),
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "blocked")
+
+    def test_finish_agent_success_with_missing_expected_artifacts_blocks(self):
+        """When finish-agent reports success with archive_action_completed=true
+        but the runtime archive move finds no expected artifacts on disk,
+        after-dispatch must block with missing_lightweight_archive_artifacts
+        and flip archive_action_completed to false (Spec Decision 11).
+
+        This covers the runtime path the review blocker identified: the helper
+        records skipped sources, but the caller must not discard that signal.
+        """
+        change_id = "2026-07-05-success-but-missing"
+        # Point the runtime design contract at plan+spec paths that do NOT
+        # exist on disk, but have finish-agent report success with the expected
+        # archived/source paths.  finish-agent claims the move will happen;
+        # the runtime must catch that the sources are absent.
+        state = self._write_lightweight_archive_ready_state(
+            change_id=change_id, with_plan=False, with_spec=False,
+        )
+        state["context"]["primary_design_path"] = (
+            f"docs/superpowers/plans/{change_id}.md"
+        )
+        state["context"]["design_artifact_paths"] = [
+            {"kind": "plan", "path": f"docs/superpowers/plans/{change_id}.md"},
+            {"kind": "spec", "path": f"docs/superpowers/specs/{change_id}.md"},
+        ]
+        self._write_current_state(state)
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="finish-agent",
+            phase="archive_change",
+            slice_id="default",
+            value=json.dumps({
+                "agent": "finish-agent",
+                "status": "success",
+                "phase": "archive_change",
+                "flow_type": "lightweight-flow",
+                "slice_id": "default",
+                "evidence": {
+                    "archive_action_completed": True,
+                    "archive_not_required_reason": "lightweight-flow",
+                    "archive_artifact_path": None,
+                    "archived_design_artifact_paths": [
+                        f"docs/superpowers/archive/plans/{change_id}.md",
+                        f"docs/superpowers/archive/specs/{change_id}.md",
+                    ],
+                    "source_design_artifact_paths": [
+                        f"docs/superpowers/plans/{change_id}.md",
+                        f"docs/superpowers/specs/{change_id}.md",
+                    ],
+                },
+                "artifacts": {
+                    "handoff_path": ".ai/workflows/runs/active/x/handoffs/default/finish-agent.md",
+                    "worktree_path": self.tmp,
+                    "feature_branch": "",
+                    "branch_finish_action": "archive",
+                },
+                "blockers": [],
+                "recommended_next_action": "complete_phase",
+            }),
+        )
+        data = json.loads(out)
+        # The runtime must block phase completion.  Per the after-dispatch
+        # convention, transition["status"] mirrors the agent status, but the
+        # workflow_command must be "block" and the state must be blocked.
+        self.assertEqual(data["workflow_command"], "workflow.py block")
+        reasons = [b.get("reason") for b in data.get("blockers", [])]
+        self.assertIn("missing_lightweight_archive_artifacts", reasons)
+        state = self._read_current_state()
+        self.assertEqual(state["status"], "blocked")
+        # The runtime must have flipped the semantic evidence to false so
+        # downstream phase completion cannot treat archive as completed.
+        self.assertEqual(
+            data["evidence"].get("archive_action_completed"), False,
+        )
+
+    def test_finish_agent_already_archived_keeps_archive_action_true(self):
+        """When finish-agent has already moved plan/spec files to the archive
+        directories (source absent, destination present), after-dispatch must
+        treat this as idempotent success: archive_action_completed stays true
+        and no missing_lightweight_archive_artifacts blocker is added.
+        """
+        change_id = "2026-07-05-already-archived"
+        plan_filename = f"{change_id}.md"
+        spec_filename = f"{change_id}.md"
+
+        # Create archive destinations (finish-agent already moved them).
+        archive_plans_dir = os.path.join(
+            self.tmp, "docs", "superpowers", "archive", "plans"
+        )
+        archive_specs_dir = os.path.join(
+            self.tmp, "docs", "superpowers", "archive", "specs"
+        )
+        os.makedirs(archive_plans_dir, exist_ok=True)
+        os.makedirs(archive_specs_dir, exist_ok=True)
+        with open(os.path.join(archive_plans_dir, plan_filename), "w") as f:
+            f.write(f"# Plan {change_id}\n")
+        with open(os.path.join(archive_specs_dir, spec_filename), "w") as f:
+            f.write(f"# Spec {change_id}\n")
+
+        # Do NOT create source files in docs/superpowers/plans/ or specs/.
+        state = {
+            "version": 1,
+            "run_id": f"2026-07-09-{change_id}",
+            "workflow": "sdlc-main",
+            "flow_type": "lightweight-flow",
+            "status": "running",
+            "current_phase": "archive_change",
+            "primary_subject": {"type": "spec_change", "id": change_id},
+            "context": {
+                "change_id": change_id,
+                "execution_mode": "main_checkout",
+                "primary_design_path": f"docs/superpowers/plans/{plan_filename}",
+                "design_artifact_paths": [
+                    {"kind": "plan", "path": f"docs/superpowers/plans/{plan_filename}"},
+                    {"kind": "spec", "path": f"docs/superpowers/specs/{spec_filename}"},
+                ],
+            },
+            "phase_readiness": {
+                "phase": "archive_change",
+                "ready": True,
+                "missing_required_inputs": [],
+            },
+            "pending_hooks": [],
+            "completed_hooks": [],
+            "completed_phases": ["apply_change"],
+            "gates": {},
+            "evidence": {},
+            "block": None,
+            "updated_at": "2026-07-09T00:00:00",
+        }
+        self._write_current_state(state)
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="finish-agent",
+            phase="archive_change",
+            slice_id="default",
+            value=json.dumps({
+                "agent": "finish-agent",
+                "status": "success",
+                "phase": "archive_change",
+                "flow_type": "lightweight-flow",
+                "slice_id": "default",
+                "evidence": {
+                    "archive_action_completed": True,
+                    "archive_not_required_reason": "lightweight-flow",
+                    "archive_artifact_path": None,
+                    "archived_design_artifact_paths": [
+                        f"docs/superpowers/archive/plans/{change_id}.md",
+                        f"docs/superpowers/archive/specs/{change_id}.md",
+                    ],
+                    "source_design_artifact_paths": [
+                        f"docs/superpowers/plans/{change_id}.md",
+                        f"docs/superpowers/specs/{change_id}.md",
+                    ],
+                },
+                "artifacts": {
+                    "handoff_path": ".ai/workflows/runs/active/x/handoffs/default/finish-agent.md",
+                    "worktree_path": self.tmp,
+                    "feature_branch": "",
+                    "branch_finish_action": "archive",
+                },
+                "blockers": [],
+                "recommended_next_action": "complete_phase",
+            }),
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        # archive_action_completed must remain true (no flip).
+        self.assertEqual(
+            data["evidence"].get("archive_action_completed"), True,
+        )
+        # No missing_lightweight_archive_artifacts blocker.
+        reasons = [b.get("reason") for b in data.get("blockers", [])]
+        self.assertNotIn("missing_lightweight_archive_artifacts", reasons)
+        # Run state must not be blocked.
+        run_state = self._read_current_state()
+        self.assertNotEqual(run_state["status"], "blocked")
+
+    def test_deterministic_slug_date_fallback_moves_matching_spec(self):
+        """When only primary_design_path points at a plan and a same-slug spec
+        exists in docs/superpowers/specs/, the deterministic slug/date fallback
+        must also move the matching spec (Spec Decision 11 / Task 8).
+        """
+        change_id = "2026-07-05-slug-fallback"
+        # Only a plan is declared in the runtime contract; a matching spec
+        # file with the same slug/date exists on disk but is NOT listed in
+        # design_artifact_paths.
+        plan_filename = f"{change_id}.md"
+        spec_filename = f"{change_id}.md"
+        self._make_superpowers_plan(plan_filename, content=f"# Plan {change_id}\n")
+        self._make_superpowers_spec(spec_filename, content=f"# Spec {change_id}\n")
+        state = {
+            "version": 1,
+            "run_id": f"2026-07-09-{change_id}",
+            "workflow": "sdlc-main",
+            "flow_type": "lightweight-flow",
+            "status": "running",
+            "current_phase": "archive_change",
+            "primary_subject": {"type": "spec_change", "id": change_id},
+            "context": {
+                "change_id": change_id,
+                "execution_mode": "main_checkout",
+                "primary_design_path": f"docs/superpowers/plans/{plan_filename}",
+                # NOTE: no design_artifact_paths entry for the spec.
+            },
+            "phase_readiness": {
+                "phase": "archive_change",
+                "ready": True,
+                "missing_required_inputs": [],
+            },
+            "pending_hooks": [],
+            "completed_hooks": [],
+            "completed_phases": ["apply_change"],
+            "gates": {},
+            "evidence": {},
+            "block": None,
+            "updated_at": "2026-07-09T00:00:00",
+        }
+        self._write_current_state(state)
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="finish-agent",
+            phase="archive_change",
+            slice_id="default",
+            value=json.dumps({
+                "agent": "finish-agent",
+                "status": "success",
+                "phase": "archive_change",
+                "flow_type": "lightweight-flow",
+                "slice_id": "default",
+                "evidence": {
+                    "archive_action_completed": True,
+                    "archive_not_required_reason": "lightweight-flow",
+                    "archive_artifact_path": None,
+                    # finish-agent only reported the plan it knew about.
+                    "archived_design_artifact_paths": [
+                        f"docs/superpowers/archive/plans/{change_id}.md",
+                    ],
+                    "source_design_artifact_paths": [
+                        f"docs/superpowers/plans/{change_id}.md",
+                    ],
+                },
+                "artifacts": {
+                    "handoff_path": ".ai/workflows/runs/active/x/handoffs/default/finish-agent.md",
+                    "worktree_path": self.tmp,
+                    "feature_branch": "",
+                    "branch_finish_action": "archive",
+                },
+                "blockers": [],
+                "recommended_next_action": "complete_phase",
+            }),
+        )
+        self.assertEqual(rc, 0)
+        # The matching spec must have been moved by the deterministic fallback.
+        archived_spec = os.path.join(
+            self.tmp, "docs", "superpowers", "archive", "specs",
+            spec_filename,
+        )
+        self.assertTrue(
+            os.path.exists(archived_spec),
+            "matching spec was not moved by the slug/date fallback",
+        )
+        source_spec = os.path.join(
+            self.tmp, "docs", "superpowers", "specs", spec_filename,
+        )
+        self.assertFalse(
+            os.path.exists(source_spec),
+            "matching spec was not removed from docs/superpowers/specs/",
+        )
+        # And the plan must still have been moved.
+        archived_plan = os.path.join(
+            self.tmp, "docs", "superpowers", "archive", "plans",
+            plan_filename,
+        )
+        self.assertTrue(os.path.exists(archived_plan))
+
+    def test_absolute_runtime_design_artifact_paths_move_plan_and_spec(self):
+        """When the runtime design contract provides absolute paths (as the
+        governed workflow dispatch does), the archive helper must normalize
+        them to repo-relative paths and still move both the plan and the spec
+        into their typed archive dirs (Spec Decision 11 / review blocker).
+        """
+        change_id = "2026-07-05-abs-paths"
+        plan_filename = f"{change_id}.md"
+        spec_filename = f"{change_id}.md"
+        self._make_superpowers_plan(plan_filename, content=f"# Plan {change_id}\n")
+        self._make_superpowers_spec(spec_filename, content=f"# Spec {change_id}\n")
+        # Governed runtime context supplies ABSOLUTE design artifact paths.
+        abs_plan = os.path.join(self.tmp, "docs", "superpowers", "plans", plan_filename)
+        abs_spec = os.path.join(self.tmp, "docs", "superpowers", "specs", spec_filename)
+        state = {
+            "version": 1,
+            "run_id": f"2026-07-09-{change_id}",
+            "workflow": "sdlc-main",
+            "flow_type": "lightweight-flow",
+            "status": "running",
+            "current_phase": "archive_change",
+            "primary_subject": {"type": "spec_change", "id": change_id},
+            "context": {
+                "change_id": change_id,
+                "execution_mode": "main_checkout",
+                "primary_design_path": abs_plan,
+                "design_artifact_paths": [
+                    {"kind": "plan", "path": abs_plan},
+                    {"kind": "spec", "path": abs_spec},
+                ],
+            },
+            "phase_readiness": {
+                "phase": "archive_change",
+                "ready": True,
+                "missing_required_inputs": [],
+            },
+            "pending_hooks": [],
+            "completed_hooks": [],
+            "completed_phases": ["apply_change"],
+            "gates": {},
+            "evidence": {},
+            "block": None,
+            "updated_at": "2026-07-09T00:00:00",
+        }
+        self._write_current_state(state)
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="finish-agent",
+            phase="archive_change",
+            slice_id="default",
+            value=json.dumps({
+                "agent": "finish-agent",
+                "status": "success",
+                "phase": "archive_change",
+                "flow_type": "lightweight-flow",
+                "slice_id": "default",
+                "evidence": {
+                    "archive_action_completed": True,
+                    "archive_not_required_reason": "lightweight-flow",
+                    "archive_artifact_path": None,
+                    # finish-agent did not report explicit paths; runtime must
+                    # derive them from the absolute runtime contract and move.
+                    "archived_design_artifact_paths": [],
+                    "source_design_artifact_paths": [],
+                },
+                "artifacts": {
+                    "handoff_path": ".ai/workflows/runs/active/x/handoffs/default/finish-agent.md",
+                    "worktree_path": self.tmp,
+                    "feature_branch": "",
+                    "branch_finish_action": "archive",
+                },
+                "blockers": [],
+                "recommended_next_action": "complete_phase",
+            }),
+        )
+        self.assertEqual(rc, 0)
+        # Both the plan and the spec must have been moved to archive dirs.
+        archived_plan = os.path.join(
+            self.tmp, "docs", "superpowers", "archive", "plans", plan_filename,
+        )
+        archived_spec = os.path.join(
+            self.tmp, "docs", "superpowers", "archive", "specs", spec_filename,
+        )
+        self.assertTrue(
+            os.path.exists(archived_plan),
+            "plan from absolute primary_design_path was not moved to archive/plans/",
+        )
+        self.assertTrue(
+            os.path.exists(archived_spec),
+            "spec from absolute design_artifact_paths was not moved to archive/specs/",
+        )
+        # And the sources must no longer be in the active dirs.
+        self.assertFalse(os.path.exists(abs_plan))
+        self.assertFalse(os.path.exists(abs_spec))
+
+    def test_absolute_runtime_path_missing_source_blocks(self):
+        """When the runtime contract points at absolute Superpowers paths but
+        those sources do not exist on disk, after-dispatch must block with
+        missing_lightweight_archive_artifacts rather than silently claiming
+        archive success (Spec Decision 11 / review blocker).
+
+        Before the fix, absolute paths were dropped before classification, so
+        no source was ever paired and the skipped-artifacts check never ran.
+        """
+        change_id = "2026-07-05-abs-missing"
+        plan_filename = f"{change_id}.md"
+        spec_filename = f"{change_id}.md"
+        # Do NOT create the plan/spec files on disk.
+        abs_plan = os.path.join(self.tmp, "docs", "superpowers", "plans", plan_filename)
+        abs_spec = os.path.join(self.tmp, "docs", "superpowers", "specs", spec_filename)
+        state = {
+            "version": 1,
+            "run_id": f"2026-07-09-{change_id}",
+            "workflow": "sdlc-main",
+            "flow_type": "lightweight-flow",
+            "status": "running",
+            "current_phase": "archive_change",
+            "primary_subject": {"type": "spec_change", "id": change_id},
+            "context": {
+                "change_id": change_id,
+                "execution_mode": "main_checkout",
+                "primary_design_path": abs_plan,
+                "design_artifact_paths": [
+                    {"kind": "plan", "path": abs_plan},
+                    {"kind": "spec", "path": abs_spec},
+                ],
+            },
+            "phase_readiness": {
+                "phase": "archive_change",
+                "ready": True,
+                "missing_required_inputs": [],
+            },
+            "pending_hooks": [],
+            "completed_hooks": [],
+            "completed_phases": ["apply_change"],
+            "gates": {},
+            "evidence": {},
+            "block": None,
+            "updated_at": "2026-07-09T00:00:00",
+        }
+        self._write_current_state(state)
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="finish-agent",
+            phase="archive_change",
+            slice_id="default",
+            value=json.dumps({
+                "agent": "finish-agent",
+                "status": "success",
+                "phase": "archive_change",
+                "flow_type": "lightweight-flow",
+                "slice_id": "default",
+                "evidence": {
+                    "archive_action_completed": True,
+                    "archive_not_required_reason": "lightweight-flow",
+                    "archive_artifact_path": None,
+                    "archived_design_artifact_paths": [],
+                    "source_design_artifact_paths": [],
+                },
+                "artifacts": {
+                    "handoff_path": ".ai/workflows/runs/active/x/handoffs/default/finish-agent.md",
+                    "worktree_path": self.tmp,
+                    "feature_branch": "",
+                    "branch_finish_action": "archive",
+                },
+                "blockers": [],
+                "recommended_next_action": "complete_phase",
+            }),
+        )
+        data = json.loads(out)
+        # The runtime must block because the expected sources are absent.
+        self.assertEqual(data["workflow_command"], "workflow.py block")
+        reasons = [b.get("reason") for b in data.get("blockers", [])]
+        self.assertIn("missing_lightweight_archive_artifacts", reasons)
+        self.assertEqual(
+            data["evidence"].get("archive_action_completed"), False,
+        )
+
+
+class TestSemanticArchiveEvidence(FixtureBase):
+    """Tests for semantic archive evidence (Spec Decision 10).
+
+    New lightweight-flow runs must use archive_action_completed,
+    archive_artifact_path, archive_not_required_reason, and
+    archived_design_artifact_paths instead of misleading archive_path_exists.
+    """
+
+    def test_lightweight_flow_archive_success_accepts_semantic_evidence(self):
+        """archive_change phase completion must accept semantic archive evidence
+        (archive_action_completed) for lightweight-flow."""
+        state = {
+            "version": 1,
+            "run_id": "2026-07-09-semantic-archive",
+            "workflow": "sdlc-main",
+            "flow_type": "lightweight-flow",
+            "status": "running",
+            "current_phase": "archive_change",
+            "primary_subject": {"type": "spec_change", "id": "semantic-archive"},
+            "context": {
+                "change_id": "semantic-archive",
+                "execution_mode": "main_checkout",
+            },
+            "phase_readiness": {
+                "phase": "archive_change",
+                "ready": True,
+                "missing_required_inputs": [],
+            },
+            "pending_hooks": [],
+            "completed_hooks": [],
+            "completed_phases": ["apply_change"],
+            "gates": {},
+            "evidence": {},
+            "block": None,
+            "updated_at": "2026-07-09T00:00:00",
+        }
+        self._write_current_state(state)
+        # Record semantic archive evidence via after-dispatch.
+        run_workflow(
+            self.tmp, "after-dispatch",
+            agent="finish-agent",
+            phase="archive_change",
+            slice_id="default",
+            value=json.dumps({
+                "agent": "finish-agent",
+                "status": "success",
+                "phase": "archive_change",
+                "flow_type": "lightweight-flow",
+                "slice_id": "default",
+                "evidence": {
+                    "archive_action_completed": True,
+                    "archive_not_required_reason": "lightweight-flow",
+                    "archive_artifact_path": None,
+                    "archived_design_artifact_paths": [],
+                    "source_design_artifact_paths": [],
+                    "criteria_satisfied": "archive_action_completed",
+                },
+                "artifacts": {
+                    "handoff_path": ".ai/workflows/runs/active/x/handoffs/default/finish-agent.md",
+                    "worktree_path": self.tmp,
+                    "feature_branch": "",
+                    "branch_finish_action": "archive",
+                },
+                "blockers": [],
+                "recommended_next_action": "complete_phase",
+            }),
+        )
+        # complete-phase with semantic criteria should succeed.
+        rc, out, _ = run_workflow(
+            self.tmp, "complete-phase",
+            exit_criteria_satisfied="archive_action_completed",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertIn("archive_change", data.get("completed_phases", []))
+
+    def test_legacy_archive_path_exists_remains_readable(self):
+        """Legacy archive_path_exists evidence remains accepted for backward
+        compatibility during migration."""
+        state = {
+            "version": 1,
+            "run_id": "2026-07-09-legacy-archive",
+            "workflow": "sdlc-main",
+            "flow_type": "lightweight-flow",
+            "status": "running",
+            "current_phase": "archive_change",
+            "primary_subject": {"type": "spec_change", "id": "legacy-archive"},
+            "context": {
+                "change_id": "legacy-archive",
+                "execution_mode": "main_checkout",
+            },
+            "phase_readiness": {
+                "phase": "archive_change",
+                "ready": True,
+                "missing_required_inputs": [],
+            },
+            "pending_hooks": [],
+            "completed_hooks": [],
+            "completed_phases": ["apply_change"],
+            "gates": {},
+            "evidence": {},
+            "block": None,
+            "updated_at": "2026-07-09T00:00:00",
+        }
+        self._write_current_state(state)
+        run_workflow(
+            self.tmp, "record-evidence",
+            key="archive_path_exists",
+            value="true",
+        )
+        rc, out, _ = run_workflow(
+            self.tmp, "complete-phase",
+            exit_criteria_satisfied="archive_path_exists",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertIn("archive_change", data.get("completed_phases", []))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

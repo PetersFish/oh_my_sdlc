@@ -1365,9 +1365,13 @@ class TestAgentPromptBody(unittest.TestCase):
         archive_change_success_idx = body.find('"phase": "archive_change"')
         self.assertGreater(archive_change_success_idx, -1,
                            "finish-agent must define an archive_change output example")
-        archive_success_block = body[archive_change_success_idx:archive_change_success_idx + 400]
-        self.assertIn('"archive_path_exists": true', archive_success_block,
-                      "archive_change success example must include archive_path_exists")
+        archive_success_block = body[archive_change_success_idx:archive_change_success_idx + 600]
+        # Spec Decision 10: new runs use semantic archive evidence, not
+        # misleading archive_path_exists.  Legacy archive_path_exists remains
+        # accepted during migration but the success example should use the
+        # new semantic fields.
+        self.assertIn('"archive_action_completed": true', archive_success_block,
+                      "archive_change success example must include archive_action_completed")
         self.assertNotIn("pending_hooks_empty", archive_success_block,
                           "archive_change success example must not include legacy pending_hooks_empty")
 
@@ -3013,6 +3017,63 @@ class TestExecutionContextArtifactContract(unittest.TestCase):
         self.assertIn("worktree_path", discipline_block)
         self.assertIn("feature_branch", discipline_block)
         self.assertIn("branch_finish_action", discipline_block)
+
+    def test_finish_agent_requires_branch_finish_decision_gate(self):
+        """finish-agent prompt must require branch_finish_decision before
+        branch-affecting actions (Spec Decision 1-3, 12)."""
+        body = (AGENTS_DIR / "finish-agent.md").read_text(encoding="utf-8")
+        self.assertIn("branch_finish_decision", body)
+        self.assertIn("missing_branch_finish_decision", body)
+        self.assertIn("ask_user_branch_finish_decision", body)
+        # Must forbid silent branch outcome
+        self.assertIn("silently choose", body.lower())
+        # Must list allowed values
+        for value in ("merge_local", "create_pr", "keep_branch", "discard"):
+            self.assertIn(value, body, f"finish-agent missing allowed branch decision: {value}")
+
+    def test_finish_agent_forbids_terminal_finalization(self):
+        """finish-agent prompt must forbid direct terminal workflow finalization
+        (Spec Decision 8)."""
+        body = (AGENTS_DIR / "finish-agent.md").read_text(encoding="utf-8")
+        terminal_idx = body.find("Terminal Finalization Boundary")
+        self.assertGreater(terminal_idx, -1,
+                           "finish-agent must have a Terminal Finalization Boundary section")
+        terminal_section = body[terminal_idx:]
+        self.assertIn("workflow.py done", terminal_section)
+        self.assertIn("MUST NOT", terminal_section)
+
+    def test_finish_agent_archives_lightweight_flow_superpowers_artifacts(self):
+        """finish-agent prompt must archive lightweight-flow Superpowers plan/spec
+        files into typed archive subdirectories (Spec Decision 11, 12)."""
+        body = (AGENTS_DIR / "finish-agent.md").read_text(encoding="utf-8")
+        self.assertIn("docs/superpowers/archive/plans/", body)
+        self.assertIn("docs/superpowers/archive/specs/", body)
+        self.assertIn("archived_design_artifact_paths", body)
+        self.assertIn("source_design_artifact_paths", body)
+
+    def test_finish_agent_uses_semantic_archive_evidence(self):
+        """finish-agent prompt must use semantic archive evidence fields
+        (Spec Decision 10, 12)."""
+        body = (AGENTS_DIR / "finish-agent.md").read_text(encoding="utf-8")
+        self.assertIn("archive_action_completed", body)
+        self.assertIn("archive_artifact_path", body)
+        self.assertIn("archive_not_required_reason", body)
+
+    def test_dev_orchestrator_owns_branch_decision_collection(self):
+        """dev-orchestrator prompt must own user branch decision collection
+        (Spec Decision 13)."""
+        body = (AGENTS_DIR / "dev-orchestrator.md").read_text(encoding="utf-8")
+        branch_idx = body.find("Branch Finish Decision Collection")
+        self.assertGreater(branch_idx, -1,
+                           "dev-orchestrator must have a Branch Finish Decision Collection section")
+        branch_section = body[branch_idx:]
+        self.assertIn("missing_branch_finish_decision", branch_section)
+        self.assertIn("merge_local", branch_section)
+        self.assertIn("create_pr", branch_section)
+        self.assertIn("keep_branch", branch_section)
+        self.assertIn("discard", branch_section)
+        self.assertIn("record-context", branch_section)
+        self.assertIn("branch_finish_decision", branch_section)
 
 
 if __name__ == "__main__":

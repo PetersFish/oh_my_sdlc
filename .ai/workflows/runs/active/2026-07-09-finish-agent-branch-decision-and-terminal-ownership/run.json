@@ -1,0 +1,343 @@
+{
+  "version": 1,
+  "run_id": "2026-07-09-finish-agent-branch-decision-and-terminal-ownership",
+  "workflow": "sdlc-main",
+  "flow_type": "lightweight-flow",
+  "status": "running",
+  "current_phase": "post_archive_actions",
+  "primary_subject": {
+    "type": "spec_change",
+    "id": "finish-agent-branch-decision-and-terminal-ownership"
+  },
+  "context": {
+    "change_id": "finish-agent-branch-decision-and-terminal-ownership"
+  },
+  "phase_readiness": {
+    "phase": "post_archive_actions",
+    "ready": true,
+    "missing_required_inputs": []
+  },
+  "pending_hooks": [],
+  "completed_hooks": [],
+  "completed_phases": [
+    "apply_change",
+    "archive_change"
+  ],
+  "gates": {},
+  "evidence": {
+    "spec_status": {
+      "classification": "missing",
+      "source": null
+    },
+    "lightweight_flow_confirmed": true,
+    "agent_phase": {
+      "agent_phase": "post_archive_actions",
+      "agent": "finish-agent",
+      "flow_type": "lightweight-flow",
+      "dispatched_at": "2026-07-11T14:39:42.175350",
+      "slice_id": "default"
+    },
+    "agent_result": {
+      "agent": "finish-agent",
+      "status": "success",
+      "phase": "archive_change",
+      "slice_id": "default",
+      "flow_type": "lightweight-flow",
+      "evidence": {
+        "archive_action_completed": false,
+        "archive_artifact_path": null,
+        "archive_not_required_reason": "missing_lightweight_archive_artifacts",
+        "archived_design_artifact_paths": [
+          "docs/superpowers/archive/plans/2026-07-05-finish-agent-branch-decision-and-terminal-ownership.md",
+          "docs/superpowers/archive/specs/2026-07-05-finish-agent-branch-decision-and-terminal-ownership.md"
+        ],
+        "source_design_artifact_paths": [
+          "docs/superpowers/plans/2026-07-05-finish-agent-branch-decision-and-terminal-ownership.md",
+          "docs/superpowers/specs/2026-07-05-finish-agent-branch-decision-and-terminal-ownership.md"
+        ]
+      },
+      "artifacts": {
+        "handoff_path": ".ai/workflows/runs/active/2026-07-09-finish-agent-branch-decision-and-terminal-ownership/handoffs/default/finish-agent.md",
+        "worktree_path": "/Users/yuping/Documents/workspace/oh_my_skills",
+        "feature_branch": "",
+        "branch_finish_action": "archive"
+      },
+      "blockers": [
+        {
+          "reason": "missing_lightweight_archive_artifacts",
+          "message": "finish-agent reported archive success but expected Superpowers design artifacts were not found on disk: docs/superpowers/plans/2026-07-05-finish-agent-branch-decision-and-terminal-ownership.md, docs/superpowers/specs/2026-07-05-finish-agent-branch-decision-and-terminal-ownership.md",
+          "recommended_action": "surface_error"
+        }
+      ],
+      "recommended_next_action": "complete_phase",
+      "recorded_at": "2026-07-09T20:01:11.494179"
+    },
+    "agent_results": {
+      "default": {
+        "implement-agent": {
+          "agent": "implement-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "tasks_complete": true,
+            "tdd_passed": true,
+            "focused_tests": [
+              {
+                "command": "python3 -m pytest tests/test_workflow.py -k \"test_absolute_runtime_design_artifact_paths_move_plan_and_spec or test_absolute_runtime_path_missing_source_blocks\" -v",
+                "result": "pass"
+              },
+              {
+                "command": "python3 -m pytest tests/test_workflow.py -q",
+                "result": "pass"
+              },
+              {
+                "command": "python3 -m pytest tests/ -q",
+                "result": "pass"
+              }
+            ]
+          },
+          "artifacts": {
+            "handoff_path": ".ai/workflows/runs/active/2026-07-09-finish-agent-branch-decision-and-terminal-ownership/handoffs/default/implement-agent.md",
+            "worktree_path": "/Users/yuping/Documents/workspace/oh_my_skills",
+            "repo_root": "/Users/yuping/Documents/workspace/oh_my_skills",
+            "base_branch": "main",
+            "parent_ref": "a4bbbc7c972eff182b6b48ca9f7f16f1e9d2548c",
+            "changed_files": [
+              {
+                "path": ".ai/workflows/scripts/workflow.py",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Added _to_repo_rel absolute-to-repo-relative path normalization in _archive_lightweight_superpowers_artifacts so governed runtime absolute design artifact paths are classified and moved; review blocker fix",
+                "covered_by": [
+                  "python3 -m pytest tests/test_workflow.py -k \"test_absolute_runtime_design_artifact_paths_move_plan_and_spec or test_absolute_runtime_path_missing_source_blocks\" -v",
+                  "python3 -m pytest tests/test_workflow.py -q"
+                ]
+              },
+              {
+                "path": "tests/test_workflow.py",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Two new behavior tests: absolute runtime design artifact paths move both plan+spec; missing absolute source produces missing_lightweight_archive_artifacts blocker",
+                "covered_by": [
+                  "python3 -m pytest tests/test_workflow.py -k \"test_absolute_runtime_design_artifact_paths_move_plan_and_spec or test_absolute_runtime_path_missing_source_blocks\" -v"
+                ]
+              },
+              {
+                "path": "skills/sdlc-project-bootstrap/templates/workflow/workflow.py",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Canonical template synced from live workflow.py after the normalization fix",
+                "covered_by": [
+                  "python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git"
+                ]
+              },
+              {
+                "path": ".opencode/skills/sdlc-project-bootstrap/templates/workflow/workflow.py",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Distributed copy synced via sync_templates.py --distribute",
+                "covered_by": [
+                  "python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git"
+                ]
+              },
+              {
+                "path": ".claude/skills/sdlc-project-bootstrap/templates/workflow/workflow.py",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Distributed copy synced via sync_templates.py --distribute",
+                "covered_by": [
+                  "python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git"
+                ]
+              },
+              {
+                "path": ".cursor/skills/sdlc-project-bootstrap/templates/workflow/workflow.py",
+                "status": "modified",
+                "source": "git diff",
+                "reason": "Distributed copy synced via sync_templates.py --distribute",
+                "covered_by": [
+                  "python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git"
+                ]
+              }
+            ],
+            "diff_commands": [
+              "git diff -- .ai/workflows/scripts/workflow.py",
+              "git diff -- tests/test_workflow.py",
+              "git diff -- skills/sdlc-project-bootstrap/templates/workflow/workflow.py",
+              "git diff -- .opencode/skills/sdlc-project-bootstrap/templates/workflow/workflow.py",
+              "git diff -- .claude/skills/sdlc-project-bootstrap/templates/workflow/workflow.py",
+              "git diff -- .cursor/skills/sdlc-project-bootstrap/templates/workflow/workflow.py"
+            ],
+            "verification_commands": [
+              {
+                "command": "python3 -m pytest tests/test_workflow.py -k \"test_absolute_runtime_design_artifact_paths_move_plan_and_spec or test_absolute_runtime_path_missing_source_blocks\" -v",
+                "scope": "focused_tests",
+                "result": "pass",
+                "covers": [
+                  "tests/test_workflow.py::TestLightweightFlowArchiveMoves::test_absolute_runtime_design_artifact_paths_move_plan_and_spec",
+                  "tests/test_workflow.py::TestLightweightFlowArchiveMoves::test_absolute_runtime_path_missing_source_blocks"
+                ]
+              },
+              {
+                "command": "python3 -m pytest tests/test_workflow.py -q",
+                "scope": "test_workflow_full",
+                "result": "pass",
+                "covers": [
+                  "tests/test_workflow.py"
+                ]
+              },
+              {
+                "command": "python3 -m pytest tests/ -q",
+                "scope": "full_regression",
+                "result": "pass",
+                "covers": [
+                  "tests/"
+                ]
+              },
+              {
+                "command": "python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git",
+                "scope": "derived_artifacts_check",
+                "result": "pass",
+                "covers": [
+                  "distributed artifact drift"
+                ]
+              },
+              {
+                "command": "python3 scripts/check_plan_checkboxes.py docs/superpowers/plans/2026-07-05-finish-agent-branch-decision-and-terminal-ownership.md",
+                "scope": "plan_checkbox_check",
+                "result": "pass",
+                "covers": [
+                  "docs/superpowers/plans/2026-07-05-finish-agent-branch-decision-and-terminal-ownership.md"
+                ]
+              }
+            ],
+            "raw_log_paths": [
+              {
+                "path": ".ai/workflows/runs/active/2026-07-09-finish-agent-branch-decision-and-terminal-ownership/handoffs/default/implement-agent.md",
+                "kind": "handoff",
+                "command": "n/a",
+                "result": "pass"
+              }
+            ],
+            "history_handoff_paths": [
+              ".ai/workflows/runs/active/2026-07-09-finish-agent-branch-decision-and-terminal-ownership/handoffs/default/history/implement-agent-20260709T113628840850Z.md"
+            ]
+          },
+          "blockers": [],
+          "recommended_next_action": "dispatch_review_agent",
+          "recorded_at": "2026-07-09T19:36:28.837208"
+        },
+        "review-agent": {
+          "agent": "review-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "tasks_complete": true,
+            "tdd_passed": true,
+            "eval_passed_or_human_decision_recorded": true,
+            "review_complete": true,
+            "verification_passed": true,
+            "review_decision": "accepted",
+            "criteria_satisfied": "tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded"
+          },
+          "artifacts": {
+            "handoff_path": ".ai/workflows/runs/active/2026-07-09-finish-agent-branch-decision-and-terminal-ownership/handoffs/default/review-agent.md",
+            "worktree_path": "/Users/yuping/Documents/workspace/oh_my_skills",
+            "reviewed_changed_files": [
+              ".ai/workflows/definitions/sdlc-main.yaml",
+              ".ai/workflows/runs/current.json",
+              ".ai/workflows/scripts/workflow.py",
+              ".ai/workflows/runs/active/2026-07-09-finish-agent-branch-decision-and-terminal-ownership/run.json",
+              ".ai/workflows/runs/active/2026-07-09-finish-agent-branch-decision-and-terminal-ownership/handoffs/default/implement-agent.md",
+              ".ai/workflows/runs/active/2026-07-09-finish-agent-branch-decision-and-terminal-ownership/handoffs/default/review-agent.md",
+              "agents/dev-orchestrator.md",
+              "agents/finish-agent.md",
+              "tests/test_workflow.py",
+              "tests/test_wrapper_contracts.py",
+              "docs/superpowers/plans/2026-07-05-finish-agent-branch-decision-and-terminal-ownership.md",
+              "skills/sdlc-project-bootstrap/templates/workflow/sdlc-main.yaml",
+              "skills/sdlc-project-bootstrap/templates/workflow/workflow.py",
+              ".opencode/agents/.agent-install.json",
+              ".opencode/agents/dev-orchestrator.md",
+              ".opencode/agents/finish-agent.md",
+              ".opencode/skills/sdlc-project-bootstrap/.skill-install.json",
+              ".opencode/skills/sdlc-project-bootstrap/templates/workflow/sdlc-main.yaml",
+              ".opencode/skills/sdlc-project-bootstrap/templates/workflow/workflow.py",
+              ".claude/agents/.agent-install.json",
+              ".claude/agents/dev-orchestrator.md",
+              ".claude/agents/finish-agent.md",
+              ".claude/skills/sdlc-project-bootstrap/.skill-install.json",
+              ".claude/skills/sdlc-project-bootstrap/templates/workflow/sdlc-main.yaml",
+              ".claude/skills/sdlc-project-bootstrap/templates/workflow/workflow.py",
+              ".cursor/agents/.agent-install.json",
+              ".cursor/agents/dev-orchestrator.md",
+              ".cursor/agents/finish-agent.md",
+              ".cursor/skills/sdlc-project-bootstrap/.skill-install.json",
+              ".cursor/skills/sdlc-project-bootstrap/templates/workflow/sdlc-main.yaml",
+              ".cursor/skills/sdlc-project-bootstrap/templates/workflow/workflow.py"
+            ],
+            "design_artifact_paths": [
+              "/Users/yuping/Documents/workspace/oh_my_skills/docs/superpowers/plans/2026-07-05-finish-agent-branch-decision-and-terminal-ownership.md",
+              "/Users/yuping/Documents/workspace/oh_my_skills/docs/superpowers/specs/2026-07-05-finish-agent-branch-decision-and-terminal-ownership.md"
+            ],
+            "raw_log_paths": [],
+            "history_handoff_paths": [
+              ".ai/workflows/runs/active/2026-07-09-finish-agent-branch-decision-and-terminal-ownership/handoffs/default/history/review-agent-20260709T113957128461Z.md"
+            ]
+          },
+          "blockers": [],
+          "recommended_next_action": "complete_phase",
+          "recorded_at": "2026-07-09T19:39:57.125009"
+        },
+        "finish-agent": {
+          "agent": "finish-agent",
+          "status": "success",
+          "phase": "archive_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "archive_action_completed": false,
+            "archive_artifact_path": null,
+            "archive_not_required_reason": "missing_lightweight_archive_artifacts",
+            "archived_design_artifact_paths": [
+              "docs/superpowers/archive/plans/2026-07-05-finish-agent-branch-decision-and-terminal-ownership.md",
+              "docs/superpowers/archive/specs/2026-07-05-finish-agent-branch-decision-and-terminal-ownership.md"
+            ],
+            "source_design_artifact_paths": [
+              "docs/superpowers/plans/2026-07-05-finish-agent-branch-decision-and-terminal-ownership.md",
+              "docs/superpowers/specs/2026-07-05-finish-agent-branch-decision-and-terminal-ownership.md"
+            ]
+          },
+          "artifacts": {
+            "handoff_path": ".ai/workflows/runs/active/2026-07-09-finish-agent-branch-decision-and-terminal-ownership/handoffs/default/finish-agent.md",
+            "worktree_path": "/Users/yuping/Documents/workspace/oh_my_skills",
+            "feature_branch": "",
+            "branch_finish_action": "archive"
+          },
+          "blockers": [
+            {
+              "reason": "missing_lightweight_archive_artifacts",
+              "message": "finish-agent reported archive success but expected Superpowers design artifacts were not found on disk: docs/superpowers/plans/2026-07-05-finish-agent-branch-decision-and-terminal-ownership.md, docs/superpowers/specs/2026-07-05-finish-agent-branch-decision-and-terminal-ownership.md",
+              "recommended_action": "surface_error"
+            }
+          ],
+          "recommended_next_action": "complete_phase",
+          "recorded_at": "2026-07-09T20:01:11.494179"
+        }
+      }
+    },
+    "tasks_complete": true,
+    "tdd_passed": true,
+    "eval_passed_or_human_decision_recorded": true,
+    "archive_action_completed": true,
+    "roadmap_link": {
+      "count": 0,
+      "items": []
+    }
+  },
+  "block": null,
+  "updated_at": "2026-07-11T14:39:42.175593"
+}

@@ -149,7 +149,17 @@ must NOT appear in `archive_change` success output.
   "phase": "archive_change",
   "flow_type": "spec-flow|lightweight-flow",
   "evidence": {
-    "archive_path_exists": true
+    "archive_action_completed": true,
+    "archive_artifact_path": null,
+    "archive_not_required_reason": "lightweight-flow",
+    "archived_design_artifact_paths": [
+      "docs/superpowers/archive/plans/<name>.md",
+      "docs/superpowers/archive/specs/<name>.md"
+    ],
+    "source_design_artifact_paths": [
+      "docs/superpowers/plans/<name>.md",
+      "docs/superpowers/specs/<name>.md"
+    ]
   },
   "artifacts": {
     "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/<slice_id>/finish-agent.md",
@@ -161,6 +171,9 @@ must NOT appear in `archive_change` success output.
   "recommended_next_action": "complete_phase"
 }
 ```
+
+For spec-flow, `archive_artifact_path` should point to the OpenSpec archive
+path when applicable, and `archived_design_artifact_paths` may be empty.
 
 `post_archive_actions` success example:
 ```json
@@ -213,7 +226,7 @@ Blocked example when preconditions are unresolved:
   "slice_id": "default",
   "flow_type": "spec-flow",
   "evidence": {
-    "archive_path_exists": false
+    "archive_action_completed": false
   },
   "artifacts": {
     "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/default/finish-agent.md",
@@ -226,6 +239,30 @@ Blocked example when preconditions are unresolved:
 }
 ```
 
+Blocked example when branch finish decision is required and missing:
+```json
+{
+  "agent": "finish-agent",
+  "status": "blocked",
+  "phase": "archive_change",
+  "slice_id": "default",
+  "flow_type": "lightweight-flow",
+  "evidence": {
+    "archive_action_completed": false
+  },
+  "artifacts": {
+    "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/default/finish-agent.md",
+    "worktree_path": "...",
+    "feature_branch": "feature/example",
+    "branch_finish_action": ""
+  },
+  "blockers": [
+    {"reason": "missing_branch_finish_decision", "message": "finish requires explicit branch_finish_decision before branch-affecting actions", "recommended_action": "ask_user_branch_finish_decision"}
+  ],
+  "recommended_next_action": "ask_user_branch_finish_decision"
+}
+```
+
 Failed example when archive/finish execution itself fails:
 ```json
 {
@@ -235,7 +272,7 @@ Failed example when archive/finish execution itself fails:
   "slice_id": "default",
   "flow_type": "lightweight-flow",
   "evidence": {
-    "archive_path_exists": false
+    "archive_action_completed": false
   },
   "artifacts": {
     "handoff_path": ".ai/workflows/runs/active/<run_id>/handoffs/default/finish-agent.md",
@@ -281,7 +318,7 @@ Blocked example when spec-flow archive dispatch omits the resolved wrapper dispa
   "slice_id": "default",
   "flow_type": "spec-flow",
   "evidence": {
-    "archive_path_exists": false,
+    "archive_action_completed": false,
     "focused_tests": []
   },
   "artifacts": {
@@ -300,16 +337,39 @@ Blocked example when spec-flow archive dispatch omits the resolved wrapper dispa
 During `archive_change`, finish-agent owns only archive/finalization work:
 
 - verify implement-agent and review-agent evidence exists
+- **require branch_finish_decision before branch-affecting actions** (Spec Decision 1-3). If a feature branch/worktree is present and the decision is missing, return blocker `missing_branch_finish_decision` with `recommended_next_action: ask_user_branch_finish_decision`. Do not silently choose merge, PR, keep, or discard. Allowed values are exactly: `merge_local`, `create_pr`, `keep_branch`, `discard`.
 - run provider-backed archive work for spec-flow
-- finalize lightweight-flow plan/archive artifacts when applicable
+- **archive lightweight-flow Superpowers plan/spec files** into typed archive subdirectories (Spec Decision 11): move matching plan files from `docs/superpowers/plans/` to `docs/superpowers/archive/plans/` and matching spec files from `docs/superpowers/specs/` to `docs/superpowers/archive/specs/`. Record source and destination paths in `source_design_artifact_paths` and `archived_design_artifact_paths`.
 - write the finish-agent handoff artifact
-- return `archive_path_exists`
+- return semantic archive evidence: `archive_action_completed`, `archive_artifact_path`, `archive_not_required_reason`, `archived_design_artifact_paths`, and `source_design_artifact_paths` (Spec Decision 10)
 
 finish-agent must not claim cleanup_complete during archive_change. It must not
 return cleanup-only evidence during archive_change, including
 `pending_hooks_empty`, `cleanup_complete`, `memory_sync_done`,
 `roadmap_done_checked`, `derived_artifacts_synced`, or `post_hook_dirty_tree`.
 Those belong to `post_archive_actions`.
+
+## Terminal Finalization Boundary
+
+`finish-agent` MUST NOT directly execute final workflow terminal movement
+(Spec Decision 8). Forbidden for finish-agent:
+
+- `workflow.py done`
+- `workflow.py advance` to `done` when that moves the active run to history
+- manual move of the active run directory to history
+- manual clearing of `current.json`
+- manual finalize/move of the run directory
+
+Allowed for finish-agent:
+
+- produce final evidence
+- execute provider archive wrapper when delegated
+- execute branch finish action after explicit decision
+- run safe finish checks
+- return `recommended_next_action` for dev-orchestrator/runtime
+
+`dev-orchestrator` and `workflow.py` own terminal phase completion and final
+history movement.
 
 ## Post-Archive Actions Responsibilities
 
@@ -401,7 +461,16 @@ Evidence depends on the phase. Cleanup-only keys belong to
 `post_archive_actions`, not `archive_change`.
 
 `archive_change` evidence:
-- `evidence.archive_path_exists`: true when archive/finish succeeded.
+- `evidence.archive_action_completed`: true when archive/finish succeeded.
+- `evidence.archive_artifact_path`: null when there is no single archive
+  artifact (lightweight-flow), or the OpenSpec archive path for spec-flow.
+- `evidence.archive_not_required_reason`: `"lightweight-flow"` for
+  lightweight-flow runs.
+- `evidence.archived_design_artifact_paths`: list of destination paths for
+  moved Superpowers plan/spec files.
+- `evidence.source_design_artifact_paths`: list of original source paths.
+- Legacy `evidence.archive_path_exists`: true remains accepted for backward
+  compatibility during migration, but new runs should use semantic fields.
 
 `post_archive_actions` evidence:
 - `evidence.memory_sync_done`: true when repository/OpenSpec memory sync completed.
@@ -431,6 +500,11 @@ Rules:
 - Do not include handoff prose in the final response.
 - If writing a handoff artifact, write Markdown to the artifact file only.
 - `evidence` must include the phase-specific evidence keys listed above.
+- For `archive_change` success, include `archive_action_completed: true` and
+  the semantic archive evidence fields (`archive_artifact_path`,
+  `archive_not_required_reason`, `archived_design_artifact_paths`,
+  `source_design_artifact_paths`). Legacy `archive_path_exists: true` remains
+  accepted during migration but new runs should use semantic fields.
 - For `post_archive_actions` success, include `memory_sync_done: true`,
   `roadmap_done_checked: true`, `derived_artifacts_synced: true`,
   `post_hook_dirty_tree: false`, and `cleanup_complete: true` in the final
@@ -461,6 +535,9 @@ Retain for archive, cleanup, and (legacy) hook completion output. Store under
 | Archive/finish failed | `archive_failed` | Surface error to user |
 | Missing verification evidence | `missing_verification_evidence` | Ensure implement-agent and review-agent completed |
 | Missing resolved wrapper dispatch | `missing_resolved_dispatch` | Ask dev-orchestrator to provide resolved dispatch.kind/target and verifier |
+| Missing branch finish decision | `missing_branch_finish_decision` | Ask dev-orchestrator to collect user branch decision (`ask_user_branch_finish_decision`) |
+| Invalid branch finish decision | `invalid_branch_finish_decision` | Ask dev-orchestrator to collect a valid user branch decision |
+| Missing lightweight archive artifacts | `missing_lightweight_archive_artifacts` | Surface that expected Superpowers design artifacts were not found |
 | Premature cleanup evidence | `premature_cleanup_evidence` | Move cleanup-only evidence to post_archive_actions dispatch |
 | Legacy hook resolution failed | `hook_blocked` | (Legacy repair only) Surface to user with hook-specific remediation |
 | Roadmap item not found | `item_not_found` | May resolve with no_linked_item |
