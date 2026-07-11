@@ -697,6 +697,19 @@ python3 .ai/workflows/scripts/workflow.py --root . complete-phase \
 python3 .ai/workflows/scripts/workflow.py --root . advance
 ```
 
+## Final Tail Commit Protocol
+
+After the workflow reaches `done`, dev-orchestrator must publish final workflow/governance artifacts through the runtime command, not direct Git commands.
+
+Required order:
+1. Capture the active `run_id` before advancing to `done`, because `advance` may clear `.ai/workflows/runs/current.json`.
+2. Ensure finish lifecycle evidence has already been recorded according to the runtime context and finish lifecycle specs.
+3. Call `complete-phase` / `complete-hook` / `advance` as required until the run reaches `done` and the active run is moved to history.
+4. Call `python3 .ai/workflows/scripts/workflow.py --root . final-commit --run-id <captured_run_id> --push`.
+5. Call `git status --short` and report clean status or `residual_dirty_paths`.
+
+Do not run direct `git add`, `git commit`, or `git push`; final Git publishing is owned by `workflow.py final-commit`.
+
 ## Parallel Dispatch
 
 Only split into parallel work when:

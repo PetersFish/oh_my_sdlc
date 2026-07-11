@@ -3076,5 +3076,33 @@ class TestExecutionContextArtifactContract(unittest.TestCase):
         self.assertIn("branch_finish_decision", branch_section)
 
 
+class TestDevOrchestratorFinalTailCommit(unittest.TestCase):
+    """dev-orchestrator must include the Final Tail Commit Protocol."""
+
+    def test_dev_orchestrator_has_final_tail_commit_protocol_section(self):
+        body = (AGENTS_DIR / "dev-orchestrator.md").read_text(encoding="utf-8")
+        self.assertIn("Final Tail Commit Protocol", body)
+
+    def test_dev_orchestrator_captures_run_id_before_done(self):
+        body = (AGENTS_DIR / "dev-orchestrator.md").read_text(encoding="utf-8")
+        self.assertIn("Capture the active `run_id` before advancing to `done`", body)
+
+    def test_dev_orchestrator_calls_final_commit_command(self):
+        body = (AGENTS_DIR / "dev-orchestrator.md").read_text(encoding="utf-8")
+        self.assertIn("final-commit --run-id", body)
+
+    def test_dev_orchestrator_does_not_run_direct_git(self):
+        body = (AGENTS_DIR / "dev-orchestrator.md").read_text(encoding="utf-8")
+        self.assertIn("Do not run direct `git add`, `git commit`, or `git push`", body)
+
+    def test_dev_orchestrator_checks_git_status_after_final_commit(self):
+        body = (AGENTS_DIR / "dev-orchestrator.md").read_text(encoding="utf-8")
+        self.assertIn("git status --short", body)
+
+    def test_dev_orchestrator_reports_residual_dirty_paths(self):
+        body = (AGENTS_DIR / "dev-orchestrator.md").read_text(encoding="utf-8")
+        self.assertIn("residual_dirty_paths", body)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

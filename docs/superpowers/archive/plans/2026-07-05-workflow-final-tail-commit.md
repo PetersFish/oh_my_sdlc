@@ -52,11 +52,11 @@ Out of scope for this plan:
 
 **Purpose:** Lock desired `workflow.py final-commit` behavior before implementation.
 
-- [ ] **Step 1: Inspect existing workflow test helpers**
+- [x] **Step 1: Inspect existing workflow test helpers**
 
 Find existing helpers for creating temporary workflow roots, invoking `workflow.py`, initializing Git repositories, reading JSON command output, and asserting run state. Reuse existing patterns instead of inventing unrelated fixtures.
 
-- [ ] **Step 2: Add test for rejecting incomplete or active runs**
+- [x] **Step 2: Add test for rejecting incomplete or active runs**
 
 Create a temporary repo with an active run or a history run whose `run.json` is not done.
 
@@ -80,7 +80,7 @@ run_not_done
 
 Prefer one stable value per failure mode.
 
-- [ ] **Step 3: Add test for noop when nothing allowlisted is dirty**
+- [x] **Step 3: Add test for noop when nothing allowlisted is dirty**
 
 Create `.ai/workflows/runs/history/<run_id>/run.json` with `status: done` and `current_phase: done`, commit the baseline, then run:
 
@@ -100,7 +100,7 @@ Assert JSON contains:
 }
 ```
 
-- [ ] **Step 4: Add test for committing allowed workflow history files**
+- [x] **Step 4: Add test for committing allowed workflow history files**
 
 After baseline commit, modify:
 
@@ -118,7 +118,7 @@ Assert:
 - `staged_paths` includes the history run path
 - `git status --short` is clean afterward
 
-- [ ] **Step 5: Add test for not staging unrelated dirty files**
+- [x] **Step 5: Add test for not staging unrelated dirty files**
 
 After baseline commit, modify both:
 
@@ -136,7 +136,7 @@ Assert:
 - output contains `src/unrelated.py` in `residual_dirty_paths`;
 - the commit diff does not include `src/unrelated.py`.
 
-- [ ] **Step 6: Add test for allowlist scoped to the specific run id**
+- [x] **Step 6: Add test for allowlist scoped to the specific run id**
 
 Create two done history runs:
 
@@ -155,7 +155,7 @@ Assert:
 - other run changes remain dirty and appear in `residual_dirty_paths` unless covered by another allowlist rule;
 - final-commit does not stage all of `.ai/workflows/runs/history/` indiscriminately.
 
-- [ ] **Step 7: Add test for committing Superpowers archive governance artifacts**
+- [x] **Step 7: Add test for committing Superpowers archive governance artifacts**
 
 After baseline commit, create or modify:
 
@@ -172,7 +172,7 @@ Assert:
 - unrelated files under `docs/superpowers/plans/` or `docs/superpowers/specs/` are not staged unless they were moved into the archive path and reported by Git as archived destination paths;
 - unrelated source files remain residual.
 
-- [ ] **Step 8: Add test for push only after successful commit**
+- [x] **Step 8: Add test for push only after successful commit**
 
 Use monkeypatch or the repository's existing command-runner abstraction if present. If no abstraction exists, introduce a small helper in `workflow.py` to execute Git commands so tests can stub push safely.
 
@@ -182,7 +182,7 @@ Assert:
 - `--push` does not invoke `git push` on noop;
 - push failure reports `status: failed`, `committed: true`, `pushed: false`, and preserves `commit_id`.
 
-- [ ] **Step 9: Run focused tests and confirm expected failures**
+- [x] **Step 9: Run focused tests and confirm expected failures**
 
 Run:
 
@@ -205,7 +205,7 @@ Do not weaken the tests to pass against current code.
 
 **Purpose:** Add deterministic final Git publishing after workflow completion.
 
-- [ ] **Step 1: Add Git helper functions**
+- [x] **Step 1: Add Git helper functions**
 
 Add small helpers near existing workflow utility functions:
 
@@ -227,7 +227,7 @@ Rules:
 - Do not shell-concatenate user input.
 - Return enough information for structured JSON errors.
 
-- [ ] **Step 2: Add dirty path parsing**
+- [x] **Step 2: Add dirty path parsing**
 
 Parse `git status --porcelain` into paths.
 
@@ -238,7 +238,7 @@ Requirements:
 - normalize paths to repository-relative POSIX-style strings;
 - avoid absolute paths in JSON output unless an existing test helper requires them.
 
-- [ ] **Step 3: Add final-commit allowlist logic**
+- [x] **Step 3: Add final-commit allowlist logic**
 
 Implement a helper like:
 
@@ -268,7 +268,7 @@ Rules:
 - Active Superpowers source directories such as `docs/superpowers/plans/` and `docs/superpowers/specs/` are not broadly allowlisted.
 - All other paths are residual.
 
-- [ ] **Step 4: Add run completion precondition check**
+- [x] **Step 4: Add run completion precondition check**
 
 Implement helper:
 
@@ -293,7 +293,7 @@ Return structured error codes such as:
 - `run_id_mismatch`
 - `run_not_done`
 
-- [ ] **Step 5: Implement `cmd_final_commit`**
+- [x] **Step 5: Implement `cmd_final_commit`**
 
 Algorithm:
 
@@ -319,7 +319,7 @@ Important:
 - If `git commit` fails, return `status: failed`, `committed: false`.
 - If `git push` fails after commit, return `status: failed`, `committed: true`, `pushed: false`, and the commit id.
 
-- [ ] **Step 6: Add argparse wiring**
+- [x] **Step 6: Add argparse wiring**
 
 Add parser entry for:
 
@@ -329,7 +329,7 @@ workflow.py final-commit --run-id <run_id> [--message <message>] [--push]
 
 Ensure command dispatch calls `cmd_final_commit`.
 
-- [ ] **Step 7: Run focused runtime tests**
+- [x] **Step 7: Run focused runtime tests**
 
 Run:
 
@@ -351,7 +351,7 @@ Expected:
 
 **Purpose:** Make dev-orchestrator run final tail commit after the workflow reaches done without giving it direct Git write duties.
 
-- [ ] **Step 1: Add failing prompt-contract test**
+- [x] **Step 1: Add failing prompt-contract test**
 
 Add a test that asserts canonical `agents/dev-orchestrator.md` contains:
 
@@ -366,7 +366,7 @@ residual_dirty_paths
 
 Run the focused test and confirm it fails before prompt update.
 
-- [ ] **Step 2: Add Final Tail Commit Protocol section**
+- [x] **Step 2: Add Final Tail Commit Protocol section**
 
 Add a section near dispatch lifecycle / terminal workflow handling:
 
@@ -387,13 +387,13 @@ Do not run direct `git add`, `git commit`, or `git push`; final Git publishing i
 
 Do not define finish-agent branch decision or terminal ownership rules in this section; reference the finish lifecycle spec for those rules.
 
-- [ ] **Step 3: Update terminal success action table if needed**
+- [x] **Step 3: Update terminal success action table if needed**
 
 Where the table says a run reaches done after finish/hook completion, extend the downstream action to include final tail commit after done.
 
 Do not imply final-commit runs before hooks are completed.
 
-- [ ] **Step 4: Run prompt-contract tests**
+- [x] **Step 4: Run prompt-contract tests**
 
 Run the relevant prompt tests:
 
@@ -416,7 +416,7 @@ python3 -m pytest tests/test_wrapper_contracts.py -k "dev_orchestrator" -v
 
 **Purpose:** Keep canonical sources and generated/activated copies aligned without touching finish-agent prompt copies for this plan.
 
-- [ ] **Step 1: Inspect existing sync commands**
+- [x] **Step 1: Inspect existing sync commands**
 
 Read existing repo guidance and scripts:
 
@@ -429,7 +429,7 @@ python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py --help
 
 Use the repository's established sync path rather than manually editing every derived file unless the sync tool requires manual follow-up.
 
-- [ ] **Step 2: Sync workflow runtime template**
+- [x] **Step 2: Sync workflow runtime template**
 
 Propagate `.ai/workflows/scripts/workflow.py` changes to:
 
@@ -440,7 +440,7 @@ skills/sdlc-project-bootstrap/templates/workflow/workflow.py
 .cursor/skills/sdlc-project-bootstrap/templates/workflow/workflow.py
 ```
 
-- [ ] **Step 3: Sync dev-orchestrator prompt**
+- [x] **Step 3: Sync dev-orchestrator prompt**
 
 Propagate canonical dev-orchestrator prompt changes to:
 
@@ -452,7 +452,7 @@ Propagate canonical dev-orchestrator prompt changes to:
 
 Do not edit or sync finish-agent prompt copies as part of this plan unless another already-approved spec requires it in the same work package.
 
-- [ ] **Step 4: Run derived artifact check**
+- [x] **Step 4: Run derived artifact check**
 
 Run:
 
@@ -476,37 +476,37 @@ python3 scripts/sync_derived_artifacts.py --check
 
 **Purpose:** Prove runtime, prompt contracts, and derived sync all pass.
 
-- [ ] **Step 1: Run focused workflow tests**
+- [x] **Step 1: Run focused workflow tests**
 
 ```bash
 python3 -m pytest tests/test_workflow.py -k "final_commit" -v
 ```
 
-- [ ] **Step 2: Run full workflow tests**
+- [x] **Step 2: Run full workflow tests**
 
 ```bash
 python3 -m pytest tests/test_workflow.py -v
 ```
 
-- [ ] **Step 3: Run prompt-contract tests**
+- [x] **Step 3: Run prompt-contract tests**
 
 ```bash
 python3 -m pytest tests/test_wrapper_contracts.py -v
 ```
 
-- [ ] **Step 4: Run full test suite**
+- [x] **Step 4: Run full test suite**
 
 ```bash
 python3 -m pytest tests/ -v
 ```
 
-- [ ] **Step 5: Run final sync check**
+- [x] **Step 5: Run final sync check**
 
 ```bash
 python3 scripts/sync_derived_artifacts.py --check
 ```
 
-- [ ] **Step 6: Inspect final Git state**
+- [x] **Step 6: Inspect final Git state**
 
 Run:
 
@@ -529,7 +529,7 @@ Expected:
 
 **Purpose:** Return enough evidence for review-agent and dev-orchestrator to validate the implementation.
 
-- [ ] **Step 1: Summarize changed files**
+- [x] **Step 1: Summarize changed files**
 
 Report:
 
@@ -538,7 +538,7 @@ Report:
 - derived/template files changed;
 - tests changed.
 
-- [ ] **Step 2: Summarize final-commit behavior**
+- [x] **Step 2: Summarize final-commit behavior**
 
 Include:
 
@@ -548,7 +548,7 @@ Include:
 - residual dirty path handling;
 - push semantics.
 
-- [ ] **Step 3: Summarize verification commands**
+- [x] **Step 3: Summarize verification commands**
 
 Include exact command/result pairs for:
 
@@ -560,7 +560,7 @@ python3 -m pytest tests/ -v
 python3 scripts/sync_derived_artifacts.py --check
 ```
 
-- [ ] **Step 4: Confirm acceptance criteria**
+- [x] **Step 4: Confirm acceptance criteria**
 
 Acceptance checklist:
 

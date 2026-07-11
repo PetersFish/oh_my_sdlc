@@ -3,7 +3,8 @@
 
 Commands: status, start, resume, readiness, resolve, record-evidence,
 complete-phase, complete-hook, advance, block, done, validate,
-governance-check, preflight, ensure-run, before-dispatch, after-dispatch.
+governance-check, preflight, ensure-run, before-dispatch, after-dispatch,
+final-commit.
 """
 
 import argparse
@@ -12,6 +13,7 @@ import hashlib
 import json
 import os
 import shutil
+import subprocess
 import sys
 import time
 import yaml
@@ -3254,6 +3256,248 @@ def cmd_block(root, args):
     print(json.dumps(state, indent=2))
 
 
+# ---------------------------------------------------------------------------
+# final-commit helpers
+# ---------------------------------------------------------------------------
+
+def _run_git(root, args, *, check=False):
+    """Run a git command in root, capturing output.
+
+    Returns (returncode, stdout, stderr).
+    """
+    result = subprocess.run(
+        ["git"] + list(args),
+        cwd=root,
+        capture_output=True,
+        text=True,
+    )
+    if check and result.returncode != 0:
+        raise RuntimeError(
+            f"git {' '.join(args)} failed: {result.stderr.strip() or result.stdout.strip()}"
+        )
+    # Do NOT strip stdout here — callers that need line-by-line parsing
+    # (e.g. git status --porcelain) depend on per-line formatting that
+    # leading/trailing whitespace conveys.
+    return result.returncode, result.stdout, result.stderr.strip()
+
+
+def _git_status_porcelain(root):
+    """Return list of (status_code, path) tuples from git status --porcelain.
+
+    Uses -uall so untracked files are listed individually rather than as
+    collapsed directories.
+    """
+    rc, out, _ = _run_git(root, ["status", "--porcelain", "-uall"])
+    if rc != 0:
+        return []
+    entries = []
+    for line in out.splitlines():
+        if not line.strip():
+            continue
+        status_code = line[:2]
+        # Porcelain format: XY <path> or XY <path> -> <dest> for renames
+        path_part = line[3:]
+        if " -> " in path_part:
+            # Rename: use destination path
+            path = path_part.split(" -> ", 1)[1]
+        else:
+            path = path_part
+        # Normalize to POSIX-style relative paths
+        path = path.replace("\\", "/").strip('"')
+        entries.append((status_code.strip(), path))
+    return entries
+
+
+def _git_dirty_paths(root):
+    """Return list of dirty paths (relative, POSIX-style) from git status."""
+    entries = _git_status_porcelain(root)
+    return [path for _, path in entries]
+
+
+def _final_commit_allowed_prefixes(run_id):
+    """Return allowlist path prefixes for final-commit staging."""
+    return [
+        f".ai/workflows/runs/history/{run_id}/",
+        ".ai/workflows/runs/current.json",
+        ".ai/roadmap/",
+        ".ai/memory/",
+        "openspec/changes/archive/",
+        "docs/superpowers/archive/",
+    ]
+
+
+def _classify_final_commit_paths(dirty_paths, run_id):
+    """Split dirty paths into (allowed, residual) based on the allowlist."""
+    prefixes = _final_commit_allowed_prefixes(run_id)
+    allowed = []
+    residual = []
+    for path in dirty_paths:
+        if any(path.startswith(prefix) or path == prefix.rstrip("/") for prefix in prefixes):
+            allowed.append(path)
+        else:
+            residual.append(path)
+    return allowed, residual
+
+
+def _load_done_history_run_for_final_commit(root, run_id):
+    """Validate that a done history run exists. Returns (state, error_code).
+
+    On success, error_code is None.
+    On failure, state is None and error_code is a stable string.
+    """
+    if not run_id:
+        return None, "missing_run_id"
+    history_run_path = _resolve_path(
+        root, f".ai/workflows/runs/history/{run_id}/run.json"
+    )
+    if not os.path.exists(history_run_path):
+        return None, "history_run_not_found"
+    try:
+        with open(history_run_path, "r") as f:
+            state = json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return None, "invalid_run_json"
+    state_run_id = state.get("run_id")
+    if state_run_id and state_run_id != run_id:
+        return None, "run_id_mismatch"
+    status = state.get("status")
+    current_phase = state.get("current_phase")
+    if status != "done" and current_phase != "done":
+        return None, "run_not_done"
+    return state, None
+
+
+def cmd_final_commit(root, args):
+    """Final tail commit for governance artifacts after a workflow run is done.
+
+    Stages only allowlisted paths, commits, optionally pushes, and reports
+    residual dirty paths. Never uses git add -A.
+    """
+    run_id = args.run_id
+
+    # 1. Validate done history run
+    state, error_code = _load_done_history_run_for_final_commit(root, run_id)
+    if error_code:
+        print(json.dumps({
+            "status": "failed",
+            "run_id": run_id,
+            "committed": False,
+            "commit_id": None,
+            "pushed": False,
+            "staged_paths": [],
+            "residual_dirty_paths": [],
+            "error": error_code,
+        }, indent=2))
+        sys.exit(1)
+
+    # 2. Read dirty paths
+    dirty_paths = _git_dirty_paths(root)
+
+    # 3. Classify allowed vs residual
+    allowed_dirty, residual_dirty = _classify_final_commit_paths(dirty_paths, run_id)
+
+    # 4. If no allowed dirty paths, return noop
+    if not allowed_dirty:
+        print(json.dumps({
+            "status": "noop",
+            "reason": "nothing_to_commit",
+            "run_id": run_id,
+            "committed": False,
+            "commit_id": None,
+            "pushed": False,
+            "staged_paths": [],
+            "residual_dirty_paths": residual_dirty,
+        }, indent=2))
+        return
+
+    # 5. Stage allowed paths individually (never git add -A)
+    for path in allowed_dirty:
+        _run_git(root, ["add", "--", path], check=True)
+
+    # 6. Check staged diff for allowlisted paths only.
+    #    Use the allowlist to filter, because git diff --cached --name-only
+    #    may include pre-existing staged files outside the allowlist that
+    #    must NOT be committed by final-commit.
+    rc, staged_out, _ = _run_git(root, ["diff", "--cached", "--name-only"])
+    all_staged = [p.strip() for p in staged_out.splitlines() if p.strip()]
+    prefixes = _final_commit_allowed_prefixes(run_id)
+    staged_paths = [
+        p for p in all_staged
+        if any(p.startswith(prefix) or p == prefix.rstrip("/") for prefix in prefixes)
+    ]
+
+    # 7. If no allowlisted staged diff, return noop
+    if not staged_paths:
+        print(json.dumps({
+            "status": "noop",
+            "reason": "nothing_to_commit",
+            "run_id": run_id,
+            "committed": False,
+            "commit_id": None,
+            "pushed": False,
+            "staged_paths": [],
+            "residual_dirty_paths": residual_dirty,
+        }, indent=2))
+        return
+
+    # 8. Commit ONLY allowlisted paths. Passing explicit pathspecs to
+    #    git commit scopes the commit to those paths, preventing any
+    #    pre-existing staged files outside the allowlist from being
+    #    included while preserving their index state.
+    message = args.message or f"chore(workflow): finalize {run_id}"
+    rc, _, commit_err = _run_git(
+        root, ["commit", "-m", message, "--"] + staged_paths
+    )
+    if rc != 0:
+        print(json.dumps({
+            "status": "failed",
+            "run_id": run_id,
+            "committed": False,
+            "commit_id": None,
+            "pushed": False,
+            "staged_paths": staged_paths,
+            "residual_dirty_paths": residual_dirty,
+            "error": "commit_failed",
+        }, indent=2))
+        sys.exit(1)
+
+    # 9. Read commit id
+    rc, commit_id, _ = _run_git(root, ["rev-parse", "HEAD"])
+    commit_id = commit_id.strip()
+
+    # 10. Push if requested
+    pushed = False
+    if args.push:
+        rc, _, push_err = _run_git(root, ["push", "origin", "HEAD"])
+        if rc != 0:
+            print(json.dumps({
+                "status": "failed",
+                "run_id": run_id,
+                "committed": True,
+                "commit_id": commit_id,
+                "pushed": False,
+                "staged_paths": staged_paths,
+                "residual_dirty_paths": residual_dirty,
+                "error": "push_failed",
+            }, indent=2))
+            sys.exit(1)
+        pushed = True
+
+    # 11. Read residual dirty paths again
+    residual_after = _git_dirty_paths(root)
+
+    # 12. Return structured JSON
+    print(json.dumps({
+        "status": "success",
+        "run_id": run_id,
+        "committed": True,
+        "commit_id": commit_id,
+        "pushed": pushed,
+        "staged_paths": staged_paths,
+        "residual_dirty_paths": residual_after,
+    }, indent=2))
+
+
 def cmd_done(root, args):
     state = load_run_state(root)
     if not state:
@@ -3924,6 +4168,7 @@ COMMANDS = {
     "verify-foundations",
     "before-dispatch",
     "after-dispatch",
+    "final-commit",
 }
 
 
@@ -3956,6 +4201,8 @@ def main():
     parser.add_argument("--message", default=None, help="block/status message")
     parser.add_argument("--next-allowed", default=None, help="comma-separated next allowed actions")
     parser.add_argument("--action", default=None, help="governed action for preflight/ensure-run")
+    parser.add_argument("--run-id", default=None, help="workflow run id for final-commit")
+    parser.add_argument("--push", action="store_true", help="push after commit (final-commit)")
     parser.add_argument("--json", action="store_true", help="output as JSON")
 
     args = parser.parse_args()
@@ -4001,6 +4248,8 @@ def main():
         cmd_before_dispatch(root, args)
     elif args.command == "after-dispatch":
         cmd_after_dispatch(root, args)
+    elif args.command == "final-commit":
+        cmd_final_commit(root, args)
 
 
 if __name__ == "__main__":

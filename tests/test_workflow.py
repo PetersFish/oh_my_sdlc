@@ -8495,5 +8495,411 @@ class TestSemanticArchiveEvidence(FixtureBase):
         self.assertIn("archive_change", data.get("completed_phases", []))
 
 
+class TestFinalCommit(FixtureBase):
+    """Tests for workflow.py final-commit command.
+
+    final-commit runs after a workflow run reaches done. It stages
+    only allowlisted governance artifacts and commits them, leaving
+    unrelated dirty files unstaged.
+    """
+
+    def _init_git(self):
+        subprocess.run(["git", "init"], cwd=self.tmp, capture_output=True, check=True)
+        subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=self.tmp, capture_output=True, check=True)
+        subprocess.run(["git", "config", "user.name", "Test"], cwd=self.tmp, capture_output=True, check=True)
+
+    def _git_current_branch(self):
+        result = subprocess.run(
+            ["git", "branch", "--show-current"],
+            cwd=self.tmp, capture_output=True, text=True, check=True,
+        )
+        return result.stdout.strip()
+
+    def _git_commit_baseline(self, msg="baseline"):
+        subprocess.run(["git", "add", "-A"], cwd=self.tmp, capture_output=True, check=True)
+        subprocess.run(["git", "commit", "-m", msg], cwd=self.tmp, capture_output=True, check=True)
+
+    def _git_status_porcelain(self):
+        result = subprocess.run(
+            ["git", "status", "--porcelain", "-uall"],
+            cwd=self.tmp, capture_output=True, text=True, check=True,
+        )
+        return [line.strip() for line in result.stdout.strip().splitlines() if line.strip()]
+
+    def _git_show_name_only(self, commit="HEAD"):
+        result = subprocess.run(
+            ["git", "show", "--name-only", "--pretty=format:", commit],
+            cwd=self.tmp, capture_output=True, text=True, check=True,
+        )
+        return [line.strip() for line in result.stdout.strip().splitlines() if line.strip()]
+
+    def _make_done_history_run(self, run_id="2026-07-05-example"):
+        """Create a done history run with run.json."""
+        history_dir = os.path.join(
+            self.tmp, ".ai", "workflows", "runs", "history", run_id
+        )
+        os.makedirs(history_dir, exist_ok=True)
+        state = {
+            "version": 1,
+            "run_id": run_id,
+            "workflow": "sdlc-main",
+            "status": "done",
+            "current_phase": "done",
+            "flow_type": "lightweight-flow",
+            "primary_subject": {"type": "spec_change", "id": "example"},
+            "context": {"change_id": "example", "execution_mode": "main_checkout"},
+            "completed_phases": ["apply_change", "archive_change", "post_archive_actions"],
+            "pending_hooks": [],
+            "completed_hooks": [],
+            "gates": {},
+            "evidence": {},
+            "block": None,
+            "updated_at": "2026-07-05T00:00:00",
+        }
+        with open(os.path.join(history_dir, "run.json"), "w") as f:
+            json.dump(state, f)
+        return run_id
+
+    def test_final_commit_rejects_missing_run_id(self):
+        rc, out, _ = run_workflow(self.tmp, "final-commit")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "failed")
+        self.assertEqual(data["error"], "missing_run_id")
+
+    def test_final_commit_rejects_history_run_not_found(self):
+        rc, out, _ = run_workflow(
+            self.tmp, "final-commit", run_id="nonexistent-run"
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "failed")
+        self.assertEqual(data["error"], "history_run_not_found")
+
+    def test_final_commit_rejects_not_done_run(self):
+        run_id = "2026-07-05-active"
+        history_dir = os.path.join(
+            self.tmp, ".ai", "workflows", "runs", "history", run_id
+        )
+        os.makedirs(history_dir, exist_ok=True)
+        state = {
+            "version": 1,
+            "run_id": run_id,
+            "workflow": "sdlc-main",
+            "status": "running",
+            "current_phase": "apply_change",
+            "completed_phases": [],
+            "pending_hooks": [],
+            "completed_hooks": [],
+            "gates": {},
+            "evidence": {},
+            "block": None,
+            "updated_at": "2026-07-05T00:00:00",
+        }
+        with open(os.path.join(history_dir, "run.json"), "w") as f:
+            json.dump(state, f)
+        rc, out, _ = run_workflow(self.tmp, "final-commit", run_id=run_id)
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "failed")
+        self.assertEqual(data["error"], "run_not_done")
+
+    def test_final_commit_rejects_run_id_mismatch(self):
+        run_id = "2026-07-05-mismatch"
+        history_dir = os.path.join(
+            self.tmp, ".ai", "workflows", "runs", "history", run_id
+        )
+        os.makedirs(history_dir, exist_ok=True)
+        state = {
+            "version": 1,
+            "run_id": "different-run-id",
+            "workflow": "sdlc-main",
+            "status": "done",
+            "current_phase": "done",
+            "completed_phases": [],
+            "pending_hooks": [],
+            "completed_hooks": [],
+            "gates": {},
+            "evidence": {},
+            "block": None,
+            "updated_at": "2026-07-05T00:00:00",
+        }
+        with open(os.path.join(history_dir, "run.json"), "w") as f:
+            json.dump(state, f)
+        rc, out, _ = run_workflow(self.tmp, "final-commit", run_id=run_id)
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "failed")
+        self.assertEqual(data["error"], "run_id_mismatch")
+
+    def test_final_commit_noop_when_nothing_dirty(self):
+        self._init_git()
+        run_id = self._make_done_history_run()
+        self._git_commit_baseline()
+        rc, out, _ = run_workflow(self.tmp, "final-commit", run_id=run_id)
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "noop")
+        self.assertEqual(data["reason"], "nothing_to_commit")
+        self.assertFalse(data["committed"])
+        self.assertFalse(data["pushed"])
+        self.assertEqual(data["staged_paths"], [])
+        self.assertEqual(data["residual_dirty_paths"], [])
+
+    def test_final_commit_commits_allowed_history_file(self):
+        self._init_git()
+        run_id = self._make_done_history_run()
+        self._git_commit_baseline()
+        # Modify the history run.json
+        run_json_path = os.path.join(
+            self.tmp, ".ai", "workflows", "runs", "history", run_id, "run.json"
+        )
+        with open(run_json_path, "w") as f:
+            json.dump({"status": "done", "current_phase": "done", "run_id": run_id}, f)
+        rc, out, _ = run_workflow(self.tmp, "final-commit", run_id=run_id)
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "success")
+        self.assertTrue(data["committed"])
+        self.assertTrue(data["commit_id"])
+        self.assertIn(
+            f".ai/workflows/runs/history/{run_id}/run.json",
+            data["staged_paths"],
+        )
+        # Git status should be clean
+        status = self._git_status_porcelain()
+        self.assertEqual(status, [])
+
+    def test_final_commit_does_not_stage_unrelated_files(self):
+        self._init_git()
+        run_id = self._make_done_history_run()
+        self._git_commit_baseline()
+        # Modify history run.json
+        run_json_path = os.path.join(
+            self.tmp, ".ai", "workflows", "runs", "history", run_id, "run.json"
+        )
+        with open(run_json_path, "w") as f:
+            json.dump({"status": "done", "current_phase": "done", "run_id": run_id}, f)
+        # Create an unrelated dirty file
+        src_dir = os.path.join(self.tmp, "src")
+        os.makedirs(src_dir, exist_ok=True)
+        with open(os.path.join(src_dir, "unrelated.py"), "w") as f:
+            f.write("# unrelated change\n")
+        rc, out, _ = run_workflow(self.tmp, "final-commit", run_id=run_id)
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "success")
+        self.assertTrue(data["committed"])
+        # Unrelated file should be in residual_dirty_paths
+        self.assertIn("src/unrelated.py", data["residual_dirty_paths"])
+        # The commit should not include src/unrelated.py
+        commit_files = self._git_show_name_only()
+        self.assertNotIn("src/unrelated.py", commit_files)
+        self.assertIn(
+            f".ai/workflows/runs/history/{run_id}/run.json",
+            commit_files,
+        )
+        # src/unrelated.py should still be dirty
+        status = self._git_status_porcelain()
+        self.assertTrue(any("src/unrelated.py" in s for s in status))
+
+    def test_final_commit_does_not_commit_pre_staged_unrelated_file(self):
+        """Regression: a pre-existing staged tracked file outside the
+        allowlist must NOT be included in the final commit, and its staged
+        index state must be preserved after final-commit returns.
+        """
+        self._init_git()
+        run_id = self._make_done_history_run()
+        # Create a tracked source file and commit it as baseline
+        src_dir = os.path.join(self.tmp, "src")
+        os.makedirs(src_dir, exist_ok=True)
+        unrelated_path = os.path.join(src_dir, "unrelated.py")
+        with open(unrelated_path, "w") as f:
+            f.write("# original\n")
+        self._git_commit_baseline()
+        # Modify history run.json (allowlisted)
+        run_json_path = os.path.join(
+            self.tmp, ".ai", "workflows", "runs", "history", run_id, "run.json"
+        )
+        with open(run_json_path, "w") as f:
+            json.dump({"status": "done", "current_phase": "done", "run_id": run_id}, f)
+        # Pre-stage an unrelated tracked file modification BEFORE final-commit
+        with open(unrelated_path, "w") as f:
+            f.write("# modified by user\n")
+        subprocess.run(
+            ["git", "add", "--", "src/unrelated.py"],
+            cwd=self.tmp, capture_output=True, check=True,
+        )
+        # Confirm it is staged before final-commit
+        pre_status = self._git_status_porcelain()
+        self.assertTrue(any("M  src/unrelated.py" in s for s in pre_status))
+        # Run final-commit
+        rc, out, _ = run_workflow(self.tmp, "final-commit", run_id=run_id)
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "success")
+        self.assertTrue(data["committed"])
+        # The commit must NOT include the unrelated pre-staged file
+        commit_files = self._git_show_name_only()
+        self.assertNotIn("src/unrelated.py", commit_files)
+        self.assertIn(
+            f".ai/workflows/runs/history/{run_id}/run.json",
+            commit_files,
+        )
+        # The unrelated file must still be staged (index state preserved)
+        post_status = self._git_status_porcelain()
+        self.assertTrue(
+            any("M  src/unrelated.py" in s for s in post_status),
+            f"src/unrelated.py staged state not preserved: {post_status}",
+        )
+        # It should appear in residual_dirty_paths
+        self.assertIn("src/unrelated.py", data["residual_dirty_paths"])
+
+    def test_final_commit_allowlist_scoped_to_specific_run_id(self):
+        self._init_git()
+        target_run = self._make_done_history_run(run_id="2026-07-05-target")
+        other_run = self._make_done_history_run(run_id="2026-07-05-other")
+        self._git_commit_baseline()
+        # Modify both run.json files
+        for rid in (target_run, other_run):
+            run_json_path = os.path.join(
+                self.tmp, ".ai", "workflows", "runs", "history", rid, "run.json"
+            )
+            with open(run_json_path, "w") as f:
+                json.dump({"status": "done", "current_phase": "done", "run_id": rid}, f)
+        rc, out, _ = run_workflow(self.tmp, "final-commit", run_id=target_run)
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "success")
+        self.assertTrue(data["committed"])
+        # Target run should be staged
+        self.assertIn(
+            f".ai/workflows/runs/history/{target_run}/run.json",
+            data["staged_paths"],
+        )
+        # Other run should NOT be staged
+        self.assertNotIn(
+            f".ai/workflows/runs/history/{other_run}/run.json",
+            data["staged_paths"],
+        )
+        # Other run should appear in residual_dirty_paths
+        self.assertIn(
+            f".ai/workflows/runs/history/{other_run}/run.json",
+            data["residual_dirty_paths"],
+        )
+
+    def test_final_commit_commits_superpowers_archive_artifacts(self):
+        self._init_git()
+        run_id = self._make_done_history_run()
+        self._git_commit_baseline()
+        # Create archived superpowers artifacts
+        archive_plans_dir = os.path.join(
+            self.tmp, "docs", "superpowers", "archive", "plans"
+        )
+        os.makedirs(archive_plans_dir, exist_ok=True)
+        with open(os.path.join(archive_plans_dir, "2026-07-05-example.md"), "w") as f:
+            f.write("# Archived Plan\n")
+        archive_specs_dir = os.path.join(
+            self.tmp, "docs", "superpowers", "archive", "specs"
+        )
+        os.makedirs(archive_specs_dir, exist_ok=True)
+        with open(os.path.join(archive_specs_dir, "2026-07-05-example.md"), "w") as f:
+            f.write("# Archived Spec\n")
+        # Also create an unrelated active plan
+        active_plans_dir = os.path.join(
+            self.tmp, "docs", "superpowers", "plans"
+        )
+        os.makedirs(active_plans_dir, exist_ok=True)
+        with open(os.path.join(active_plans_dir, "2026-07-05-active.md"), "w") as f:
+            f.write("# Active Plan\n")
+        rc, out, _ = run_workflow(self.tmp, "final-commit", run_id=run_id)
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "success")
+        self.assertTrue(data["committed"])
+        # Archive paths should be staged
+        self.assertIn("docs/superpowers/archive/plans/2026-07-05-example.md", data["staged_paths"])
+        self.assertIn("docs/superpowers/archive/specs/2026-07-05-example.md", data["staged_paths"])
+        # Active plan path should NOT be staged
+        self.assertNotIn("docs/superpowers/plans/2026-07-05-active.md", data["staged_paths"])
+        self.assertIn("docs/superpowers/plans/2026-07-05-active.md", data["residual_dirty_paths"])
+
+    def test_final_commit_push_after_successful_commit(self):
+        self._init_git()
+        run_id = self._make_done_history_run()
+        self._git_commit_baseline()
+        # Modify history run.json
+        run_json_path = os.path.join(
+            self.tmp, ".ai", "workflows", "runs", "history", run_id, "run.json"
+        )
+        with open(run_json_path, "w") as f:
+            json.dump({"status": "done", "current_phase": "done", "run_id": run_id}, f)
+        # Create a bare repo to push to
+        bare_repo = os.path.join(os.path.dirname(self.tmp), f"bare-{run_id}")
+        if os.path.exists(bare_repo):
+            shutil.rmtree(bare_repo, ignore_errors=True)
+        os.makedirs(bare_repo, exist_ok=True)
+        subprocess.run(
+            ["git", "init", "--bare", bare_repo],
+            capture_output=True, check=True,
+        )
+        subprocess.run(
+            ["git", "remote", "add", "origin", bare_repo],
+            cwd=self.tmp, capture_output=True, check=True,
+        )
+        # Push the initial baseline so the remote has the branch
+        branch = self._git_current_branch()
+        subprocess.run(
+            ["git", "push", "origin", branch],
+            cwd=self.tmp, capture_output=True, check=True,
+        )
+        rc, out, _ = run_workflow(
+            self.tmp, "final-commit", run_id=run_id, push=True
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "success")
+        self.assertTrue(data["committed"])
+        self.assertTrue(data["pushed"])
+
+    def test_final_commit_push_not_invoked_on_noop(self):
+        self._init_git()
+        run_id = self._make_done_history_run()
+        self._git_commit_baseline()
+        # Nothing dirty — should noop
+        rc, out, _ = run_workflow(
+            self.tmp, "final-commit", run_id=run_id, push=True
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "noop")
+        self.assertFalse(data["pushed"])
+
+    def test_final_commit_push_failure_reports_committed_true_pushed_false(self):
+        self._init_git()
+        run_id = self._make_done_history_run()
+        self._git_commit_baseline()
+        # Modify history run.json
+        run_json_path = os.path.join(
+            self.tmp, ".ai", "workflows", "runs", "history", run_id, "run.json"
+        )
+        with open(run_json_path, "w") as f:
+            json.dump({"status": "done", "current_phase": "done", "run_id": run_id}, f)
+        # Set a remote URL that will fail to push (nonexistent)
+        subprocess.run(
+            ["git", "remote", "add", "origin", "/nonexistent/remote/path"],
+            cwd=self.tmp, capture_output=True, check=True,
+        )
+        rc, out, _ = run_workflow(
+            self.tmp, "final-commit", run_id=run_id, push=True
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "failed")
+        self.assertTrue(data["committed"])
+        self.assertFalse(data["pushed"])
+        self.assertTrue(data["commit_id"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
