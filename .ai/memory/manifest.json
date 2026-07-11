@@ -5,14 +5,14 @@
   "git": {
     "available": true,
     "has_commits": true,
-    "head": "b368a7f731ea3cf734827fee0b5484b72eb9319b",
-    "last_synced_commit": "b368a7f731ea3cf734827fee0b5484b72eb9319b",
+    "head": "4523caf4297c8b933fe7d234ed54b54ae7b21681",
+    "last_synced_commit": "4523caf4297c8b933fe7d234ed54b54ae7b21681",
     "worktree_state": "dirty"
   },
   "pending_snapshots": [],
   "last_sync": {
-    "timestamp": "2026-07-11T08:03:26.613182Z",
-    "commit": "b368a7f731ea3cf734827fee0b5484b72eb9319b",
-    "snapshot_id": "20260711-workflow-final-tail-commit"
+    "timestamp": "2026-07-11T10:59:37.315248Z",
+    "commit": "4523caf4297c8b933fe7d234ed54b54ae7b21681",
+    "snapshot_id": "20260711-workflow-decision-block-unlock"
   }
 }
