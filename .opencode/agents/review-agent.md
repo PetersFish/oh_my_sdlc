@@ -35,7 +35,7 @@ permission:
     "git -C * check-ignore*": allow
     "git -C * rev-parse*": allow
     "git -C * branch*": allow
-model: openai/gpt-5.5
+model: openai/gpt-5.6-sol
 variant: Default
 ---
 

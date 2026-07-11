@@ -27,7 +27,7 @@ permission:
     "openspec status*": allow
     "openspec instructions*": allow
     "openspec list*": allow
-model: openai/gpt-5.5
+model: openai/gpt-5.6-sol
 variant: Default
 ---
 

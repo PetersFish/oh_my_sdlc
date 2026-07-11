@@ -40,7 +40,7 @@ permission:
     "openspec status*": allow
     "openspec list*": allow
     "openspec archive*": allow
-model: opencode-go/deepseek-v4-pro
+model: ollama-cloud/glm-5.2
 variant: Default
 ---
 

@@ -24,7 +24,7 @@ permission:
     "git log*": allow
     "python3 skills/sdlc-roadmap/scripts/*": allow
     "roadmap *": allow
-model: opencode-go/deepseek-v4-pro
+model: ollama-cloud/glm-5.2
 variant: Default
 ---
 

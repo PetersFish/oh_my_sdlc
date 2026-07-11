@@ -14,25 +14,22 @@ defaults:
 
 profiles:
   orchestrator:
-    model: openai/gpt-5.4
+    model: openai/gpt-5.6-terra
     variant: Default
   planning:
-    model: openai/gpt-5.5
+    model: openai/gpt-5.6-sol
     variant: Default
   implementation:
     model: ollama-cloud/glm-5.2
     variant: Default
-  testing:
-    model: opencode-go/deepseek-v4-pro
-    variant: Default
   review:
-    model: openai/gpt-5.5
+    model: openai/gpt-5.6-sol
     variant: Default
   finish:
-    model: opencode-go/deepseek-v4-pro
+    model: ollama-cloud/glm-5.2
     variant: Default
   roadmap:
-    model: opencode-go/deepseek-v4-pro
+    model: ollama-cloud/glm-5.2
     variant: Default
 
 agents:
@@ -42,8 +39,6 @@ agents:
     profile: planning
   implement-agent:
     profile: implementation
-  test-agent:
-    profile: testing
   review-agent:
     profile: review
   finish-agent:
