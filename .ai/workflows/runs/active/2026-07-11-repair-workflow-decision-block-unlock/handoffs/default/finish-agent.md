@@ -1,58 +1,67 @@
-# finish-agent — archive_change handoff
+# Finish-Agent Handoff — post_archive_actions
 
-- **Run ID:** 2026-07-11-repair-workflow-decision-block-unlock
-- **Phase:** archive_change
-- **Flow type:** spec-flow
-- **Change ID:** repair-workflow-decision-block-unlock
-- **Execution mode:** main_checkout
-- **Slice ID:** default
+- **Run ID**: 2026-07-11-repair-workflow-decision-block-unlock
+- **Phase**: post_archive_actions
+- **Flow type**: spec-flow
+- **Execution mode**: main_checkout
+- **Change ID**: repair-workflow-decision-block-unlock
 
-## Pre-condition verification
+## Pre-Cleanup Checkpoint
 
-- implement-agent evidence: present — `verification_passed: true`, provider `openspec.apply` verified `all_done` (17/17 tasks complete).
-- review-agent evidence: present — `review_complete: true`, `verification_passed: true`, `review_decision: accepted`.
-- Both required before proceeding. ✓
+- Tree was dirty with implementation + archive + run state changes.
+- Staged approved implementation, archive, and workflow run artifacts.
+- Pre-cleanup commit: `4523caf4297c8b933fe7d234ed54b54ae7b21681`
+- Pre-cleanup pushed: true
 
-## Branch finish decision
+## Memory Sync
 
-- Execution mode `main_checkout` — no feature branch/worktree present; current branch is `main`.
-- No branch-affecting action required; `branch_finish_action: archive` (spec-flow archive).
-- No `missing_branch_finish_decision` blocker raised.
+OpenSpec memory sync adapter used (spec-flow). Delegated to `sdlc-repository-memory-sync`.
 
-## Provider-backed archive execution
+- Loaded existing memory context (`.ai/memory/index.json`).
+- Detected state: committed range `b368a7f..4523caf`, clean worktree after pre-cleanup commit.
+- Reconciled pending snapshots: 0 upgraded.
+- Classified and wrote memory deltas:
+  - `specs/repair-workflow-decision-block-unlock.md` — spec memory for decision block unlock contract.
+  - `pitfalls/stale-decision-block-persists-after-valid-correction.md` — pitfall for stale block persistence.
+  - `evolution/20260711-workflow-decision-block-unlock.md` — evolution entry for reconciliation capability.
+- Validated memory: all files valid.
+- Rebuilt index: 36 entries.
+- Updated manifest: HEAD -> `4523caf`, sync_id `20260711-workflow-decision-block-unlock`.
+- Wrote sync-history audit trail.
 
-Resolved wrapper dispatch contract:
-- module: spec
-- capability: archive
-- provider: openspec
-- dispatch.kind: skill
-- dispatch.target: openspec-archive-change
-- verifier.target: openspec.archive
-- result_contract: spec_change
+## Roadmap Completion Check
 
-### Steps performed
-1. `openspec status --change repair-workflow-decision-block-unlock --json` — all artifacts `done` (proposal, design, specs, tasks). ✓
-2. Tasks file reviewed — all 17 tasks marked `[x]`. ✓
-3. Delta spec assessed — `specs/sdlc-workflow-engine/spec.md` adds requirement "Corrected Branch Decisions Reconcile Stale Blocks".
-4. Delta spec synced to main spec `openspec/specs/sdlc-workflow-engine/spec.md` (new requirement appended with 5 scenarios) via openspec-sync-specs intelligent merge.
-5. `openspec archive repair-workflow-decision-block-unlock -y --skip-specs` — archived as `2026-07-11-repair-workflow-decision-block-unlock`. (Specs already synced in step 4; `--skip-specs` avoids duplicate-add abort.)
-6. Provider verifier `openspec.archive` confirmed: `openspec list --json` returns `{"changes":[]}`; archived directory exists at `openspec/changes/archive/2026-07-11-repair-workflow-decision-block-unlock/`.
+- `primary_subject.type` is `spec_change`, not `roadmap_item`.
+- `evidence.roadmap_link`: count 0, items [].
+- No active roadmap items found (`list.py --status active` returned 0 items).
+- Roadmap completion not required; checked and recorded as `no_linked_item`.
 
-## Archive evidence
+## Derived Artifact Sync
 
-- `archive_action_completed`: true
-- `archive_artifact_path`: `openspec/changes/archive/2026-07-11-repair-workflow-decision-block-unlock`
-- `archive_not_required_reason`: null (spec-flow archive performed)
-- `archived_design_artifact_paths`: [] (spec-flow; OpenSpec archive owns the design artifacts)
-- `source_design_artifact_paths`: [] (spec-flow; OpenSpec change directory moved as a whole)
+- `python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git`: SKIPPED (only memory paths changed; no derived-artifact domains affected).
+- `python3 scripts/sync_derived_artifacts.py --check` (full): OK — all 6 check suites in sync.
+
+## Post-Cleanup Checkpoint
+
+- Memory sync generated 5 new/modified files.
+- Staged and committed: `bf87409ee38c54f9d063f439198d2d5e50e8eb79`
+- Post-cleanup pushed: true
+- Final tree: clean, in sync with origin/main.
+
+## Evidence Summary
+
+- `memory_sync_done`: true
+- `roadmap_done_checked`: true (no_linked_item)
+- `derived_artifacts_synced`: true
+- `post_hook_dirty_tree`: false
+- `cleanup_complete`: true
+- `pre_hook_commit_id`: `4523caf4297c8b933fe7d234ed54b54ae7b21681`
+- `pre_hook_pushed`: true
+- `post_hook_commit_id`: `bf87409ee38c54f9d063f439198d2d5e50e8eb79`
+- `post_hook_pushed`: true
 
 ## Artifacts
 
-- `worktree_path`: /Users/yuping/Documents/workspace/oh_my_skills (main_checkout)
-- `feature_branch`: main
-- `branch_finish_action`: archive
-- `handoff_path`: .ai/workflows/runs/active/2026-07-11-repair-workflow-decision-block-unlock/handoffs/default/finish-agent.md
-
-## Next action
-
-- `complete_phase` — dev-orchestrator/runtime owns terminal phase completion and post_archive_actions dispatch.
+- `worktree_path`: `/Users/yuping/Documents/workspace/oh_my_skills`
+- `feature_branch`: `main`
+- `branch_finish_action`: `archive` (spec-flow archive_change, main_checkout)
