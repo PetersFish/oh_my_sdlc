@@ -1,0 +1,243 @@
+{
+  "version": 1,
+  "run_id": "2026-07-12-workflow-finalization-repair",
+  "workflow": "sdlc-main",
+  "flow_type": "lightweight-flow",
+  "status": "done",
+  "current_phase": "done",
+  "primary_subject": {
+    "type": "spec_change",
+    "id": "workflow-finalization-repair"
+  },
+  "context": {
+    "change_id": "workflow-finalization-repair",
+    "primary_design_path": "\"docs/superpowers/plans/2026-07-12-workflow-finalization-repair.md\"",
+    "design_artifact_paths": "[\"docs/superpowers/plans/2026-07-12-workflow-finalization-repair.md\",\"docs/superpowers/specs/2026-07-12-workflow-finalization-repair-design.md\"]"
+  },
+  "phase_readiness": {
+    "phase": "done",
+    "ready": true,
+    "missing_required_inputs": []
+  },
+  "pending_hooks": [],
+  "completed_hooks": [],
+  "completed_phases": [
+    "apply_change",
+    "archive_change",
+    "post_archive_actions"
+  ],
+  "gates": {},
+  "evidence": {
+    "spec_status": {
+      "classification": "missing",
+      "source": null
+    },
+    "lightweight_flow_confirmed": true,
+    "agent_phase": {
+      "agent_phase": "post_archive_actions",
+      "agent": "finish-agent",
+      "flow_type": "lightweight-flow",
+      "dispatched_at": "2026-07-12T11:50:53.536716"
+    },
+    "agent_result": {
+      "agent": "finish-agent",
+      "status": "success",
+      "phase": "post_archive_actions",
+      "slice_id": "default",
+      "flow_type": "lightweight-flow",
+      "evidence": {
+        "memory_sync_done": true,
+        "roadmap_done_checked": true,
+        "derived_artifacts_synced": true,
+        "post_hook_dirty_tree": false,
+        "cleanup_complete": true,
+        "pre_hook_commit_id": "db18359a2d4bfbf370dcefeb62b6c9db6fdfa72e",
+        "pre_hook_pushed": true,
+        "post_hook_commit_id": "53113198b0c00a9e482a4ba07ffe227fb81e690a",
+        "post_hook_pushed": true
+      },
+      "artifacts": {
+        "handoff_path": ".ai/workflows/runs/active/2026-07-12-workflow-finalization-repair/handoffs/default/finish-agent.md",
+        "worktree_path": "/Users/yuping/Documents/workspace/oh_my_skills",
+        "feature_branch": "main",
+        "branch_finish_action": "keep-branch"
+      },
+      "blockers": [],
+      "recommended_next_action": "complete_phase",
+      "recorded_at": "2026-07-12T11:55:54.517596"
+    },
+    "agent_results": {
+      "default": {
+        "implement-agent": {
+          "agent": "implement-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "tasks_complete": true,
+            "tdd_passed": true,
+            "focused_tests": [
+              {
+                "command": "python3 -m pytest tests/test_workflow.py::TestTerminalEvidenceValidation -v",
+                "result": "pass"
+              },
+              {
+                "command": "python3 -m pytest tests/test_workflow.py::TestFinalCommit -v",
+                "result": "pass"
+              },
+              {
+                "command": "python3 -m pytest tests/ -v",
+                "result": "pass"
+              }
+            ],
+            "verification_summary": {
+              "status": "pass",
+              "full_regression": {
+                "command": "python3 -m pytest tests/ -v",
+                "passed": 1204,
+                "failed": 0,
+                "accepted_preexisting_failures": []
+              }
+            }
+          },
+          "artifacts": {
+            "handoff_path": ".ai/workflows/runs/active/2026-07-12-workflow-finalization-repair/handoffs/default/implement-agent.md",
+            "worktree_path": "/Users/yuping/Documents/workspace/oh_my_skills",
+            "repo_root": "/Users/yuping/Documents/workspace/oh_my_skills",
+            "base_branch": "main",
+            "parent_ref": "a4d77be",
+            "changed_files": [
+              {
+                "path": ".ai/workflows/scripts/workflow_runtime/state.py",
+                "status": "modified"
+              },
+              {
+                "path": ".ai/workflows/scripts/workflow_runtime/governance.py",
+                "status": "modified"
+              },
+              {
+                "path": "tests/test_workflow.py",
+                "status": "modified"
+              },
+              {
+                "path": "skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/state.py",
+                "status": "modified"
+              },
+              {
+                "path": "skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/governance.py",
+                "status": "modified"
+              },
+              {
+                "path": "docs/superpowers/plans/2026-07-12-workflow-finalization-repair.md",
+                "status": "modified"
+              }
+            ],
+            "diff_commands": [
+              "git diff -- .ai/workflows/scripts/workflow_runtime/state.py",
+              "git diff -- .ai/workflows/scripts/workflow_runtime/governance.py",
+              "git diff -- tests/test_workflow.py"
+            ],
+            "verification_commands": [
+              {
+                "command": "python3 -m pytest tests/ -v",
+                "scope": "full_regression",
+                "result": "pass"
+              }
+            ],
+            "raw_log_paths": [],
+            "history_handoff_paths": [
+              ".ai/workflows/runs/active/2026-07-12-workflow-finalization-repair/handoffs/default/history/implement-agent-20260712T034516117411Z.md"
+            ]
+          },
+          "blockers": [],
+          "recommended_next_action": "dispatch_review_agent",
+          "recorded_at": "2026-07-12T11:45:16.114804"
+        },
+        "review-agent": {
+          "agent": "review-agent",
+          "status": "success",
+          "phase": "apply_change",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "tasks_complete": true,
+            "tdd_passed": true,
+            "eval_passed_or_human_decision_recorded": true,
+            "review_complete": true,
+            "verification_passed": true,
+            "review_decision": "accepted",
+            "criteria_satisfied": "tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded"
+          },
+          "artifacts": {
+            "handoff_path": ".ai/workflows/runs/active/2026-07-12-workflow-finalization-repair/handoffs/default/review-agent.md",
+            "worktree_path": "/Users/yuping/Documents/workspace/oh_my_skills",
+            "reviewed_changed_files": [
+              ".ai/workflows/scripts/workflow_runtime/state.py",
+              ".ai/workflows/scripts/workflow_runtime/governance.py",
+              "tests/test_workflow.py",
+              "skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/state.py",
+              "skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/governance.py",
+              ".opencode/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/state.py",
+              ".opencode/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/governance.py",
+              ".claude/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/state.py",
+              ".claude/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/governance.py",
+              ".cursor/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/state.py",
+              ".cursor/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/governance.py",
+              "docs/superpowers/plans/2026-07-12-workflow-finalization-repair.md"
+            ],
+            "raw_log_paths": [],
+            "history_handoff_paths": [
+              ".ai/workflows/runs/active/2026-07-12-workflow-finalization-repair/handoffs/default/history/review-agent-20260712T034744472641Z.md"
+            ]
+          },
+          "blockers": [],
+          "recommended_next_action": "complete_phase",
+          "recorded_at": "2026-07-12T11:47:44.469906"
+        },
+        "finish-agent": {
+          "agent": "finish-agent",
+          "status": "success",
+          "phase": "post_archive_actions",
+          "slice_id": "default",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "memory_sync_done": true,
+            "roadmap_done_checked": true,
+            "derived_artifacts_synced": true,
+            "post_hook_dirty_tree": false,
+            "cleanup_complete": true,
+            "pre_hook_commit_id": "db18359a2d4bfbf370dcefeb62b6c9db6fdfa72e",
+            "pre_hook_pushed": true,
+            "post_hook_commit_id": "53113198b0c00a9e482a4ba07ffe227fb81e690a",
+            "post_hook_pushed": true
+          },
+          "artifacts": {
+            "handoff_path": ".ai/workflows/runs/active/2026-07-12-workflow-finalization-repair/handoffs/default/finish-agent.md",
+            "worktree_path": "/Users/yuping/Documents/workspace/oh_my_skills",
+            "feature_branch": "main",
+            "branch_finish_action": "keep-branch"
+          },
+          "blockers": [],
+          "recommended_next_action": "complete_phase",
+          "recorded_at": "2026-07-12T11:55:54.517596"
+        }
+      }
+    },
+    "tasks_complete": true,
+    "tdd_passed": true,
+    "eval_passed_or_human_decision_recorded": true,
+    "archive_action_completed": true,
+    "roadmap_link": {
+      "count": 0,
+      "items": []
+    },
+    "memory_sync_done": true,
+    "roadmap_done_checked": true,
+    "derived_artifacts_synced": true,
+    "post_hook_dirty_tree": false,
+    "cleanup_complete": true
+  },
+  "block": null,
+  "updated_at": "2026-07-12T11:56:01.916962"
+}
