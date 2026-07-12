@@ -9,9 +9,10 @@ summary: >-
 parent_id: root
 sync_status: synced
 evidence_mode: commit
-linked_commits: [f04a9d6]
+linked_commits: [f04a9d6, db18359]
 linked_specs: [workflow-runtime-modularity]
-updated_at: 2026-07-12T00:00:00Z
+linked_sessions: []
+updated_at: 2026-07-12T16:00:00Z
 confidence: high
 tags: [workflow, runtime, architecture, modules, cli-facade, state-io]
 status: synced
@@ -71,3 +72,23 @@ Package tree mirrors to `skills/sdlc-project-bootstrap/templates/workflow/workfl
 - Spec: `openspec/specs/workflow-runtime-modularity/spec.md`
 - Archived change: `openspec/changes/archive/2026-07-11-modularize-workflow-runtime/`
 - Roadmap: RM-ORCH-009 (done), RM-ORCH-010 (next: class-based state machine)
+
+## Refinements (2026-07-12, commit db18359)
+
+Two contract refinements to `governance.py` and `state.py` (lightweight-flow `workflow-finalization-repair`):
+
+### governance.py — status-aware final-commit path classification
+
+`final-commit` previously classified dirty paths by prefix allowlist only, using `_classify_final_commit_paths`. That path-only view could not distinguish an active-run directory **deletion** (the expected move-to-history cleanup) from an unexpected dirty active-run artifact. As a result, active-run deletions stayed residual and the finalized tree never became clean.
+
+Added `_classify_final_commit_entries` which consumes `git status --porcelain` entries (status code + path) and admits active-run paths whose status code indicates deletion (`D`). The path-only `_classify_final_commit_paths` is retained for existing callers/tests. `cmd_final_commit` now uses the status-aware classifier and filters staged paths against the resulting allowed set, preventing pre-existing staged files outside the commit scope from being swept in.
+
+Tests: `test_final_commit_commits_target_active_run_deletions`, `test_final_commit_does_not_commit_target_active_run_non_deletions` in `tests/test_workflow.py`.
+
+### state.py — finish-agent evidence slice-id resolution
+
+`_missing_terminal_finish_agent_evidence` previously derived a single `relevant_slice_id` as `dispatch_intent_slice_id or change_id or "default"`. For unsliced lifecycle runs that recorded finish-agent results under `"default"` while `context.change_id` was set, the validator looked under `change_id`, failed to find success evidence, and blocked terminal movement to `done`.
+
+The validator now builds a `candidate_slice_ids` list: when a dispatch-intent slice is present, only that slice is checked; otherwise both `"default"` and `change_id` are checked. A success under any candidate clears the gate. The returned finding (if any) reports the candidate list for diagnostics.
+
+Tests: `test_advance_accepts_default_finish_agent_evidence_when_no_dispatch_slice` in `tests/test_workflow.py`.

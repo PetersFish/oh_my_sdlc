@@ -5,14 +5,14 @@
   "git": {
     "available": true,
     "has_commits": true,
-    "head": "f04a9d6",
-    "last_synced_commit": "f04a9d6",
+    "head": "db18359a2d4bfbf370dcefeb62b6c9db6fdfa72e",
+    "last_synced_commit": "db18359a2d4bfbf370dcefeb62b6c9db6fdfa72e",
     "worktree_state": "dirty"
   },
   "pending_snapshots": [],
   "last_sync": {
-    "timestamp": "2026-07-12T00:00:00Z",
-    "commit": "f04a9d6",
-    "snapshot_id": "20260712-workflow-runtime-modularization"
+    "timestamp": "2026-07-12T03:54:01.858856Z",
+    "commit": "db18359a2d4bfbf370dcefeb62b6c9db6fdfa72e",
+    "snapshot_id": "20260712-finalization-repair"
   }
 }
