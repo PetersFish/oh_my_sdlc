@@ -7426,6 +7426,37 @@ class TestTerminalEvidenceValidation(FixtureBase):
         self.assertIsNotNone(state)
         self.assertNotEqual(state.get("status"), "done")
 
+    def test_advance_accepts_default_finish_agent_evidence_when_no_dispatch_slice(self):
+        """Unsliced lifecycle runs record finish-agent results under default.
+
+        If no dispatch-intent slice is present, terminal validation must not
+        reinterpret context.change_id as the required slice.
+        """
+        change_id = "terminal-default-slice"
+        self._prepare_post_archive_done_state(change_id=change_id)
+        self._record_finish_agent_result(slice_id="default")
+
+        state = self._read_current_state()
+        state["current_phase"] = "post_archive_actions"
+        state["status"] = "running"
+        state["pending_hooks"] = []
+        state["block"] = None
+        state.setdefault("evidence", {}).setdefault("agent_phase", {}).pop("slice_id", None)
+        state["context"]["change_id"] = change_id
+        state["completed_phases"] = [
+            "input", "load_memory", "brainstorm", "decide_intent",
+            "create_change", "apply_change", "archive_change",
+            "post_archive_actions",
+        ]
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(self.tmp, "advance")
+
+        self.assertEqual(rc, 0, out)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "done")
+        self.assertEqual(data["current_phase"], "done")
+
     def test_done_proceeds_when_finish_agent_evidence_under_relevant_slice(self):
         """When finish-agent success is recorded under the dispatch-intent
         (relevant) slice, terminal movement proceeds even if an unrelated slice
@@ -8866,6 +8897,34 @@ class TestFinalCommit(FixtureBase):
             json.dump(state, f)
         return run_id
 
+    def _make_tracked_active_run_files(self, run_id):
+        active_dir = os.path.join(
+            self.tmp, ".ai", "workflows", "runs", "active", run_id
+        )
+        handoff_dir = os.path.join(active_dir, "handoffs", "default")
+        os.makedirs(handoff_dir, exist_ok=True)
+        active_state = {
+            "version": 1,
+            "run_id": run_id,
+            "workflow": "sdlc-main",
+            "status": "running",
+            "current_phase": "post_archive_actions",
+            "flow_type": "spec-flow",
+            "primary_subject": {"type": "spec_change", "id": "example"},
+            "context": {"change_id": "example"},
+            "completed_phases": ["archive_change", "post_archive_actions"],
+            "pending_hooks": [],
+            "completed_hooks": [],
+            "gates": {},
+            "evidence": {},
+            "block": None,
+            "updated_at": "2026-07-12T00:00:00",
+        }
+        with open(os.path.join(active_dir, "run.json"), "w") as f:
+            json.dump(active_state, f)
+        with open(os.path.join(handoff_dir, "finish-agent.md"), "w") as f:
+            f.write("# finish handoff\n")
+
     def test_final_commit_rejects_missing_run_id(self):
         rc, out, _ = run_workflow(self.tmp, "final-commit")
         self.assertNotEqual(rc, 0)
@@ -8975,6 +9034,92 @@ class TestFinalCommit(FixtureBase):
         # Git status should be clean
         status = self._git_status_porcelain()
         self.assertEqual(status, [])
+
+    def test_final_commit_commits_target_active_run_deletions(self):
+        self._init_git()
+        run_id = "2026-07-12-active-delete"
+        self._make_tracked_active_run_files(run_id)
+        self._git_commit_baseline()
+
+        active_dir = os.path.join(
+            self.tmp, ".ai", "workflows", "runs", "active", run_id
+        )
+        shutil.rmtree(active_dir)
+        self._make_done_history_run(run_id=run_id)
+
+        rc, out, _ = run_workflow(self.tmp, "final-commit", run_id=run_id)
+
+        self.assertEqual(rc, 0, out)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "success")
+        self.assertIn(
+            f".ai/workflows/runs/active/{run_id}/run.json",
+            data["staged_paths"],
+        )
+        self.assertIn(
+            f".ai/workflows/runs/active/{run_id}/handoffs/default/finish-agent.md",
+            data["staged_paths"],
+        )
+        self.assertNotIn(
+            f".ai/workflows/runs/active/{run_id}/run.json",
+            data["residual_dirty_paths"],
+        )
+
+        commit_files = self._git_show_name_only()
+        self.assertIn(
+            f".ai/workflows/runs/active/{run_id}/run.json",
+            commit_files,
+        )
+        self.assertIn(
+            f".ai/workflows/runs/history/{run_id}/run.json",
+            commit_files,
+        )
+
+        status = self._git_status_porcelain()
+        self.assertFalse(
+            any(f".ai/workflows/runs/active/{run_id}/" in s for s in status),
+            status,
+        )
+
+    def test_final_commit_does_not_commit_target_active_run_non_deletions(self):
+        self._init_git()
+        run_id = "2026-07-12-active-dirty"
+        self._make_done_history_run(run_id=run_id)
+        self._git_commit_baseline()
+
+        active_dir = os.path.join(
+            self.tmp, ".ai", "workflows", "runs", "active", run_id
+        )
+        os.makedirs(active_dir, exist_ok=True)
+        active_note = os.path.join(active_dir, "unexpected.txt")
+        with open(active_note, "w") as f:
+            f.write("unexpected active artifact\n")
+
+        run_json_path = os.path.join(
+            self.tmp, ".ai", "workflows", "runs", "history", run_id, "run.json"
+        )
+        with open(run_json_path, "w") as f:
+            json.dump({"status": "done", "current_phase": "done", "run_id": run_id}, f)
+
+        rc, out, _ = run_workflow(self.tmp, "final-commit", run_id=run_id)
+
+        self.assertEqual(rc, 0, out)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "success")
+        self.assertIn(
+            f".ai/workflows/runs/active/{run_id}/unexpected.txt",
+            data["residual_dirty_paths"],
+        )
+        self.assertNotIn(
+            f".ai/workflows/runs/active/{run_id}/unexpected.txt",
+            data["staged_paths"],
+        )
+
+        commit_files = self._git_show_name_only()
+        self.assertNotIn(
+            f".ai/workflows/runs/active/{run_id}/unexpected.txt",
+            commit_files,
+        )
 
     def test_final_commit_does_not_stage_unrelated_files(self):
         self._init_git()

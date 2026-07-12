@@ -286,17 +286,22 @@ def _missing_terminal_finish_agent_evidence(state):
         state.get("evidence", {}).get("agent_phase", {}).get("slice_id", "")
     ) or ""
     change_id = state.get("context", {}).get("change_id", "") or ""
-    relevant_slice_id = (
-        dispatch_intent_slice_id
-        or change_id
-        or "default"
-    )
+
+    if dispatch_intent_slice_id:
+        candidate_slice_ids = [dispatch_intent_slice_id]
+    else:
+        candidate_slice_ids = ["default"]
+        if change_id and change_id not in candidate_slice_ids:
+            candidate_slice_ids.append(change_id)
 
     agent_results = state.get("evidence", {}).get("agent_results", {}) or {}
-    by_agent = agent_results.get(relevant_slice_id, {}) or {}
-    finish_result = by_agent.get("finish-agent") or by_agent.get("finish_agent")
-    if finish_result and finish_result.get("status") == "success":
-        return None
+    for candidate_slice_id in candidate_slice_ids:
+        by_agent = agent_results.get(candidate_slice_id, {}) or {}
+        finish_result = by_agent.get("finish-agent") or by_agent.get("finish_agent")
+        if finish_result and finish_result.get("status") == "success":
+            return None
+
+    relevant_slice_id = candidate_slice_ids[0]
 
     return {
         "error": (
@@ -308,6 +313,7 @@ def _missing_terminal_finish_agent_evidence(state):
         "reason": "missing_finish_agent_evidence",
         "agent": "finish-agent",
         "slice_id": relevant_slice_id,
+        "candidate_slice_ids": candidate_slice_ids,
     }
 
 

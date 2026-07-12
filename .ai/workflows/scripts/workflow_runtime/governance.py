@@ -95,8 +95,33 @@ def _final_commit_allowed_prefixes(run_id):
     ]
 
 
+def _is_delete_status(status_code):
+    return "D" in (status_code or "")
+
+
+def _classify_final_commit_entries(entries, run_id):
+    """Split dirty status entries into allowed and residual path lists."""
+    prefixes = _final_commit_allowed_prefixes(run_id)
+    active_run_prefix = f".ai/workflows/runs/active/{run_id}/"
+    allowed = []
+    residual = []
+    for status_code, path in entries:
+        if any(path.startswith(prefix) or path == prefix.rstrip("/") for prefix in prefixes):
+            allowed.append(path)
+        elif path.startswith(active_run_prefix) and _is_delete_status(status_code):
+            allowed.append(path)
+        else:
+            residual.append(path)
+    return allowed, residual
+
+
 def _classify_final_commit_paths(dirty_paths, run_id):
-    """Split dirty paths into (allowed, residual) based on the allowlist."""
+    """Split dirty paths into (allowed, residual) based on the allowlist.
+
+    Path-only classification is retained for existing tests and callers. It
+    does not allow active-run cleanup because active paths require Git status
+    information to prove they are deletions.
+    """
     prefixes = _final_commit_allowed_prefixes(run_id)
     allowed = []
     residual = []
@@ -160,10 +185,11 @@ def cmd_final_commit(root, args):
         sys.exit(1)
 
     # 2. Read dirty paths
-    dirty_paths = _git_dirty_paths(root)
+    dirty_entries = _git_status_porcelain(root)
+    dirty_paths = [path for _, path in dirty_entries]
 
     # 3. Classify allowed vs residual
-    allowed_dirty, residual_dirty = _classify_final_commit_paths(dirty_paths, run_id)
+    allowed_dirty, residual_dirty = _classify_final_commit_entries(dirty_entries, run_id)
 
     # 4. If no allowed dirty paths, return noop
     if not allowed_dirty:
@@ -186,14 +212,14 @@ def cmd_final_commit(root, args):
     # 6. Check staged diff for allowlisted paths only.
     #    Use the allowlist to filter, because git diff --cached --name-only
     #    may include pre-existing staged files outside the allowlist that
-    #    must NOT be committed by final-commit.
+    #    must NOT be committed by final-commit.  allowed_dirty already
+    #    encodes the status-aware allowlist (prefixes plus target active-run
+    #    deletions), so membership filtering excludes pre-existing staged
+    #    files outside the intended commit scope.
     rc, staged_out, _ = _run_git(root, ["diff", "--cached", "--name-only"])
     all_staged = [p.strip() for p in staged_out.splitlines() if p.strip()]
-    prefixes = _final_commit_allowed_prefixes(run_id)
-    staged_paths = [
-        p for p in all_staged
-        if any(p.startswith(prefix) or p == prefix.rstrip("/") for prefix in prefixes)
-    ]
+    allowed_set = set(allowed_dirty)
+    staged_paths = [p for p in all_staged if p in allowed_set]
 
     # 7. If no allowlisted staged diff, return noop
     if not staged_paths:

@@ -33,7 +33,7 @@
 - Modify: `tests/test_workflow.py`
 - Modify: `.ai/workflows/scripts/workflow_runtime/state.py`
 
-- [ ] **Step 1: Add a failing test for unsliced default finish-agent evidence**
+- [x] **Step 1: Add a failing test for unsliced default finish-agent evidence**
 
 In `tests/test_workflow.py`, add this test inside `class TestTerminalEvidenceValidation(FixtureBase):` after `test_advance_proceeds_when_finish_agent_evidence_present`:
 
@@ -70,7 +70,7 @@ In `tests/test_workflow.py`, add this test inside `class TestTerminalEvidenceVal
         self.assertEqual(data["current_phase"], "done")
 ```
 
-- [ ] **Step 2: Run the new test and verify it fails**
+- [x] **Step 2: Run the new test and verify it fails**
 
 Run:
 
@@ -80,7 +80,7 @@ python3 -m pytest tests/test_workflow.py::TestTerminalEvidenceValidation::test_a
 
 Expected: FAIL with `missing_finish_agent_evidence` or an error mentioning slice `terminal-default-slice`.
 
-- [ ] **Step 3: Implement terminal evidence candidate resolution**
+- [x] **Step 3: Implement terminal evidence candidate resolution**
 
 In `.ai/workflows/scripts/workflow_runtime/state.py`, replace the relevant-slice block in `_missing_terminal_finish_agent_evidence()` with this logic:
 
@@ -114,7 +114,7 @@ Then update the returned blocker to include the checked candidates:
         "candidate_slice_ids": candidate_slice_ids,
 ```
 
-- [ ] **Step 4: Run terminal evidence tests**
+- [x] **Step 4: Run terminal evidence tests**
 
 Run:
 
@@ -124,7 +124,7 @@ python3 -m pytest tests/test_workflow.py::TestTerminalEvidenceValidation -v
 
 Expected: PASS, including the existing strict explicit-slice tests.
 
-- [ ] **Step 5: Commit Task 1 if working in a branch**
+- [x] **Step 5: Commit Task 1 if working in a branch**
 
 Run:
 
@@ -141,7 +141,7 @@ Expected: commit succeeds. If this work is managed by an outer workflow that own
 - Modify: `tests/test_workflow.py`
 - Modify: `.ai/workflows/scripts/workflow_runtime/governance.py`
 
-- [ ] **Step 1: Add a helper for tracked active-run files**
+- [x] **Step 1: Add a helper for tracked active-run files**
 
 In `class TestFinalCommit(FixtureBase):`, add this helper after `_make_done_history_run`:
 
@@ -175,7 +175,7 @@ In `class TestFinalCommit(FixtureBase):`, add this helper after `_make_done_hist
             f.write("# finish handoff\n")
 ```
 
-- [ ] **Step 2: Add failing final-commit deletion regression test**
+- [x] **Step 2: Add failing final-commit deletion regression test**
 
 In `class TestFinalCommit(FixtureBase):`, add this test after `test_final_commit_commits_allowed_history_file`:
 
@@ -227,7 +227,7 @@ In `class TestFinalCommit(FixtureBase):`, add this test after `test_final_commit
         )
 ```
 
-- [ ] **Step 3: Add safety test for non-deletion active files**
+- [x] **Step 3: Add safety test for non-deletion active files**
 
 In `class TestFinalCommit(FixtureBase):`, add this test after the deletion regression test:
 
@@ -273,7 +273,7 @@ In `class TestFinalCommit(FixtureBase):`, add this test after the deletion regre
         )
 ```
 
-- [ ] **Step 4: Run new final-commit tests and verify at least deletion test fails**
+- [x] **Step 4: Run new final-commit tests and verify at least deletion test fails**
 
 Run:
 
@@ -283,7 +283,7 @@ python3 -m pytest tests/test_workflow.py::TestFinalCommit::test_final_commit_com
 
 Expected before implementation: deletion test FAILS because active deletion paths remain residual or absent from staged paths. Safety test may pass or fail depending on current classification, but must pass after implementation.
 
-- [ ] **Step 5: Implement status-aware final-commit classification**
+- [x] **Step 5: Implement status-aware final-commit classification**
 
 In `.ai/workflows/scripts/workflow_runtime/governance.py`, replace `_git_dirty_paths()` and `_classify_final_commit_paths()` with status-aware variants while keeping `_git_dirty_paths()` available for callers:
 
@@ -343,7 +343,7 @@ Then change `cmd_final_commit()` step 2-3 from path-only classification to:
 
 Leave the existing post-commit `residual_after = _git_dirty_paths(root)` behavior intact so returned residual paths stay path-only.
 
-- [ ] **Step 6: Run final-commit focused tests**
+- [x] **Step 6: Run final-commit focused tests**
 
 Run:
 
@@ -353,7 +353,7 @@ python3 -m pytest tests/test_workflow.py::TestFinalCommit -v
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit Task 2 if working in a branch**
+- [x] **Step 7: Commit Task 2 if working in a branch**
 
 Run:
 
@@ -376,7 +376,7 @@ Expected: commit succeeds. If this work is managed by an outer workflow that own
 - Modify: `.cursor/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/state.py`
 - Modify: `.cursor/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/governance.py`
 
-- [ ] **Step 1: Sync live workflow runtime to canonical templates**
+- [x] **Step 1: Sync live workflow runtime to canonical templates**
 
 Run:
 
@@ -386,7 +386,7 @@ python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py --root .
 
 Expected: command exits 0 and copies live `.ai/workflows/scripts/workflow_runtime/state.py` and `governance.py` into `skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/`.
 
-- [ ] **Step 2: Distribute canonical workflow templates**
+- [x] **Step 2: Distribute canonical workflow templates**
 
 Run:
 
@@ -396,7 +396,7 @@ python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py --root . --distr
 
 Expected: command exits 0 and updates `.opencode/`, `.claude/`, and `.cursor/` workflow template copies.
 
-- [ ] **Step 3: Verify template parity**
+- [x] **Step 3: Verify template parity**
 
 Run:
 
@@ -407,7 +407,7 @@ python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py --root . --check
 
 Expected: both commands PASS with no drift.
 
-- [ ] **Step 4: Verify aggregate derived artifact check**
+- [x] **Step 4: Verify aggregate derived artifact check**
 
 Run:
 
@@ -417,7 +417,7 @@ python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit Task 3 if working in a branch**
+- [x] **Step 5: Commit Task 3 if working in a branch**
 
 Run:
 
@@ -442,7 +442,7 @@ Expected: commit succeeds. If this work is managed by an outer workflow that own
 - Verify: `.ai/workflows/scripts/workflow.py`
 - Verify: `skills/sdlc-project-bootstrap/scripts/sync_templates.py`
 
-- [ ] **Step 1: Run focused workflow tests**
+- [x] **Step 1: Run focused workflow tests**
 
 Run:
 
@@ -452,7 +452,7 @@ python3 -m pytest tests/test_workflow.py::TestTerminalEvidenceValidation tests/t
 
 Expected: PASS.
 
-- [ ] **Step 2: Run full workflow test file**
+- [x] **Step 2: Run full workflow test file**
 
 Run:
 
@@ -462,7 +462,7 @@ python3 -m pytest tests/test_workflow.py -v
 
 Expected: PASS.
 
-- [ ] **Step 3: Run full regression suite**
+- [x] **Step 3: Run full regression suite**
 
 Run:
 
@@ -472,7 +472,7 @@ python3 -m pytest tests/ -v
 
 Expected: PASS.
 
-- [ ] **Step 4: Run final derived artifact check**
+- [x] **Step 4: Run final derived artifact check**
 
 Run:
 
@@ -482,7 +482,7 @@ python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git
 
 Expected: PASS.
 
-- [ ] **Step 5: Smoke-test workflow CLI**
+- [x] **Step 5: Smoke-test workflow CLI**
 
 Run:
 
@@ -492,7 +492,7 @@ python3 .ai/workflows/scripts/workflow.py --help
 
 Expected: exits 0 and lists `final-commit` among commands.
 
-- [ ] **Step 6: Inspect Git status**
+- [x] **Step 6: Inspect Git status**
 
 Run:
 
@@ -502,7 +502,7 @@ git status --short
 
 Expected: only intended workflow runtime, template, distributed copy, test, spec, and plan files are dirty. No unrelated user files are staged or modified by this plan.
 
-- [ ] **Step 7: Final commit if working in a branch**
+- [x] **Step 7: Final commit if working in a branch**
 
 Run:
 
