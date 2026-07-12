@@ -4,7 +4,7 @@
   "workflow": "sdlc-main",
   "flow_type": "lightweight-flow",
   "status": "running",
-  "current_phase": "archive_change",
+  "current_phase": "post_archive_actions",
   "primary_subject": {
     "type": "spec_change",
     "id": "remove-superpowers-direct-dead-code"
@@ -16,14 +16,15 @@
     "design_artifact_paths": "[\"docs/superpowers/plans/2026-07-12-remove-superpowers-direct-dead-code.md\"]"
   },
   "phase_readiness": {
-    "phase": "archive_change",
+    "phase": "post_archive_actions",
     "ready": true,
     "missing_required_inputs": []
   },
   "pending_hooks": [],
   "completed_hooks": [],
   "completed_phases": [
-    "apply_change"
+    "apply_change",
+    "archive_change"
   ],
   "gates": {},
   "evidence": {
@@ -33,46 +34,38 @@
     },
     "lightweight_flow_confirmed": true,
     "agent_phase": {
-      "agent_phase": "archive_change",
+      "agent_phase": "post_archive_actions",
       "agent": "finish-agent",
       "flow_type": "lightweight-flow",
-      "dispatched_at": "2026-07-12T23:33:44.569865"
+      "dispatched_at": "2026-07-12T23:37:21.567195"
     },
     "agent_result": {
-      "agent": "review-agent",
+      "agent": "finish-agent",
       "status": "success",
-      "phase": "apply_change",
+      "phase": "archive_change",
       "slice_id": "remove-superpowers-direct-dead-code",
       "flow_type": "lightweight-flow",
       "evidence": {
-        "tasks_complete": true,
-        "tdd_passed": true,
-        "eval_passed_or_human_decision_recorded": true,
-        "review_complete": true,
-        "review_blockers": [],
-        "verification_passed": true,
-        "review_decision": "accepted",
-        "criteria_satisfied": "tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded"
-      },
-      "artifacts": {
-        "handoff_path": ".ai/workflows/runs/active/2026-07-12-remove-superpowers-direct-dead-code/handoffs/remove-superpowers-direct-dead-code/review-agent.md",
-        "worktree_path": "/Users/yuping/Documents/workspace/oh_my_skills",
-        "reviewed_changed_files": [
-          ".ai/workflows/runs/current.json",
-          "docs/superpowers/plans/2026-07-12-remove-superpowers-direct-dead-code.md",
-          "openspec/specs/sdlc-orchestrator/spec.md"
+        "archive_action_completed": true,
+        "archive_artifact_path": null,
+        "archive_not_required_reason": "lightweight-flow",
+        "archived_design_artifact_paths": [
+          "docs/superpowers/archive/plans/2026-07-12-remove-superpowers-direct-dead-code.md"
         ],
-        "design_artifact_paths": [
+        "source_design_artifact_paths": [
           "docs/superpowers/plans/2026-07-12-remove-superpowers-direct-dead-code.md"
         ],
-        "raw_log_paths": [],
-        "history_handoff_paths": [
-          ".ai/workflows/runs/active/2026-07-12-remove-superpowers-direct-dead-code/handoffs/remove-superpowers-direct-dead-code/history/review-agent-20260712T153333830875Z.md"
-        ]
+        "archive_path_exists": true
+      },
+      "artifacts": {
+        "handoff_path": ".ai/workflows/runs/active/2026-07-12-remove-superpowers-direct-dead-code/handoffs/remove-superpowers-direct-dead-code/finish-agent.md",
+        "worktree_path": "/Users/yuping/Documents/workspace/oh_my_skills",
+        "feature_branch": "main",
+        "branch_finish_action": "keep-branch"
       },
       "blockers": [],
       "recommended_next_action": "complete_phase",
-      "recorded_at": "2026-07-12T23:33:33.828135"
+      "recorded_at": "2026-07-12T23:37:13.166811"
     },
     "agent_results": {
       "remove-superpowers-direct-dead-code": {
@@ -204,13 +197,46 @@
           "blockers": [],
           "recommended_next_action": "complete_phase",
           "recorded_at": "2026-07-12T23:33:33.828135"
+        },
+        "finish-agent": {
+          "agent": "finish-agent",
+          "status": "success",
+          "phase": "archive_change",
+          "slice_id": "remove-superpowers-direct-dead-code",
+          "flow_type": "lightweight-flow",
+          "evidence": {
+            "archive_action_completed": true,
+            "archive_artifact_path": null,
+            "archive_not_required_reason": "lightweight-flow",
+            "archived_design_artifact_paths": [
+              "docs/superpowers/archive/plans/2026-07-12-remove-superpowers-direct-dead-code.md"
+            ],
+            "source_design_artifact_paths": [
+              "docs/superpowers/plans/2026-07-12-remove-superpowers-direct-dead-code.md"
+            ],
+            "archive_path_exists": true
+          },
+          "artifacts": {
+            "handoff_path": ".ai/workflows/runs/active/2026-07-12-remove-superpowers-direct-dead-code/handoffs/remove-superpowers-direct-dead-code/finish-agent.md",
+            "worktree_path": "/Users/yuping/Documents/workspace/oh_my_skills",
+            "feature_branch": "main",
+            "branch_finish_action": "keep-branch"
+          },
+          "blockers": [],
+          "recommended_next_action": "complete_phase",
+          "recorded_at": "2026-07-12T23:37:13.166811"
         }
       }
     },
     "tasks_complete": true,
     "tdd_passed": true,
-    "eval_passed_or_human_decision_recorded": true
+    "eval_passed_or_human_decision_recorded": true,
+    "archive_action_completed": true,
+    "roadmap_link": {
+      "count": 0,
+      "items": []
+    }
   },
   "block": null,
-  "updated_at": "2026-07-12T23:33:44.570141"
+  "updated_at": "2026-07-12T23:37:21.567563"
 }
