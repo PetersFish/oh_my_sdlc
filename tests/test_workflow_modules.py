@@ -310,24 +310,6 @@ class TestPolicyRegistry(unittest.TestCase):
         self.assertTrue(meta3["creates_run"])
         self.assertIn("memory_sync", meta3["repair_hooks"])
 
-        # superpowers_direct has no allowed_phases restriction
-        meta4 = pol_mod.POLICY_META.get("superpowers_direct")
-        self.assertIsNotNone(meta4, "superpowers_direct must be registered")
-
-    def test_policy_evaluation_preserves_status_reason_and_next_action(self):
-        """The _policy_no_workflow function must return allowed=True, status=not_required
-        with empty reason, through the extracted policies API."""
-        pol_mod = _import_policies()
-        import tempfile
-        tmp = tempfile.mkdtemp()
-        try:
-            decision = pol_mod._policy_no_workflow(tmp, "superpowers_direct", None, None)
-            self.assertTrue(decision["allowed"])
-            self.assertEqual(decision["status"], "not_required")
-            self.assertEqual(decision["reason"], "")
-        finally:
-            shutil.rmtree(tmp, ignore_errors=True)
-
 
 def _import_dispatch():
     """Import the workflow_runtime.dispatch module with the scripts dir on sys.path."""

@@ -197,7 +197,7 @@ Only after the run is confirmed usable may you call `before-dispatch`.
 
 Use this branch when the user asks to implement an existing design, plan, or OpenSpec change instead of creating a new plan.
 
-This branch is governed workflow execution, not `superpowers-direct`. It MUST still use workflow start/resume, `before-dispatch`, `implement-agent`, and `review-agent`. It only needs to skip `plan-agent` after existing design artifacts are selected.
+This branch is governed workflow execution. It MUST still use workflow start/resume, `before-dispatch`, `implement-agent`, and `review-agent`. It only needs to skip `plan-agent` after existing design artifacts are selected.
 
 Required routing inputs:
 - `flow_type`: `spec-flow` or `lightweight-flow`

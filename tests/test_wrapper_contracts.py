@@ -418,7 +418,6 @@ class TestDevOrchestratorStartWithPlanHandoff(unittest.TestCase):
 
     def test_start_with_plan_is_governed_not_direct_execution(self):
         content = (AGENTS_DIR / "dev-orchestrator.md").read_text(encoding="utf-8")
-        self.assertIn("not `superpowers-direct`", content)
         self.assertIn("before-dispatch", content)
         self.assertIn("implement-agent", content)
         self.assertIn("skip `plan-agent`", content)

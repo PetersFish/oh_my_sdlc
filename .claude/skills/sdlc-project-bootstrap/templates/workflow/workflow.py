@@ -112,7 +112,6 @@ from workflow_runtime.policies import (
     _read_roadmap_item_openspec_change,
     _ensure_command,
     _load_done_history_run_ids,
-    _policy_no_workflow,
     _policy_openspec_change,
     _policy_archived_change,
     _policy_roadmap,

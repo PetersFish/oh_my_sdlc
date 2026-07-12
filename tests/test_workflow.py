@@ -2449,14 +2449,6 @@ class TestPreflightAndEnsureRun(FixtureBase):
         rc, out, err = run_workflow(self.tmp, "ensure-run", **kwargs)
         return rc, json.loads(out), err
 
-    # --- no-workflow policy ---
-
-    def test_preflight_superpowers_direct_returns_not_required(self):
-        rc, data, _ = self._run_preflight("superpowers_direct")
-        self.assertEqual(rc, 0)
-        self.assertTrue(data["allowed"])
-        self.assertEqual(data["status"], "not_required")
-
     # --- openspec action without active run ---
 
     def test_preflight_openspec_create_without_active_run_blocks(self):
@@ -2745,14 +2737,6 @@ class TestPreflightAndEnsureRun(FixtureBase):
         self.assertEqual(data["reason"], "linked_roadmap_run_exists")
         self.assertIsNotNone(data.get("next_action"))
         self.assertIn("resume", data["next_action"].get("command", ""))
-
-    # --- ensure-run superpowers_direct returns not_required ---
-
-    def test_ensure_run_superpowers_direct_returns_not_required(self):
-        rc, data, _ = self._run_ensure_run("superpowers_direct")
-        self.assertEqual(rc, 0)
-        self.assertTrue(data["allowed"])
-        self.assertEqual(data["status"], "not_required")
 
     # --- phase validation: preflight blocks when run phase doesn't match action ---
 

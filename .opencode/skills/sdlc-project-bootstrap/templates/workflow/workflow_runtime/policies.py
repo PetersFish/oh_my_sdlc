@@ -203,11 +203,6 @@ def _ensure_command(subject_type, subject_id):
 
 # --- Policies ---
 
-@register_policy("superpowers_direct")
-def _policy_no_workflow(root, action, subject_type, subject_id):
-    return _make_preflight_decision(True, "not_required")
-
-
 @register_policy(
     "spec_create", allowed_phases={"create_change", "input"},
 )
@@ -518,7 +513,7 @@ def cmd_ensure_run(root, args):
 
     meta = POLICY_META.get(action, {})
 
-    # Non-governed actions (e.g., superpowers_direct) pass through
+    # Non-governed actions (creates_run=False) pass through
     if not meta.get("creates_run"):
         decision = policy(root, action, subject_type, subject_id)
         print(json.dumps(decision, indent=2))

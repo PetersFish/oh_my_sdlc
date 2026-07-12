@@ -24,11 +24,6 @@ Behavioral constraints for agents modifying `.ai/workflows/scripts/workflow.py`.
 - Repair MUST go through the runtime: `ensure-run --action dangling_archive_repair` creates an active run at `post_archive_actions`, followed by `resolve`, `complete-hook`, `advance`/`done`.
 - If a linked roadmap item exists, the `roadmap_done_if_relevant` hook validates it. If no link exists, record `no_linked_item` resolution -- do NOT auto-create roadmap items.
 
-## 4. Superpowers Direct Flow
-
-- `superpowers_direct` action MUST NOT create a workflow run or write any workflow state.
-- The `_policy_no_workflow` function MUST return `allowed=true, status=not_required` without any side effects.
-
 ## 5. Test Discipline
 
 - Every new policy or command behavior MUST have a corresponding test in `test_workflow.py`.
