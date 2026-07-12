@@ -46,7 +46,7 @@ Synced by `python3 scripts/sync_derived_artifacts.py --fix --changed-files-from-
 - Modify: `.ai/workflows/scripts/workflow_runtime/policies.py:204-208`
 - Modify: `.ai/workflows/scripts/workflow_runtime/policies.py:521`
 
-- [ ] **Step 1: Delete the `superpowers_direct` registration and `_policy_no_workflow` function**
+- [x] **Step 1: Delete the `superpowers_direct` registration and `_policy_no_workflow` function**
 
 In `.ai/workflows/scripts/workflow_runtime/policies.py`, remove lines 206-208 (the decorator, function definition, and return statement). The `# --- Policies ---` header comment at line 204 stays, followed directly by the `@register_policy("spec_create", ...)` decorator that was previously at line 211.
 
@@ -69,7 +69,7 @@ After:
 @register_policy(
 ```
 
-- [ ] **Step 2: Update the `cmd_ensure_run` passthrough comment**
+- [x] **Step 2: Update the `cmd_ensure_run` passthrough comment**
 
 In the same file, change the comment at line 521 to drop the `superpowers_direct` example. Keep the passthrough branch itself intact because `post_archive_actions` (registered with the default `creates_run=False`) also relies on it.
 
@@ -83,7 +83,7 @@ After:
     # Non-governed actions (creates_run=False) pass through
 ```
 
-- [ ] **Step 3: Verify the canonical module still imports**
+- [x] **Step 3: Verify the canonical module still imports**
 
 Run:
 ```bash
@@ -97,7 +97,7 @@ Expected: a sorted list of action names that does NOT include `superpowers_direc
 **Files:**
 - Modify: `.ai/workflows/scripts/workflow.py:115`
 
-- [ ] **Step 1: Delete the `_policy_no_workflow` import line**
+- [x] **Step 1: Delete the `_policy_no_workflow` import line**
 
 In `.ai/workflows/scripts/workflow.py`, remove line 115 (`    _policy_no_workflow,`) from the `from workflow_runtime.policies import (...)` block.
 
@@ -114,7 +114,7 @@ After (lines 114-115):
     _policy_openspec_change,
 ```
 
-- [ ] **Step 2: Verify `workflow.py` still imports cleanly**
+- [x] **Step 2: Verify `workflow.py` still imports cleanly**
 
 Run:
 ```bash
@@ -128,7 +128,7 @@ Expected: `workflow.py imports ok` with exit code 0.
 **Files:**
 - Modify: `.ai/workflows/AGENTS.md:27-30`
 
-- [ ] **Step 1: Delete section "## 4. Superpowers Direct Flow"**
+- [x] **Step 1: Delete section "## 4. Superpowers Direct Flow"**
 
 Remove lines 27-30 inclusive. The section header, both bullet points, and the trailing blank line before "## 5. Test Discipline" should be deleted so that "## 3. Dangling Archive Repair" is followed directly by "## 5. Test Discipline".
 
@@ -149,7 +149,7 @@ After (lines 26-29):
 ## 5. Test Discipline
 ```
 
-- [ ] **Step 2: Verify the file no longer references `superpowers_direct`**
+- [x] **Step 2: Verify the file no longer references `superpowers_direct`**
 
 Run:
 ```bash
@@ -163,7 +163,7 @@ Expected: `AGENTS.md clean` with exit code 0.
 **Files:**
 - Modify: `agents/dev-orchestrator.md:198`
 
-- [ ] **Step 1: Rewrite the Start-With-Plan paragraph to drop the `superpowers-direct` reference**
+- [x] **Step 1: Rewrite the Start-With-Plan paragraph to drop the `superpowers-direct` reference**
 
 Replace line 198 only. Keep the rest of the paragraph (the governance requirement) intact, just drop the negative-assertion clause.
 
@@ -177,7 +177,7 @@ After (line 198):
 This branch is governed workflow execution. It MUST still use workflow start/resume, `before-dispatch`, `implement-agent`, and `review-agent`. It only needs to skip `plan-agent` after existing design artifacts are selected.
 ```
 
-- [ ] **Step 2: Verify the agent file no longer references `superpowers-direct`**
+- [x] **Step 2: Verify the agent file no longer references `superpowers-direct`**
 
 Run:
 ```bash
@@ -192,7 +192,7 @@ Expected: `dev-orchestrator.md clean` with exit code 0.
 - Modify: `tests/test_workflow.py:2452-2458`
 - Modify: `tests/test_workflow.py:2749-2755`
 
-- [ ] **Step 1: Delete the `test_preflight_superpowers_direct_returns_not_required` test and its section comment**
+- [x] **Step 1: Delete the `test_preflight_superpowers_direct_returns_not_required` test and its section comment**
 
 Remove lines 2452-2458 inclusive (the `# --- no-workflow policy ---` section comment, the blank line before it if it is the only separator, the test method definition, and its body).
 
@@ -222,7 +222,7 @@ After (lines 2450-2454):
     def test_preflight_openspec_create_without_active_run_blocks(self):
 ```
 
-- [ ] **Step 2: Delete the `test_ensure_run_superpowers_direct_returns_not_required` test and its section comment**
+- [x] **Step 2: Delete the `test_ensure_run_superpowers_direct_returns_not_required` test and its section comment**
 
 Remove lines 2749-2755 inclusive.
 
@@ -252,7 +252,7 @@ After (lines 2748-2752):
     def test_preflight_openspec_apply_in_create_phase_blocks(self):
 ```
 
-- [ ] **Step 3: Verify no `superpowers_direct` references remain in the test file**
+- [x] **Step 3: Verify no `superpowers_direct` references remain in the test file**
 
 Run:
 ```bash
@@ -267,7 +267,7 @@ Expected: `test_workflow.py clean` with exit code 0.
 - Modify: `tests/test_workflow_modules.py:313-315` (the `meta4` block)
 - Modify: `tests/test_workflow_modules.py:317-329` (the `test_policy_evaluation_preserves_status_reason_and_next_action` method)
 
-- [ ] **Step 1: Delete the `meta4` assertions inside `test_stacked_policy_decorators_keep_per_action_metadata`**
+- [x] **Step 1: Delete the `meta4` assertions inside `test_stacked_policy_decorators_keep_per_action_metadata`**
 
 Remove lines 313-315 inclusive (the comment and two assertions). The preceding `meta3` block (lines 307-311) becomes the last assertion block in the test method.
 
@@ -297,7 +297,7 @@ After (lines 307-312):
     def test_policy_evaluation_preserves_status_reason_and_next_action(self):
 ```
 
-- [ ] **Step 2: Delete the entire `test_policy_evaluation_preserves_status_reason_and_next_action` method**
+- [x] **Step 2: Delete the entire `test_policy_evaluation_preserves_status_reason_and_next_action` method**
 
 Remove lines 317-329 inclusive (the method definition, docstring, body, and the blank line that precedes the next method at line 331). This test exercises `_policy_no_workflow`, which no longer exists.
 
@@ -329,7 +329,7 @@ After (lines 312-314):
 def _import_dispatch():
 ```
 
-- [ ] **Step 3: Verify no `superpowers_direct` or `_policy_no_workflow` references remain in the module test file**
+- [x] **Step 3: Verify no `superpowers_direct` or `_policy_no_workflow` references remain in the module test file**
 
 Run:
 ```bash
@@ -338,7 +338,7 @@ python3 -c "content = open('tests/test_workflow_modules.py').read(); assert 'sup
 
 Expected: `test_workflow_modules.py clean` with exit code 0.
 
-- [ ] **Step 4: Check that `shutil` import is still needed in `tests/test_workflow_modules.py`**
+- [x] **Step 4: Check that `shutil` import is still needed in `tests/test_workflow_modules.py`**
 
 Run:
 ```bash
@@ -359,7 +359,7 @@ Only remove the `import shutil` line if every remaining `shutil` reference is th
 
 This task was added after Task 7 surfaced an additional test asserting the removed `superpowers-direct` string.
 
-- [ ] **Step 1: Remove the `assertIn("not \`superpowers-direct\"`)" line**
+- [x] **Step 1: Remove the `assertIn("not \`superpowers-direct\"`)" line**
 
 In `tests/test_wrapper_contracts.py`, the method `test_start_with_plan_is_governed_not_direct_execution` asserts that `dev-orchestrator.md` contains `not \`superpowers-direct\``. That clause was removed in Task 4. Delete the assertion line; keep the remaining assertions (`before-dispatch`, `implement-agent`, `skip \`plan-agent\``, `design_artifact_paths`, the `plan_path` checks) which still validate the governance intent.
 
@@ -378,7 +378,7 @@ After (lines 419-421):
         self.assertIn("before-dispatch", content)
 ```
 
-- [ ] **Step 2: Verify the test passes**
+- [x] **Step 2: Verify the test passes**
 
 Run:
 ```bash
@@ -392,7 +392,7 @@ Expected: PASS.
 **Files:**
 - None (verification only)
 
-- [ ] **Step 1: Run the workflow test suite**
+- [x] **Step 1: Run the workflow test suite**
 
 Run:
 ```bash
@@ -407,7 +407,7 @@ Expected: all remaining tests PASS. Specifically:
 
 If any test fails with an import error for `_policy_no_workflow`, re-check Task 2 Step 1 and Task 6 Step 2 — you may have left a reference to the deleted function.
 
-- [ ] **Step 2: Run the broader test suite to catch cross-module regressions**
+- [x] **Step 2: Run the broader test suite to catch cross-module regressions**
 
 Run:
 ```bash
@@ -428,7 +428,7 @@ Expected: all tests PASS. If a test outside `test_workflow.py` and `test_workflo
 - Synced: `skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/policies.py`
 - Synced: `skills/sdlc-project-bootstrap/templates/workflow/workflow.py`
 
-- [ ] **Step 1: Run the incremental derived-artifact fix**
+- [x] **Step 1: Run the incremental derived-artifact fix**
 
 Run:
 ```bash
@@ -437,7 +437,7 @@ python3 scripts/sync_derived_artifacts.py --fix --changed-files-from-git
 
 Expected: the script detects the changed canonical files (`.ai/workflows/scripts/workflow_runtime/policies.py` and `.ai/workflows/scripts/workflow.py`) and re-syncs the matching template copies in `.opencode/`, `.claude/`, `.cursor/`, and `skills/sdlc-project-bootstrap/templates/`. Exit code 0.
 
-- [ ] **Step 2: Run the incremental derived-artifact check to confirm no drift**
+- [x] **Step 2: Run the incremental derived-artifact check to confirm no drift**
 
 Run:
 ```bash
@@ -446,7 +446,7 @@ python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git
 
 Expected: exit code 0, no drift reported.
 
-- [ ] **Step 3: Verify the derived copies no longer contain `superpowers_direct` or `_policy_no_workflow`**
+- [x] **Step 3: Verify the derived copies no longer contain `superpowers_direct` or `_policy_no_workflow`**
 
 Run:
 ```bash
@@ -471,7 +471,7 @@ print('all derived copies clean')
 
 Expected: `all derived copies clean` with exit code 0.
 
-- [ ] **Step 4: Run the workflow template distributed-copy check**
+- [x] **Step 4: Run the workflow template distributed-copy check**
 
 Run:
 ```bash
@@ -489,7 +489,7 @@ then re-run `--check-distributed`.
 **Files:**
 - None (verification and commit only)
 
-- [ ] **Step 1: Confirm no live references to `superpowers_direct` or `_policy_no_workflow` remain outside history/memory**
+- [x] **Step 1: Confirm no live references to `superpowers_direct` or `_policy_no_workflow` remain outside history/memory**
 
 Run:
 ```bash
@@ -514,7 +514,7 @@ Expected: zero matches. Acceptable remaining matches are ONLY in:
 
 If a match appears anywhere else, add a Task to clean it up before committing.
 
-- [ ] **Step 2: Confirm `dev-orchestrator.md` no longer contains `superpowers-direct`**
+- [x] **Step 2: Confirm `dev-orchestrator.md` no longer contains `superpowers-direct`**
 
 Run:
 ```bash
@@ -523,7 +523,7 @@ python3 -c "content = open('agents/dev-orchestrator.md').read(); assert 'superpo
 
 Expected: `dev-orchestrator.md verified` with exit code 0.
 
-- [ ] **Step 3: Stage the changed canonical and derived files**
+- [x] **Step 3: Stage the changed canonical and derived files**
 
 Stage only the files this plan touched. Do NOT stage run history, memory, or archive files.
 
@@ -545,7 +545,7 @@ git add \
   skills/sdlc-project-bootstrap/templates/workflow/workflow.py
 ```
 
-- [ ] **Step 4: Commit the removal**
+- [x] **Step 4: Commit the removal**
 
 ```bash
 git commit -m "refactor: remove superpowers_direct dead code
@@ -564,7 +564,7 @@ covered the deleted policy. Sync derived template copies via the
 standard derived-artifact sync pipeline."
 ```
 
-- [ ] **Step 5: Verify the commit contains only intended files**
+- [x] **Step 5: Verify the commit contains only intended files**
 
 ```bash
 git show --stat HEAD

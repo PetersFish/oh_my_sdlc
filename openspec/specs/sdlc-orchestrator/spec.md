@@ -180,10 +180,6 @@ The `sdlc-orchestrator` skill SHALL align Plan Mode handoff language with the se
 - **WHEN** the orchestrator is in Plan Mode and has selected `spec-driven-incremental-flow`
 - **THEN** the final handoff SHALL say that after leaving Plan Mode it can create or continue the OpenSpec change, not that it can directly execute the implementation plan
 
-#### Scenario: Direct flow handoff may name direct execution
-- **WHEN** the orchestrator is in Plan Mode and has selected `superpowers-direct`
-- **THEN** the final handoff MAY say that after leaving Plan Mode it can directly execute the task
-
 ### Requirement: Ambiguous Execution Requests Respect Prior Route
 The `sdlc-orchestrator` skill SHALL treat ambiguous execution requests as instructions to continue the previously selected route, not as permission to bypass route governance.
 
