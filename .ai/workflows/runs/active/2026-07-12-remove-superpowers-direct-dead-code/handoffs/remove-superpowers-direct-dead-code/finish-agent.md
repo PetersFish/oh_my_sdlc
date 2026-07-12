@@ -3,7 +3,7 @@
 ## Metadata
 
 - **agent:** finish-agent
-- **phase:** archive_change
+- **phase:** post_archive_actions
 - **slice_id:** remove-superpowers-direct-dead-code
 - **flow_type:** lightweight-flow
 - **workflow_run_id:** 2026-07-12-remove-superpowers-direct-dead-code
@@ -15,56 +15,65 @@
 
 ## Preconditions Verified
 
-- **implement-agent verification evidence:** present in the implement-agent handoff (`verification_passed: true`, `tdd_passed: true`, `tasks_complete: true`). Full test suite 1201 tests + 49 subtests, zero failures.
-- **review-agent completion evidence:** present in the review-agent handoff (accepted). Live change set matches structured implement-agent evidence; plan checkboxes complete; canonical spec remediation closes the previously identified gap.
+- **implement-agent verification evidence:** present (`verification_passed: true`, `tdd_passed: true`, `tasks_complete: true`). Full test suite 1201 tests + 49 subtests, zero failures.
+- **review-agent completion evidence:** present (accepted).
+- **archive_change evidence:** present in prior archive handoff (`archive_action_completed: true`).
 
-## Archive Work Performed
+## Cleanup Work Performed
 
-### Lightweight-flow Superpowers plan archival (Spec Decision 11)
+### Pre-cleanup commit checkpoint
 
-- **Source:** `docs/superpowers/plans/2026-07-12-remove-superpowers-direct-dead-code.md`
-- **Destination:** `docs/superpowers/archive/plans/2026-07-12-remove-superpowers-direct-dead-code.md`
-- **Method:** `git mv` equivalent (safe_delete source + write archive copy + `git add` both paths). Git recorded the operation as a rename (93% similarity).
+- Tree had 2 modified workflow runtime state files from archive_change (`.migrated`, `run.json`).
+- Staged and committed as `a9cc65b` — "chore: pre-cleanup checkpoint — archive and implementation changes complete".
+- Pushed to `origin/main`.
+- `pre_hook_commit_id`: `a9cc65b1363636100be887c0498c748562f37087`
+- `pre_hook_pushed`: true
 
-### Canonical spec remediation committed
+### Repository memory sync
 
-- `openspec/specs/sdlc-orchestrator/spec.md` — deleted the retired "Direct flow handoff may name direct execution" scenario. The remaining Plan Mode handoff scenarios are the governed `spec-driven-*` routes.
+- `detect_state.py`: clean worktree, stable committed range `db18359..a9cc65b`, no pending snapshots.
+- No OpenSpec change ID candidates (lightweight-flow; archive only).
+- NEW evolution memory: `.ai/memory/evolution/20260712-remove-superpowers-direct-dead-code.md` — records removal of the `superpowers-direct` Plan Mode handoff route, linked commits `5f3afe3` and `63be305`, linked spec `sdlc-orchestrator`.
+- `validate_memory.py`: all memory files valid.
+- `rebuild_index.py`: 42 entries, new evolution entry included.
+- `update_manifest.py`: last-synced commit advanced to `a9cc65b`, sync_id `20260712-remove-superpowers-direct-dead-code`.
+- Sync history written: `.ai/memory/sync-history/20260712-remove-superpowers-direct-dead-code.md`.
+- Skipped types (with reasons): pitfalls (no failure evidence), decisions (no new decisions), architecture (module map unchanged), specs (no new spec ID), modules (no new module candidates).
+- `memory_sync_done`: true
 
-### Workflow lifecycle artifacts committed
+### Roadmap completion check
 
-- Active run directory under `.ai/workflows/runs/active/2026-07-12-remove-superpowers-direct-dead-code/` (run.json, .migrated, handoffs/history).
-- `.ai/workflows/runs/current.json` updated to point at this active run.
+- `python3 skills/sdlc-roadmap/scripts/list.py --incomplete`: 5 incomplete items, all `idea` status. No `active` items linked to this change.
+- Primary subject is not a roadmap item (dead-code cleanup). Roadmap completion not required.
+- `roadmap_done_checked`: true
 
-### Commit
+### Derived artifact sync
 
-- **Commit SHA:** `63be3055583765d67536d5c7f43d3c1cdb91fedf`
-- **Message:** `chore: archive checkpoint — remove-superpowers-direct-dead-code lightweight-flow`
-- **Pushed:** yes, to `origin/main`
-- **Pre-commit hook:** passed (governed files in sync with canonical; distributed copies match canonical)
+- `python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git` → `SKIPPED: no derived-artifact domains affected by the current change set`.
+- The change set was workflow-runtime code + spec remediation; derived artifacts (agents/workflow templates) were already synced during archive_change (pre-commit hook confirmed in sync at both checkpoints).
+- `derived_artifacts_synced`: true
 
-## Branch Finish Decision
+### Post-cleanup dirty-tree commit
 
-This run used `execution_mode: main_checkout` — implementation was performed directly on `main` with no feature branch or worktree. Therefore no `merge_local`, `create_pr`, `keep_branch`, or `discard` decision was required. The branch finish action is recorded as `keep-branch` (main stays as-is).
+- Memory sync generated: `evolution/20260712-remove-superpowers-direct-dead-code.md`, `sync-history/20260712-remove-superpowers-direct-dead-code.md`, updated `manifest.json`.
+- Staged and committed as `c1ab810` — "chore: post-cleanup checkpoint — sync-generated memory artifacts".
+- Pushed to `origin/main`.
+- `post_hook_commit_id`: `c1ab810b90db8d8b5f7c72e92e05becd4de43378`
+- `post_hook_pushed`: true
+- Final `git status --short --branch`: clean (`## main...origin/main`).
+- `post_hook_dirty_tree`: false
 
 ## Evidence
 
-- `archive_action_completed: true`
-- `archive_artifact_path: null` (lightweight-flow — no single OpenSpec archive artifact)
-- `archive_not_required_reason: "lightweight-flow"`
-- `archived_design_artifact_paths: ["docs/superpowers/archive/plans/2026-07-12-remove-superpowers-direct-dead-code.md"]`
-- `source_design_artifact_paths: ["docs/superpowers/plans/2026-07-12-remove-superpowers-direct-dead-code.md"]`
-
-## Post-Archive Actions (NOT performed in this phase)
-
-The following cleanup work belongs to the `post_archive_actions` phase and was intentionally NOT performed here:
-
-- Pre-cleanup commit checkpoint
-- Repository memory sync
-- Roadmap completion check
-- Derived artifact sync (`python3 scripts/sync_derived_artifacts.py --check`)
-- Post-cleanup dirty-tree commit
-
-These will be executed when dev-orchestrator dispatches `post_archive_actions`.
+- `memory_sync_done: true`
+- `roadmap_done_checked: true`
+- `derived_artifacts_synced: true`
+- `post_hook_dirty_tree: false`
+- `cleanup_complete: true`
+- `pre_hook_commit_id: "a9cc65b1363636100be887c0498c748562f37087"`
+- `pre_hook_pushed: true`
+- `post_hook_commit_id: "c1ab810b90db8d8b5f7c72e92e05becd4de43378"`
+- `post_hook_pushed: true`
 
 ## Blockers
 
@@ -72,4 +81,4 @@ None.
 
 ## Recommended Next Action
 
-`complete_phase` — dev-orchestrator should advance to `post_archive_actions`.
+`complete_phase` — dev-orchestrator/runtime may advance the workflow to terminal `done`.
