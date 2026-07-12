@@ -710,6 +710,8 @@ Required order:
 4. Call `python3 .ai/workflows/scripts/workflow.py --root . final-commit --run-id <captured_run_id> --push`.
 5. Call `git status --short` and report clean status or `residual_dirty_paths`.
 
+After final-commit returns success, inspect `residual_dirty_paths`. If any entry starts with `.ai/workflows/runs/active/<run_id>/`, finalization is NOT complete — re-run final-commit or escalate; do not report the run as finalized.
+
 Do not run direct `git add`, `git commit`, or `git push`; final Git publishing is owned by `workflow.py final-commit`.
 
 ## Parallel Dispatch

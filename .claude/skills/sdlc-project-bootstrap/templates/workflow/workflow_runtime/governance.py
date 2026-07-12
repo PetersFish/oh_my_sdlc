@@ -64,16 +64,38 @@ def _git_status_porcelain(root):
         if not line.strip():
             continue
         status_code = line[:2]
-        # Porcelain format: XY <path> or XY <path> -> <dest> for renames
+        # Porcelain format: XY <path> or XY <path> -> <dest> for renames.
+        # X = index (staged) status, Y = working-tree (unstaged) status.
         path_part = line[3:]
         if " -> " in path_part:
-            # Rename: use destination path
-            path = path_part.split(" -> ", 1)[1]
+            # Rename: represents BOTH a deletion of the source AND an
+            # addition of the destination. Emit two entries so the
+            # classifier can see the source as a deletion (required for
+            # active-run cleanup) and the destination as an addition.
+            src, dst = path_part.split(" -> ", 1)
+            src = src.replace("\\", "/").strip('"')
+            dst = dst.replace("\\", "/").strip('"')
+            # Synthesize a deletion status for the source that preserves
+            # the staged/unstaged position of the original rename: if the
+            # rename was staged (X non-space), the source deletion is
+            # already in the index (D in position X); otherwise it is an
+            # unstaged deletion (D in position Y). _is_delete_status
+            # checks "D" in the code, so both "D " and " D" match.
+            x = status_code[0]
+            src_status = "D " if x != " " else " D"
+            entries.append((src_status, src))
+            # Keep the original rename status code on the destination;
+            # the classifier only needs it to NOT be a deletion, and the
+            # destination is covered by the history/ allowlist. Preserve
+            # the full 2-char code so callers can inspect the index/
+            # working-tree positions.
+            entries.append((status_code, dst))
         else:
-            path = path_part
-        # Normalize to POSIX-style relative paths
-        path = path.replace("\\", "/").strip('"')
-        entries.append((status_code.strip(), path))
+            path = path_part.replace("\\", "/").strip('"')
+            # Preserve the full 2-char XY code (do NOT strip) so callers
+            # can distinguish staged (X non-space) from unstaged (Y
+            # non-space) changes.
+            entries.append((status_code, path))
     return entries
 
 
@@ -205,21 +227,44 @@ def cmd_final_commit(root, args):
         }, indent=2))
         return
 
-    # 5. Stage allowed paths individually (never git add -A)
+    # 5. Stage allowed paths individually (never git add -A).
+    #    Skip paths whose index status (first char of the porcelain XY
+    #    code) indicates the change is already in the index — those are
+    #    already staged (e.g. a staged rename source deletion), and
+    #    running `git add` on a path that no longer exists in the
+    #    working tree would fail with "did not match any files".
+    #    Untracked files ("??") are NOT staged and must be added.
+    status_by_path = {}
+    for sc, p in dirty_entries:
+        status_by_path[p] = sc
     for path in allowed_dirty:
+        sc = status_by_path.get(path, "")
+        x = sc[0] if sc else " "
+        if x != " " and x != "?":
+            # Already staged in the index; do not re-stage.
+            continue
         _run_git(root, ["add", "--", path], check=True)
 
-    # 6. Check staged diff for allowlisted paths only.
-    #    Use the allowlist to filter, because git diff --cached --name-only
-    #    may include pre-existing staged files outside the allowlist that
-    #    must NOT be committed by final-commit.  allowed_dirty already
-    #    encodes the status-aware allowlist (prefixes plus target active-run
-    #    deletions), so membership filtering excludes pre-existing staged
-    #    files outside the intended commit scope.
+    # 6. Determine which allowed paths are staged. git diff --cached
+    #    --name-only lists staged changes by path, but for a staged
+    #    rename it shows ONLY the destination — the source deletion is
+    #    in the index but absent from the name-only output. So we
+    #    supplement the name-only list with allowed paths whose status
+    #    code indicates they are already staged (index position
+    #    non-space), which covers rename source deletions.
     rc, staged_out, _ = _run_git(root, ["diff", "--cached", "--name-only"])
-    all_staged = [p.strip() for p in staged_out.splitlines() if p.strip()]
+    all_staged = set(p.strip() for p in staged_out.splitlines() if p.strip())
     allowed_set = set(allowed_dirty)
     staged_paths = [p for p in all_staged if p in allowed_set]
+    for path in allowed_dirty:
+        if path in all_staged:
+            continue
+        sc = status_by_path.get(path, "")
+        x = sc[0] if sc else " "
+        if x != " " and x != "?":
+            # Already in the index (e.g. rename source) but not listed
+            # by diff --cached --name-only; include it as a staged path.
+            staged_paths.append(path)
 
     # 7. If no allowlisted staged diff, return noop
     if not staged_paths:
@@ -238,7 +283,9 @@ def cmd_final_commit(root, args):
     # 8. Commit ONLY allowlisted paths. Passing explicit pathspecs to
     #    git commit scopes the commit to those paths, preventing any
     #    pre-existing staged files outside the allowlist from being
-    #    included while preserving their index state.
+    #    included while preserving their index state.  The pathspec
+    #    includes rename source paths (which are in the index as
+    #    deletions) so git commit records both sides of the rename.
     message = args.message or f"chore(workflow): finalize {run_id}"
     rc, _, commit_err = _run_git(
         root, ["commit", "-m", message, "--"] + staged_paths

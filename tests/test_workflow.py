@@ -9335,6 +9335,152 @@ class TestFinalCommit(FixtureBase):
         self.assertFalse(data["pushed"])
         self.assertTrue(data["commit_id"])
 
+    def test_final_commit_commits_target_active_run_rename_source(self):
+        """Regression: active->history move reported by Git as a rename
+        (R  active/... -> history/...) must surface BOTH the source
+        deletion and the destination addition to final-commit. The
+        parser previously kept only the destination, leaving the active
+        source paths residual and the finalize tree dirty.
+        """
+        self._init_git()
+        run_id = "2026-07-12-active-rename"
+        self._make_tracked_active_run_files(run_id)
+        self._git_commit_baseline()
+
+        active_dir = os.path.join(
+            self.tmp, ".ai", "workflows", "runs", "active", run_id
+        )
+        history_dir = os.path.join(
+            self.tmp, ".ai", "workflows", "runs", "history", run_id
+        )
+        os.makedirs(history_dir, exist_ok=True)
+
+        # Move each tracked active file to the corresponding history path
+        # using git mv so Git records rename entries in porcelain output.
+        active_run_json = os.path.join(active_dir, "run.json")
+        active_handoff = os.path.join(
+            active_dir, "handoffs", "default", "finish-agent.md"
+        )
+        history_run_json = os.path.join(history_dir, "run.json")
+        history_handoff_dir = os.path.join(
+            history_dir, "handoffs", "default"
+        )
+        os.makedirs(history_handoff_dir, exist_ok=True)
+        history_handoff = os.path.join(history_handoff_dir, "finish-agent.md")
+
+        subprocess.run(
+            ["git", "mv", active_run_json, history_run_json],
+            cwd=self.tmp, capture_output=True, check=True,
+        )
+        subprocess.run(
+            ["git", "mv", active_handoff, history_handoff],
+            cwd=self.tmp, capture_output=True, check=True,
+        )
+
+        # Write the done history run.json (overwrites the moved file's
+        # content with a valid done state so final-commit validation
+        # passes).
+        self._make_done_history_run(run_id=run_id)
+        subprocess.run(
+            ["git", "add", "--",
+             f".ai/workflows/runs/history/{run_id}/run.json"],
+            cwd=self.tmp, capture_output=True, check=True,
+        )
+
+        rc, out, _ = run_workflow(self.tmp, "final-commit", run_id=run_id)
+
+        self.assertEqual(rc, 0, out)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "success", out)
+        # The active source path must be staged (as a deletion).
+        self.assertIn(
+            f".ai/workflows/runs/active/{run_id}/run.json",
+            data["staged_paths"],
+        )
+        # The active source path must NOT remain residual.
+        self.assertNotIn(
+            f".ai/workflows/runs/active/{run_id}/run.json",
+            data["residual_dirty_paths"],
+        )
+        # No active-run paths may remain dirty after success.
+        status = self._git_status_porcelain()
+        self.assertFalse(
+            any(f".ai/workflows/runs/active/{run_id}/" in s for s in status),
+            status,
+        )
+        # The commit must include both the active source (deletion) and
+        # the history destination (addition).
+        commit_files = self._git_show_name_only()
+        self.assertIn(
+            f".ai/workflows/runs/active/{run_id}/run.json",
+            commit_files,
+        )
+        self.assertIn(
+            f".ai/workflows/runs/history/{run_id}/run.json",
+            commit_files,
+        )
+
+    def test_final_commit_success_leaves_no_target_active_residuals(self):
+        """Guard invariant: a successful final-commit must not leave any
+        target-run active paths in residual_dirty_paths. This catches
+        rename-source parsing regressions that let active deletions slip
+        through as residual.
+        """
+        self._init_git()
+        run_id = "2026-07-12-active-rename-guard"
+        self._make_tracked_active_run_files(run_id)
+        self._git_commit_baseline()
+
+        active_dir = os.path.join(
+            self.tmp, ".ai", "workflows", "runs", "active", run_id
+        )
+        history_dir = os.path.join(
+            self.tmp, ".ai", "workflows", "runs", "history", run_id
+        )
+        os.makedirs(history_dir, exist_ok=True)
+
+        active_run_json = os.path.join(active_dir, "run.json")
+        active_handoff = os.path.join(
+            active_dir, "handoffs", "default", "finish-agent.md"
+        )
+        history_run_json = os.path.join(history_dir, "run.json")
+        history_handoff_dir = os.path.join(
+            history_dir, "handoffs", "default"
+        )
+        os.makedirs(history_handoff_dir, exist_ok=True)
+        history_handoff = os.path.join(history_handoff_dir, "finish-agent.md")
+
+        subprocess.run(
+            ["git", "mv", active_run_json, history_run_json],
+            cwd=self.tmp, capture_output=True, check=True,
+        )
+        subprocess.run(
+            ["git", "mv", active_handoff, history_handoff],
+            cwd=self.tmp, capture_output=True, check=True,
+        )
+
+        self._make_done_history_run(run_id=run_id)
+        subprocess.run(
+            ["git", "add", "--",
+             f".ai/workflows/runs/history/{run_id}/run.json"],
+            cwd=self.tmp, capture_output=True, check=True,
+        )
+
+        rc, out, _ = run_workflow(self.tmp, "final-commit", run_id=run_id)
+        self.assertEqual(rc, 0, out)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "success", out)
+
+        active_prefix = f".ai/workflows/runs/active/{run_id}/"
+        residual_active = [
+            p for p in data["residual_dirty_paths"]
+            if p.startswith(active_prefix)
+        ]
+        self.assertEqual(
+            residual_active, [],
+            f"final-commit success left target active residuals: {residual_active}",
+        )
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
