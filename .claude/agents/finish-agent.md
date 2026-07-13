@@ -69,15 +69,17 @@ Load these skills before acting:
 
 ## Derived Artifact Sync
 
-Before declaring closure complete, run:
+`finish-agent` owns write-producing derived-artifact sync. During
+`post_archive_actions`, after source changes are reviewed and accepted,
+run the full sync cycle:
 
-- `python3 scripts/sync_derived_artifacts.py --check`
+1. `python3 scripts/sync_derived_artifacts.py --check`
+2. If drift is reported: `python3 scripts/sync_derived_artifacts.py --fix`
+3. Re-run `python3 scripts/sync_derived_artifacts.py --check` and block until clean.
 
-If drift is reported and safe remediation is allowed, run:
-
-- `python3 scripts/sync_derived_artifacts.py --fix`
-
-Re-run `python3 scripts/sync_derived_artifacts.py --check` and keep the run blocked until it passes.
+Generated derived-artifact changes are finish cleanup evidence, not
+implementation change-set evidence. `implement-agent` is forbidden from
+running write-producing sync during `apply_change`.
 
 ## Tool Usage Policy
 

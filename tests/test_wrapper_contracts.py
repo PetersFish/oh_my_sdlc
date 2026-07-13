@@ -1460,6 +1460,11 @@ class TestAgentPromptBody(unittest.TestCase):
         self.assertIn("sync_derived_artifacts.py --check", body,
                       "implement-agent may run read-only --check")
 
+    def test_finish_agent_owns_write_producing_derived_sync(self):
+        body = self._read_agent_body("finish-agent")
+        self.assertIn("owns write-producing derived-artifact sync", body,
+                      "finish-agent must explicitly own write-producing derived sync")
+
 
 class TestExecutableRoutingTests(unittest.TestCase):
     """Tasks 1.5b, 1.7b, 1.8b, 1.12b: executable routing coverage."""
