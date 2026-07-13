@@ -34,7 +34,7 @@
       "agent_phase": "apply_change",
       "agent": "implement-agent",
       "flow_type": "lightweight-flow",
-      "dispatched_at": "2026-07-13T20:59:09.811454",
+      "dispatched_at": "2026-07-13T21:17:57.618548",
       "slice_id": "default"
     },
     "agent_result": {
@@ -51,34 +51,32 @@
           "worktree_verified",
           "commit_range_inspected",
           "implement_verification_evidence_present",
-          "targeted_tests_passed"
+          "requested_tests_passed",
+          "previous_blockers_rechecked"
+        ],
+        "previous_blockers_resolved": [
+          "active_source_dirty_files_removed",
+          "symmetric_assessment_gating",
+          "slice_id_enforcement",
+          "assessment_schema_validation",
+          "changed_files_complete"
         ]
       },
       "artifacts": {
         "handoff_path": ".ai/workflows/runs/active/2026-07-13-sliced-apply-change-assessment-gate/handoffs/default/review-agent.md",
         "history_handoff_paths": [
-          ".ai/workflows/runs/active/2026-07-13-sliced-apply-change-assessment-gate/handoffs/default/history/review-agent-20260713T125156423056Z.md"
+          ".ai/workflows/runs/active/2026-07-13-sliced-apply-change-assessment-gate/handoffs/default/history/review-agent-20260713T131749001194Z.md"
         ]
       },
       "blockers": [
         {
-          "reason": "review_change_set_mismatch",
-          "message": "changed-file contract omits committed files: cli/lifecycle/slices, agent prompts, docs, test_wrapper_contracts",
-          "recommended_action": "back_to_implement"
-        },
-        {
-          "reason": "review_slice_change_set_mismatch",
-          "message": "Dirty source/test files outside commit range: pyproject.toml, repro_test.py, etc",
-          "recommended_action": "back_to_implement"
-        },
-        {
           "reason": "review_blocked",
-          "message": "Exact slice-id enforcement too permissive for active not_required states",
+          "message": "validate_implementation_state does not enforce not_required explicit-waiver invariants (Invariant 7): empty reasons/assessed_by or non-governed default slices still authorize dispatch",
           "recommended_action": "back_to_implement"
         }
       ],
       "recommended_next_action": "dispatch_implement_agent",
-      "recorded_at": "2026-07-13T20:51:56.420386"
+      "recorded_at": "2026-07-13T21:17:48.998440"
     },
     "agent_results": {
       "default": {
@@ -106,11 +104,10 @@
               }
             ],
             "verification_summary": {
-              "status": "pass_with_accepted_preexisting_failures",
+              "status": "pass",
               "full_regression": {
-                "passed": 1348,
-                "failed": 4,
-                "accepted_preexisting_failures": 4
+                "passed": 768,
+                "failed": 0
               }
             }
           },
@@ -120,44 +117,84 @@
             "repo_root": "/Users/yuping/Documents/workspace/oh_my_skills",
             "base_branch": "main",
             "changed_files": [
+              ".ai/workflows/scripts/workflow_runtime/cli.py",
               ".ai/workflows/scripts/workflow_runtime/dispatch.py",
+              ".ai/workflows/scripts/workflow_runtime/lifecycle.py",
+              ".ai/workflows/scripts/workflow_runtime/slices.py",
               ".ai/workflows/scripts/workflow_runtime/state.py",
-              "skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/dispatch.py",
-              "skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/state.py",
-              "tests/test_workflow.py",
-              ".ai/workflows/runs/active/2026-07-13-sliced-apply-change-assessment-gate/",
-              ".ai/workflows/runs/active/2026-07-13-repository-memory-structural-reconciliation/",
+              "agents/dev-orchestrator.md",
+              "agents/implement-agent.md",
+              "agents/plan-agent.md",
+              "agents/review-agent.md",
+              ".claude/agents/.agent-install.json",
+              ".claude/agents/dev-orchestrator.md",
+              ".claude/agents/implement-agent.md",
+              ".claude/agents/plan-agent.md",
+              ".claude/agents/review-agent.md",
+              ".claude/skills/sdlc-project-bootstrap/.skill-install.json",
+              ".claude/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/cli.py",
+              ".claude/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/dispatch.py",
+              ".claude/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/lifecycle.py",
+              ".claude/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/slices.py",
+              ".claude/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/state.py",
+              ".cursor/agents/.agent-install.json",
+              ".cursor/agents/dev-orchestrator.md",
+              ".cursor/agents/implement-agent.md",
+              ".cursor/agents/plan-agent.md",
+              ".cursor/agents/review-agent.md",
+              ".cursor/skills/sdlc-project-bootstrap/.skill-install.json",
+              ".cursor/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/cli.py",
+              ".cursor/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/dispatch.py",
+              ".cursor/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/lifecycle.py",
+              ".cursor/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/slices.py",
+              ".cursor/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/state.py",
               ".opencode/agents/.agent-install.json",
               ".opencode/agents/config/model-profiles.yaml",
-              ".claude/skills/sdlc-project-bootstrap/.skill-install.json",
-              ".cursor/skills/sdlc-project-bootstrap/.skill-install.json",
+              ".opencode/agents/dev-orchestrator.md",
+              ".opencode/agents/implement-agent.md",
+              ".opencode/agents/plan-agent.md",
+              ".opencode/agents/review-agent.md",
               ".opencode/skills/sdlc-project-bootstrap/.skill-install.json",
-              ".claude/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/dispatch.py",
-              ".claude/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/state.py",
-              ".cursor/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/dispatch.py",
-              ".cursor/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/state.py"
+              ".opencode/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/cli.py",
+              ".opencode/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/dispatch.py",
+              ".opencode/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/lifecycle.py",
+              ".opencode/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/slices.py",
+              ".opencode/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/state.py",
+              "docs/superpowers/plans/2026-07-13-sliced-apply-change-assessment-gate.md",
+              "docs/superpowers/specs/2026-07-13-sliced-apply-change-assessment-gate-design.md",
+              "skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/cli.py",
+              "skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/dispatch.py",
+              "skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/lifecycle.py",
+              "skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/slices.py",
+              "skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/state.py",
+              "tests/test_workflow.py",
+              "tests/test_wrapper_contracts.py",
+              ".ai/workflows/runs/active/2026-07-13-sliced-apply-change-assessment-gate/",
+              ".ai/workflows/runs/active/2026-07-13-repository-memory-structural-reconciliation/",
+              ".ai/workflows/runs/current.json"
             ],
             "diff_commands": [
-              "git diff e1d034eff1b1a7e6c684aac86d3a6c749908ef0f..b5e811cd94a15c022d98aeadab2cd3a428c6fb67"
+              "git diff e1d034eff1b1a7e6c684aac86d3a6c749908ef0f..36a538d"
             ],
             "verification_commands": [
               "python3 -m pytest tests/test_workflow.py -v",
               "python3 -m pytest tests/test_wrapper_contracts.py -v",
               "python3 -m pytest tests/test_workflow_modules.py -v"
             ],
-            "head_ref": "b5e811cd94a15c022d98aeadab2cd3a428c6fb67",
+            "head_ref": "36a538d",
             "base_ref": "e1d034eff1b1a7e6c684aac86d3a6c749908ef0f",
             "commit_refs": [
               "9d3a8cae223513c6bb281bf72ff2290eb399369a",
-              "b5e811cd94a15c022d98aeadab2cd3a428c6fb67"
+              "b5e811cd94a15c022d98aeadab2cd3a428c6fb67",
+              "36a538d"
             ],
             "history_handoff_paths": [
-              ".ai/workflows/runs/active/2026-07-13-sliced-apply-change-assessment-gate/handoffs/default/history/implement-agent-20260713T124749321807Z.md"
+              ".ai/workflows/runs/active/2026-07-13-sliced-apply-change-assessment-gate/handoffs/default/history/implement-agent-20260713T131049105826Z.md"
             ]
           },
           "blockers": [],
           "recommended_next_action": "dispatch_review_agent",
-          "recorded_at": "2026-07-13T20:47:49.226306"
+          "recorded_at": "2026-07-13T21:10:49.031451"
         },
         "review-agent": {
           "agent": "review-agent",
@@ -173,34 +210,32 @@
               "worktree_verified",
               "commit_range_inspected",
               "implement_verification_evidence_present",
-              "targeted_tests_passed"
+              "requested_tests_passed",
+              "previous_blockers_rechecked"
+            ],
+            "previous_blockers_resolved": [
+              "active_source_dirty_files_removed",
+              "symmetric_assessment_gating",
+              "slice_id_enforcement",
+              "assessment_schema_validation",
+              "changed_files_complete"
             ]
           },
           "artifacts": {
             "handoff_path": ".ai/workflows/runs/active/2026-07-13-sliced-apply-change-assessment-gate/handoffs/default/review-agent.md",
             "history_handoff_paths": [
-              ".ai/workflows/runs/active/2026-07-13-sliced-apply-change-assessment-gate/handoffs/default/history/review-agent-20260713T125156423056Z.md"
+              ".ai/workflows/runs/active/2026-07-13-sliced-apply-change-assessment-gate/handoffs/default/history/review-agent-20260713T131749001194Z.md"
             ]
           },
           "blockers": [
             {
-              "reason": "review_change_set_mismatch",
-              "message": "changed-file contract omits committed files: cli/lifecycle/slices, agent prompts, docs, test_wrapper_contracts",
-              "recommended_action": "back_to_implement"
-            },
-            {
-              "reason": "review_slice_change_set_mismatch",
-              "message": "Dirty source/test files outside commit range: pyproject.toml, repro_test.py, etc",
-              "recommended_action": "back_to_implement"
-            },
-            {
               "reason": "review_blocked",
-              "message": "Exact slice-id enforcement too permissive for active not_required states",
+              "message": "validate_implementation_state does not enforce not_required explicit-waiver invariants (Invariant 7): empty reasons/assessed_by or non-governed default slices still authorize dispatch",
               "recommended_action": "back_to_implement"
             }
           ],
           "recommended_next_action": "dispatch_implement_agent",
-          "recorded_at": "2026-07-13T20:51:56.420386"
+          "recorded_at": "2026-07-13T21:17:48.998440"
         }
       }
     },
@@ -209,14 +244,12 @@
   },
   "block": {
     "type": "worker_failed",
-    "message": "review_change_set_mismatch; review_slice_change_set_mismatch; review_blocked",
+    "message": "review_blocked",
     "next_allowed": [
-      "back_to_implement",
-      "back_to_implement",
       "back_to_implement"
     ]
   },
-  "updated_at": "2026-07-13T20:59:09.811550",
+  "updated_at": "2026-07-13T21:17:57.618645",
   "implementation": {
     "strategy": "sequential",
     "slicing_assessment": {
@@ -236,14 +269,15 @@
         "depends_on": [],
         "required": true,
         "status": "in_progress",
-        "attempt_count": 3,
+        "attempt_count": 4,
         "block": null,
         "base_ref": "e1d034eff1b1a7e6c684aac86d3a6c749908ef0f",
-        "head_ref": "b5e811cd94a15c022d98aeadab2cd3a428c6fb67",
+        "head_ref": "36a538d",
         "accepted_head_ref": "",
         "commit_refs": [
           "9d3a8cae223513c6bb281bf72ff2290eb399369a",
-          "b5e811cd94a15c022d98aeadab2cd3a428c6fb67"
+          "b5e811cd94a15c022d98aeadab2cd3a428c6fb67",
+          "36a538d"
         ],
         "implement_evidence": {
           "tasks_complete": true,
@@ -263,11 +297,10 @@
             }
           ],
           "verification_summary": {
-            "status": "pass_with_accepted_preexisting_failures",
+            "status": "pass",
             "full_regression": {
-              "passed": 1348,
-              "failed": 4,
-              "accepted_preexisting_failures": 4
+              "passed": 768,
+              "failed": 0
             }
           }
         },

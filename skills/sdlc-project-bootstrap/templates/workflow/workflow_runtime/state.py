@@ -550,9 +550,9 @@ def normalize_implementation_state(state):
             "slicing_assessment": {
                 "status": "not_required",
                 "decision": "single_slice",
-                "assessed_by": "",
+                "assessed_by": "system",
                 "assessment_handoff_path": "",
-                "reasons": [],
+                "reasons": ["Legacy run without explicit slicing assessment"],
             },
             "aggregate_review_status": "pending",
             "active_slice_id": None,
@@ -856,6 +856,64 @@ def validate_implementation_state(impl):
             "message": f"slicing_assessment.decision must be one of {sorted(VALID_SLICING_DECISIONS)}, got {decision!r}",
             "slice_ids": [],
         })
+
+    # Spec Invariant 7 / Spec Decision 7: not_required waiver invariants.
+    # An explicit no-decomposition decision must have non-empty assessed_by,
+    # at least one non-empty reason, a single_slice decision, and exactly
+    # one required default slice.  Defense-in-depth: both the constructor
+    # (make_no_decomposition_implementation_state) and this validator
+    # independently enforce these invariants.
+    if assessment_status == "not_required":
+        if decision != "single_slice":
+            errors.append({
+                "reason": "invalid_not_required_waiver",
+                "message": (
+                    "not_required assessment must have decision 'single_slice', "
+                    f"got {decision!r}"
+                ),
+                "slice_ids": [],
+            })
+        if not (assessment.get("assessed_by") or "").strip():
+            errors.append({
+                "reason": "invalid_not_required_waiver",
+                "message": "not_required assessment must have non-empty assessed_by",
+                "slice_ids": [],
+            })
+        reasons = assessment.get("reasons", []) or []
+        if not reasons or all(not (r or "").strip() for r in reasons):
+            errors.append({
+                "reason": "invalid_not_required_waiver",
+                "message": "not_required assessment must have at least one non-empty reason",
+                "slice_ids": [],
+            })
+
+        # Slice-level invariants for not_required: exactly one required
+        # default slice and no other slices.
+        slices = impl.get("slices", []) or []
+        if len(slices) != 1:
+            errors.append({
+                "reason": "invalid_not_required_waiver",
+                "message": (
+                    "not_required assessment must have exactly one slice, "
+                    f"got {len(slices)}"
+                ),
+                "slice_ids": [s.get("slice_id", "") for s in slices],
+            })
+        elif slices[0].get("slice_id") != "default":
+            errors.append({
+                "reason": "invalid_not_required_waiver",
+                "message": (
+                    "not_required assessment must have a 'default' slice, "
+                    f"got {slices[0].get('slice_id', '')!r}"
+                ),
+                "slice_ids": [slices[0].get("slice_id", "")],
+            })
+        elif not slices[0].get("required", False):
+            errors.append({
+                "reason": "invalid_not_required_waiver",
+                "message": "not_required assessment's default slice must be required",
+                "slice_ids": ["default"],
+            })
 
     agg_status = impl.get("aggregate_review_status", "")
     if agg_status not in VALID_AGGREGATE_REVIEW_STATUSES:

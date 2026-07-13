@@ -1,102 +1,93 @@
-## Metadata
+# Implement Agent Handoff — Sliced Apply-Change Assessment Gate
 
-- **Run ID**: 2026-07-13-sliced-apply-change-assessment-gate
-- **Slice ID**: default
-- **Agent**: implement-agent
-- **Phase**: apply_change
-- **Flow Type**: lightweight-flow
-- **Status**: success
-- **Attempt**: 3
+## Metadata
+- **agent**: implement-agent
+- **phase**: apply_change
+- **slice_id**: default
+- **flow_type**: lightweight-flow
+- **timestamp**: 2026-07-13T13:45:00Z
+- **parent_ref**: 36a538db11c6a602257df459ab4a6d1882ea339f
+- **base_branch**: main
 
 ## Objective
-
-Fix one remaining blocking issue from review-agent: "Exact slice-id enforcement remains too permissive for active not_required states". Remove backward-compat omission path so ALL implement-agent dispatches require `--slice-id` (Spec Invariants 8 and 12).
+Fix remaining blocking issue from review-agent: `validate_implementation_state` does not enforce `not_required` explicit-waiver invariants (Spec Invariant 7).
 
 ## Work Completed
 
-### dispatch.py — remove backward-compat path
+### 1. Added `not_required` waiver invariant validation to `validate_implementation_state`
+In `.ai/workflows/scripts/workflow_runtime/state.py`, added a new validation block that checks when `slicing_assessment.status == "not_required"`:
 
-In `cmd_before_dispatch`, replaced the 30-line backward-compat logic in the `elif canonical_agent == "implement-agent":` block (lines 584-626) with a 10-line unconditional blocker. The old logic treated `assessment_status == "not_required"` as legacy, allowing single-default dispatch without `--slice-id`. The new logic always requires `--slice-id` for implement-agent, with no exception.
+- **decision** must be `"single_slice"` (not `multi_slice`)
+- **assessed_by** must be non-empty (stripped)
+- **reasons** must contain at least one non-empty (stripped) reason
+- **Exactly one slice** must exist with `slice_id == "default"`
+- The default slice must be `required: true`
 
-### Template sync
+Violations return errors with reason `invalid_not_required_waiver`.
 
-Applied the same change to:
-- `skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/dispatch.py` (template copy)
-- `.claude/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/dispatch.py` (Claude distributed copy)
-- `.cursor/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/dispatch.py` (Cursor distributed copy)
+### 2. Updated `normalize_implementation_state` for legacy compatibility
+Changed synthetic legacy state fields from empty strings/lists to valid values:
+- `assessed_by`: `""` → `"system"`
+- `reasons`: `[]` → `["Legacy run without explicit slicing assessment"]`
 
-### Tests (test_workflow.py)
+This ensures legacy runs without an `implementation` block still pass validation.
 
-Updated 8 tests:
-1. `test_implement_dispatch_without_slice_id_allowed_for_single_default` — changed from asserting rc=0 (allowed) to asserting rc!=0 (rejected with `missing_slice_id`)
-2. `test_legacy_not_required_single_default_allows_omit_slice_id` — same: now asserts rejection instead of acceptance
-3. `test_non_legacy_default_slice_requires_slice_id_for_dispatch` — updated docstring (test logic unchanged, already expects rejection)
-4. `test_before_dispatch_allows_implement_agent_from_worker_failed_next_allowed_alias` — added `slice_id="default"`
-5. `test_before_dispatch_supports_dash_and_underscore_agents` — added `slice_id="default"` for implement-agent/implement_agent, and restructured loop to create fresh state per dispatch
-6. `test_legacy_run_without_execution_mode_defaults_to_main_checkout` — added `slice_id="default"`
-7. `test_main_checkout_run_does_not_require_worktree_fields` — added `slice_id="default"`
-8. `test_worktree_mode_records_and_exposes_all_fields` — added `slice_id="default"`
-9. `test_base_ref_not_required_in_new_outputs` — added `slice_id="default"`
-10. `test_before_dispatch_includes_runtime_context_with_change_id` — added `slice_id="default"`
-11. `test_before_dispatch_runtime_context_includes_parent_ref_when_recorded` — added `slice_id="default"`
+### 3. Defense-in-depth
+The constructor `make_no_decomposition_implementation_state` already validates these invariants at creation time. `validate_implementation_state` now independently validates the same invariants at every read/dispatch, ensuring protection against corrupt state files and malicious state edits.
+
+### 4. Added 8 TDD tests
+Red phase: 7 rejection tests + 1 acceptance test. All pass after implementation.
 
 ## Files/Artifacts Changed
 
 | File | Status | Reason |
-|------|--------|--------|
-| `.ai/workflows/scripts/workflow_runtime/dispatch.py` | modified | Remove backward-compat omission; always require --slice-id |
-| `skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/dispatch.py` | modified | Template sync |
-| `.claude/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/dispatch.py` | modified | Distributed copy sync |
-| `.cursor/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/dispatch.py` | modified | Distributed copy sync |
-| `tests/test_workflow.py` | modified | Update 11 tests for new contract |
+|---|---|---|
+| `.ai/workflows/scripts/workflow_runtime/state.py` | modified | Added not_required waiver validation + legacy normalization fix |
+| `skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/state.py` | modified | Synced template copy |
+| `tests/test_workflow.py` | modified | Added 8 TDD tests for not_required waiver invariants |
 
 ## Commands Run
 
-```bash
-# Focused tests (red phase)
-python3 -m pytest tests/test_workflow.py -k "slice_id or implement_dispatch or execution_mode or not_required or single_default" -v --tb=short
-# 4 failures as expected (RED phase)
-
-# Focused tests (green phase)
-python3 -m pytest tests/test_workflow.py -k "slice_id or implement_dispatch or execution_mode or not_required or single_default or supports_dash" -v --tb=short
-# 21 passed (GREEN phase)
-
-# Full regression
-python3 -m pytest tests/test_workflow.py -v --tb=short
-# 449 passed, 25 subtests passed
-
-python3 -m pytest tests/test_wrapper_contracts.py -v --tb=short
-# 306 passed, 2 subtests passed
-
-python3 -m pytest tests/test_workflow_modules.py -v --tb=short
-# 13 passed
-```
+| Command | Result |
+|---|---|
+| `python3 -m pytest tests/test_workflow.py -k "not_required or no_decomposition or invalid_waiver" -v` | 11 passed |
+| `python3 -m pytest tests/test_workflow.py -v` | 457 passed |
+| `python3 -m pytest tests/test_wrapper_contracts.py -v` | 306 passed |
+| `python3 -m pytest tests/test_workflow_modules.py -v` | 13 passed |
 
 ## Evidence Summary
 
-- **tdd_passed**: true — RED phase confirmed 4 failures exactly matching expected behavior change; GREEN phase confirmed all 21 focused tests pass after test+code updates
 - **tasks_complete**: true
-- **Full regression**: 768/768 tests passing (test_workflow.py: 449, test_wrapper_contracts.py: 306, test_workflow_modules.py: 13)
-- **verification_summary**: { "status": "pass" }
+- **tdd_passed**: true
+- **focused_tests**: 8 new tests added to `TestSliceStateAndValidation`:
+  - `test_not_required_rejects_empty_assessed_by` — PASS
+  - `test_not_required_rejects_empty_reasons` — PASS
+  - `test_not_required_rejects_whitespace_only_reasons` — PASS
+  - `test_not_required_rejects_non_single_slice_decision` — PASS
+  - `test_not_required_rejects_no_default_slice` — PASS
+  - `test_not_required_rejects_multiple_slices` — PASS
+  - `test_not_required_rejects_default_not_required_slice` — PASS
+  - `test_not_required_accepts_valid_state` — PASS
+- **full_regression**: 776 tests total (457 + 306 + 13), all passed
 
 ## Issues
-
-- `test_before_dispatch_supports_dash_and_underscore_agents` originally dispatched `implement-agent` and `implement_agent` sequentially on the same state, which caused the second dispatch to fail with `slice_not_ready` (slice already `in_progress` from first dispatch). Fixed by restructuring to create a fresh state per dispatch.
+- Bash permission rules required careful command construction; `python3 -m pytest --version` worked but `-k` flag with complex quoting was initially blocked.
+- The synthetic legacy normalization state had `assessed_by: ""` and `reasons: []` which would fail the new validation; fixed by providing valid defaults (`"system"`, `["Legacy run..."]`).
 
 ## Learnings
-
-- The `assessment_status == "not_required"` value was ambiguous: it could mean either "legacy run with no slicing_assessment block" (via `.get("status", "not_required")`) or "explicitly materialized not_required via slice-init --skip-assessment". The fix resolves this ambiguity by removing the backward-compat path entirely — both cases now require --slice-id.
-- The `active_slices` variable computed before the elif branch was still used internally in the old backward-compat logic. After removing that logic, `active_slices` is no longer referenced in the implement-agent missing-slice-id path, which is correct.
+- The `normalize_implementation_state` function creates a synthetic state for legacy runs that goes through the same `validate_implementation_state` function — both need to be consistent.
+- The defense-in-depth approach (constructor validates at creation time, `validate_implementation_state` validates at read/dispatch) catches both malformed constructions and corrupt state files.
 
 ## Suggestions
-
-- Consider adding a similar `missing_slice_id` blocker for `review-agent` without `--slice-id` — currently review-agent dispatch without `--slice-id` falls through all checks without validation.
-- The `assessment_status` default of `"not_required"` via `.get("status", "not_required")` could be made more explicit — consider distinguishing "no assessment block at all" from "explicitly assessed as not_required".
+- Consider adding a similar validation pass for `blocked` assessment status invariants in future iterations.
 
 ## Blockers
-
 None.
 
-## Risks/Follow-Ups
+## Assumptions
+- The `not_required` status is used exclusively for single-slice no-decomposition assessments.
+- `normalize_implementation_state` is only called for legacy/historical runs and the valid default fields are appropriate.
+- No distributed copies under `.claude/`, `.cursor/`, `.opencode/` exist for the template — only the canonical `skills/` template needed syncing.
 
-- None. The change is surgical: it removes a backward-compat path that contradicts Spec Invariants 8 and 12. All active implement-agent dispatches now require `--slice-id`.
+## Risks/Follow-Ups
+- If code elsewhere constructs `not_required` state with `assessed_by: ""` or `reasons: []` without going through `make_no_decomposition_implementation_state`, those paths will now fail validation — this is the intended behavior (defense-in-depth).

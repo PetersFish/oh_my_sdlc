@@ -9757,6 +9757,114 @@ class TestSliceStateAndValidation(FixtureBase):
         self.assertEqual(slice_b["implement_evidence"], {})
         self.assertEqual(slice_b["review_evidence"], {})
 
+    # --- Validation: not_required waiver invariants (Spec Invariant 7) ---
+
+    def _make_not_required_impl(self, assessed_by="user", reasons=None,
+                                 decision="single_slice", slices=None,
+                                 override_assessment=None):
+        """Build a not_required implementation block for waiver validation tests."""
+        assessment = {
+            "status": "not_required",
+            "decision": decision,
+            "assessed_by": assessed_by,
+            "assessment_handoff_path": "",
+            "reasons": reasons if reasons is not None else ["valid reason"],
+        }
+        if override_assessment:
+            assessment.update(override_assessment)
+        return {
+            "strategy": "sequential",
+            "slicing_assessment": assessment,
+            "aggregate_review_status": "pending",
+            "active_slice_id": None,
+            "slices": slices if slices is not None else [_make_slice("default")],
+        }
+
+    def test_not_required_rejects_empty_assessed_by(self):
+        """not_required assessment must have non-empty assessed_by."""
+        impl = self._make_not_required_impl(assessed_by="")
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-status")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [e.get("reason", "") for e in data.get("errors", [])]
+        self.assertIn("invalid_not_required_waiver", reasons)
+
+    def test_not_required_rejects_empty_reasons(self):
+        """not_required assessment must have at least one non-empty reason."""
+        impl = self._make_not_required_impl(reasons=[])
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-status")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [e.get("reason", "") for e in data.get("errors", [])]
+        self.assertIn("invalid_not_required_waiver", reasons)
+
+    def test_not_required_rejects_whitespace_only_reasons(self):
+        """not_required assessment must have at least one non-empty-stripped reason."""
+        impl = self._make_not_required_impl(reasons=["   ", "\t\n", ""])
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-status")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [e.get("reason", "") for e in data.get("errors", [])]
+        self.assertIn("invalid_not_required_waiver", reasons)
+
+    def test_not_required_rejects_non_single_slice_decision(self):
+        """not_required assessment must have decision 'single_slice'."""
+        impl = self._make_not_required_impl(decision="multi_slice")
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-status")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [e.get("reason", "") for e in data.get("errors", [])]
+        self.assertIn("invalid_not_required_waiver", reasons)
+
+    def test_not_required_rejects_no_default_slice(self):
+        """not_required assessment must have a default slice."""
+        impl = self._make_not_required_impl(slices=[_make_slice("other")])
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-status")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [e.get("reason", "") for e in data.get("errors", [])]
+        self.assertIn("invalid_not_required_waiver", reasons)
+
+    def test_not_required_rejects_multiple_slices(self):
+        """not_required assessment must have exactly one slice (the default)."""
+        impl = self._make_not_required_impl(
+            slices=[_make_slice("default"), _make_slice("extra")],
+        )
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-status")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [e.get("reason", "") for e in data.get("errors", [])]
+        self.assertIn("invalid_not_required_waiver", reasons)
+
+    def test_not_required_rejects_default_not_required_slice(self):
+        """not_required: the default slice must be required=True."""
+        impl = self._make_not_required_impl(
+            slices=[_make_slice("default", required=False)],
+        )
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-status")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [e.get("reason", "") for e in data.get("errors", [])]
+        self.assertIn("invalid_not_required_waiver", reasons)
+
+    def test_not_required_accepts_valid_state(self):
+        """A valid not_required state (non-empty reason, non-empty assessed_by,
+        single required default slice) must pass validation."""
+        impl = self._make_not_required_impl(
+            assessed_by="user",
+            reasons=["User explicitly selected one governed implementation slice"],
+        )
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-status")
+        self.assertEqual(rc, 0, out)
+
 
 # ---------------------------------------------------------------------------
 # Slice 2: Runtime Slice Commands

@@ -1,13 +1,13 @@
 {
   "skill": "sdlc-project-bootstrap",
-  "source_repo": "/Users/yuping/Documents/workspace/oh_my_skills",
+  "source_repo": ".",
   "source_path": "skills/sdlc-project-bootstrap",
   "source_ref": "HEAD",
   "status": "stable",
-  "target": "/Users/yuping/Documents/workspace/oh_my_skills/.cursor/skills/sdlc-project-bootstrap",
-  "installed_at": "2026-07-13T09:20:04.143239Z",
+  "target": ".cursor/skills/sdlc-project-bootstrap",
+  "installed_at": "2026-07-13T13:27:13.486251Z",
   "backport_policy": "review-required",
-  "payload_hash": "db955cd828c4d15a0c176e1be8bd211a6e4606a5df8ce5f57c3b213d6dd6e28b",
+  "payload_hash": "85a835671472ca11da2675f592b778074630f78d7d5cbb339a18e662c275de95",
   "files": [
     "SKILL.md",
     "scripts/init_foundations.py",
