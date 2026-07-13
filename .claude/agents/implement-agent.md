@@ -20,6 +20,9 @@ permission:
     "python3 -m pytest *": allow
     "pytest *": allow
     "python3 .ai/workflows/scripts/workflow.py *": allow
+    "python3 scripts/sync_derived_artifacts.py --fix*": deny
+    "python3 scripts/setup_agents.py --force*": deny
+    "python3 skills/meta-skill-lifecycle-governance/scripts/install_skill.py*": deny
     "python3 scripts/*": allow
     "python3 scripts/safe_delete.py *": allow
     "python3 skills/*": allow

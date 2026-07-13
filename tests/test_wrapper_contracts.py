@@ -1460,6 +1460,15 @@ class TestAgentPromptBody(unittest.TestCase):
         self.assertIn("sync_derived_artifacts.py --check", body,
                       "implement-agent may run read-only --check")
 
+    def test_implement_agent_permission_denies_derived_sync_fix(self):
+        fm = _read_agent_frontmatter(".opencode", "implement-agent")
+        bash = fm.get("permission", {}).get("bash", {})
+        deny_patterns = [k for k, v in bash.items() if v == "deny"]
+        self.assertTrue(
+            any("sync_derived_artifacts.py" in p and "--fix" in p for p in deny_patterns),
+            "implement-agent permission.bash must deny sync_derived_artifacts.py --fix",
+        )
+
     def test_finish_agent_owns_write_producing_derived_sync(self):
         body = self._read_agent_body("finish-agent")
         self.assertIn("owns write-producing derived-artifact sync", body,
