@@ -1440,6 +1440,26 @@ class TestAgentPromptBody(unittest.TestCase):
             for marker in required_markers:
                 self.assertIn(marker, body, f"{name}: missing tool-policy marker {marker!r}")
 
+    def test_implement_agent_forbids_derived_sync_fix(self):
+        body = self._read_agent_body("implement-agent")
+        self.assertIn("MUST NOT run `sync_derived_artifacts.py --fix`", body,
+                      "implement-agent must explicitly forbid --fix during apply_change")
+
+    def test_implement_agent_forbids_setup_agents_force(self):
+        body = self._read_agent_body("implement-agent")
+        self.assertIn("MUST NOT run `setup_agents.py --force`", body,
+                      "implement-agent must explicitly forbid setup_agents --force")
+
+    def test_implement_agent_forbids_install_skill(self):
+        body = self._read_agent_body("implement-agent")
+        self.assertIn("MUST NOT run `install_skill.py`", body,
+                      "implement-agent must explicitly forbid install_skill.py")
+
+    def test_implement_agent_may_run_read_only_check(self):
+        body = self._read_agent_body("implement-agent")
+        self.assertIn("sync_derived_artifacts.py --check", body,
+                      "implement-agent may run read-only --check")
+
 
 class TestExecutableRoutingTests(unittest.TestCase):
     """Tasks 1.5b, 1.7b, 1.8b, 1.12b: executable routing coverage."""

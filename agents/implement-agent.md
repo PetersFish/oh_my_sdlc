@@ -366,6 +366,38 @@ isolate or clean them before returning success. This applies at three levels:
 A test suite that leaves `.skill-install.json` churn behind is failing its own
 cleanup contract, even if assertions pass.
 
+## Derived Sync Restriction
+
+During `apply_change`, you MUST NOT run any write-producing derived-artifact
+sync command. Specifically:
+
+- MUST NOT run `sync_derived_artifacts.py --fix`.
+- MUST NOT run `setup_agents.py --force`.
+- MUST NOT run `install_skill.py`.
+
+You MAY run read-only checks to detect drift:
+
+- `python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git`
+- `python3 scripts/sync_templates.py --check`
+
+If the read-only check reports drift, return `status: blocked` with:
+
+```json
+{
+  "blockers": [
+    {
+      "reason": "derived_artifact_drift_detected",
+      "message": "Derived artifact drift detected. Deferred to finish-agent.",
+      "recommended_action": "defer_to_finish_agent"
+    }
+  ],
+  "recommended_next_action": "dispatch_review_agent"
+}
+```
+
+Derived-artifact sync is owned by `finish-agent` during post-review cleanup.
+This boundary prevents review-scope churn from generated/distributed files.
+
 ## Constrained Restore for Derived Artifacts
 
 If real derived-artifact churn appears during development, do not hand-edit
