@@ -24,6 +24,16 @@ def _compute_payload(target_dir: Path) -> tuple[str, list[str]]:
     return hasher.hexdigest(), files
 
 
+def _existing_target_metadata(target_dir: Path) -> dict | None:
+    metadata_path = target_dir / ".skill-install.json"
+    if not metadata_path.exists():
+        return None
+    try:
+        return json.loads(metadata_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Install a skill into a target directory.")
     parser.add_argument("--source-repo", required=True)
@@ -36,6 +46,17 @@ def main() -> int:
     source_skill = Path(args.source_repo) / "skills" / args.skill_name
     target_dir = Path(args.target)
     target_dir.parent.mkdir(parents=True, exist_ok=True)
+
+    source_payload_hash, source_files = _compute_payload(source_skill)
+
+    existing = _existing_target_metadata(target_dir)
+    if existing is not None:
+        existing_hash = existing.get("payload_hash", "")
+        existing_files = existing.get("files", [])
+        if existing_hash == source_payload_hash and existing_files == source_files:
+            print(json.dumps(existing, indent=2))
+            return 0
+
     if target_dir.exists():
         shutil.rmtree(target_dir)
     shutil.copytree(source_skill, target_dir)
