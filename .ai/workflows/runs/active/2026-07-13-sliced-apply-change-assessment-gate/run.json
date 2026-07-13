@@ -34,7 +34,7 @@
       "agent_phase": "apply_change",
       "agent": "implement-agent",
       "flow_type": "lightweight-flow",
-      "dispatched_at": "2026-07-13T21:17:57.618548",
+      "dispatched_at": "2026-07-13T21:35:29.691196",
       "slice_id": "default"
     },
     "agent_result": {
@@ -47,36 +47,46 @@
         "review_decision": "rejected",
         "review_complete": false,
         "verification_passed": true,
-        "criteria_satisfied": [
-          "worktree_verified",
-          "commit_range_inspected",
-          "implement_verification_evidence_present",
-          "requested_tests_passed",
-          "previous_blockers_rechecked"
+        "tests_passed": true,
+        "invariants_verified": [
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ],
+        "invariants_failed": [
+          1,
+          2,
+          12
         ],
         "previous_blockers_resolved": [
-          "active_source_dirty_files_removed",
-          "symmetric_assessment_gating",
-          "slice_id_enforcement",
-          "assessment_schema_validation",
-          "changed_files_complete"
+          "changed_files_list_complete",
+          "active_implement_dispatches_require_slice_id",
+          "pending_blocked_assessment_gates_implement_and_review",
+          "assessment_materialization_validates_required_fields",
+          "not_required_waiver_invariants_enforced"
         ]
       },
       "artifacts": {
         "handoff_path": ".ai/workflows/runs/active/2026-07-13-sliced-apply-change-assessment-gate/handoffs/default/review-agent.md",
         "history_handoff_paths": [
-          ".ai/workflows/runs/active/2026-07-13-sliced-apply-change-assessment-gate/handoffs/default/history/review-agent-20260713T131749001194Z.md"
+          ".ai/workflows/runs/active/2026-07-13-sliced-apply-change-assessment-gate/handoffs/default/history/review-agent-20260713T133519459478Z.md"
         ]
       },
       "blockers": [
         {
           "reason": "review_blocked",
-          "message": "validate_implementation_state does not enforce not_required explicit-waiver invariants (Invariant 7): empty reasons/assessed_by or non-governed default slices still authorize dispatch",
+          "message": "cmd_complete_phase does not block when implementation state is missing for active apply runs, violating invariants 1,2,12 and Decision 9 phase-completion-gate",
           "recommended_action": "back_to_implement"
         }
       ],
       "recommended_next_action": "dispatch_implement_agent",
-      "recorded_at": "2026-07-13T21:17:48.998440"
+      "recorded_at": "2026-07-13T21:35:19.456461"
     },
     "agent_results": {
       "default": {
@@ -106,7 +116,7 @@
             "verification_summary": {
               "status": "pass",
               "full_regression": {
-                "passed": 768,
+                "passed": 776,
                 "failed": 0
               }
             }
@@ -174,27 +184,28 @@
               ".ai/workflows/runs/current.json"
             ],
             "diff_commands": [
-              "git diff e1d034eff1b1a7e6c684aac86d3a6c749908ef0f..36a538d"
+              "git diff e1d034eff1b1a7e6c684aac86d3a6c749908ef0f..7f9e743"
             ],
             "verification_commands": [
               "python3 -m pytest tests/test_workflow.py -v",
               "python3 -m pytest tests/test_wrapper_contracts.py -v",
               "python3 -m pytest tests/test_workflow_modules.py -v"
             ],
-            "head_ref": "36a538d",
+            "head_ref": "7f9e743",
             "base_ref": "e1d034eff1b1a7e6c684aac86d3a6c749908ef0f",
             "commit_refs": [
               "9d3a8cae223513c6bb281bf72ff2290eb399369a",
               "b5e811cd94a15c022d98aeadab2cd3a428c6fb67",
-              "36a538d"
+              "36a538d",
+              "7f9e743"
             ],
             "history_handoff_paths": [
-              ".ai/workflows/runs/active/2026-07-13-sliced-apply-change-assessment-gate/handoffs/default/history/implement-agent-20260713T131049105826Z.md"
+              ".ai/workflows/runs/active/2026-07-13-sliced-apply-change-assessment-gate/handoffs/default/history/implement-agent-20260713T132809586694Z.md"
             ]
           },
           "blockers": [],
           "recommended_next_action": "dispatch_review_agent",
-          "recorded_at": "2026-07-13T21:10:49.031451"
+          "recorded_at": "2026-07-13T21:28:09.500968"
         },
         "review-agent": {
           "agent": "review-agent",
@@ -206,36 +217,46 @@
             "review_decision": "rejected",
             "review_complete": false,
             "verification_passed": true,
-            "criteria_satisfied": [
-              "worktree_verified",
-              "commit_range_inspected",
-              "implement_verification_evidence_present",
-              "requested_tests_passed",
-              "previous_blockers_rechecked"
+            "tests_passed": true,
+            "invariants_verified": [
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11
+            ],
+            "invariants_failed": [
+              1,
+              2,
+              12
             ],
             "previous_blockers_resolved": [
-              "active_source_dirty_files_removed",
-              "symmetric_assessment_gating",
-              "slice_id_enforcement",
-              "assessment_schema_validation",
-              "changed_files_complete"
+              "changed_files_list_complete",
+              "active_implement_dispatches_require_slice_id",
+              "pending_blocked_assessment_gates_implement_and_review",
+              "assessment_materialization_validates_required_fields",
+              "not_required_waiver_invariants_enforced"
             ]
           },
           "artifacts": {
             "handoff_path": ".ai/workflows/runs/active/2026-07-13-sliced-apply-change-assessment-gate/handoffs/default/review-agent.md",
             "history_handoff_paths": [
-              ".ai/workflows/runs/active/2026-07-13-sliced-apply-change-assessment-gate/handoffs/default/history/review-agent-20260713T131749001194Z.md"
+              ".ai/workflows/runs/active/2026-07-13-sliced-apply-change-assessment-gate/handoffs/default/history/review-agent-20260713T133519459478Z.md"
             ]
           },
           "blockers": [
             {
               "reason": "review_blocked",
-              "message": "validate_implementation_state does not enforce not_required explicit-waiver invariants (Invariant 7): empty reasons/assessed_by or non-governed default slices still authorize dispatch",
+              "message": "cmd_complete_phase does not block when implementation state is missing for active apply runs, violating invariants 1,2,12 and Decision 9 phase-completion-gate",
               "recommended_action": "back_to_implement"
             }
           ],
           "recommended_next_action": "dispatch_implement_agent",
-          "recorded_at": "2026-07-13T21:17:48.998440"
+          "recorded_at": "2026-07-13T21:35:19.456461"
         }
       }
     },
@@ -249,7 +270,7 @@
       "back_to_implement"
     ]
   },
-  "updated_at": "2026-07-13T21:17:57.618645",
+  "updated_at": "2026-07-13T21:35:29.691284",
   "implementation": {
     "strategy": "sequential",
     "slicing_assessment": {
@@ -269,15 +290,16 @@
         "depends_on": [],
         "required": true,
         "status": "in_progress",
-        "attempt_count": 4,
+        "attempt_count": 5,
         "block": null,
         "base_ref": "e1d034eff1b1a7e6c684aac86d3a6c749908ef0f",
-        "head_ref": "36a538d",
+        "head_ref": "7f9e743",
         "accepted_head_ref": "",
         "commit_refs": [
           "9d3a8cae223513c6bb281bf72ff2290eb399369a",
           "b5e811cd94a15c022d98aeadab2cd3a428c6fb67",
-          "36a538d"
+          "36a538d",
+          "7f9e743"
         ],
         "implement_evidence": {
           "tasks_complete": true,
@@ -299,7 +321,7 @@
           "verification_summary": {
             "status": "pass",
             "full_regression": {
-              "passed": 768,
+              "passed": 776,
               "failed": 0
             }
           }

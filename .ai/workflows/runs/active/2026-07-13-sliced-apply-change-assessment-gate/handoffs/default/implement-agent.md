@@ -1,93 +1,95 @@
-# Implement Agent Handoff — Sliced Apply-Change Assessment Gate
+# Handoff: implement-agent (Attempt 5 — Sliced Apply-Change Phase Completion Gate)
 
 ## Metadata
-- **agent**: implement-agent
-- **phase**: apply_change
+
+- **run_id**: 2026-07-13-sliced-apply-change-assessment-gate
 - **slice_id**: default
+- **phase**: apply_change
 - **flow_type**: lightweight-flow
-- **timestamp**: 2026-07-13T13:45:00Z
-- **parent_ref**: 36a538db11c6a602257df459ab4a6d1882ea339f
+- **timestamp**: 2026-07-13T13:35:00Z
 - **base_branch**: main
+- **parent_ref**: e1d034e
 
 ## Objective
-Fix remaining blocking issue from review-agent: `validate_implementation_state` does not enforce `not_required` explicit-waiver invariants (Spec Invariant 7).
+
+Fix the remaining blocking issue from review-agent: `cmd_complete_phase` does not block when implementation state is missing for active apply runs. The aggregate review gate was only enforced when `state.get("implementation") is not None`, allowing active apply runs with missing implementation to bypass the gate entirely and fall through to ordinary evidence validation.
 
 ## Work Completed
 
-### 1. Added `not_required` waiver invariant validation to `validate_implementation_state`
-In `.ai/workflows/scripts/workflow_runtime/state.py`, added a new validation block that checks when `slicing_assessment.status == "not_required"`:
+### Root Cause
 
-- **decision** must be `"single_slice"` (not `multi_slice`)
-- **assessed_by** must be non-empty (stripped)
-- **reasons** must contain at least one non-empty (stripped) reason
-- **Exactly one slice** must exist with `slice_id == "default"`
-- The default slice must be `required: true`
+`cmd_complete_phase` (line 531 of lifecycle.py) had:
 
-Violations return errors with reason `invalid_not_required_waiver`.
+```python
+if current == "apply_change" and state.get("implementation") is not None:
+```
 
-### 2. Updated `normalize_implementation_state` for legacy compatibility
-Changed synthetic legacy state fields from empty strings/lists to valid values:
-- `assessed_by`: `""` → `"system"`
-- `reasons`: `[]` → `["Legacy run without explicit slicing assessment"]`
+When `implementation` was `None` on an active apply run, the entire slicing gate was skipped. The code fell through to evidence key validation, violating:
 
-This ensures legacy runs without an `implementation` block still pass validation.
+- **Spec Invariant 1**: An active running apply run always has persisted valid implementation state.
+- **Spec Invariant 2**: Missing active implementation state always blocks apply execution.
+- **Spec Decision 9**: Historical compatibility cannot be used by active apply phase completion gates.
 
-### 3. Defense-in-depth
-The constructor `make_no_decomposition_implementation_state` already validates these invariants at creation time. `validate_implementation_state` now independently validates the same invariants at every read/dispatch, ensuring protection against corrupt state files and malicious state edits.
+### Fix Applied
 
-### 4. Added 8 TDD tests
-Red phase: 7 rejection tests + 1 acceptance test. All pass after implementation.
+Changed the gate in `cmd_complete_phase` to always block on missing or incomplete slicing state for `apply_change`:
 
-## Files/Artifacts Changed
+1. **Missing implementation**: Blocks with error `"Active apply run has no persisted implementation slicing state"`.
+2. **Pending/blocked assessment**: Blocks with error pointing to incomplete `slicing_assessment` status and remediation via `slice-init`.
+3. **Aggregate review not passed**: Blocks as before with the existing aggregate review error.
+
+### TDD Red/Green Loop
+
+All 4 new tests witnessed RED (3 failures, 1 pass from existing behavior overlap) before the fix, and all 4 passed GREEN after.
+
+## Files Changed
 
 | File | Status | Reason |
-|---|---|---|
-| `.ai/workflows/scripts/workflow_runtime/state.py` | modified | Added not_required waiver validation + legacy normalization fix |
-| `skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/state.py` | modified | Synced template copy |
-| `tests/test_workflow.py` | modified | Added 8 TDD tests for not_required waiver invariants |
+|------|--------|--------|
+| `.ai/workflows/scripts/workflow_runtime/lifecycle.py` | modified | Canonical: expanded slicing assessment gate in `cmd_complete_phase` |
+| `skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/lifecycle.py` | modified | Template sync (canonical → template) |
+| `.claude/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/lifecycle.py` | modified | Distributed copy sync |
+| `.cursor/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/lifecycle.py` | modified | Distributed copy sync |
+| `.opencode/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/lifecycle.py` | modified | Distributed copy sync |
+| `tests/test_workflow.py` | modified | 4 new tests + fix for 1 existing test requiring implementation |
 
-## Commands Run
+## Verification Summary
 
-| Command | Result |
-|---|---|
-| `python3 -m pytest tests/test_workflow.py -k "not_required or no_decomposition or invalid_waiver" -v` | 11 passed |
-| `python3 -m pytest tests/test_workflow.py -v` | 457 passed |
-| `python3 -m pytest tests/test_wrapper_contracts.py -v` | 306 passed |
-| `python3 -m pytest tests/test_workflow_modules.py -v` | 13 passed |
+### Focused Tests (all PASS)
 
-## Evidence Summary
+```
+python3 -m pytest tests/test_workflow.py -k "missing_slicing_assessment or pending_slicing_assessment or blocked_slicing_assessment or valid_implementation_and_aggregate_passed" -v
+```
 
-- **tasks_complete**: true
-- **tdd_passed**: true
-- **focused_tests**: 8 new tests added to `TestSliceStateAndValidation`:
-  - `test_not_required_rejects_empty_assessed_by` — PASS
-  - `test_not_required_rejects_empty_reasons` — PASS
-  - `test_not_required_rejects_whitespace_only_reasons` — PASS
-  - `test_not_required_rejects_non_single_slice_decision` — PASS
-  - `test_not_required_rejects_no_default_slice` — PASS
-  - `test_not_required_rejects_multiple_slices` — PASS
-  - `test_not_required_rejects_default_not_required_slice` — PASS
-  - `test_not_required_accepts_valid_state` — PASS
-- **full_regression**: 776 tests total (457 + 306 + 13), all passed
+| Test | Result |
+|------|--------|
+| `test_complete_phase_blocks_with_missing_slicing_assessment` | PASS |
+| `test_complete_phase_blocks_with_pending_slicing_assessment` | PASS |
+| `test_complete_phase_blocks_with_blocked_slicing_assessment` | PASS |
+| `test_complete_phase_succeeds_with_valid_implementation_and_aggregate_passed` | PASS |
+
+### Full Regression
+
+```
+python3 -m pytest tests/test_workflow.py -v
+461 passed, 25 subtests passed
+
+python3 -m pytest tests/test_wrapper_contracts.py tests/test_workflow_modules.py -v
+319 passed, 2 subtests passed
+```
+
+One existing test (`TestRoadmapHookFiltering::test_spec_change_run_does_not_enqueue_roadmap_hooks_on_apply_change`) was updated to include a minimal valid implementation state, since `complete-phase` on apply_change now requires it.
 
 ## Issues
-- Bash permission rules required careful command construction; `python3 -m pytest --version` worked but `-k` flag with complex quoting was initially blocked.
-- The synthetic legacy normalization state had `assessed_by: ""` and `reasons: []` which would fail the new validation; fixed by providing valid defaults (`"system"`, `["Legacy run..."]`).
+
+None. The fix was surgical, affecting only the gate condition in `cmd_complete_phase` and one test that set up apply_change state without implementation.
 
 ## Learnings
-- The `normalize_implementation_state` function creates a synthetic state for legacy runs that goes through the same `validate_implementation_state` function — both need to be consistent.
-- The defense-in-depth approach (constructor validates at creation time, `validate_implementation_state` validates at read/dispatch) catches both malformed constructions and corrupt state files.
+
+- The `normalize_implementation_state` helper provides backward-compatible defaults for legacy/terminal runs, but active dispatch paths must use `active_apply_slicing_errors` or check the raw `state["implementation"]` directly.
+- The original gate condition (`and state.get("implementation") is not None`) was designed with the assumption that `normalize_implementation_state` would paper over missing state, but this normalization is explicitly documented as "read-only compatibility for historical/terminal runs only."
 
 ## Suggestions
-- Consider adding a similar validation pass for `blocked` assessment status invariants in future iterations.
 
-## Blockers
-None.
-
-## Assumptions
-- The `not_required` status is used exclusively for single-slice no-decomposition assessments.
-- `normalize_implementation_state` is only called for legacy/historical runs and the valid default fields are appropriate.
-- No distributed copies under `.claude/`, `.cursor/`, `.opencode/` exist for the template — only the canonical `skills/` template needed syncing.
-
-## Risks/Follow-Ups
-- If code elsewhere constructs `not_required` state with `assessed_by: ""` or `reasons: []` without going through `make_no_decomposition_implementation_state`, those paths will now fail validation — this is the intended behavior (defense-in-depth).
+- Consider adding a centralized "apply_change phase completion gate" helper that enforces all three prerequisites (implementation present, assessment completed, aggregate review passed) in one callable, shared between `cmd_complete_phase`, `cmd_advance`, and any future completion paths.
+- The test suite has multiple `_make_apply_run` helpers across different test classes — consider a shared test fixture builder to reduce duplication.

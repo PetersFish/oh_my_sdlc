@@ -525,11 +525,31 @@ def cmd_complete_phase(root, args):
         print(json.dumps(state, indent=2))
         sys.exit(1)
 
-    # P0 Sliced apply-change: aggregate review completion gate.
-    # apply_change completion requires aggregate_review_status == "passed"
-    # when implementation state exists.
-    if current == "apply_change" and state.get("implementation") is not None:
+    # P0 Sliced apply-change: aggregate review completion gate
+    # and slicing assessment prerequisites.
+    # Spec Invariants 1, 2: an active apply run must have persisted
+    # implementation state.  Spec Decision 9: historical compatibility
+    # cannot authorize active apply phase-completion gates.
+    if current == "apply_change":
+        if state.get("implementation") is None:
+            print(json.dumps({
+                "error": "Active apply run has no persisted implementation slicing state",
+            }, indent=2))
+            sys.exit(1)
         impl = normalize_implementation_state(state)
+        # Spec Decision 9: slicing_assessment must be completed (not pending/blocked)
+        # before phase completion is allowed.
+        assessment = impl.get("slicing_assessment", {})
+        assessment_status = assessment.get("status", "pending")
+        if assessment_status in ("pending", "blocked"):
+            print(json.dumps({
+                "error": (
+                    f"apply_change completion requires a completed "
+                    f"slicing_assessment; status is {assessment_status!r}. "
+                    "Run slice-init or resolve the assessment block first."
+                ),
+            }, indent=2))
+            sys.exit(1)
         agg_status = impl.get("aggregate_review_status", "pending")
         if agg_status != "passed":
             print(json.dumps({

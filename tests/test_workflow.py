@@ -2052,6 +2052,15 @@ class TestRoadmapHookFiltering(FixtureBase):
         state["evidence"]["tasks_complete"] = True
         state["evidence"]["tdd_passed"] = True
         state["evidence"]["eval_passed_or_human_decision_recorded"] = True
+        # Add minimal valid implementation state required by the slicing gate
+        state["implementation"] = _make_implementation_state(
+            [_make_slice("default", status="completed",
+                         accepted_head_ref="head-hf",
+                         review_evidence={"review_passed": True})],
+            assessment_status="completed",
+            decision="single_slice",
+        )
+        state["implementation"]["aggregate_review_status"] = "passed"
         self._write_current_state(state)
 
         rc, out, _ = run_workflow(
@@ -10589,6 +10598,77 @@ class TestSliceDispatchRemediation(FixtureBase):
             exit_criteria_satisfied="all_tasks_complete",
         )
         self.assertNotEqual(rc, 0)
+
+    # --- Issue 5: complete-phase slicing assessment gate ---
+
+    def test_complete_phase_blocks_with_missing_slicing_assessment(self):
+        """complete-phase must block when implementation is None on an
+        active apply run (Spec Invariants 1, 2; Decision 9)."""
+        self._make_apply_run(implementation=None)
+        rc, out, _ = run_workflow(
+            self.tmp, "complete-phase",
+            exit_criteria_satisfied="tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded",
+        )
+        self.assertNotEqual(rc, 0)
+        self.assertIn("no persisted implementation", out)
+
+    def test_complete_phase_blocks_with_pending_slicing_assessment(self):
+        """complete-phase must block when slicing_assessment.status is
+        'pending' (assessment not yet complete)."""
+        impl = _make_implementation_state(
+            [_make_slice("default")],
+            assessment_status="pending",
+            decision="single_slice",
+        )
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(
+            self.tmp, "complete-phase",
+            exit_criteria_satisfied="tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded",
+        )
+        self.assertNotEqual(rc, 0)
+        self.assertIn("slicing_assessment", out.lower())
+
+    def test_complete_phase_blocks_with_blocked_slicing_assessment(self):
+        """complete-phase must block when slicing_assessment.status is
+        'blocked' (assessment blocked)."""
+        impl = _make_implementation_state(
+            [_make_slice("default")],
+            assessment_status="blocked",
+            decision="single_slice",
+        )
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(
+            self.tmp, "complete-phase",
+            exit_criteria_satisfied="tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded",
+        )
+        self.assertNotEqual(rc, 0)
+        self.assertIn("slicing_assessment", out.lower())
+
+    def test_complete_phase_succeeds_with_valid_implementation_and_aggregate_passed(self):
+        """complete-phase succeeds when implementation state is valid,
+        slicing_assessment is completed, and aggregate review passed."""
+        impl = _make_implementation_state(
+            [_make_slice("default", status="completed",
+                         accepted_head_ref="head-a",
+                         review_evidence={"review_passed": True})],
+            assessment_status="completed",
+            decision="single_slice",
+        )
+        impl["aggregate_review_status"] = "passed"
+        self._make_apply_run(implementation=impl)
+        # Set evidence keys required for apply_change
+        state = self._read_current_state()
+        state.setdefault("evidence", {})["tasks_complete"] = True
+        state.setdefault("evidence", {})["tdd_passed"] = True
+        state.setdefault("evidence", {})["eval_passed_or_human_decision_recorded"] = True
+        self._write_current_state(state)
+        rc, out, _ = run_workflow(
+            self.tmp, "complete-phase",
+            exit_criteria_satisfied="tasks_complete,tdd_passed,eval_passed_or_human_decision_recorded",
+        )
+        self.assertEqual(rc, 0)
+        data = json.loads(out)
+        self.assertIn("apply_change", data.get("completed_phases", []))
 
     def test_slice_next_returns_all_complete_only_after_aggregate_passed(self):
         """slice-next must return all_slices_and_aggregate_complete only
