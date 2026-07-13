@@ -40,7 +40,7 @@ permission:
     "openspec status*": allow
     "openspec list*": allow
     "openspec archive*": allow
-model: ollama-cloud/glm-5.2
+model: openai/gpt-5.4-mini
 variant: Default
 ---
 

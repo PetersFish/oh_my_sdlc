@@ -24,7 +24,7 @@ permission:
     "git log*": allow
     "python3 skills/sdlc-roadmap/scripts/*": allow
     "roadmap *": allow
-model: ollama-cloud/glm-5.2
+model: openai/gpt-5.4-mini
 variant: Default
 ---
 
