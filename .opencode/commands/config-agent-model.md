@@ -1,0 +1,1 @@
+Please config .opencode/agents/* with .opencode/agents/config/model-profiles.yaml, using scripts/setup_agents.py
