@@ -4557,6 +4557,7 @@ class TestDispatchHooks(FixtureBase):
         rc, out, _ = run_workflow(
             self.tmp, "before-dispatch",
             agent="implement-agent",
+            slice_id="default",
         )
 
         self.assertEqual(rc, 0)
@@ -4980,14 +4981,17 @@ class TestDispatchHooks(FixtureBase):
             ("archive_change", ["finish-agent", "finish_agent"]),
         ]
         for phase, agents in cases:
-            self._create_run()
-            state = self._read_current_state()
-            state["current_phase"] = phase
-            self._write_current_state(state)
             for agent in agents:
+                self._create_run()
+                state = self._read_current_state()
+                state["current_phase"] = phase
+                self._write_current_state(state)
+                kwargs = {"agent": agent}
+                if agent in ("implement-agent", "implement_agent"):
+                    kwargs["slice_id"] = "default"
                 rc, out, _ = run_workflow(
                     self.tmp, "before-dispatch",
-                    agent=agent,
+                    **kwargs,
                 )
                 self.assertEqual(rc, 0, f"Agent {agent} should be valid in {phase}")
 
@@ -6887,6 +6891,7 @@ class TestExecutionContextAndRuntimeContext(FixtureBase):
         rc, out, _ = run_workflow(
             self.tmp, "before-dispatch",
             agent="implement-agent",
+            slice_id="default",
         )
         self.assertEqual(rc, 0)
         data = json.loads(out)
@@ -6904,6 +6909,7 @@ class TestExecutionContextAndRuntimeContext(FixtureBase):
         rc, out, _ = run_workflow(
             self.tmp, "before-dispatch",
             agent="implement-agent",
+            slice_id="default",
         )
         self.assertEqual(rc, 0)
         data = json.loads(out)
@@ -6931,6 +6937,7 @@ class TestExecutionContextAndRuntimeContext(FixtureBase):
         rc, out, _ = run_workflow(
             self.tmp, "before-dispatch",
             agent="implement-agent",
+            slice_id="default",
         )
         self.assertEqual(rc, 0)
         data = json.loads(out)
@@ -6959,6 +6966,7 @@ class TestExecutionContextAndRuntimeContext(FixtureBase):
         rc, out, _ = run_workflow(
             self.tmp, "before-dispatch",
             agent="implement-agent",
+            slice_id="default",
         )
         self.assertEqual(rc, 0)
         data = json.loads(out)
@@ -7032,6 +7040,7 @@ class TestExecutionContextAndRuntimeContext(FixtureBase):
         rc, out, _ = run_workflow(
             self.tmp, "before-dispatch",
             agent="implement-agent",
+            slice_id="default",
         )
         self.assertEqual(rc, 0)
         data = json.loads(out)
@@ -7058,6 +7067,7 @@ class TestExecutionContextAndRuntimeContext(FixtureBase):
         rc, out, _ = run_workflow(
             self.tmp, "before-dispatch",
             agent="implement-agent",
+            slice_id="default",
         )
         self.assertEqual(rc, 0)
         data = json.loads(out)
@@ -10980,10 +10990,9 @@ class TestReviewBlockerRemediation(FixtureBase):
         self.assertIn("missing_slice_id", reasons)
 
     def test_implement_dispatch_without_slice_id_allowed_for_single_default(self):
-        """before-dispatch(implement-agent) without --slice-id is allowed
-        when the implementation state has only the single 'default' slice
-        and assessment_status is 'not_required' (legacy / backward compat).
-        New persisted states with completed assessment require --slice-id."""
+        """before-dispatch(implement-agent) without --slice-id is REJECTED
+        even for a single 'default' slice — all active implement-agent
+        dispatches require --slice-id (Invariants 8 and 12)."""
         impl = _make_implementation_state(
             [_make_slice("default", depends_on=[], status="ready",
                          base_ref="base-0")],
@@ -10994,7 +11003,10 @@ class TestReviewBlockerRemediation(FixtureBase):
 
         rc, out, _ = run_workflow(self.tmp, "before-dispatch",
                                   agent="implement-agent")
-        self.assertEqual(rc, 0, out)
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [b.get("reason", "") for b in data.get("blockers", [])]
+        self.assertIn("missing_slice_id", reasons)
 
     def test_implement_dispatch_without_slice_id_rejected_for_completed_assessment(self):
         """before-dispatch(implement-agent) without --slice-id is REJECTED
@@ -12634,10 +12646,9 @@ class TestNoDecomposition(FixtureBase):
         self.assertEqual(rc, 0, out)
 
     def test_non_legacy_default_slice_requires_slice_id_for_dispatch(self):
-        """After materialization (not_required=False), implement-agent dispatch
+        """After assessment is materialized, implement-agent dispatch
         without --slice-id must be rejected even for single-default slices.
-        The backward-compat skip for omitted --slice-id only applies when
-        assessment_status is 'not_required'."""
+        There is no backward-compat omission for any active dispatch."""
         self._make_apply_run(implementation=None)
         # First materialize via skip_assessment, then override to completed.
         run_workflow(
@@ -12661,21 +12672,25 @@ class TestNoDecomposition(FixtureBase):
         self.assertIn("missing_slice_id", reasons)
 
     def test_legacy_not_required_single_default_allows_omit_slice_id(self):
-        """When assessment_status is 'not_required' (legacy), implement-agent
-        dispatch without --slice-id is still allowed for backward compatibility."""
+        """When assessment_status is 'not_required', implement-agent dispatch
+        without --slice-id is REJECTED — all active dispatches require
+        --slice-id regardless of assessment status (Invariants 8, 12)."""
         self._make_apply_run(implementation=None)
         run_workflow(
             self.tmp, "slice-init",
             skip_assessment=True,
             reason="User explicitly selected one governed implementation slice",
         )
-        # Dispatch without --slice-id should succeed (legacy compat)
+        # Dispatch without --slice-id should be rejected
         rc, out, _ = run_workflow(
             self.tmp, "before-dispatch",
             agent="implement-agent",
             phase="apply_change",
         )
-        self.assertEqual(rc, 0, out)
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [b.get("reason", "") for b in data.get("blockers", [])]
+        self.assertIn("missing_slice_id", reasons)
 
 
 # ---------------------------------------------------------------------------

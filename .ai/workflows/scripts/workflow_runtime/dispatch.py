@@ -582,48 +582,18 @@ def cmd_before_dispatch(root, args):
                         "recommended_action": "dispatch implement-agent first to move slice to in_review",
                     })
         elif canonical_agent == "implement-agent":
-            # No slice_id provided.
-            # All new persisted implementation states (assessment_status !=
-            # "not_required") require --slice-id.  The backward-compat skip
-            # for omitted --slice-id only applies to legacy runs where
-            # the implementation block was never explicitly materialized.
-            all_slices = impl.get("slices", []) or []
-            is_single_default = (
-                len(all_slices) == 1
-                and all_slices[0].get("slice_id") == "default"
-            )
-            is_legacy = assessment_status == "not_required"
-            if is_legacy:
-                # Legacy runs: only require --slice-id for multi-slice or
-                # active-slice cases; single-default remains allowed.
-                if not is_single_default:
-                    blocker_reasons.append({
-                        "reason": "missing_slice_id",
-                        "message": (
-                            "implement dispatch requires --slice-id when "
-                            "implementation state has multiple slices; use "
-                            "slice-next to find the next ready slice"
-                        ),
-                        "recommended_action": "use_slice_next_to_find_ready_slice",
-                    })
-                elif active_slices:
-                    blocker_reasons.append({
-                        "reason": "another_slice_active",
-                        "message": f"slice {active_slices[0].get('slice_id')!r} is currently {active_slices[0].get('status')!r}",
-                        "recommended_action": "wait for active slice to complete or specify its slice_id",
-                    })
-            else:
-                # Non-legacy: --slice-id is always required for new
-                # persisted implementation states.
-                blocker_reasons.append({
-                    "reason": "missing_slice_id",
-                    "message": (
-                        "implement dispatch requires --slice-id for all "
-                        "new persisted implementation states; use "
-                        "slice-next to find the next ready slice"
-                    ),
-                    "recommended_action": "use_slice_next_to_find_ready_slice",
-                })
+            # All implement-agent dispatches require --slice-id.
+            # There is no backward-compat omission path; historical runs
+            # that predate the slicing assessment gate cannot execute new
+            # work until assessment is present.
+            blocker_reasons.append({
+                "reason": "missing_slice_id",
+                "message": (
+                    "implement dispatch requires --slice-id; use "
+                    "slice-next to find the next ready slice"
+                ),
+                "recommended_action": "use_slice_next_to_find_ready_slice",
+            })
 
     if blocker_reasons:
         blocker = {
