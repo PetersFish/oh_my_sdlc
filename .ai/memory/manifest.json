@@ -5,14 +5,14 @@
   "git": {
     "available": true,
     "has_commits": true,
-    "head": "a4a3fb4ecd074f9e283279fc04e00c4cef70a555",
-    "last_synced_commit": "a4a3fb4ecd074f9e283279fc04e00c4cef70a555",
+    "head": "0e827f58bec955a78b1ef3ec63e5e73e7f446c4c",
+    "last_synced_commit": "0e827f58bec955a78b1ef3ec63e5e73e7f446c4c",
     "worktree_state": "dirty"
   },
   "pending_snapshots": [],
   "last_sync": {
-    "timestamp": "2026-07-13T05:10:11.444993Z",
-    "commit": "a4a3fb4ecd074f9e283279fc04e00c4cef70a555",
-    "snapshot_id": "20260713-sliced-apply-change-p0"
+    "timestamp": "2026-07-13T14:02:01.379495Z",
+    "commit": "0e827f58bec955a78b1ef3ec63e5e73e7f446c4c",
+    "snapshot_id": "20260713-220000"
   }
 }

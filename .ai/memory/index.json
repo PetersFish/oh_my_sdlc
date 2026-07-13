@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "generated_at": "2026-07-05T13:17:56.117665Z",
+  "generated_at": "2026-07-13T14:01:45.151097Z",
   "entries": [
     {
       "id": "agents",
@@ -15,7 +15,7 @@
         "subagents",
         "roadmap"
       ],
-      "updated_at": "2026-07-05T21:20:00Z",
+      "updated_at": "2026-07-13T13:10:00Z",
       "confidence": "high",
       "status": "synced",
       "parent_id": "root",
@@ -263,7 +263,7 @@
         "roadmap",
         "evalops"
       ],
-      "updated_at": "2026-06-14T07:00:00Z",
+      "updated_at": "2026-07-11T00:00:00Z",
       "confidence": "high",
       "status": "synced",
       "parent_id": "skills",
@@ -384,7 +384,7 @@
       "tags": [
         "tests"
       ],
-      "updated_at": "2026-05-30T11:47:00Z",
+      "updated_at": "2026-07-11T00:00:00Z",
       "confidence": "high",
       "status": "synced",
       "parent_id": "root",
@@ -402,6 +402,25 @@
         "tests/"
       ],
       "spec_paths": []
+    },
+    {
+      "id": "workflow-runtime-architecture",
+      "type": "architecture",
+      "path": "architecture/workflow-runtime-architecture.md",
+      "title": "Workflow Runtime Module Architecture",
+      "summary": ">-",
+      "tags": [
+        "workflow",
+        "runtime",
+        "architecture",
+        "modules",
+        "cli-facade",
+        "state-io"
+      ],
+      "updated_at": "2026-07-13T13:10:00Z",
+      "confidence": "high",
+      "status": "synced",
+      "parent_id": "root"
     },
     {
       "id": "init-command-core-pattern",
@@ -485,6 +504,25 @@
         "git-hooks"
       ],
       "updated_at": "2026-06-21T16:00:00Z",
+      "confidence": "high",
+      "status": "synced",
+      "parent_id": "root"
+    },
+    {
+      "id": "workflow-runtime-modularization",
+      "type": "decisions",
+      "path": "decisions/workflow-runtime-modularization.md",
+      "title": "Workflow Runtime Modularization \u2014 sibling package behind script facade",
+      "summary": "Split the monolithic workflow.py into a sibling workflow_runtime/ package while keeping workflow.py as the executable CLI facade. Modules follow a strict dependency direction; state writes confined to state.py.",
+      "tags": [
+        "workflow",
+        "runtime",
+        "modularization",
+        "architecture",
+        "refactor",
+        "cli-facade"
+      ],
+      "updated_at": "2026-07-12T00:00:00Z",
       "confidence": "high",
       "status": "synced",
       "parent_id": "root"
@@ -574,6 +612,43 @@
       "status": "synced"
     },
     {
+      "id": "pitfalls/final-commit-active-run-deletion-residual",
+      "type": "pitfalls",
+      "path": "pitfalls/final-commit-active-run-deletion-residual.md",
+      "title": "final-commit left active-run directory deletions residual, blocking clean finalization",
+      "summary": ">-",
+      "tags": [
+        "workflow",
+        "final-commit",
+        "governance",
+        "active-run",
+        "finalization"
+      ],
+      "updated_at": "2026-07-12T16:00:00Z",
+      "confidence": "high",
+      "status": "synced",
+      "parent_id": "root"
+    },
+    {
+      "id": "pitfalls/finish-agent-evidence-slice-id-change-id",
+      "type": "pitfalls",
+      "path": "pitfalls/finish-agent-evidence-slice-id-change-id.md",
+      "title": "Terminal validation rejected finish-agent success when change_id differed from the default slice",
+      "summary": ">-",
+      "tags": [
+        "workflow",
+        "state",
+        "terminal",
+        "finish-agent",
+        "slice-id",
+        "evidence"
+      ],
+      "updated_at": "2026-07-12T16:00:00Z",
+      "confidence": "high",
+      "status": "synced",
+      "parent_id": "root"
+    },
+    {
       "id": "live-template-drift",
       "type": "pitfalls",
       "path": "pitfalls/live-template-drift.md",
@@ -636,6 +711,24 @@
       "parent_id": "root"
     },
     {
+      "id": "pitfalls/stale-decision-block-persists-after-valid-correction",
+      "type": "pitfalls",
+      "path": "pitfalls/stale-decision-block-persists-after-valid-correction.md",
+      "title": "Recording a corrected valid branch_finish_decision leaves stale decision block intact, blocking guarded dispatch and advancement",
+      "summary": "cmd_record_context updated context but preserved status=blocked and the decision block, so a run blocked for a missing/invalid branch_finish_decision could not recover by recording a corrected value \u2014 guarded dispatch (before-dispatch) and advancement still rejected the run even though the original decision error was resolved.",
+      "tags": [
+        "workflow",
+        "decision-block",
+        "branch-finish",
+        "stale-state",
+        "record-context",
+        "dispatch"
+      ],
+      "updated_at": "2026-07-11T00:00:00Z",
+      "confidence": "high",
+      "status": "synced"
+    },
+    {
       "id": "pitfalls/stale-global-skill-copies-break-openspec-init",
       "type": "pitfalls",
       "path": "pitfalls/stale-global-skill-copies-break-openspec-init.md",
@@ -691,6 +784,35 @@
       "spec_paths": ""
     },
     {
+      "id": "specs/repair-workflow-decision-block-unlock",
+      "type": "specs",
+      "path": "specs/repair-workflow-decision-block-unlock.md",
+      "title": "Workflow decision block unlock contract",
+      "summary": "Defines and verifies that recording a corrected valid branch_finish_decision reconciles the stale decision-specific block atomically, restoring the run to running with block null while preserving unrelated blocks and invalid corrections.",
+      "tags": [
+        "workflow",
+        "decision-block",
+        "branch-finish",
+        "reconciliation",
+        "openspec"
+      ],
+      "updated_at": "2026-07-11T00:00:00Z",
+      "confidence": "high",
+      "status": "synced",
+      "owned_paths": "",
+      "path_hints": "",
+      "keywords": [
+        "decision-block",
+        "branch-finish-decision",
+        "unblock",
+        "reconcile",
+        "record-context",
+        "running"
+      ],
+      "test_paths": "",
+      "spec_paths": ""
+    },
+    {
       "id": "20260621-workflow-runtime-enhancements",
       "type": "evolution",
       "path": "evolution/20260621-workflow-runtime-enhancements.md",
@@ -728,39 +850,117 @@
       "parent_id": "root"
     },
     {
-      "id": "decisions/workflow-runtime-modularization",
-      "type": "decisions",
-      "path": "decisions/workflow-runtime-modularization.md",
-      "title": "Workflow Runtime Modularization — sibling package behind script facade",
-      "summary": "Split monolithic workflow.py into a sibling workflow_runtime/ package while keeping workflow.py as the executable CLI facade. Modules follow a strict dependency direction; state writes confined to state.py.",
+      "id": "20260711-finish-agent-branch-decision",
+      "type": "evolution",
+      "path": "evolution/20260711-finish-agent-branch-decision.md",
+      "title": "2026-07-11 \u2014 Finish-Agent Branch Decision Gate and Terminal Ownership",
+      "summary": "Added explicit branch finish decision gate (merge_local/create_pr/keep_branch/discard), separated implementation from workflow commits, defined memory sync target ref rules per branch decision, enforced finish-agent terminal boundaries, replaced misleading archive evidence with semantic fields, and implemented lightweight-flow Superpowers plan/spec archive moves into typed subdirectories.",
       "tags": [
         "workflow",
-        "runtime",
-        "modularization",
-        "architecture",
-        "refactor",
-        "cli-facade"
+        "finish-agent",
+        "branch",
+        "archive",
+        "governance",
+        "dev-orchestrator"
       ],
-      "updated_at": "2026-07-12T00:00:00Z",
+      "updated_at": "2026-07-11T00:00:00Z",
       "confidence": "high",
       "status": "synced",
       "parent_id": "root"
     },
     {
-      "id": "architecture/workflow-runtime-architecture",
-      "type": "architecture",
-      "path": "architecture/workflow-runtime-architecture.md",
-      "title": "Workflow Runtime Module Architecture",
-      "summary": "workflow_runtime/ package behind a thin workflow.py CLI facade. Modules: core, state, definitions, domains, policies, dispatch, lifecycle, governance, cli. state.py is sole run-state writer; domains.py is read-only.",
+      "id": "20260711-workflow-decision-block-unlock",
+      "type": "evolution",
+      "path": "evolution/20260711-workflow-decision-block-unlock.md",
+      "title": "2026-07-11 \u2014 Workflow Decision Block Unlock",
+      "summary": "Fixed stale decision block persistence by adding atomic reconciliation in cmd_record_context \u2014 recording a corrected valid branch_finish_decision now clears only the decision-specific block and restores the run to running, while preserving unrelated blocks and invalid corrections. Added narrow structured block-recognition predicates and behavioral regression coverage.",
+      "tags": [
+        "workflow",
+        "decision-block",
+        "branch-finish",
+        "reconciliation",
+        "record-context",
+        "governance"
+      ],
+      "updated_at": "2026-07-11T00:00:00Z",
+      "confidence": "high",
+      "status": "synced",
+      "parent_id": "root"
+    },
+    {
+      "id": "20260711-workflow-final-tail-commit",
+      "type": "evolution",
+      "path": "evolution/20260711-workflow-final-tail-commit.md",
+      "title": "2026-07-11 \u2014 Workflow Final Tail Commit Command",
+      "summary": "Added `workflow.py final-commit` command and dev-orchestrator \"Final Tail Commit Protocol\" so governance artifacts (history run dir, current.json, roadmap, memory, openspec/changes/archive, docs/superpowers/archive) are published through a single allowlist-scoped commit after a run reaches done, replacing direct git add/commit/push by the orchestrator.",
+      "tags": [
+        "workflow",
+        "final-commit",
+        "governance",
+        "dev-orchestrator",
+        "archive"
+      ],
+      "updated_at": "2026-07-11T00:00:00Z",
+      "confidence": "high",
+      "status": "synced",
+      "parent_id": "root"
+    },
+    {
+      "id": "20260712-finalization-repair",
+      "type": "evolution",
+      "path": "evolution/20260712-finalization-repair.md",
+      "title": "2026-07-12 - Finalization Repair (active-run deletion + finish-agent slice-id)",
+      "summary": ">-",
+      "tags": [
+        "workflow",
+        "final-commit",
+        "terminal",
+        "governance",
+        "state",
+        "bugfix"
+      ],
+      "updated_at": "2026-07-12T16:00:00Z",
+      "confidence": "high",
+      "status": "synced",
+      "parent_id": "root"
+    },
+    {
+      "id": "20260712-remove-superpowers-direct-dead-code",
+      "type": "evolution",
+      "path": "evolution/20260712-remove-superpowers-direct-dead-code.md",
+      "title": "2026-07-12 \u2014 Remove superpowers-direct Dead Code",
+      "summary": ">-",
+      "tags": [
+        "workflow",
+        "dev-orchestrator",
+        "dead-code",
+        "spec-remediation",
+        "lightweight-flow"
+      ],
+      "updated_at": "2026-07-12T19:00:00Z",
+      "confidence": "high",
+      "status": "synced",
+      "parent_id": "root"
+    },
+    {
+      "id": "20260713-sliced-apply-change-p0",
+      "type": "evolution",
+      "path": "evolution/20260713-sliced-apply-change-p0.md",
+      "title": "\"2026-07-13 \u2014 P0 Sliced Apply-Change Workflow Runtime\"",
+      "summary": ">-",
       "tags": [
         "workflow",
         "runtime",
-        "architecture",
-        "modules",
-        "cli-facade",
-        "state-io"
+        "slices",
+        "apply-change",
+        "dispatch",
+        "plan-agent",
+        "implement-agent",
+        "review-agent",
+        "finish-agent",
+        "dev-orchestrator"
       ],
-      "updated_at": "2026-07-12T00:00:00Z",
+      "updated_at": "2026-07-13T13:10:00Z",
       "confidence": "high",
       "status": "synced",
       "parent_id": "root"
