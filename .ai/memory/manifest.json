@@ -5,14 +5,14 @@
   "git": {
     "available": true,
     "has_commits": true,
-    "head": "a9cc65b1363636100be887c0498c748562f37087",
-    "last_synced_commit": "a9cc65b1363636100be887c0498c748562f37087",
+    "head": "a4a3fb4ecd074f9e283279fc04e00c4cef70a555",
+    "last_synced_commit": "a4a3fb4ecd074f9e283279fc04e00c4cef70a555",
     "worktree_state": "dirty"
   },
   "pending_snapshots": [],
   "last_sync": {
-    "timestamp": "2026-07-12T15:39:29.937751Z",
-    "commit": "a9cc65b1363636100be887c0498c748562f37087",
-    "snapshot_id": "20260712-remove-superpowers-direct-dead-code"
+    "timestamp": "2026-07-13T05:10:11.444993Z",
+    "commit": "a4a3fb4ecd074f9e283279fc04e00c4cef70a555",
+    "snapshot_id": "20260713-sliced-apply-change-p0"
   }
 }
