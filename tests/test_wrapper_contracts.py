@@ -1455,10 +1455,10 @@ class TestAgentPromptBody(unittest.TestCase):
         self.assertIn("MUST NOT run `install_skill.py`", body,
                       "implement-agent must explicitly forbid install_skill.py")
 
-    def test_implement_agent_may_run_read_only_check(self):
+    def test_implement_agent_forbids_read_only_check(self):
         body = self._read_agent_body("implement-agent")
-        self.assertIn("sync_derived_artifacts.py --check", body,
-                      "implement-agent may run read-only --check")
+        self.assertIn("MUST NOT run `sync_derived_artifacts.py --check`", body,
+                      "implement-agent must forbid --check during apply_change (drift is expected)")
 
     def test_implement_agent_permission_denies_derived_sync_fix(self):
         fm = _read_agent_frontmatter(".opencode", "implement-agent")

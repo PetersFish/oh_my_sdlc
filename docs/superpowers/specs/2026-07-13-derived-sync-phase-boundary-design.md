@@ -27,19 +27,20 @@ not reconcile with the much larger live Git state.
 
 ## Decisions
 
-### 1. implement-agent Must Not Run Write-Producing Derived Sync
+### 1. implement-agent Must Not Run Derived Sync (Check or Fix)
 
 During `apply_change`, `implement-agent`:
 
 - MUST NOT run `sync_derived_artifacts.py --fix`.
 - MUST NOT run `setup_agents.py --force`.
 - MUST NOT run `install_skill.py`.
-- MAY run `sync_derived_artifacts.py --check --changed-files-from-git` (read-only).
-- MAY run `sync_templates.py --check` (read-only).
+- MUST NOT run `sync_derived_artifacts.py --check` or `sync_templates.py --check`.
 
-If the read-only check reports drift, `implement-agent` returns `blocked` with
-reason `derived_artifact_drift_detected` and recommended action
-`defer_to_finish_agent`.
+Modifying canonical `agents/`, `skills/`, or workflow templates always
+produces distributed-copy drift — this is expected, not an error. Running
+`--check` would always report drift and serve no purpose during
+`apply_change`. Drift detection and repair is owned by `finish-agent`
+during `post_archive_actions`.
 
 ### 2. finish-agent Owns Write-Producing Derived Sync
 

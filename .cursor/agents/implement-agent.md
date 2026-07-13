@@ -380,28 +380,15 @@ sync command. Specifically:
 - MUST NOT run `setup_agents.py --force`.
 - MUST NOT run `install_skill.py`.
 
-You MAY run read-only checks to detect drift:
+You also MUST NOT run `sync_derived_artifacts.py --check` or
+`sync_templates.py --check`. Modifying canonical `agents/`, `skills/`, or
+workflow templates will always produce distributed-copy drift — this is
+expected, not an error. Running `--check` would always report drift and
+serve no purpose during `apply_change`.
 
-- `python3 scripts/sync_derived_artifacts.py --check --changed-files-from-git`
-- `python3 scripts/sync_templates.py --check`
-
-If the read-only check reports drift, return `status: blocked` with:
-
-```json
-{
-  "blockers": [
-    {
-      "reason": "derived_artifact_drift_detected",
-      "message": "Derived artifact drift detected. Deferred to finish-agent.",
-      "recommended_action": "defer_to_finish_agent"
-    }
-  ],
-  "recommended_next_action": "dispatch_review_agent"
-}
-```
-
-Derived-artifact sync is owned by `finish-agent` during post-review cleanup.
-This boundary prevents review-scope churn from generated/distributed files.
+Derived-artifact drift detection and repair is owned by `finish-agent`
+during `post_archive_actions`. This boundary prevents review-scope churn
+from generated/distributed files.
 
 ## Constrained Restore for Derived Artifacts
 
