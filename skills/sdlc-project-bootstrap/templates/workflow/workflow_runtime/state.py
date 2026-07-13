@@ -537,6 +537,11 @@ def normalize_implementation_state(state):
     slice with ``slicing_assessment.status=not_required``.  This never
     mutates the persisted state file — it returns a fresh dict for callers
     to use read-only.
+
+    This normalization is read-only compatibility for historical/terminal
+    runs only.  Active dispatch, readiness, and slice selection paths must
+    use ``active_apply_slicing_errors`` or the persisted ``implementation``
+    block directly.
     """
     impl = state.get("implementation")
     if impl is None:
@@ -557,6 +562,163 @@ def normalize_implementation_state(state):
     impl = dict(impl)
     impl["slices"] = list(impl.get("slices", []))
     return impl
+
+
+def make_pending_implementation_state():
+    """Return a fresh pending implementation block for a new apply run.
+
+    The run is blocked until plan-agent produces a valid slicing assessment.
+    """
+    return {
+        "strategy": "sequential",
+        "slicing_assessment": {
+            "status": "pending",
+            "decision": "",
+            "assessed_by": "",
+            "assessment_handoff_path": "",
+            "reasons": [],
+        },
+        "aggregate_review_status": "pending",
+        "active_slice_id": None,
+        "slices": [],
+    }
+
+
+def make_slicing_assessment_block():
+    """Return a fresh slicing assessment blocker dict."""
+    return {
+        "type": "slicing_assessment_required",
+        "message": "Apply cannot continue without validated implementation slices",
+        "next_allowed": ["dispatch_plan_agent"],
+    }
+
+
+def active_apply_slicing_errors(state):
+    """Return slicing error dicts for an active apply run.
+
+    Unlike ``normalize_implementation_state``, this NEVER silently
+    authorizes an active apply run that is missing ``implementation``.
+    Historical/terminal runs use ``normalize_implementation_state`` for
+    read-only display; active dispatch paths use this helper.
+    """
+    if state.get("current_phase") != "apply_change":
+        return []
+    if state.get("status") in ("done", "cancelled"):
+        return []
+    impl = state.get("implementation")
+    if impl is None:
+        return [{
+            "reason": "missing_slicing_assessment",
+            "message": "Active apply run has no persisted implementation slicing state",
+            "slice_ids": [],
+            "recommended_action": "run_slice_init",
+        }]
+    return validate_implementation_state(impl)
+
+
+def make_no_decomposition_implementation_state(reason, assessed_by="user"):
+    """Return a no-decomposition implementation state with a governed default slice.
+
+    The only assessment bypass is an explicit no-decomposition decision
+    recorded in run state.  Requires a non-empty reason.
+    """
+    reason = (reason or "").strip()
+    if not reason:
+        raise ValueError("missing_no_decomposition_reason")
+    return {
+        "strategy": "sequential",
+        "slicing_assessment": {
+            "status": "not_required",
+            "decision": "single_slice",
+            "assessed_by": assessed_by,
+            "assessment_handoff_path": "",
+            "reasons": [reason],
+        },
+        "aggregate_review_status": "pending",
+        "active_slice_id": None,
+        "slices": [_make_default_slice()],
+    }
+
+
+def materialize_slicing_assessment(agent_result, handoff_path):
+    """Materialize a plan-agent assessment result into implementation state.
+
+    Pure helper with no file I/O.  Returns the new implementation block or
+    raises SlicingAssessmentError with the validation errors.
+    """
+    assessment = agent_result.get("slicing_assessment") or {}
+    decision = assessment.get("decision")
+    reasons = list(assessment.get("reasons") or [])
+
+    if decision == "blocked":
+        raise SlicingAssessmentError("blocked_assessment", assessment)
+    if decision == "single_slice":
+        slices = [_make_default_slice()]
+    elif decision == "multi_slice":
+        slices = [
+            materialize_slice_contract(item)
+            for item in assessment.get("implementation_slices", [])
+        ]
+    else:
+        raise SlicingAssessmentError("invalid_assessment_decision", assessment)
+
+    impl = {
+        "strategy": "sequential",
+        "slicing_assessment": {
+            "status": "completed",
+            "decision": decision,
+            "assessed_by": "plan-agent",
+            "assessment_handoff_path": handoff_path,
+            "reasons": reasons,
+        },
+        "aggregate_review_status": "pending",
+        "active_slice_id": None,
+        "slices": slices,
+    }
+    errors = validate_implementation_state(impl)
+    if errors:
+        raise SlicingAssessmentError("invalid_slicing_assessment", errors)
+    return impl
+
+
+class SlicingAssessmentError(Exception):
+    """Raised when a slicing assessment result cannot be materialized."""
+
+    def __init__(self, reason, details=None):
+        self.reason = reason
+        self.details = details
+        super().__init__(f"SlicingAssessmentError: {reason}")
+
+
+def materialize_slice_contract(item):
+    """Materialize a single slice contract from an assessment result."""
+    if not isinstance(item, dict):
+        raise SlicingAssessmentError("invalid_slice_contract", item)
+    slice_id = item.get("slice_id", "")
+    if not slice_id:
+        raise SlicingAssessmentError("missing_slice_id", item)
+    if slice_id in RESERVED_SLICE_IDS:
+        raise SlicingAssessmentError("reserved_slice_id", slice_id)
+    return {
+        "slice_id": slice_id,
+        "depends_on": list(item.get("depends_on", []) or []),
+        "required": item.get("required", True),
+        "status": "pending",
+        "attempt_count": 0,
+        "block": None,
+        "base_ref": "",
+        "head_ref": "",
+        "accepted_head_ref": "",
+        "commit_refs": [],
+        "implement_evidence": {},
+        "review_evidence": {},
+        "handoff_paths": [],
+    }
+
+
+def required_slices(impl):
+    """Return the list of required slices from an implementation block."""
+    return [sl for sl in impl.get("slices", []) if sl.get("required", True)]
 
 
 def _make_default_slice():

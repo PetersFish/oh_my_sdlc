@@ -328,6 +328,30 @@ When `planning_action=assess_implementation_slicing` or when existing
 apply-ready artifacts lack slice metadata, plan-agent MUST produce a
 slicing assessment.
 
+Plan-agent is NOT a normal `apply_change` phase worker.  It may enter
+a blocked apply run only as `assess_implementation_slicing` remediation
+through the `slicing_assessment_required` blocker.  It must never edit
+source or tests during assessment.
+
+### Remediation Metadata
+
+The dispatch intent must include:
+- `action: assess_implementation_slicing`
+- `remediation_for: slicing_assessment_required`
+
+`after-dispatch` validates the stored intent before materializing the
+assessment.  Stale or unrelated plan-agent results cannot update
+implementation state.
+
+### Preserving Approved Design Boundaries
+
+Assessment reorganizes approved work into implementation slices.  It
+must NOT:
+- change requirements, architecture, or acceptance criteria
+- redesign approved behavior
+- edit source code or tests
+- create new design artifacts beyond the assessment result
+
 ### Slicing Assessment Output
 
 ```json

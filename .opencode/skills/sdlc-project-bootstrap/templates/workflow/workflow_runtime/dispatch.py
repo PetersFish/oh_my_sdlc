@@ -29,7 +29,14 @@ from workflow_runtime.state import (
     _archive_lightweight_superpowers_artifacts,
     normalize_implementation_state,
     validate_implementation_state,
+    active_apply_slicing_errors,
+    make_pending_implementation_state,
+    make_slicing_assessment_block,
+    materialize_slicing_assessment,
+    SlicingAssessmentError,
+    required_slices,
     slice_is_ready,
+    all_required_slices_completed,
     ACTIVE_SLICE_STATUSES,
 )
 from workflow_runtime.definitions import (
@@ -161,6 +168,10 @@ def _allows_replan_from_apply_change(state, agent):
     if state.get("current_phase") != "apply_change":
         return False
     block = state.get("block") or {}
+    # The slicing assessment blocker has its own remediation path via
+    # _allows_slicing_assessment_remediation; do not also accept it here.
+    if block.get("type") == "slicing_assessment_required":
+        return False
     next_allowed = block.get("next_allowed", [])
     if isinstance(next_allowed, str):
         next_allowed = [next_allowed]
@@ -174,6 +185,28 @@ def _allows_replan_from_apply_change(state, agent):
         if blocker.get("recommended_action") == "dispatch_plan_agent":
             return True
     return "dispatch_plan_agent" in next_allowed
+
+
+def _allows_slicing_assessment_remediation(state, canonical_agent, action):
+    """Return True if this dispatch is plan-agent slicing-assessment remediation.
+
+    Plan-agent may enter a blocked apply run only when:
+    - block.type == "slicing_assessment_required"
+    - block.next_allowed contains "dispatch_plan_agent"
+    - the requested action is "assess_implementation_slicing"
+    - the persisted assessment status is "pending" or "blocked"
+    """
+    block = state.get("block") or {}
+    assessment = (state.get("implementation") or {}).get("slicing_assessment", {})
+    return (
+        state.get("current_phase") == "apply_change"
+        and state.get("status") == "blocked"
+        and canonical_agent == "plan-agent"
+        and action == "assess_implementation_slicing"
+        and block.get("type") == "slicing_assessment_required"
+        and "dispatch_plan_agent" in (block.get("next_allowed") or [])
+        and assessment.get("status") in {"pending", "blocked"}
+    )
 
 
 def _normalized_block_actions(raw_actions):
@@ -273,6 +306,14 @@ def cmd_before_dispatch(root, args):
     flow_type = state.get("flow_type", "")
     context = state.get("context", {}) or {}
     execution_mode = _resolve_execution_mode(context)
+    action = getattr(args, "action", "") or ""
+
+    # Slicing assessment remediation: plan-agent may enter a blocked apply
+    # run only for assess_implementation_slicing when the slicing blocker
+    # is active.
+    allows_assessment_remediation = _allows_slicing_assessment_remediation(
+        state, canonical_agent, action
+    )
 
     blocker_reasons = []
     if agent not in VALID_AGENT_NAMES:
@@ -323,14 +364,42 @@ def cmd_before_dispatch(root, args):
             })
     allow_replan = _allows_replan_from_apply_change(state, canonical_agent)
     allow_blocked_dispatch = _allows_blocked_dispatch(state, canonical_agent)
-    if state.get("status") == "blocked" and agent not in {"finish-agent", "finish_agent"} and not (allow_replan or allow_blocked_dispatch):
-        block = state.get("block", {})
+
+    # assess_implementation_slicing action is only valid for the slicing
+    # assessment blocker; reject it for any other block type.
+    if (
+        action == "assess_implementation_slicing"
+        and canonical_agent == "plan-agent"
+        and state.get("current_phase") == "apply_change"
+        and not allows_assessment_remediation
+    ):
         blocker_reasons.append({
-            "reason": "run_is_blocked",
-            "message": f"Workflow run is blocked: {block.get('type', 'unknown')} — {block.get('message', 'no message')}",
-            "recommended_action": "resolve the block before dispatching agents",
+            "reason": "plan_agent_not_assessment_remediation",
+            "message": "assess_implementation_slicing is only valid for slicing_assessment_required blocker",
+            "recommended_action": "use_assessment_remediation_action",
         })
-    if agent in VALID_AGENT_NAMES and not (_phase_allows_agent(current_phase, canonical_agent) or allow_replan or allow_blocked_dispatch):
+
+    if state.get("status") == "blocked" and agent not in {"finish-agent", "finish_agent"} and not (allow_replan or allow_blocked_dispatch or allows_assessment_remediation):
+        block = state.get("block", {})
+        # Special case: plan-agent in blocked apply with wrong action
+        if (
+            canonical_agent == "plan-agent"
+            and state.get("current_phase") == "apply_change"
+            and block.get("type") == "slicing_assessment_required"
+            and not allows_assessment_remediation
+        ):
+            blocker_reasons.append({
+                "reason": "plan_agent_not_assessment_remediation",
+                "message": "Plan-agent may enter blocked apply only for assess_implementation_slicing",
+                "recommended_action": "use_assessment_remediation_action",
+            })
+        else:
+            blocker_reasons.append({
+                "reason": "run_is_blocked",
+                "message": f"Workflow run is blocked: {block.get('type', 'unknown')} — {block.get('message', 'no message')}",
+                "recommended_action": "resolve the block before dispatching agents",
+            })
+    if agent in VALID_AGENT_NAMES and not (_phase_allows_agent(current_phase, canonical_agent) or allow_replan or allow_blocked_dispatch or allows_assessment_remediation):
         blocker_reasons.append({
             "reason": "agent_not_allowed_for_phase",
             "message": f"Agent '{canonical_agent}' is not allowed in phase '{current_phase}'",
@@ -371,6 +440,22 @@ def cmd_before_dispatch(root, args):
     # agents in apply_change phase when implementation state exists.
     requested_slice_id = getattr(args, "slice_id", "") or ""
     impl = state.get("implementation")
+
+    # Slicing assessment gate: an active apply run without persisted
+    # implementation state cannot dispatch apply workers.  Missing state
+    # is never equivalent to not_required for active dispatch.
+    if (
+        phase == "apply_change"
+        and state.get("status") in ("running", "blocked")
+        and canonical_agent in ("implement-agent", "review-agent")
+        and impl is None
+    ):
+        blocker_reasons.append({
+            "reason": "missing_slicing_assessment",
+            "message": "Active apply run has no persisted implementation slicing state",
+            "recommended_action": "run_slice_init",
+        })
+
     if impl is not None and phase == "apply_change" and canonical_agent in ("implement-agent", "review-agent"):
         assessment_status = impl.get("slicing_assessment", {}).get("status", "not_required")
         if canonical_agent == "implement-agent" and assessment_status == "pending":
@@ -554,6 +639,10 @@ def cmd_before_dispatch(root, args):
     }
     if args.slice_id:
         dispatch_intent["slice_id"] = args.slice_id
+    if action:
+        dispatch_intent["action"] = action
+    if allows_assessment_remediation:
+        dispatch_intent["remediation_for"] = "slicing_assessment_required"
 
     state.setdefault("evidence", {})["agent_phase"] = dispatch_intent
 
@@ -992,6 +1081,59 @@ def cmd_after_dispatch(root, args):
     evidence["agent_result"] = latest_result
     evidence.setdefault("agent_results", {}).setdefault(slice_id, {})[canonical_agent] = latest_result
 
+    # Slicing assessment materialization: when plan-agent returns from
+    # assess_implementation_slicing remediation, atomically materialize the
+    # assessment into implementation state.  Only process when the stored
+    # dispatch intent matches the exact remediation contract.
+    dispatch_intent = evidence.get("agent_phase", {}) or {}
+    _materialization_done = False
+    if (
+        phase == "apply_change"
+        and canonical_agent == "plan-agent"
+        and dispatch_intent.get("action") == "assess_implementation_slicing"
+        and dispatch_intent.get("remediation_for") == "slicing_assessment_required"
+        and state.get("block", {}).get("type") == "slicing_assessment_required"
+    ):
+        handoff_path = (agent_result.get("artifacts") or {}).get("handoff_path", "")
+        try:
+            materialized = materialize_slicing_assessment(agent_result, handoff_path)
+            # Validate the materialized state before persisting.
+            errors = validate_implementation_state(materialized)
+            if errors:
+                raise SlicingAssessmentError("invalid_slicing_assessment", errors)
+            state["implementation"] = materialized
+            state["block"] = None
+            state["status"] = "running"
+            state["phase_readiness"] = {
+                "phase": "apply_change",
+                "ready": True,
+                "missing_required_inputs": [],
+            }
+            recommended_next_action = "call_slice_next"
+            agent_recommended = "call_slice_next"
+            _materialization_done = True
+        except SlicingAssessmentError as e:
+            if e.reason == "blocked_assessment":
+                # Plan-agent returned decision=blocked; keep run blocked.
+                assessment = e.details or {}
+                impl_existing = state.get("implementation") or {}
+                impl_existing.setdefault("slicing_assessment", {}).update({
+                    "status": "blocked",
+                    "reasons": list(assessment.get("reasons") or []),
+                })
+                state["implementation"] = impl_existing
+                agent_blockers.append({
+                    "reason": "slicing_assessment_blocked",
+                    "message": "Plan-agent assessment returned blocked decision",
+                    "recommended_action": "resolve_assessment_block",
+                })
+            else:
+                agent_blockers.append({
+                    "reason": "invalid_slicing_assessment",
+                    "message": f"Assessment result did not produce a valid implementation slice graph: {e.reason}",
+                    "recommended_action": "redispatch_plan_agent_with_validation_findings",
+                })
+
     # P0 Sliced apply-change: after-dispatch slice state transitions.
     impl = state.get("implementation")
     # Aggregate review is identified by slice_id == "aggregate" (reserved).
@@ -1091,10 +1233,15 @@ def cmd_after_dispatch(root, args):
                     target["review_evidence"] = agent_evidence
                     impl["active_slice_id"] = None
                     # Recompute aggregate_review_status: if all required slices
-                    # are completed, transition to 'ready'.
-                    from workflow_runtime.state import all_required_slices_completed
+                    # are completed, transition to 'passed' for single-slice
+                    # or 'ready' for multi-slice (aggregate review needed).
+                    from workflow_runtime.state import all_required_slices_completed, required_slices
                     if all_required_slices_completed(impl):
-                        impl["aggregate_review_status"] = "ready"
+                        req = required_slices(impl)
+                        if len(req) <= 1:
+                            impl["aggregate_review_status"] = "passed"
+                        else:
+                            impl["aggregate_review_status"] = "ready"
             elif canonical_agent == "review-agent" and agent_status != "success":
                 # Review rejection: preserve base_ref, move slice back to ready
                 # for re-implementation (base_ref is preserved, head may advance).
@@ -1215,6 +1362,10 @@ def cmd_after_dispatch(root, args):
             recommended_next_action = "resolve_failure"
     elif agent_blockers:
         next_cmd = "block"
+    elif _materialization_done:
+        # Materialization succeeded; route to slice-next, not phase completion.
+        next_cmd = ""
+        recommended_next_action = "call_slice_next"
     elif canonical_agent == "implement-agent":
         # implement-agent owns normal verification; route to review-agent next.
         next_cmd = ""
@@ -1224,10 +1375,22 @@ def cmd_after_dispatch(root, args):
         # completed, do not attempt complete-phase — continue to the next slice.
         # The aggregate review (slice_id="aggregate") is the phase-completing
         # worker for apply_change.
-        from workflow_runtime.state import all_required_slices_completed
+        from workflow_runtime.state import all_required_slices_completed, required_slices
         if impl is not None and not all_required_slices_completed(impl):
             next_cmd = ""
             recommended_next_action = "dispatch_next_slice"
+        elif impl is not None and all_required_slices_completed(impl):
+            req = required_slices(impl)
+            if len(req) <= 1:
+                # Single-slice: aggregate review is passed directly by the
+                # slice review.  No separate aggregate review dispatch.
+                next_cmd = ""
+                recommended_next_action = "complete_phase"
+            else:
+                # Multi-slice: all required slice reviews complete; route
+                # to aggregate review dispatch.
+                next_cmd = ""
+                recommended_next_action = "dispatch_aggregate_review"
     elif canonical_agent == "roadmap-agent":
         # roadmap-agent is a lifecycle hook worker, not a phase worker.
         # Its after-dispatch should lead to hook completion flow, not
@@ -1304,14 +1467,33 @@ def cmd_after_dispatch(root, args):
         next_allowed = recommended_next_action if should_block else ""
 
     if should_block:
-        state["status"] = "blocked"
-        state["block"] = {
-            "type": "worker_failed",
-            "message": block_message,
-            "next_allowed": [item for item in next_allowed.split(",") if item],
-        }
+        # Preserve the slicing_assessment_required block type when the
+        # materialization explicitly failed or when an unrelated plan-agent
+        # result can't clear the slicing blocker.
+        _preserve_slicing_block = (
+            (state.get("block") or {}).get("type") == "slicing_assessment_required"
+            and (
+                # Materialization failure
+                any(b.get("reason", "") in (
+                    "invalid_slicing_assessment",
+                    "slicing_assessment_blocked",
+                ) for b in agent_blockers)
+                # Unrelated plan-agent result that can't clear the blocker
+                or (canonical_agent == "plan-agent" and not _materialization_done)
+            )
+        )
+        if _preserve_slicing_block:
+            state["status"] = "blocked"
+            # Keep the existing slicing_assessment_required block.
+        else:
+            state["status"] = "blocked"
+            state["block"] = {
+                "type": "worker_failed",
+                "message": block_message,
+                "next_allowed": [item for item in next_allowed.split(",") if item],
+            }
     else:
-        if state.get("block") and state.get("block", {}).get("type") == "worker_failed":
+        if state.get("block") and (state.get("block") or {}).get("type") == "worker_failed":
             state["block"] = None
         if state.get("status") == "blocked":
             state["status"] = "running"

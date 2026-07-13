@@ -47,6 +47,7 @@ from workflow_runtime.slices import (
     cmd_slice_block,
     cmd_slice_resume,
     cmd_slice_cancel,
+    cmd_slice_init,
 )
 
 
@@ -77,6 +78,7 @@ COMMANDS = {
     "slice-block",
     "slice-resume",
     "slice-cancel",
+    "slice-init",
 }
 
 
@@ -112,6 +114,7 @@ def main():
     parser.add_argument("--run-id", default=None, help="workflow run id for final-commit")
     parser.add_argument("--push", action="store_true", help="push after commit (final-commit)")
     parser.add_argument("--json", action="store_true", help="output as JSON")
+    parser.add_argument("--skip-assessment", action="store_true", help="skip slicing assessment for slice-init")
 
     args = parser.parse_args()
     root = args.root or os.getcwd()
@@ -168,3 +171,5 @@ def main():
         cmd_slice_resume(root, args)
     elif args.command == "slice-cancel":
         cmd_slice_cancel(root, args)
+    elif args.command == "slice-init":
+        cmd_slice_init(root, args)

@@ -14,16 +14,16 @@ defaults:
 
 profiles:
   orchestrator:
-    model: ollama-cloud/glm-5.2
+    model: openai/gpt-5.4
     variant: Default
   planning:
-    model: openai/gpt-5.6-sol
+    model: openai/gpt-5.5
     variant: Default
   implementation:
-    model: ollama-cloud/glm-5.2
+    model: opencode-go/deepseek-v4-pro
     variant: Default
   review:
-    model: openai/gpt-5.6-sol
+    model: openai/gpt-5.5
     variant: Default
   finish:
     model: openai/gpt-5.4-mini

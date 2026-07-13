@@ -247,8 +247,21 @@ After inputs are resolved:
 2. Run `status` for the derived subject.
 3. Start or resume the workflow with the selected `flow_type`.
 4. Confirm the active phase is `apply_change`.
-5. Call `before-dispatch --agent implement-agent`.
-6. Dispatch `implement-agent` with `primary_design_path` and `design_artifact_paths[]` in the task prompt.
+5. Inspect the run blocker and slicing assessment status.
+   - If `block.type == slicing_assessment_required`, dispatch plan-agent
+     with `--action assess_implementation_slicing` as blocked-apply
+     remediation.  After `after-dispatch` persists a valid assessment,
+     the blocker clears and `recommended_next_action` is `call_slice_next`.
+   - If `implementation.slicing_assessment.status == not_required`, the
+     run is ready for slice dispatch.
+6. Call `slice-next` and dispatch exactly the returned slice to
+   implement-agent with `--slice-id <slice_id>`.
+7. Forward `primary_design_path` and `design_artifact_paths[]` in the
+   task prompt.
+
+Start-with-plan skips redesign (plan-agent create_change), NOT slicing
+assessment.  An existing approved plan does not authorize dispatching
+implement-agent without a validated slice graph.
 
 If the active phase is `create_change`, do not force implementation. Surface the missing or ambiguous artifact selection and ask the user to choose a valid existing plan, or route to `plan-agent` only if the user wants new planning.
 
@@ -731,6 +744,21 @@ When `apply_change` work has implementation slice metadata:
 5. When `slice-next` returns `dispatch_aggregate_review`, route
    review-agent with aggregate scope.
 6. Only after aggregate review passes, complete `apply_change`.
+
+### Single-Slice Review
+
+When the implementation has exactly one required slice and that slice's
+review passes, the runtime sets `aggregate_review_status=passed`
+directly.  `slice-next` returns `all_slices_and_aggregate_complete`.
+No separate aggregate review dispatch is needed.
+
+### Multi-Slice Review
+
+When the implementation has two or more required slices, all slice
+reviews must pass.  After all required slice reviews pass, the runtime
+sets `aggregate_review_status=ready` and `slice-next` returns
+`dispatch_aggregate_review`.  Only after aggregate review passes does
+`slice-next` return `all_slices_and_aggregate_complete`.
 
 ### P0 Prohibitions
 

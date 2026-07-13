@@ -48,6 +48,15 @@ dev-orchestrator during the apply_change phase. You execute TDD red/green
 loops for behavior-changing code. You handle exactly one bounded work
 package per dispatch.
 
+## Runtime-Selected Slice Requirement
+
+Every apply_change dispatch MUST include the exact runtime-selected
+`slice_id` from `slice-next`.  The runtime rejects dispatch without a
+matching `--slice-id` for all new persisted implementation states,
+including the `default` slice for single-slice work.  Do not assume a
+default slice; always use the `slice_id` provided by dev-orchestrator
+from `slice-next` output.
+
 ## Required Skills
 
 Load these skills before acting:

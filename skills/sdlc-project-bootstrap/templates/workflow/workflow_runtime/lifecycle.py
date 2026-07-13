@@ -31,6 +31,9 @@ from workflow_runtime.state import (
     _cancel_active_run,
     _missing_terminal_finish_agent_evidence,
     normalize_implementation_state,
+    make_pending_implementation_state,
+    make_slicing_assessment_block,
+    active_apply_slicing_errors,
 )
 from workflow_runtime.definitions import (
     load_workflow,
@@ -186,38 +189,7 @@ def cmd_start(root, args):
     flow_type = args.flow_type or "spec-flow"
     phase = _infer_phase(root, subject_type, subject_id, flow_type)
 
-    # Confirmation-gated lightweight-flow: LLM decides externally, runtime blocks until user confirms
-    if args.flow_type == "lightweight-flow":
-        state = {
-            "version": 1,
-            "run_id": run_id,
-            "workflow": workflow_id,
-            "flow_type": "lightweight-flow",
-            "status": "blocked",
-            "current_phase": phase,
-            "primary_subject": {"type": subject_type, "id": subject_id},
-            "context": {"change_id": subject_id} if subject_type == "spec_change" else {},
-            "phase_readiness": {"phase": phase, "ready": False, "missing_required_inputs": []},
-            "pending_hooks": [],
-            "completed_hooks": [],
-            "completed_phases": [],
-            "gates": {},
-            "evidence": {},
-            "block": {
-                "type": "user_decision_required",
-                "message": "Flow type: lightweight-flow. Confirm to continue.",
-                "next_allowed": ["confirm_lightweight_flow"],
-            },
-            "updated_at": "",
-        }
-        wf = load_workflow(root, workflow_id)
-        if wf:
-            _run_loaders(root, state, wf)
-        save_run_state(root, state)
-        state["updated_at"] = _ts()
-        print(json.dumps(state, indent=2))
-        return
-
+    # Explicit flow_type is treated as user-confirmed; no confirmation gate.
     state = {
         "version": 1,
         "run_id": run_id,
@@ -239,6 +211,19 @@ def cmd_start(root, args):
     wf = load_workflow(root, workflow_id)
     if wf:
         _run_loaders(root, state, wf)
+
+    # Slicing assessment gate: an apply-ready run must be blocked until
+    # plan-agent produces a validated slicing assessment.  The run is in
+    # the apply phase for workflow identity, but apply execution is blocked.
+    if phase == "apply_change":
+        state["implementation"] = make_pending_implementation_state()
+        state["status"] = "blocked"
+        state["block"] = make_slicing_assessment_block()
+        state["phase_readiness"] = {
+            "phase": "apply_change",
+            "ready": False,
+            "missing_required_inputs": ["validated_implementation_slices"],
+        }
 
     save_run_state(root, state)
     state["updated_at"] = _ts()
@@ -1011,6 +996,32 @@ def cmd_advance(root, args):
     state["phase_readiness"] = {"phase": next_phase, "ready": False, "missing_required_inputs": []}
     _run_loaders(root, state, wf)
     _calc_readiness(state, wf)
+
+    # Slicing assessment gate: when advancing into apply_change, require
+    # a valid materialized assessment.  If planning completed without
+    # assessment, install the slicing blocker instead of advancing into
+    # running apply.  Do not reset user approval or regenerate design artifacts.
+    if next_phase == "apply_change":
+        if state.get("implementation") is None:
+            state["implementation"] = make_pending_implementation_state()
+            state["status"] = "blocked"
+            state["block"] = make_slicing_assessment_block()
+            state["phase_readiness"] = {
+                "phase": "apply_change",
+                "ready": False,
+                "missing_required_inputs": ["validated_implementation_slices"],
+            }
+        else:
+            # Validate existing implementation state; block if invalid.
+            impl_errors = active_apply_slicing_errors(state)
+            if impl_errors:
+                state["status"] = "blocked"
+                state["block"] = make_slicing_assessment_block()
+                state["phase_readiness"] = {
+                    "phase": "apply_change",
+                    "ready": False,
+                    "missing_required_inputs": ["validated_implementation_slices"],
+                }
 
     if next_phase == "done":
         pending = state.get("pending_hooks", [])

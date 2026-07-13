@@ -3164,5 +3164,71 @@ class TestDevOrchestratorFinalTailCommit(unittest.TestCase):
         self.assertIn("residual_dirty_paths", body)
 
 
+class TestSlicingAssessmentRoutingContracts(unittest.TestCase):
+    """Task 8: agent prompts must document corrected slicing assessment routing."""
+
+    def test_start_with_plan_skips_redesign_not_slicing_assessment(self):
+        """start-with-plan must say it skips redesign, not slicing assessment."""
+        body = (AGENTS_DIR / "dev-orchestrator.md").read_text(encoding="utf-8")
+        self.assertIn("Start-with-plan skips redesign", body)
+        self.assertIn("NOT slicing", body)
+
+    def test_dev_orchestrator_routes_assessment_remediation(self):
+        """dev-orchestrator must document blocked assessment remediation routing."""
+        body = (AGENTS_DIR / "dev-orchestrator.md").read_text(encoding="utf-8")
+        self.assertIn("slicing_assessment_required", body)
+        self.assertIn("assess_implementation_slicing", body)
+
+    def test_dev_orchestrator_uses_slice_next_for_selection(self):
+        """dev-orchestrator must document slice-next as the slice selection owner."""
+        body = (AGENTS_DIR / "dev-orchestrator.md").read_text(encoding="utf-8")
+        self.assertIn("slice-next", body)
+
+    def test_plan_agent_is_remediation_only_in_blocked_apply(self):
+        """plan-agent must document it is remediation-only in blocked apply."""
+        body = (AGENTS_DIR / "plan-agent.md").read_text(encoding="utf-8")
+        self.assertIn("remediation", body.lower())
+        self.assertIn("assess_implementation_slicing", body)
+        self.assertIn("NOT a normal", body)
+
+    def test_plan_agent_preserves_approved_design_boundaries(self):
+        """plan-agent must document it does not redesign during assessment."""
+        body = (AGENTS_DIR / "plan-agent.md").read_text(encoding="utf-8")
+        self.assertIn("Preserving Approved Design Boundaries", body)
+        self.assertIn("must NOT", body)
+
+    def test_implement_agent_requires_runtime_selected_slice(self):
+        """implement-agent must document it requires a runtime-selected slice_id."""
+        body = (AGENTS_DIR / "implement-agent.md").read_text(encoding="utf-8")
+        self.assertIn("Runtime-Selected Slice Requirement", body)
+        self.assertIn("slice_id", body)
+        self.assertIn("slice-next", body)
+
+    def test_review_agent_documents_single_slice_completion(self):
+        """review-agent must document single-slice review as final apply review."""
+        body = (AGENTS_DIR / "review-agent.md").read_text(encoding="utf-8")
+        self.assertIn("Slice and Aggregate Review Scope", body)
+        self.assertIn("single required slice", body)
+        self.assertIn("aggregate_review_status", body)
+
+    def test_review_agent_documents_multi_slice_aggregate(self):
+        """review-agent must document multi-slice aggregate review behavior."""
+        body = (AGENTS_DIR / "review-agent.md").read_text(encoding="utf-8")
+        self.assertIn("dispatch_aggregate_review", body)
+        self.assertIn("all_slices_and_aggregate_complete", body)
+
+    def test_dev_orchestrator_documents_single_slice_review(self):
+        """dev-orchestrator must document single-slice review behavior."""
+        body = (AGENTS_DIR / "dev-orchestrator.md").read_text(encoding="utf-8")
+        self.assertIn("Single-Slice Review", body)
+        self.assertIn("all_slices_and_aggregate_complete", body)
+
+    def test_dev_orchestrator_documents_multi_slice_aggregate(self):
+        """dev-orchestrator must document multi-slice aggregate review behavior."""
+        body = (AGENTS_DIR / "dev-orchestrator.md").read_text(encoding="utf-8")
+        self.assertIn("Multi-Slice Review", body)
+        self.assertIn("dispatch_aggregate_review", body)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
