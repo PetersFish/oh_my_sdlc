@@ -640,6 +640,27 @@ def make_no_decomposition_implementation_state(reason, assessed_by="user"):
     }
 
 
+# Allowed values for assessment confidence.
+VALID_ASSESSMENT_CONFIDENCE = {"high", "medium", "low"}
+
+# Required signals fields and their expected types.
+SIGNALS_REQUIRED_FIELDS = {
+    "independent_behaviors": int,
+    "dependency_layers": int,
+    "expected_core_files": int,
+    "cross_module_boundaries": int,
+    "independent_verification_boundaries": int,
+    "migration_or_compatibility_work": bool,
+    "multiple_external_integrations": bool,
+    "high_debug_uncertainty": bool,
+}
+
+# Required fields on slice contracts within a multi-slice assessment.
+MULTI_SLICE_REQUIRED_SLICE_FIELDS = {
+    "scope", "verification_commands",
+}
+
+
 def materialize_slicing_assessment(agent_result, handoff_path):
     """Materialize a plan-agent assessment result into implementation state.
 
@@ -650,14 +671,52 @@ def materialize_slicing_assessment(agent_result, handoff_path):
     decision = assessment.get("decision")
     reasons = list(assessment.get("reasons") or [])
 
+    # Validate non-empty reasons (required for all assessment decisions).
+    if not reasons:
+        raise SlicingAssessmentError("empty_reasons", assessment)
+
+    # Validate confidence (required, must be one of high|medium|low).
+    confidence = assessment.get("confidence", "")
+    if confidence not in VALID_ASSESSMENT_CONFIDENCE:
+        raise SlicingAssessmentError("invalid_confidence", assessment)
+
+    # Validate signals object and required signal fields.
+    signals = assessment.get("signals") or {}
+    if not isinstance(signals, dict):
+        raise SlicingAssessmentError("missing_signals", assessment)
+    missing_signals = set(SIGNALS_REQUIRED_FIELDS.keys()) - set(signals.keys())
+    if missing_signals:
+        raise SlicingAssessmentError(
+            "invalid_signals",
+            {"missing": sorted(missing_signals)},
+        )
+    for field_name, expected_type in SIGNALS_REQUIRED_FIELDS.items():
+        val = signals.get(field_name)
+        if not isinstance(val, expected_type):
+            raise SlicingAssessmentError(
+                "invalid_signals",
+                {"field": field_name, "expected": expected_type.__name__,
+                 "got": type(val).__name__},
+            )
+
     if decision == "blocked":
         raise SlicingAssessmentError("blocked_assessment", assessment)
     if decision == "single_slice":
         slices = [_make_default_slice()]
     elif decision == "multi_slice":
+        impl_slices = assessment.get("implementation_slices", [])
+        if not impl_slices:
+            raise SlicingAssessmentError("empty_implementation_slices", assessment)
+        # Validate task_coverage for multi-slice assessments.
+        task_coverage = assessment.get("task_coverage") or {}
+        if not isinstance(task_coverage, dict) or not task_coverage:
+            raise SlicingAssessmentError("missing_task_coverage", assessment)
+        # Validate each slice contract includes required fields.
+        for item in impl_slices:
+            _validate_multi_slice_contract(item)
         slices = [
             materialize_slice_contract(item)
-            for item in assessment.get("implementation_slices", [])
+            for item in impl_slices
         ]
     else:
         raise SlicingAssessmentError("invalid_assessment_decision", assessment)
@@ -688,6 +747,33 @@ class SlicingAssessmentError(Exception):
         self.reason = reason
         self.details = details
         super().__init__(f"SlicingAssessmentError: {reason}")
+
+
+def _validate_multi_slice_contract(item):
+    """Validate a slice contract from a multi-slice assessment includes
+    required fields (scope, verification_commands)."""
+    if not isinstance(item, dict):
+        raise SlicingAssessmentError("invalid_slice_contract", item)
+    missing = MULTI_SLICE_REQUIRED_SLICE_FIELDS - set(item.keys())
+    if missing:
+        raise SlicingAssessmentError(
+            "missing_slice_contract_fields",
+            {"slice_id": item.get("slice_id", "?"), "missing": sorted(missing)},
+        )
+    # scope must be a non-empty string.
+    scope = item.get("scope", "")
+    if not isinstance(scope, str) or not scope.strip():
+        raise SlicingAssessmentError(
+            "invalid_slice_scope",
+            {"slice_id": item.get("slice_id", "?")},
+        )
+    # verification_commands must be a non-empty list.
+    vc = item.get("verification_commands", [])
+    if not isinstance(vc, list) or not vc:
+        raise SlicingAssessmentError(
+            "invalid_slice_verification_commands",
+            {"slice_id": item.get("slice_id", "?")},
+        )
 
 
 def materialize_slice_contract(item):

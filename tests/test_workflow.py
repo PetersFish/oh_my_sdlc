@@ -4439,10 +4439,11 @@ class TestDispatchHooks(FixtureBase):
         # Install valid single-default-slice implementation state so tests
         # that set current_phase to apply_change can dispatch implement/review
         # agents without the slicing assessment gate blocking them.
+        # Use not_required status for backward-compat dispatch without --slice-id.
         state = self._read_current_state()
         state["implementation"] = _make_implementation_state(
             [_make_slice("default", status="pending")],
-            assessment_status="completed",
+            assessment_status="not_required",
             decision="single_slice",
         )
         self._write_current_state(state)
@@ -6861,11 +6862,12 @@ class TestExecutionContextAndRuntimeContext(FixtureBase):
         state["current_phase"] = "apply_change"
         # Ensure context.change_id is set for runtime_context output.
         state.setdefault("context", {}).setdefault("change_id", change_id)
-        # Install valid completed-slice implementation state so dispatch
+        # Install valid single-default-slice implementation state so dispatch
         # gates pass and the tests can focus on execution context behavior.
+        # Use not_required for backward-compat dispatch without --slice-id.
         state["implementation"] = _make_implementation_state(
             [_make_slice("default", status="pending")],
-            assessment_status="completed",
+            assessment_status="not_required",
             decision="single_slice",
         )
         state["status"] = "running"
@@ -10980,10 +10982,12 @@ class TestReviewBlockerRemediation(FixtureBase):
     def test_implement_dispatch_without_slice_id_allowed_for_single_default(self):
         """before-dispatch(implement-agent) without --slice-id is allowed
         when the implementation state has only the single 'default' slice
-        (legacy / single-slice compatibility)."""
+        and assessment_status is 'not_required' (legacy / backward compat).
+        New persisted states with completed assessment require --slice-id."""
         impl = _make_implementation_state(
             [_make_slice("default", depends_on=[], status="ready",
                          base_ref="base-0")],
+            assessment_status="not_required",
             decision="single_slice",
         )
         self._make_apply_run(implementation=impl)
@@ -10991,6 +10995,24 @@ class TestReviewBlockerRemediation(FixtureBase):
         rc, out, _ = run_workflow(self.tmp, "before-dispatch",
                                   agent="implement-agent")
         self.assertEqual(rc, 0, out)
+
+    def test_implement_dispatch_without_slice_id_rejected_for_completed_assessment(self):
+        """before-dispatch(implement-agent) without --slice-id is REJECTED
+        when assessment_status is 'completed' (non-legacy persisted state)."""
+        impl = _make_implementation_state(
+            [_make_slice("default", depends_on=[], status="ready",
+                         base_ref="base-0")],
+            assessment_status="completed",
+            decision="single_slice",
+        )
+        self._make_apply_run(implementation=impl)
+
+        rc, out, _ = run_workflow(self.tmp, "before-dispatch",
+                                  agent="implement-agent")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [b.get("reason", "") for b in data.get("blockers", [])]
+        self.assertIn("missing_slice_id", reasons)
 
     # --- Blocker 4: Git range validation ---
 
@@ -11732,6 +11754,39 @@ class TestAssessmentGateFreshRun(FixtureBase):
         reasons = [b.get("reason", "") for b in data.get("blockers", [])]
         self.assertIn("slicing_assessment_pending", reasons)
 
+    def test_fresh_apply_ready_run_rejects_direct_review_dispatch(self):
+        """Review-agent is also blocked when slicing assessment is pending.
+        Assessment gating is symmetric for implement-agent and review-agent."""
+        self._start_apply_ready_run()
+        rc, out, _ = run_workflow(
+            self.tmp,
+            "before-dispatch",
+            agent="review-agent",
+            phase="apply_change",
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [b.get("reason", "") for b in data.get("blockers", [])]
+        self.assertIn("slicing_assessment_pending", reasons)
+
+    def test_apply_run_with_blocked_assessment_rejects_review_dispatch(self):
+        """Review-agent is blocked when assessment status is 'blocked'."""
+        self._start_apply_ready_run()
+        state = self._read_current_state()
+        state["implementation"]["slicing_assessment"]["status"] = "blocked"
+        state["implementation"]["slicing_assessment"]["reasons"] = ["test block"]
+        self._write_current_state(state)
+        rc, out, _ = run_workflow(
+            self.tmp,
+            "before-dispatch",
+            agent="review-agent",
+            phase="apply_change",
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [b.get("reason", "") for b in data.get("blockers", [])]
+        self.assertIn("slicing_assessment_blocked", reasons)
+
     def test_slice_next_reports_assessment_required_before_materialization(self):
         self._start_apply_ready_run()
         rc, out, _ = run_workflow(self.tmp, "slice-next")
@@ -12229,16 +12284,24 @@ class TestAssessmentMaterialization(FixtureBase):
                     "multiple_external_integrations": False,
                     "high_debug_uncertainty": False,
                 },
+                "task_coverage": {
+                    "slice-a": ["task-1"],
+                    "slice-b": ["task-2"],
+                },
                 "implementation_slices": [
                     {
                         "slice_id": "slice-a",
                         "depends_on": [],
                         "required": True,
+                        "scope": "Implement core dispatch gate logic",
+                        "verification_commands": ["python3 -m pytest tests/ -k slice_a"],
                     },
                     {
                         "slice_id": "slice-b",
                         "depends_on": ["slice-a"],
                         "required": True,
+                        "scope": "Implement state validation and materialization",
+                        "verification_commands": ["python3 -m pytest tests/ -k slice_b"],
                     },
                 ],
             },
@@ -12307,12 +12370,16 @@ class TestAssessmentMaterialization(FixtureBase):
         self._dispatch_remediation()
         result = self._single_assessment_result()
         result["slicing_assessment"]["reasons"] = []
-        # Note: the materialization currently doesn't validate empty reasons
-        # for the plan-agent path (only for not_required).  This test verifies
-        # the run stays blocked when the assessment is invalid for other
-        # reasons.  The empty-reasons check is enforced for not_required.
-        # Skip this test case as the spec doesn't require rejecting empty
-        # reasons for completed assessments (only for not_required).
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="plan-agent",
+            phase="apply_change",
+            value=json.dumps(result),
+        )
+        self.assertEqual(rc, 0, out)
+        state = self._read_current_state()
+        self.assertEqual(state["status"], "blocked")
+        self.assertEqual(state["block"]["type"], "slicing_assessment_required")
 
     def test_blocked_assessment_preserves_blocker(self):
         self._start_blocked_apply_run()
@@ -12367,6 +12434,124 @@ class TestAssessmentMaterialization(FixtureBase):
         data = json.loads(out)
         self.assertEqual(data["status"], "dispatch_slice")
         self.assertEqual(data["slice_id"], "default")
+
+    def test_materialization_rejects_empty_reasons(self):
+        """Assessment materialization must reject empty reasons array."""
+        self._start_blocked_apply_run()
+        self._dispatch_remediation()
+        result = self._single_assessment_result()
+        result["slicing_assessment"]["reasons"] = []
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="plan-agent",
+            phase="apply_change",
+            value=json.dumps(result),
+        )
+        self.assertEqual(rc, 0, out)
+        state = self._read_current_state()
+        # Run must remain blocked — materialization refused empty reasons
+        self.assertEqual(state["status"], "blocked")
+        self.assertEqual(state["block"]["type"], "slicing_assessment_required")
+
+    def test_materialization_rejects_invalid_confidence(self):
+        """Assessment materialization must reject invalid confidence values."""
+        self._start_blocked_apply_run()
+        self._dispatch_remediation()
+        result = self._single_assessment_result()
+        result["slicing_assessment"]["confidence"] = "unknown"
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="plan-agent",
+            phase="apply_change",
+            value=json.dumps(result),
+        )
+        self.assertEqual(rc, 0, out)
+        state = self._read_current_state()
+        self.assertEqual(state["status"], "blocked")
+        self.assertEqual(state["block"]["type"], "slicing_assessment_required")
+
+    def test_materialization_rejects_missing_signals(self):
+        """Assessment materialization must reject missing signals object."""
+        self._start_blocked_apply_run()
+        self._dispatch_remediation()
+        result = self._single_assessment_result()
+        del result["slicing_assessment"]["signals"]
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="plan-agent",
+            phase="apply_change",
+            value=json.dumps(result),
+        )
+        self.assertEqual(rc, 0, out)
+        state = self._read_current_state()
+        self.assertEqual(state["status"], "blocked")
+
+    def test_materialization_rejects_invalid_signals_field(self):
+        """Assessment materialization must reject signals with invalid field types."""
+        self._start_blocked_apply_run()
+        self._dispatch_remediation()
+        result = self._single_assessment_result()
+        result["slicing_assessment"]["signals"]["independent_behaviors"] = "many"
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="plan-agent",
+            phase="apply_change",
+            value=json.dumps(result),
+        )
+        self.assertEqual(rc, 0, out)
+        state = self._read_current_state()
+        self.assertEqual(state["status"], "blocked")
+
+    def test_materialization_rejects_missing_task_coverage_for_multi_slice(self):
+        """Multi-slice assessment must include task_coverage mapping."""
+        self._start_blocked_apply_run()
+        self._dispatch_remediation()
+        result = self._multi_assessment_result()
+        # Remove task_coverage if present
+        result["slicing_assessment"].pop("task_coverage", None)
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="plan-agent",
+            phase="apply_change",
+            value=json.dumps(result),
+        )
+        self.assertEqual(rc, 0, out)
+        state = self._read_current_state()
+        self.assertEqual(state["status"], "blocked")
+
+    def test_materialization_rejects_slice_without_scope(self):
+        """Slice contracts in multi-slice assessments must include scope."""
+        self._start_blocked_apply_run()
+        self._dispatch_remediation()
+        result = self._multi_assessment_result()
+        # Remove scope from one slice
+        result["slicing_assessment"]["implementation_slices"][0].pop("scope", None)
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="plan-agent",
+            phase="apply_change",
+            value=json.dumps(result),
+        )
+        self.assertEqual(rc, 0, out)
+        state = self._read_current_state()
+        self.assertEqual(state["status"], "blocked")
+
+    def test_materialization_rejects_slice_without_verification_commands(self):
+        """Slice contracts in multi-slice assessments must include verification_commands."""
+        self._start_blocked_apply_run()
+        self._dispatch_remediation()
+        result = self._multi_assessment_result()
+        # Remove verification_commands from one slice
+        result["slicing_assessment"]["implementation_slices"][0].pop("verification_commands", None)
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="plan-agent",
+            phase="apply_change",
+            value=json.dumps(result),
+        )
+        self.assertEqual(rc, 0, out)
+        state = self._read_current_state()
+        self.assertEqual(state["status"], "blocked")
 
 
 # ---------------------------------------------------------------------------
@@ -12445,6 +12630,50 @@ class TestNoDecomposition(FixtureBase):
             agent="implement-agent",
             phase="apply_change",
             slice_id="default",
+        )
+        self.assertEqual(rc, 0, out)
+
+    def test_non_legacy_default_slice_requires_slice_id_for_dispatch(self):
+        """After materialization (not_required=False), implement-agent dispatch
+        without --slice-id must be rejected even for single-default slices.
+        The backward-compat skip for omitted --slice-id only applies when
+        assessment_status is 'not_required'."""
+        self._make_apply_run(implementation=None)
+        # First materialize via skip_assessment, then override to completed.
+        run_workflow(
+            self.tmp, "slice-init",
+            skip_assessment=True,
+            reason="User explicitly selected one governed implementation slice",
+        )
+        # Now override the assessment status to "completed" via direct state write
+        state = self._read_current_state()
+        state["implementation"]["slicing_assessment"]["status"] = "completed"
+        self._write_current_state(state)
+        # Dispatch without --slice-id should be blocked (non-legacy)
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="implement-agent",
+            phase="apply_change",
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [b.get("reason", "") for b in data.get("blockers", [])]
+        self.assertIn("missing_slice_id", reasons)
+
+    def test_legacy_not_required_single_default_allows_omit_slice_id(self):
+        """When assessment_status is 'not_required' (legacy), implement-agent
+        dispatch without --slice-id is still allowed for backward compatibility."""
+        self._make_apply_run(implementation=None)
+        run_workflow(
+            self.tmp, "slice-init",
+            skip_assessment=True,
+            reason="User explicitly selected one governed implementation slice",
+        )
+        # Dispatch without --slice-id should succeed (legacy compat)
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="implement-agent",
+            phase="apply_change",
         )
         self.assertEqual(rc, 0, out)
 
