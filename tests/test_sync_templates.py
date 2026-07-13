@@ -54,7 +54,7 @@ def _make_canonical_templates(tmp):
     # Also create workflow_runtime module files in canonical templates.
     for mod in ["__init__.py", "core.py", "state.py", "definitions.py",
                 "domains.py", "policies.py", "dispatch.py", "lifecycle.py",
-                "governance.py", "cli.py"]:
+                "governance.py", "cli.py", "slices.py"]:
         write_file(tmp,
                    f"skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/{mod}",
                    f"# canonical {mod}\n")
@@ -71,7 +71,7 @@ def _make_distributed_copies(tmp, wf_content="# canonical workflow\n",
         # Also create workflow_runtime module files in distributed copies.
         for mod in ["__init__.py", "core.py", "state.py", "definitions.py",
                     "domains.py", "policies.py", "dispatch.py", "lifecycle.py",
-                    "governance.py", "cli.py"]:
+                    "governance.py", "cli.py", "slices.py"]:
             write_file(tmp,
                        f"{d}/skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/{mod}",
                        f"# canonical {mod}\n")
@@ -216,7 +216,7 @@ class TestSyncTemplatesDistributed(unittest.TestCase):
         # Create live workflow_runtime files matching canonical
         for mod in ["__init__.py", "core.py", "state.py", "definitions.py",
                     "domains.py", "policies.py", "dispatch.py", "lifecycle.py",
-                    "governance.py", "cli.py"]:
+                    "governance.py", "cli.py", "slices.py"]:
             write_file(self.tmp,
                        f".ai/workflows/scripts/workflow_runtime/{mod}",
                        f"# canonical {mod}\n")
@@ -322,7 +322,7 @@ class TestSyncTemplatesDistributed(unittest.TestCase):
         # Make all governed files identical so only extra-file drift shows.
         for mod in ["__init__.py", "core.py", "state.py", "definitions.py",
                      "domains.py", "policies.py", "dispatch.py", "lifecycle.py",
-                     "governance.py", "cli.py"]:
+                     "governance.py", "cli.py", "slices.py"]:
             write_file(self.tmp,
                         f"skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/{mod}",
                         f"# canonical {mod}\n")
@@ -354,7 +354,7 @@ class TestSyncTemplatesDistributed(unittest.TestCase):
         # Make all governed files identical.
         for mod in ["__init__.py", "core.py", "state.py", "definitions.py",
                      "domains.py", "policies.py", "dispatch.py", "lifecycle.py",
-                     "governance.py", "cli.py"]:
+                     "governance.py", "cli.py", "slices.py"]:
             write_file(self.tmp,
                         f"skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/{mod}",
                         f"# canonical {mod}\n")
@@ -386,7 +386,7 @@ class TestSyncTemplatesDistributed(unittest.TestCase):
         # Make all governed files identical.
         for mod in ["__init__.py", "core.py", "state.py", "definitions.py",
                      "domains.py", "policies.py", "dispatch.py", "lifecycle.py",
-                     "governance.py", "cli.py"]:
+                     "governance.py", "cli.py", "slices.py"]:
             write_file(self.tmp,
                         f"skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/{mod}",
                         f"# canonical {mod}\n")
@@ -412,7 +412,7 @@ class TestSyncTemplatesDistributed(unittest.TestCase):
         # All governed files identical except for an extra in canonical.
         for mod in ["__init__.py", "core.py", "state.py", "definitions.py",
                      "domains.py", "policies.py", "dispatch.py", "lifecycle.py",
-                     "governance.py", "cli.py"]:
+                     "governance.py", "cli.py", "slices.py"]:
             write_file(self.tmp,
                         f"skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/{mod}",
                         f"# canonical {mod}\n")
@@ -458,7 +458,7 @@ class TestSyncTemplatesDistributed(unittest.TestCase):
         # All governed files identical across canonical and distributed.
         for mod in ["__init__.py", "core.py", "state.py", "definitions.py",
                      "domains.py", "policies.py", "dispatch.py", "lifecycle.py",
-                     "governance.py", "cli.py"]:
+                     "governance.py", "cli.py", "slices.py"]:
             write_file(self.tmp,
                         f"skills/sdlc-project-bootstrap/templates/workflow/workflow_runtime/{mod}",
                         f"# canonical {mod}\n")

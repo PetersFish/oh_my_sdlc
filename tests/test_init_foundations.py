@@ -97,7 +97,7 @@ class TestInitFoundations(unittest.TestCase):
         # All expected module files must be present.
         for mod in ["__init__.py", "core.py", "state.py", "definitions.py",
                      "domains.py", "policies.py", "dispatch.py", "lifecycle.py",
-                     "governance.py", "cli.py"]:
+                     "governance.py", "cli.py", "slices.py"]:
             self.assertTrue(os.path.isfile(os.path.join(pkg_dir, mod)),
                             f"workflow_runtime/{mod} must be installed")
         # The bootstrapped workflow.py must be executable.

@@ -419,6 +419,24 @@ Your handoff artifact MUST include these additional sections after Evidence Summ
 If review artifacts produce logs worth preserving, store them under
 `.ai/workflows/runs/active/<run_id>/logs/<slice_id>/review-agent/...`.
 
+## Sliced Review Contract (P0)
+
+When reviewing implementation slices:
+
+- Use `review_scope=slice|aggregate` to distinguish slice review from
+  aggregate review.
+- For slice review, treat `base_ref..<head_ref>` as the authoritative
+  scope. Derive file/hunk scope from Git, not from implement evidence.
+- Use `git -C <worktree_path>` whenever worktree mode is active.
+- Validate current HEAD/ref/worktree consistency.
+- Compare Git-derived scope with implement evidence `changed_files[]`.
+- Block on `review_slice_change_set_mismatch` or dirty source/test
+  changes outside the commit range.
+- For aggregate review, inspect `parent_ref..<latest accepted head>` and
+  all required slice evidence.
+- Validate full regression, requirement coverage, contiguous ranges,
+  and unresolved blocks.
+
 ## Failure Modes
 
 | Failure | Blocker Reason | Action |

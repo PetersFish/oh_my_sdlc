@@ -5,9 +5,9 @@
   "source_ref": "HEAD",
   "status": "stable",
   "target": "/Users/yuping/Documents/workspace/oh_my_skills/.claude/skills/sdlc-project-bootstrap",
-  "installed_at": "2026-07-11T15:58:04.045711Z",
+  "installed_at": "2026-07-13T04:48:54.984884Z",
   "backport_policy": "review-required",
-  "payload_hash": "09e9994248c5b20c47a740f9f33440f21639df100bba55c7a774a69b79672368",
+  "payload_hash": "de9fc1f4c851549aade76064041c7a1c86ed000f5a82fe0d92510038267d5622",
   "files": [
     "SKILL.md",
     "scripts/init_foundations.py",
@@ -24,6 +24,7 @@
     "templates/workflow/workflow_runtime/governance.py",
     "templates/workflow/workflow_runtime/lifecycle.py",
     "templates/workflow/workflow_runtime/policies.py",
+    "templates/workflow/workflow_runtime/slices.py",
     "templates/workflow/workflow_runtime/state.py"
   ]
 }

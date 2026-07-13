@@ -2838,6 +2838,33 @@ class TestWorktreeVerificationHygienePromptContracts(unittest.TestCase):
         # Broad statements like "all tests passed except environment" must not be acceptable
         self.assertIn("all tests passed except environment", body)
 
+    # --- implement-agent: complete live Git scope for success handoff ---
+
+    def test_implement_agent_requires_complete_live_git_scope(self):
+        """implement-agent must require deriving changed_files from the
+        complete current live Git scope (tracked + untracked), not only
+        remediation files."""
+        body = self._read_agent_body("implement-agent")
+        lower = body.lower()
+        self.assertIn("complete current live git scope", lower,
+                      "implement-agent must require the complete current live Git scope")
+        self.assertIn("untracked", lower,
+                      "implement-agent must mention untracked files in the scope")
+        self.assertIn("tracked", lower,
+                      "implement-agent must mention tracked files in the scope")
+
+    def test_implement_agent_requires_deriving_changed_files_from_git_state(self):
+        """implement-agent must require deriving structured changed_files
+        from current Git state, not just listing remediation files."""
+        body = self._read_agent_body("implement-agent")
+        lower = body.lower()
+        self.assertIn("derive", lower,
+                      "implement-agent must require deriving changed_files from Git state")
+        self.assertIn("git ls-files", lower,
+                      "implement-agent must reference git ls-files for untracked discovery")
+        self.assertIn("git diff", lower,
+                      "implement-agent must reference git diff for tracked changes")
+
 
 class TestSyncDerivedArtifactsDryRunCLI(unittest.TestCase):
     """CLI-level tests for sync_derived_artifacts.py --dry-run flag."""

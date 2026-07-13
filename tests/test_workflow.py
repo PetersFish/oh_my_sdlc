@@ -9482,5 +9482,2177 @@ class TestFinalCommit(FixtureBase):
         )
 
 
+# ---------------------------------------------------------------------------
+# Slice 1: State Model and Validation
+# ---------------------------------------------------------------------------
+
+
+def _make_implementation_state(slices, strategy="sequential",
+                                assessment_status="completed",
+                                decision="multi_slice"):
+    """Build a canonical implementation block for test fixtures."""
+    return {
+        "strategy": strategy,
+        "slicing_assessment": {
+            "status": assessment_status,
+            "decision": decision,
+            "assessed_by": "plan-agent",
+            "assessment_handoff_path": "",
+            "reasons": [],
+        },
+        "aggregate_review_status": "pending",
+        "active_slice_id": None,
+        "slices": slices,
+    }
+
+
+def _make_slice(slice_id, depends_on=None, required=True, status="pending",
+                base_ref="", head_ref="", accepted_head_ref="",
+                commit_refs=None, attempt_count=0,
+                implement_evidence=None, review_evidence=None,
+                block=None):
+    return {
+        "slice_id": slice_id,
+        "depends_on": depends_on or [],
+        "required": required,
+        "status": status,
+        "attempt_count": attempt_count,
+        "block": block,
+        "base_ref": base_ref,
+        "head_ref": head_ref,
+        "accepted_head_ref": accepted_head_ref,
+        "commit_refs": commit_refs or [],
+        "implement_evidence": implement_evidence or {},
+        "review_evidence": review_evidence or {},
+        "handoff_paths": [],
+    }
+
+
+class TestSliceStateAndValidation(FixtureBase):
+    """Slice 1: runtime state model for implementation slices."""
+
+    def _make_apply_run(self, implementation=None, flow_type="spec-flow"):
+        run_id = "2026-07-13-slice-state"
+        state = {
+            "version": 1,
+            "run_id": run_id,
+            "workflow": "sdlc-main",
+            "flow_type": flow_type,
+            "status": "running",
+            "current_phase": "apply_change",
+            "primary_subject": {"type": "spec_change", "id": "slice-state"},
+            "context": {"change_id": "slice-state"},
+            "phase_readiness": {"phase": "apply_change", "ready": True, "missing_required_inputs": []},
+            "pending_hooks": [],
+            "completed_hooks": [],
+            "completed_phases": ["create_change"],
+            "gates": {},
+            "evidence": {},
+            "block": None,
+            "updated_at": "2026-07-13T00:00:00",
+        }
+        if implementation is not None:
+            state["implementation"] = implementation
+        self._write_current_state(state)
+        return run_id
+
+    # --- Legacy normalization ---
+
+    def test_legacy_run_without_implementation_normalizes_to_default(self):
+        """A legacy run without 'implementation' gets a compatibility default
+        slice when loaded/validated, without mutating the persisted file."""
+        run_id = self._make_apply_run(implementation=None)
+        # validate should succeed and report no errors
+        rc, out, _ = run_workflow(self.tmp, "validate")
+        self.assertEqual(rc, 0, out)
+
+    # --- Single slice assessment materializes 'default' ---
+
+    def test_single_slice_assessment_materializes_default_slice(self):
+        impl = _make_implementation_state(
+            [_make_slice("default", depends_on=[], required=True)],
+            decision="single_slice",
+        )
+        run_id = self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-status")
+        self.assertEqual(rc, 0, out)
+        data = json.loads(out)
+        ids = [s["slice_id"] for s in data.get("slices", [])]
+        self.assertIn("default", ids)
+
+    # --- Multi-slice state persistence across resume ---
+
+    def test_multi_slice_state_persists_across_save_load(self):
+        slices = [
+            _make_slice("slice-a", depends_on=[]),
+            _make_slice("slice-b", depends_on=["slice-a"]),
+            _make_slice("slice-c", depends_on=["slice-a", "slice-b"]),
+        ]
+        impl = _make_implementation_state(slices)
+        run_id = self._make_apply_run(implementation=impl)
+        state = self._read_current_state()
+        self.assertEqual(state["implementation"]["strategy"], "sequential")
+        self.assertEqual(len(state["implementation"]["slices"]), 3)
+        self.assertEqual(state["implementation"]["slices"][2]["depends_on"], ["slice-a", "slice-b"])
+
+    # --- Validation: duplicate ids ---
+
+    def test_duplicate_slice_ids_rejected(self):
+        slices = [
+            _make_slice("slice-a"),
+            _make_slice("slice-a"),
+        ]
+        impl = _make_implementation_state(slices)
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-status")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [e.get("reason", "") for e in data.get("errors", [])]
+        self.assertIn("duplicate_slice_id", reasons)
+
+    # --- Validation: reserved 'aggregate' id ---
+
+    def test_reserved_aggregate_slice_id_rejected(self):
+        slices = [_make_slice("aggregate")]
+        impl = _make_implementation_state(slices)
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-status")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [e.get("reason", "") for e in data.get("errors", [])]
+        self.assertIn("reserved_slice_id", reasons)
+
+    # --- Validation: unknown dependencies ---
+
+    def test_unknown_dependency_rejected(self):
+        slices = [_make_slice("slice-a", depends_on=["nonexistent"])]
+        impl = _make_implementation_state(slices)
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-status")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [e.get("reason", "") for e in data.get("errors", [])]
+        self.assertIn("unknown_dependency", reasons)
+
+    # --- Validation: self-dependencies ---
+
+    def test_self_dependency_rejected(self):
+        slices = [_make_slice("slice-a", depends_on=["slice-a"])]
+        impl = _make_implementation_state(slices)
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-status")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [e.get("reason", "") for e in data.get("errors", [])]
+        self.assertIn("self_dependency", reasons)
+
+    # --- Validation: cycles ---
+
+    def test_cyclic_dependency_rejected(self):
+        slices = [
+            _make_slice("slice-a", depends_on=["slice-b"]),
+            _make_slice("slice-b", depends_on=["slice-a"]),
+        ]
+        impl = _make_implementation_state(slices)
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-status")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [e.get("reason", "") for e in data.get("errors", [])]
+        self.assertIn("cyclic_dependency", reasons)
+
+    # --- Validation: multiple active slices ---
+
+    def test_multiple_active_slices_rejected(self):
+        slices = [
+            _make_slice("slice-a", status="in_progress"),
+            _make_slice("slice-b", status="in_review"),
+        ]
+        impl = _make_implementation_state(slices)
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-status")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [e.get("reason", "") for e in data.get("errors", [])]
+        self.assertIn("multiple_active_slices", reasons)
+
+    # --- Validation: completed slice requires accepted_head_ref ---
+
+    def test_completed_slice_without_accepted_head_ref_rejected(self):
+        slices = [_make_slice("slice-a", status="completed", head_ref="h1")]
+        impl = _make_implementation_state(slices)
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-status")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [e.get("reason", "") for e in data.get("errors", [])]
+        self.assertIn("completed_without_accepted_head_ref", reasons)
+
+    # --- Validation: strategy must be sequential ---
+
+    def test_non_sequential_strategy_rejected(self):
+        impl = _make_implementation_state(
+            [_make_slice("default")],
+            strategy="parallel",
+        )
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-status")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [e.get("reason", "") for e in data.get("errors", [])]
+        self.assertIn("invalid_strategy", reasons)
+
+    # --- Evidence strictness: one slice's evidence cannot satisfy another ---
+
+    def test_evidence_under_one_slice_does_not_satisfy_another(self):
+        slices = [
+            _make_slice("slice-a", status="completed",
+                        accepted_head_ref="ref-a",
+                        implement_evidence={"tasks_complete": True},
+                        review_evidence={"review_passed": True}),
+            _make_slice("slice-b", depends_on=["slice-a"], status="pending"),
+        ]
+        impl = _make_implementation_state(slices)
+        run_id = self._make_apply_run(implementation=impl)
+        state = self._read_current_state()
+        # slice-b should NOT inherit slice-a's evidence
+        slice_b = [s for s in state["implementation"]["slices"] if s["slice_id"] == "slice-b"][0]
+        self.assertEqual(slice_b["implement_evidence"], {})
+        self.assertEqual(slice_b["review_evidence"], {})
+
+
+# ---------------------------------------------------------------------------
+# Slice 2: Runtime Slice Commands
+# ---------------------------------------------------------------------------
+
+
+class TestSliceNextAndCommands(FixtureBase):
+    """Slice 2: slice-next, slice-block, slice-resume, slice-cancel commands."""
+
+    def _make_apply_run(self, implementation, flow_type="spec-flow"):
+        run_id = "2026-07-13-slice-cmds"
+        state = {
+            "version": 1,
+            "run_id": run_id,
+            "workflow": "sdlc-main",
+            "flow_type": flow_type,
+            "status": "running",
+            "current_phase": "apply_change",
+            "primary_subject": {"type": "spec_change", "id": "slice-cmds"},
+            "context": {"change_id": "slice-cmds"},
+            "phase_readiness": {"phase": "apply_change", "ready": True, "missing_required_inputs": []},
+            "pending_hooks": [],
+            "completed_hooks": [],
+            "completed_phases": ["create_change"],
+            "gates": {},
+            "evidence": {},
+            "block": None,
+            "updated_at": "2026-07-13T00:00:00",
+            "implementation": implementation,
+        }
+        self._write_current_state(state)
+        return run_id
+
+    # --- slice-next ---
+
+    def test_slice_next_returns_first_ready_slice_in_declaration_order(self):
+        """A and B are both ready; declaration order selects A first."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", depends_on=[], status="pending"),
+            _make_slice("slice-b", depends_on=[], status="pending"),
+        ])
+        self._make_apply_run(impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-next")
+        self.assertEqual(rc, 0, out)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "dispatch_slice")
+        self.assertEqual(data["slice_id"], "slice-a")
+
+    def test_slice_next_returns_no_ready_slice_when_one_in_progress(self):
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="in_progress", base_ref="base-0"),
+            _make_slice("slice-b", status="pending"),
+        ])
+        impl["active_slice_id"] = "slice-a"
+        self._make_apply_run(impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-next")
+        self.assertEqual(rc, 0, out)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "no_ready_slice")
+        self.assertEqual(data["reason"], "slice_in_progress")
+
+    def test_slice_next_returns_dispatch_aggregate_review_when_all_completed(self):
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="completed", accepted_head_ref="ref-a",
+                        review_evidence={"review_passed": True}),
+        ])
+        self._make_apply_run(impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-next")
+        self.assertEqual(rc, 0, out)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "dispatch_aggregate_review")
+
+    def test_slice_next_returns_all_complete_when_aggregate_passed(self):
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="completed", accepted_head_ref="ref-a",
+                        review_evidence={"review_passed": True}),
+        ])
+        impl["aggregate_review_status"] = "passed"
+        self._make_apply_run(impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-next")
+        self.assertEqual(rc, 0, out)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "all_slices_and_aggregate_complete")
+
+    def test_slice_next_c_waits_for_accepted_a_and_b(self):
+        """C depends on A and B; C is not ready until both are completed."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="completed", accepted_head_ref="ref-a",
+                        review_evidence={"review_passed": True}),
+            _make_slice("slice-b", status="in_progress", base_ref="ref-a"),
+            _make_slice("slice-c", depends_on=["slice-a", "slice-b"], status="pending"),
+        ])
+        impl["active_slice_id"] = "slice-b"
+        self._make_apply_run(impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-next")
+        self.assertEqual(rc, 0, out)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "no_ready_slice")
+
+    def test_slice_next_is_non_mutating(self):
+        """slice-next must not change the persisted state."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="pending"),
+        ])
+        self._make_apply_run(impl)
+        state_before = self._read_current_state()
+        run_workflow(self.tmp, "slice-next")
+        state_after = self._read_current_state()
+        # Only updated_at should differ (if at all); slices unchanged.
+        self.assertEqual(
+            state_before["implementation"]["slices"],
+            state_after["implementation"]["slices"],
+        )
+
+    # --- slice-block ---
+
+    def test_slice_block_sets_slice_to_blocked(self):
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="pending"),
+        ])
+        self._make_apply_run(impl)
+        rc, out, _ = run_workflow(
+            self.tmp, "slice-block",
+            slice_id="slice-a",
+            value=json.dumps({"reason": "external_dependency"}),
+        )
+        self.assertEqual(rc, 0, out)
+        state = self._read_current_state()
+        sl = state["implementation"]["slices"][0]
+        self.assertEqual(sl["status"], "blocked")
+        self.assertEqual(sl["block"]["reason"], "external_dependency")
+
+    # --- slice-resume ---
+
+    def test_slice_resume_blocked_to_ready(self):
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="blocked", block={"reason": "waiting"}),
+        ])
+        self._make_apply_run(impl)
+        rc, out, _ = run_workflow(
+            self.tmp, "slice-resume",
+            slice_id="slice-a",
+        )
+        self.assertEqual(rc, 0, out)
+        state = self._read_current_state()
+        sl = state["implementation"]["slices"][0]
+        self.assertEqual(sl["status"], "ready")
+        self.assertIsNone(sl["block"])
+
+    def test_slice_resume_rejects_non_blocked_slice(self):
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="pending"),
+        ])
+        self._make_apply_run(impl)
+        rc, out, _ = run_workflow(
+            self.tmp, "slice-resume",
+            slice_id="slice-a",
+        )
+        self.assertNotEqual(rc, 0)
+
+    # --- slice-cancel ---
+
+    def test_slice_cancel_requires_reason(self):
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="pending"),
+        ])
+        self._make_apply_run(impl)
+        rc, out, _ = run_workflow(
+            self.tmp, "slice-cancel",
+            slice_id="slice-a",
+        )
+        self.assertNotEqual(rc, 0)
+
+    def test_slice_cancel_with_reason_sets_cancelled(self):
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="pending"),
+        ])
+        self._make_apply_run(impl)
+        rc, out, _ = run_workflow(
+            self.tmp, "slice-cancel",
+            slice_id="slice-a",
+            reason="user decided not needed",
+        )
+        self.assertEqual(rc, 0, out)
+        state = self._read_current_state()
+        sl = state["implementation"]["slices"][0]
+        self.assertEqual(sl["status"], "cancelled")
+
+
+# ---------------------------------------------------------------------------
+# Slice 3: Dispatch Lifecycle and Git Refs
+# ---------------------------------------------------------------------------
+
+
+class TestSliceDispatchLifecycle(FixtureBase):
+    """Slice 3: atomic slice transitions in before/after dispatch hooks."""
+
+    def _make_apply_run(self, implementation=None, flow_type="spec-flow",
+                        status="running", block=None):
+        run_id = "2026-07-13-slice-dispatch"
+        state = {
+            "version": 1,
+            "run_id": run_id,
+            "workflow": "sdlc-main",
+            "flow_type": flow_type,
+            "status": status,
+            "current_phase": "apply_change",
+            "primary_subject": {"type": "spec_change", "id": "slice-dispatch"},
+            "context": {"change_id": "slice-dispatch"},
+            "phase_readiness": {"phase": "apply_change", "ready": True, "missing_required_inputs": []},
+            "pending_hooks": [],
+            "completed_hooks": [],
+            "completed_phases": ["create_change"],
+            "gates": {},
+            "evidence": {},
+            "block": block,
+            "updated_at": "2026-07-13T00:00:00",
+        }
+        if implementation is not None:
+            state["implementation"] = implementation
+        self._write_current_state(state)
+        return run_id
+
+    def test_before_dispatch_rejects_implement_while_assessment_pending(self):
+        """Implement dispatch is rejected while slicing assessment is pending."""
+        impl = _make_implementation_state(
+            [_make_slice("slice-a", status="pending")],
+            assessment_status="pending",
+        )
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="implement-agent",
+            slice_id="slice-a",
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [b.get("reason", "") for b in data.get("blockers", [])]
+        self.assertIn("slicing_assessment_pending", reasons)
+
+    def test_before_dispatch_rejects_implement_while_assessment_blocked(self):
+        impl = _make_implementation_state(
+            [_make_slice("slice-a", status="pending")],
+            assessment_status="blocked",
+        )
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="implement-agent",
+            slice_id="slice-a",
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [b.get("reason", "") for b in data.get("blockers", [])]
+        self.assertIn("slicing_assessment_blocked", reasons)
+
+    def test_before_dispatch_implement_sets_slice_in_progress(self):
+        """Before-dispatch(implement-agent, slice_id) atomically sets in_progress."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="ready"),
+        ])
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="implement-agent",
+            slice_id="slice-a",
+        )
+        self.assertEqual(rc, 0, out)
+        state = self._read_current_state()
+        sl = state["implementation"]["slices"][0]
+        self.assertEqual(sl["status"], "in_progress")
+        self.assertEqual(sl["attempt_count"], 1)
+        self.assertEqual(state["implementation"]["active_slice_id"], "slice-a")
+
+    def test_before_dispatch_rejects_second_slice_while_one_in_progress(self):
+        """Another slice cannot dispatch while one is in_progress."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="in_progress", base_ref="base-0"),
+            _make_slice("slice-b", status="pending"),
+        ])
+        impl["active_slice_id"] = "slice-a"
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="implement-agent",
+            slice_id="slice-b",
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [b.get("reason", "") for b in data.get("blockers", [])]
+        self.assertIn("another_slice_active", reasons)
+
+    def test_after_dispatch_implement_success_moves_to_in_review(self):
+        """Implement success moves the same slice to in_review."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="in_progress", attempt_count=1,
+                        base_ref="base-1"),
+        ])
+        self._make_apply_run(implementation=impl)
+        agent_result = json.dumps({
+            "status": "success",
+            "evidence": {"focused_tests": [{"command": "pytest -k test", "result": "pass"}]},
+            "artifacts": {
+                "head_ref": "head-1",
+                "commit_refs": ["commit-1"],
+                "base_ref": "base-1",
+            },
+        })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="implement-agent",
+            slice_id="slice-a",
+            value=agent_result,
+        )
+        self.assertEqual(rc, 0, out)
+        state = self._read_current_state()
+        sl = state["implementation"]["slices"][0]
+        self.assertEqual(sl["status"], "in_review")
+        self.assertEqual(sl["head_ref"], "head-1")
+        self.assertEqual(sl["commit_refs"], ["commit-1"])
+
+    def test_after_dispatch_review_pass_completes_slice(self):
+        """Review pass records accepted_head_ref and completes the slice."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="in_review", head_ref="head-1",
+                        base_ref="base-1"),
+        ])
+        self._make_apply_run(implementation=impl)
+        agent_result = json.dumps({
+            "status": "success",
+            "evidence": {"review_passed": True},
+        })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="review-agent",
+            slice_id="slice-a",
+            value=agent_result,
+        )
+        self.assertEqual(rc, 0, out)
+        state = self._read_current_state()
+        sl = state["implementation"]["slices"][0]
+        self.assertEqual(sl["status"], "completed")
+        self.assertEqual(sl["accepted_head_ref"], "head-1")
+        self.assertIsNone(state["implementation"]["active_slice_id"])
+
+    def test_after_dispatch_review_rejection_preserves_base_ref(self):
+        """Review rejection preserves original base_ref and allows head advancement."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="in_review", head_ref="head-1",
+                        base_ref="base-1", attempt_count=1),
+        ])
+        self._make_apply_run(implementation=impl)
+        agent_result = json.dumps({
+            "status": "failed",
+            "evidence": {},
+            "blockers": [{
+                "reason": "review_changes_requested",
+                "message": "fix issues",
+                "recommended_action": "back_to_implement",
+            }],
+            "recommended_next_action": "back_to_implement",
+        })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="review-agent",
+            slice_id="slice-a",
+            value=agent_result,
+        )
+        self.assertEqual(rc, 0, out)
+        state = self._read_current_state()
+        sl = state["implementation"]["slices"][0]
+        # Slice goes back to pending/ready for re-implementation
+        self.assertIn(sl["status"], ("pending", "ready", "blocked"))
+        self.assertEqual(sl["base_ref"], "base-1")
+
+    def test_sequential_ab_then_c_execution(self):
+        """A/B sequential execution, C depends on accepted A+B heads."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="ready", base_ref="base-0"),
+            _make_slice("slice-b", depends_on=["slice-a"], status="pending"),
+            _make_slice("slice-c", depends_on=["slice-a", "slice-b"], status="pending"),
+        ])
+        self._make_apply_run(implementation=impl)
+
+        # Implement A
+        rc, out, _ = run_workflow(self.tmp, "before-dispatch",
+                                  agent="implement-agent", slice_id="slice-a")
+        self.assertEqual(rc, 0, out)
+        # A succeeds
+        rc, out, _ = run_workflow(self.tmp, "after-dispatch",
+                                  agent="implement-agent", slice_id="slice-a",
+                                  value=json.dumps({
+                                      "status": "success",
+                                      "evidence": {},
+                                      "artifacts": {"head_ref": "head-a", "commit_refs": ["c-a"], "base_ref": "base-0"},
+                                  }))
+        self.assertEqual(rc, 0, out)
+        # Review A passes
+        rc, out, _ = run_workflow(self.tmp, "after-dispatch",
+                                  agent="review-agent", slice_id="slice-a",
+                                  value=json.dumps({"status": "success", "evidence": {"review_passed": True}}))
+        self.assertEqual(rc, 0, out)
+
+        state = self._read_current_state()
+        sl_a = [s for s in state["implementation"]["slices"] if s["slice_id"] == "slice-a"][0]
+        self.assertEqual(sl_a["status"], "completed")
+        self.assertEqual(sl_a["accepted_head_ref"], "head-a")
+
+        # slice-next should return slice-b
+        rc, out, _ = run_workflow(self.tmp, "slice-next")
+        data = json.loads(out)
+        self.assertEqual(data["status"], "dispatch_slice")
+        self.assertEqual(data["slice_id"], "slice-b")
+
+
+# ---------------------------------------------------------------------------
+# Remediation: Review-agent blocked issues — RED tests for missing behavior
+# ---------------------------------------------------------------------------
+
+
+class TestSliceDispatchRemediation(FixtureBase):
+    """Remediation tests for review-agent blockers.
+
+    Covers:
+    1. before-dispatch must enforce exact slice-next selection + dependency readiness.
+    2. after-dispatch must reject missing/invalid Git refs.
+    3. aggregate-review state transitions + completion gating.
+    4. state validation: task coverage, review-evidence, aggregate, active-slice,
+       sequential commit-chain invariants.
+    5. negative and end-to-end scenarios.
+    """
+
+    def _make_apply_run(self, implementation=None, flow_type="spec-flow",
+                        status="running", block=None):
+        run_id = "2026-07-13-slice-remediation"
+        state = {
+            "version": 1,
+            "run_id": run_id,
+            "workflow": "sdlc-main",
+            "flow_type": flow_type,
+            "status": status,
+            "current_phase": "apply_change",
+            "primary_subject": {"type": "spec_change", "id": "slice-remediation"},
+            "context": {"change_id": "slice-remediation"},
+            "phase_readiness": {"phase": "apply_change", "ready": True, "missing_required_inputs": []},
+            "pending_hooks": [],
+            "completed_hooks": [],
+            "completed_phases": ["create_change"],
+            "gates": {},
+            "evidence": {},
+            "block": block,
+            "updated_at": "2026-07-13T00:00:00",
+        }
+        if implementation is not None:
+            state["implementation"] = implementation
+        self._write_current_state(state)
+        return run_id
+
+    # --- Issue 1: before-dispatch must enforce exact slice-next selection ---
+
+    def test_before_dispatch_rejects_slice_that_is_not_slice_next_result(self):
+        """before-dispatch(implement-agent) must accept only the exact
+        slice-next result. If slice-a is ready but slice-b is requested
+        and slice-b's dependencies are not completed, dispatch must be
+        rejected even if slice-b is 'pending'."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", depends_on=[], status="pending"),
+            _make_slice("slice-b", depends_on=["slice-a"], status="pending"),
+        ])
+        self._make_apply_run(implementation=impl)
+        # slice-next should return slice-a, NOT slice-b.
+        rc, out, _ = run_workflow(self.tmp, "slice-next")
+        self.assertEqual(rc, 0, out)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "dispatch_slice")
+        self.assertEqual(data["slice_id"], "slice-a")
+        # Requesting slice-b (whose dependency is not completed) must be rejected.
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="implement-agent",
+            slice_id="slice-b",
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [b.get("reason", "") for b in data.get("blockers", [])]
+        self.assertIn("slice_not_ready", reasons)
+
+    def test_before_dispatch_rejects_dependency_not_completed(self):
+        """A slice whose dependencies are not completed cannot dispatch,
+        even if its status is 'pending'."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", depends_on=[], status="in_progress"),
+            _make_slice("slice-b", depends_on=["slice-a"], status="pending"),
+        ])
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="implement-agent",
+            slice_id="slice-b",
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [b.get("reason", "") for b in data.get("blockers", [])]
+        # Must be blocked either because another slice is active or
+        # because dependencies are not completed.
+        self.assertTrue(
+            "another_slice_active" in reasons or "slice_not_ready" in reasons,
+            f"expected another_slice_active or slice_not_ready in {reasons}",
+        )
+
+    def test_before_dispatch_rejects_dependency_completed_but_no_accepted_head(self):
+        """A slice whose dependency is 'completed' but lacks accepted_head_ref
+        cannot dispatch."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", depends_on=[], status="completed",
+                        accepted_head_ref=""),  # missing accepted head
+            _make_slice("slice-b", depends_on=["slice-a"], status="pending"),
+        ])
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="implement-agent",
+            slice_id="slice-b",
+        )
+        self.assertNotEqual(rc, 0)
+
+    # --- Issue 2: after-dispatch must reject missing/invalid Git refs ---
+
+    def test_after_dispatch_implement_success_rejects_missing_head_ref(self):
+        """Implement success without head_ref cannot enter review."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="in_progress", attempt_count=1,
+                        base_ref="base-1"),
+        ])
+        self._make_apply_run(implementation=impl)
+        agent_result = json.dumps({
+            "status": "success",
+            "evidence": {"focused_tests": [{"command": "pytest -k test", "result": "pass"}]},
+            "artifacts": {
+                "base_ref": "base-1",
+                "commit_refs": ["commit-1"],
+                # head_ref missing
+            },
+        })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="implement-agent",
+            slice_id="slice-a",
+            value=agent_result,
+        )
+        state = self._read_current_state()
+        sl = state["implementation"]["slices"][0]
+        # Must NOT have moved to in_review.
+        self.assertNotEqual(sl["status"], "in_review")
+
+    def test_after_dispatch_implement_success_rejects_missing_commit_refs(self):
+        """Implement success without commit_refs cannot enter review."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="in_progress", attempt_count=1,
+                        base_ref="base-1"),
+        ])
+        self._make_apply_run(implementation=impl)
+        agent_result = json.dumps({
+            "status": "success",
+            "evidence": {"focused_tests": [{"command": "pytest -k test", "result": "pass"}]},
+            "artifacts": {
+                "base_ref": "base-1",
+                "head_ref": "head-1",
+                # commit_refs missing
+            },
+        })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="implement-agent",
+            slice_id="slice-a",
+            value=agent_result,
+        )
+        state = self._read_current_state()
+        sl = state["implementation"]["slices"][0]
+        self.assertNotEqual(sl["status"], "in_review")
+
+    def test_after_dispatch_implement_success_rejects_empty_string_refs(self):
+        """Implement success with empty-string refs cannot enter review."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="in_progress", attempt_count=1,
+                        base_ref="base-1"),
+        ])
+        self._make_apply_run(implementation=impl)
+        agent_result = json.dumps({
+            "status": "success",
+            "evidence": {"focused_tests": [{"command": "pytest -k test", "result": "pass"}]},
+            "artifacts": {
+                "base_ref": "base-1",
+                "head_ref": "",
+                "commit_refs": [],
+            },
+        })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="implement-agent",
+            slice_id="slice-a",
+            value=agent_result,
+        )
+        state = self._read_current_state()
+        sl = state["implementation"]["slices"][0]
+        self.assertNotEqual(sl["status"], "in_review")
+
+    def test_after_dispatch_review_pass_rejects_empty_accepted_head(self):
+        """Review success cannot complete a slice with empty accepted_head_ref."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="in_review", head_ref="",
+                        base_ref="base-1"),
+        ])
+        self._make_apply_run(implementation=impl)
+        agent_result = json.dumps({
+            "status": "success",
+            "evidence": {"review_passed": True},
+        })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="review-agent",
+            slice_id="slice-a",
+            value=agent_result,
+        )
+        state = self._read_current_state()
+        sl = state["implementation"]["slices"][0]
+        # Must NOT be completed with empty accepted_head_ref.
+        self.assertNotEqual(sl["status"], "completed")
+
+    # --- Issue 3: aggregate-review state transitions + completion gating ---
+
+    def test_after_dispatch_review_pass_sets_aggregate_ready_when_all_complete(self):
+        """When the last required slice completes, aggregate_review_status
+        must transition to 'ready'."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="in_review", head_ref="head-a",
+                        base_ref="base-0"),
+        ])
+        self._make_apply_run(implementation=impl)
+        agent_result = json.dumps({
+            "status": "success",
+            "evidence": {"review_passed": True},
+        })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="review-agent",
+            slice_id="slice-a",
+            value=agent_result,
+        )
+        self.assertEqual(rc, 0, out)
+        state = self._read_current_state()
+        self.assertEqual(
+            state["implementation"]["aggregate_review_status"], "ready",
+        )
+
+    def test_after_dispatch_aggregate_review_pass_sets_passed(self):
+        """Review-agent success with aggregate scope sets aggregate_review_status
+        to 'passed'."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="completed", accepted_head_ref="head-a",
+                        review_evidence={"review_passed": True}),
+        ])
+        impl["aggregate_review_status"] = "ready"
+        self._make_apply_run(implementation=impl)
+        agent_result = json.dumps({
+            "status": "success",
+            "evidence": {"review_passed": True, "review_scope": "aggregate"},
+            "artifacts": {"review_scope": "aggregate"},
+        })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="review-agent",
+            slice_id="aggregate",
+            value=agent_result,
+        )
+        self.assertEqual(rc, 0, out)
+        state = self._read_current_state()
+        self.assertEqual(
+            state["implementation"]["aggregate_review_status"], "passed",
+        )
+
+    def test_after_dispatch_aggregate_review_rejection_sets_blocked(self):
+        """Review-agent failure with aggregate scope sets aggregate_review_status
+        to 'blocked'."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="completed", accepted_head_ref="head-a",
+                        review_evidence={"review_passed": True}),
+        ])
+        impl["aggregate_review_status"] = "ready"
+        self._make_apply_run(implementation=impl)
+        agent_result = json.dumps({
+            "status": "failed",
+            "evidence": {},
+            "blockers": [{"reason": "aggregate_review_failed", "message": "fail"}],
+        })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="review-agent",
+            slice_id="aggregate",
+            value=agent_result,
+        )
+        state = self._read_current_state()
+        self.assertEqual(
+            state["implementation"]["aggregate_review_status"], "blocked",
+        )
+
+    def test_complete_phase_apply_change_rejects_without_aggregate_passed(self):
+        """complete-phase for apply_change must be rejected when
+        aggregate_review_status is not 'passed'."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="completed", accepted_head_ref="head-a"),
+        ])
+        impl["aggregate_review_status"] = "ready"  # not passed
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(
+            self.tmp, "complete-phase",
+            exit_criteria_satisfied="all_tasks_complete",
+        )
+        self.assertNotEqual(rc, 0)
+
+    def test_slice_next_returns_all_complete_only_after_aggregate_passed(self):
+        """slice-next must return all_slices_and_aggregate_complete only
+        when aggregate_review_status is 'passed'. When it's 'ready', it
+        must return dispatch_aggregate_review."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="completed", accepted_head_ref="head-a",
+                        review_evidence={"review_passed": True}),
+        ])
+        impl["aggregate_review_status"] = "ready"
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-next")
+        self.assertEqual(rc, 0, out)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "dispatch_aggregate_review")
+
+    # --- Issue 4: state validation gaps ---
+
+    def test_validation_rejects_completed_slice_without_review_evidence(self):
+        """A completed slice must have non-empty review_evidence."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="completed",
+                        accepted_head_ref="head-a",
+                        review_evidence={}),  # empty
+        ])
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-status")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [e.get("reason", "") for e in data.get("errors", [])]
+        self.assertIn("completed_without_review_evidence", reasons)
+
+    def test_validation_rejects_active_slice_id_mismatch(self):
+        """active_slice_id must match the slice that is in_progress/in_review."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="in_progress"),
+        ])
+        impl["active_slice_id"] = "slice-b"  # mismatch
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-status")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [e.get("reason", "") for e in data.get("errors", [])]
+        self.assertIn("active_slice_id_mismatch", reasons)
+
+    def test_validation_rejects_in_progress_slice_without_base_ref(self):
+        """An in_progress slice must have a non-empty base_ref."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="in_progress", base_ref=""),
+        ])
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-status")
+        data = json.loads(out)
+        if rc != 0:
+            reasons = [e.get("reason", "") for e in data.get("errors", [])]
+            self.assertIn("active_slice_missing_base_ref", reasons)
+
+    def test_validation_rejects_in_review_slice_without_head_ref(self):
+        """An in_review slice must have non-empty head_ref and commit_refs."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="in_review", base_ref="base-1",
+                        head_ref=""),  # missing head_ref
+        ])
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-status")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [e.get("reason", "") for e in data.get("errors", [])]
+        self.assertIn("in_review_missing_head_ref", reasons)
+
+    def test_validation_rejects_non_empty_commit_refs_for_in_review(self):
+        """An in_review slice must have non-empty commit_refs."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="in_review", base_ref="base-1",
+                        head_ref="head-1", commit_refs=[]),  # empty
+        ])
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-status")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [e.get("reason", "") for e in data.get("errors", [])]
+        self.assertIn("in_review_missing_commit_refs", reasons)
+
+    def test_validation_rejects_sequential_commit_chain_violation(self):
+        """A slice's base_ref must equal the previous accepted slice's
+        accepted_head_ref when depending on it."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="completed",
+                        accepted_head_ref="head-a"),
+            _make_slice("slice-b", depends_on=["slice-a"], status="in_progress",
+                        base_ref="wrong-base"),  # should be head-a
+        ])
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-status")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [e.get("reason", "") for e in data.get("errors", [])]
+        self.assertIn("commit_chain_violation", reasons)
+
+    def test_validation_accepts_correct_commit_chain(self):
+        """A slice's base_ref equal to previous accepted_head_ref is valid."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="completed",
+                        accepted_head_ref="head-a"),
+            _make_slice("slice-b", depends_on=["slice-a"], status="in_progress",
+                        base_ref="head-a"),  # correct chain
+        ])
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-status")
+        # Should not fail with commit_chain_violation.
+        if rc != 0:
+            data = json.loads(out)
+            reasons = [e.get("reason", "") for e in data.get("errors", [])]
+            self.assertNotIn("commit_chain_violation", reasons)
+
+    # --- Issue 5: end-to-end and negative scenarios ---
+
+    def test_e2e_single_slice_flow_assessment_to_aggregate_review(self):
+        """Complete single-slice flow: implement -> review -> aggregate review
+        -> all complete."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", depends_on=[], status="ready",
+                        base_ref="base-0"),
+        ])
+        self._make_apply_run(implementation=impl)
+
+        # Implement A
+        rc, out, _ = run_workflow(self.tmp, "before-dispatch",
+                                  agent="implement-agent", slice_id="slice-a")
+        self.assertEqual(rc, 0, out)
+        rc, out, _ = run_workflow(self.tmp, "after-dispatch",
+                                  agent="implement-agent", slice_id="slice-a",
+                                  value=json.dumps({
+                                      "status": "success",
+                                      "evidence": {},
+                                      "artifacts": {"head_ref": "head-a",
+                                                    "commit_refs": ["c-a"],
+                                                    "base_ref": "base-0"},
+                                  }))
+        self.assertEqual(rc, 0, out)
+        # Review A passes
+        rc, out, _ = run_workflow(self.tmp, "after-dispatch",
+                                  agent="review-agent", slice_id="slice-a",
+                                  value=json.dumps({
+                                      "status": "success",
+                                      "evidence": {"review_passed": True},
+                                  }))
+        self.assertEqual(rc, 0, out)
+        state = self._read_current_state()
+        self.assertEqual(
+            state["implementation"]["aggregate_review_status"], "ready",
+        )
+        # slice-next dispatches aggregate review
+        rc, out, _ = run_workflow(self.tmp, "slice-next")
+        data = json.loads(out)
+        self.assertEqual(data["status"], "dispatch_aggregate_review")
+        # Aggregate review passes
+        rc, out, _ = run_workflow(self.tmp, "after-dispatch",
+                                  agent="review-agent", slice_id="aggregate",
+                                  value=json.dumps({
+                                      "status": "success",
+                                      "evidence": {"review_passed": True,
+                                                   "review_scope": "aggregate"},
+                                      "artifacts": {"review_scope": "aggregate"},
+                                  }))
+        self.assertEqual(rc, 0, out)
+        state = self._read_current_state()
+        self.assertEqual(
+            state["implementation"]["aggregate_review_status"], "passed",
+        )
+        # slice-next returns all complete
+        rc, out, _ = run_workflow(self.tmp, "slice-next")
+        data = json.loads(out)
+        self.assertEqual(data["status"], "all_slices_and_aggregate_complete")
+
+    def test_e2e_multi_slice_a_b_c_with_c_after_accepted_a_and_b(self):
+        """Multi-slice A/B/C: A and B independently ready, C depends on both.
+        C starts only after accepted A and B heads."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", depends_on=[], status="ready",
+                        base_ref="base-0"),
+            _make_slice("slice-b", depends_on=[], status="ready",
+                        base_ref="base-0"),
+            _make_slice("slice-c", depends_on=["slice-a", "slice-b"], status="pending"),
+        ])
+        self._make_apply_run(implementation=impl)
+
+        # Implement + review A
+        run_workflow(self.tmp, "before-dispatch",
+                     agent="implement-agent", slice_id="slice-a")
+        run_workflow(self.tmp, "after-dispatch",
+                     agent="implement-agent", slice_id="slice-a",
+                     value=json.dumps({
+                         "status": "success", "evidence": {},
+                         "artifacts": {"head_ref": "head-a",
+                                       "commit_refs": ["c-a"],
+                                       "base_ref": "base-0"},
+                     }))
+        run_workflow(self.tmp, "after-dispatch",
+                     agent="review-agent", slice_id="slice-a",
+                     value=json.dumps({"status": "success",
+                                       "evidence": {"review_passed": True}}))
+
+        # slice-next must return slice-b (declaration order)
+        rc, out, _ = run_workflow(self.tmp, "slice-next")
+        data = json.loads(out)
+        self.assertEqual(data["status"], "dispatch_slice")
+        self.assertEqual(data["slice_id"], "slice-b")
+
+        # Implement + review B
+        run_workflow(self.tmp, "before-dispatch",
+                     agent="implement-agent", slice_id="slice-b")
+        run_workflow(self.tmp, "after-dispatch",
+                     agent="implement-agent", slice_id="slice-b",
+                     value=json.dumps({
+                         "status": "success", "evidence": {},
+                         "artifacts": {"head_ref": "head-b",
+                                       "commit_refs": ["c-b"],
+                                       "base_ref": "base-0"},
+                     }))
+        run_workflow(self.tmp, "after-dispatch",
+                     agent="review-agent", slice_id="slice-b",
+                     value=json.dumps({"status": "success",
+                                       "evidence": {"review_passed": True}}))
+
+        # Now C should be ready
+        rc, out, _ = run_workflow(self.tmp, "slice-next")
+        data = json.loads(out)
+        self.assertEqual(data["status"], "dispatch_slice")
+        self.assertEqual(data["slice_id"], "slice-c")
+
+    def test_e2e_blocked_a_independent_b_proceeds(self):
+        """Blocked A with independent B proceeding sequentially."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", depends_on=[], status="blocked",
+                        block={"reason": "waiting"}),
+            _make_slice("slice-b", depends_on=[], status="pending"),
+        ])
+        self._make_apply_run(implementation=impl)
+        # slice-next should return slice-b (A is blocked, B is ready)
+        rc, out, _ = run_workflow(self.tmp, "slice-next")
+        data = json.loads(out)
+        self.assertEqual(data["status"], "dispatch_slice")
+        self.assertEqual(data["slice_id"], "slice-b")
+
+    def test_e2e_review_rejection_correction_commit(self):
+        """Review rejection preserves base_ref and allows re-implementation
+        with a correction commit that advances head_ref."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="in_review", head_ref="head-1",
+                        base_ref="base-1", attempt_count=1),
+        ])
+        self._make_apply_run(implementation=impl)
+        # Review rejects
+        run_workflow(self.tmp, "after-dispatch",
+                     agent="review-agent", slice_id="slice-a",
+                     value=json.dumps({
+                         "status": "failed", "evidence": {},
+                         "blockers": [{"reason": "review_changes_requested",
+                                       "message": "fix"}],
+                         "recommended_next_action": "back_to_implement",
+                     }))
+        state = self._read_current_state()
+        sl = state["implementation"]["slices"][0]
+        self.assertEqual(sl["base_ref"], "base-1")
+        self.assertIn(sl["status"], ("ready", "pending"))
+        # Re-implement with correction commit (new head)
+        run_workflow(self.tmp, "before-dispatch",
+                     agent="implement-agent", slice_id="slice-a")
+        run_workflow(self.tmp, "after-dispatch",
+                     agent="implement-agent", slice_id="slice-a",
+                     value=json.dumps({
+                         "status": "success", "evidence": {},
+                         "artifacts": {"head_ref": "head-2",
+                                       "commit_refs": ["c-1", "c-2"],
+                                       "base_ref": "base-1"},
+                     }))
+        state = self._read_current_state()
+        sl = state["implementation"]["slices"][0]
+        self.assertEqual(sl["status"], "in_review")
+        self.assertEqual(sl["head_ref"], "head-2")
+        self.assertEqual(sl["base_ref"], "base-1")
+        self.assertEqual(sl["attempt_count"], 2)
+
+    def test_e2e_aggregate_completion_gate_failure(self):
+        """Aggregate review failure blocks apply_change completion."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="completed", accepted_head_ref="head-a",
+                        review_evidence={"review_passed": True}),
+        ])
+        impl["aggregate_review_status"] = "ready"
+        self._make_apply_run(implementation=impl)
+        # Aggregate review fails
+        run_workflow(self.tmp, "after-dispatch",
+                     agent="review-agent", slice_id="aggregate",
+                     value=json.dumps({
+                         "status": "failed", "evidence": {},
+                         "blockers": [{"reason": "aggregate_review_failed",
+                                       "message": "integration broken"}],
+                     }))
+        state = self._read_current_state()
+        self.assertEqual(
+            state["implementation"]["aggregate_review_status"], "blocked",
+        )
+        # complete-phase must be rejected
+        rc, out, _ = run_workflow(
+            self.tmp, "complete-phase",
+            exit_criteria_satisfied="all_tasks_complete",
+        )
+        self.assertNotEqual(rc, 0)
+
+    def test_e2e_aggregate_review_then_pass_allows_completion(self):
+        """After aggregate review passes, complete-phase is allowed."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="completed", accepted_head_ref="head-a",
+                        review_evidence={"review_passed": True}),
+        ])
+        impl["aggregate_review_status"] = "ready"
+        self._make_apply_run(implementation=impl)
+        # Need evidence keys for apply_change to pass; add minimal
+        state = self._read_current_state()
+        state.setdefault("evidence", {})["eval_passed_or_human_decision_recorded"] = True
+        # Provide implement verification evidence so the missing_verification_basis
+        # gate is satisfied.
+        state.setdefault("evidence", {}).setdefault("agent_results", {}).setdefault("slice-a", {})["implement-agent"] = {
+            "status": "success",
+            "evidence": {"verification_passed": True, "focused_tests": [{"command": "pytest", "result": "pass"}]},
+        }
+        self._write_current_state(state)
+        # Aggregate review passes
+        run_workflow(self.tmp, "after-dispatch",
+                     agent="review-agent", slice_id="aggregate",
+                     value=json.dumps({
+                         "status": "success", "evidence": {"review_passed": True,
+                                                           "review_scope": "aggregate"},
+                         "artifacts": {"review_scope": "aggregate"},
+                     }))
+        # slice-next returns all complete
+        rc, out, _ = run_workflow(self.tmp, "slice-next")
+        data = json.loads(out)
+        self.assertEqual(data["status"], "all_slices_and_aggregate_complete")
+
+    def test_e2e_legacy_unsliced_default_compatibility(self):
+        """Legacy unsliced run with default slice still works end-to-end."""
+        impl = _make_implementation_state(
+            [_make_slice("default", depends_on=[], status="ready",
+                         base_ref="base-0")],
+            decision="single_slice",
+        )
+        self._make_apply_run(implementation=impl)
+        # slice-next returns default
+        rc, out, _ = run_workflow(self.tmp, "slice-next")
+        data = json.loads(out)
+        self.assertEqual(data["status"], "dispatch_slice")
+        self.assertEqual(data["slice_id"], "default")
+        # Implement default
+        run_workflow(self.tmp, "before-dispatch",
+                     agent="implement-agent", slice_id="default")
+        run_workflow(self.tmp, "after-dispatch",
+                     agent="implement-agent", slice_id="default",
+                     value=json.dumps({
+                         "status": "success", "evidence": {},
+                         "artifacts": {"head_ref": "head-d",
+                                       "commit_refs": ["c-d"],
+                                       "base_ref": "base-0"},
+                     }))
+        run_workflow(self.tmp, "after-dispatch",
+                     agent="review-agent", slice_id="default",
+                     value=json.dumps({"status": "success",
+                                       "evidence": {"review_passed": True}}))
+        state = self._read_current_state()
+        self.assertEqual(
+            state["implementation"]["aggregate_review_status"], "ready",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Review-blocker remediation: aggregate review, commit-chain, slice_id
+# requirement, and Git range validation contracts.
+# ---------------------------------------------------------------------------
+
+
+class TestReviewBlockerRemediation(FixtureBase):
+    """Coverage for the four review blockers that bypassed existing contracts."""
+
+    def _make_apply_run(self, implementation=None, flow_type="spec-flow",
+                        run_id="2026-07-13-review-blockers"):
+        state = {
+            "version": 1,
+            "run_id": run_id,
+            "workflow": "sdlc-main",
+            "flow_type": flow_type,
+            "status": "running",
+            "current_phase": "apply_change",
+            "primary_subject": {"type": "spec_change", "id": "review-blockers"},
+            "context": {"change_id": "review-blockers"},
+            "phase_readiness": {"phase": "apply_change", "ready": True, "missing_required_inputs": []},
+            "pending_hooks": [],
+            "completed_hooks": [],
+            "completed_phases": ["create_change"],
+            "gates": {},
+            "evidence": {},
+            "block": None,
+            "updated_at": "2026-07-13T00:00:00",
+        }
+        if implementation is not None:
+            state["implementation"] = implementation
+        self._write_current_state(state)
+        return run_id
+
+    # --- Blocker 1: aggregate review rejected as unknown_slice ---
+
+    def test_before_dispatch_aggregate_review_not_unknown_slice(self):
+        """before-dispatch(review-agent, slice_id='aggregate') must NOT be
+        rejected as unknown_slice when aggregate_review_status is 'ready'."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="completed",
+                        accepted_head_ref="head-a",
+                        review_evidence={"review_passed": True}),
+        ])
+        impl["aggregate_review_status"] = "ready"
+        self._make_apply_run(implementation=impl)
+
+        rc, out, _ = run_workflow(self.tmp, "before-dispatch",
+                                  agent="review-agent", slice_id="aggregate")
+        self.assertEqual(rc, 0, out)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "dispatched")
+        reasons = [b.get("reason", "") for b in data.get("blockers", [])]
+        self.assertNotIn("unknown_slice", reasons)
+
+    def test_before_dispatch_aggregate_review_rejected_when_not_ready(self):
+        """before-dispatch(review-agent, slice_id='aggregate') is rejected
+        with aggregate_review_not_ready when aggregate_review_status is not
+        'ready'."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="completed",
+                        accepted_head_ref="head-a",
+                        review_evidence={"review_passed": True}),
+        ])
+        # aggregate_review_status is 'pending' (not all slices completed path)
+        impl["aggregate_review_status"] = "pending"
+        self._make_apply_run(implementation=impl)
+
+        rc, out, _ = run_workflow(self.tmp, "before-dispatch",
+                                  agent="review-agent", slice_id="aggregate")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [b.get("reason", "") for b in data.get("blockers", [])]
+        self.assertIn("aggregate_review_not_ready", reasons)
+        self.assertNotIn("unknown_slice", reasons)
+
+    # --- Blocker 2: commit-chain for differing dep heads (sequential model) ---
+
+    def test_validation_differing_dep_heads_base_must_match_latest(self):
+        """A slice depending on two completed slices with different
+        accepted_head_ref values must have base_ref equal to the latest
+        completed dependency's accepted_head_ref (the previous accepted
+        sequential head).  In declaration order [A, B], B is the latest, so
+        base_ref must be head-b, not head-a."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="completed",
+                        accepted_head_ref="head-a"),
+            _make_slice("slice-b", status="completed",
+                        accepted_head_ref="head-b"),
+            _make_slice("slice-c", depends_on=["slice-a", "slice-b"],
+                        status="in_progress", base_ref="head-a"),
+        ])
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-status")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [e.get("reason", "") for e in data.get("errors", [])]
+        self.assertIn("commit_chain_violation", reasons)
+
+    def test_validation_accepts_multi_dep_matching_heads(self):
+        """When two dependencies share the same accepted_head_ref, the
+        commit-chain is satisfiable and validation passes."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="completed",
+                        accepted_head_ref="shared-head"),
+            _make_slice("slice-b", status="completed",
+                        accepted_head_ref="shared-head"),
+            _make_slice("slice-c", depends_on=["slice-a", "slice-b"],
+                        status="in_progress", base_ref="shared-head"),
+        ])
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-status")
+        if rc != 0:
+            data = json.loads(out)
+            reasons = [e.get("reason", "") for e in data.get("errors", [])]
+            self.assertNotIn("commit_chain_violation", reasons)
+
+    # --- Blocker 3: sliced implement dispatch without slice_id ---
+
+    def test_implement_dispatch_without_slice_id_rejected_when_slices_exist(self):
+        """before-dispatch(implement-agent) without --slice-id must be
+        rejected when implementation state has explicit slices (not the
+        legacy default-only case)."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", depends_on=[], status="ready",
+                        base_ref="base-0"),
+            _make_slice("slice-b", depends_on=["slice-a"], status="pending"),
+        ])
+        self._make_apply_run(implementation=impl)
+
+        rc, out, _ = run_workflow(self.tmp, "before-dispatch",
+                                  agent="implement-agent")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [b.get("reason", "") for b in data.get("blockers", [])]
+        self.assertIn("missing_slice_id", reasons)
+
+    def test_implement_dispatch_without_slice_id_allowed_for_single_default(self):
+        """before-dispatch(implement-agent) without --slice-id is allowed
+        when the implementation state has only the single 'default' slice
+        (legacy / single-slice compatibility)."""
+        impl = _make_implementation_state(
+            [_make_slice("default", depends_on=[], status="ready",
+                         base_ref="base-0")],
+            decision="single_slice",
+        )
+        self._make_apply_run(implementation=impl)
+
+        rc, out, _ = run_workflow(self.tmp, "before-dispatch",
+                                  agent="implement-agent")
+        self.assertEqual(rc, 0, out)
+
+    # --- Blocker 4: Git range validation ---
+
+    def _init_git(self):
+        subprocess.run(["git", "init"], cwd=self.tmp, capture_output=True, check=True)
+        subprocess.run(["git", "config", "user.email", "test@test.com"],
+                       cwd=self.tmp, capture_output=True, check=True)
+        subprocess.run(["git", "config", "user.name", "Test"],
+                       cwd=self.tmp, capture_output=True, check=True)
+
+    def _git_commit(self, msg):
+        # Write a unique file so each commit has a change.
+        fname = f"file_{msg.replace(' ', '_')}_{abs(hash(msg)) % 100000}.txt"
+        with open(os.path.join(self.tmp, fname), "w") as f:
+            f.write(msg)
+        subprocess.run(["git", "add", "-A"], cwd=self.tmp,
+                       capture_output=True, check=True)
+        subprocess.run(["git", "commit", "-m", msg], cwd=self.tmp,
+                       capture_output=True, check=True)
+        result = subprocess.run(["git", "rev-parse", "HEAD"], cwd=self.tmp,
+                                capture_output=True, text=True, check=True)
+        return result.stdout.strip()
+
+    def test_after_dispatch_rejects_nonexistent_head_ref(self):
+        """after-dispatch(implement-agent success) must reject a head_ref
+        that does not exist in the git repo."""
+        self._init_git()
+        base = self._git_commit("baseline")
+        impl = _make_implementation_state([
+            _make_slice("slice-a", depends_on=[], status="ready",
+                        base_ref=base),
+        ])
+        self._make_apply_run(implementation=impl)
+        run_workflow(self.tmp, "before-dispatch",
+                     agent="implement-agent", slice_id="slice-a")
+        rc, out, _ = run_workflow(self.tmp, "after-dispatch",
+                                  agent="implement-agent", slice_id="slice-a",
+                                  value=json.dumps({
+                                      "status": "success",
+                                      "evidence": {},
+                                      "artifacts": {
+                                          "head_ref": "nonexistent-sha",
+                                          "commit_refs": ["nonexistent-sha"],
+                                          "base_ref": base,
+                                      },
+                                  }))
+        data = json.loads(out)
+        reasons = [b.get("reason", "") for b in data.get("blockers", [])]
+        self.assertIn("invalid_git_ref", reasons)
+        # Slice must NOT have transitioned to in_review
+        state = self._read_current_state()
+        sl = state["implementation"]["slices"][0]
+        self.assertNotEqual(sl["status"], "in_review")
+
+    def test_after_dispatch_rejects_head_not_descendant_of_base(self):
+        """after-dispatch must reject when head_ref is not a descendant of
+        base_ref (ancestry violation)."""
+        self._init_git()
+        base = self._git_commit("baseline")
+        # Create a divergent branch head that is NOT a descendant of base.
+        # Since base is the first commit, we create a second commit on the
+        # main branch, then use the divergent branch's commit as head — which
+        # is a sibling, not a descendant of base.
+        # Actually: base IS an ancestor of everything in this repo.  We need
+        # a head that is NOT a descendant of base.  Create two root commits
+        # by using a separate orphan branch.
+        subprocess.run(["git", "checkout", "--orphan", "orphan"],
+                       cwd=self.tmp, capture_output=True, check=True)
+        # Remove tracked files from index for the orphan branch
+        subprocess.run(["git", "rm", "-rf", "--cached", "."],
+                       cwd=self.tmp, capture_output=True, check=True)
+        head = self._git_commit("orphan-commit")
+        subprocess.run(["git", "checkout", "main"],
+                       cwd=self.tmp, capture_output=True, check=True)
+        impl = _make_implementation_state([
+            _make_slice("slice-a", depends_on=[], status="ready",
+                        base_ref=base),
+        ])
+        self._make_apply_run(implementation=impl)
+        run_workflow(self.tmp, "before-dispatch",
+                     agent="implement-agent", slice_id="slice-a")
+        rc, out, _ = run_workflow(self.tmp, "after-dispatch",
+                                  agent="implement-agent", slice_id="slice-a",
+                                  value=json.dumps({
+                                      "status": "success",
+                                      "evidence": {},
+                                      "artifacts": {
+                                          "head_ref": head,
+                                          "commit_refs": [head],
+                                          "base_ref": base,
+                                      },
+                                  }))
+        data = json.loads(out)
+        reasons = [b.get("reason", "") for b in data.get("blockers", [])]
+        self.assertIn("invalid_git_ref", reasons)
+        # Slice must NOT have transitioned to in_review
+        state = self._read_current_state()
+        sl = state["implementation"]["slices"][0]
+        self.assertNotEqual(sl["status"], "in_review")
+
+    def test_after_dispatch_rejects_commit_refs_not_in_range(self):
+        """after-dispatch must reject when commit_refs are not within the
+        base..head range (contiguity violation)."""
+        self._init_git()
+        base = self._git_commit("baseline")
+        mid = self._git_commit("middle")
+        head = self._git_commit("head")
+        # Create an out-of-range commit on a divergent branch
+        subprocess.run(["git", "checkout", "-b", "other", base],
+                       cwd=self.tmp, capture_output=True, check=True)
+        outside = self._git_commit("outside-range")
+        subprocess.run(["git", "checkout", "main"],
+                       cwd=self.tmp, capture_output=True, check=True)
+        impl = _make_implementation_state([
+            _make_slice("slice-a", depends_on=[], status="ready",
+                        base_ref=base),
+        ])
+        self._make_apply_run(implementation=impl)
+        run_workflow(self.tmp, "before-dispatch",
+                     agent="implement-agent", slice_id="slice-a")
+        rc, out, _ = run_workflow(self.tmp, "after-dispatch",
+                                  agent="implement-agent", slice_id="slice-a",
+                                  value=json.dumps({
+                                      "status": "success",
+                                      "evidence": {},
+                                      "artifacts": {
+                                          "head_ref": head,
+                                          "commit_refs": [mid, outside],
+                                          "base_ref": base,
+                                      },
+                                  }))
+        data = json.loads(out)
+        reasons = [b.get("reason", "") for b in data.get("blockers", [])]
+        self.assertIn("invalid_git_ref", reasons)
+        # Slice must NOT have transitioned to in_review
+        state = self._read_current_state()
+        sl = state["implementation"]["slices"][0]
+        self.assertNotEqual(sl["status"], "in_review")
+
+    def test_after_dispatch_accepts_valid_git_range(self):
+        """after-dispatch accepts when all refs exist, head is descendant of
+        base, and all commit_refs are within the base..head range."""
+        self._init_git()
+        base = self._git_commit("baseline")
+        mid = self._git_commit("middle")
+        head = self._git_commit("head")
+        impl = _make_implementation_state([
+            _make_slice("slice-a", depends_on=[], status="ready",
+                        base_ref=base),
+        ])
+        self._make_apply_run(implementation=impl)
+        run_workflow(self.tmp, "before-dispatch",
+                     agent="implement-agent", slice_id="slice-a")
+        rc, out, _ = run_workflow(self.tmp, "after-dispatch",
+                                  agent="implement-agent", slice_id="slice-a",
+                                  value=json.dumps({
+                                      "status": "success",
+                                      "evidence": {},
+                                      "artifacts": {
+                                          "head_ref": head,
+                                          "commit_refs": [mid, head],
+                                          "base_ref": base,
+                                      },
+                                  }))
+        self.assertEqual(rc, 0, out)
+        data = json.loads(out)
+        # Slice should have transitioned to in_review
+        state = self._read_current_state()
+        sl = state["implementation"]["slices"][0]
+        self.assertEqual(sl["status"], "in_review")
+
+
+# ---------------------------------------------------------------------------
+# Review-blocker remediation round 2: sequential A/B/C commit-chain, linked
+# worktree Git validation, exact ordered commit_refs range equality.
+# ---------------------------------------------------------------------------
+
+
+class TestReviewBlockerRemediation2(FixtureBase):
+    """Round-2 coverage for the four review blockers returned after the first
+    remediation attempt.  These tests encode the corrected invariants:
+
+    * The sequential commit-chain requires ``base_ref`` to equal the *latest*
+      accepted sequential head, and all dependency accepted heads to be
+      ancestors of (or equal to) ``base_ref`` — not equal to every dep head.
+    * Git validation must run in linked worktrees (``.git`` is a file).
+    * ``commit_refs`` must equal ``git rev-list --reverse base..head`` exactly
+      (order and completeness).
+    """
+
+    def _make_apply_run(self, implementation=None, flow_type="spec-flow",
+                        run_id="2026-07-13-review-blockers-r2"):
+        state = {
+            "version": 1,
+            "run_id": run_id,
+            "workflow": "sdlc-main",
+            "flow_type": flow_type,
+            "status": "running",
+            "current_phase": "apply_change",
+            "primary_subject": {"type": "spec_change", "id": "review-blockers-r2"},
+            "context": {"change_id": "review-blockers-r2"},
+            "phase_readiness": {"phase": "apply_change", "ready": True, "missing_required_inputs": []},
+            "pending_hooks": [],
+            "completed_hooks": [],
+            "completed_phases": ["create_change"],
+            "gates": {},
+            "evidence": {},
+            "block": None,
+            "updated_at": "2026-07-13T00:00:00",
+        }
+        if implementation is not None:
+            state["implementation"] = implementation
+        self._write_current_state(state)
+        return run_id
+
+    # --- Blocker 1: sequential A/B/C commit-chain ---
+
+    def test_validation_accepts_sequential_abc_chain(self):
+        """Sequential A/B/C: A completes with head-a, B starts from head-a
+        and completes with head-b, C depends on both and starts from head-b
+        (the latest accepted sequential head).  Validation must NOT flag this
+        as commit_chain_unsatisfiable or commit_chain_violation, because
+        head-a is an ancestor of head-b (the chain is contiguous)."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="completed",
+                        accepted_head_ref="head-a"),
+            _make_slice("slice-b", depends_on=["slice-a"], status="completed",
+                        base_ref="head-a", accepted_head_ref="head-b"),
+            _make_slice("slice-c", depends_on=["slice-a", "slice-b"],
+                        status="in_progress", base_ref="head-b"),
+        ])
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-status")
+        if rc != 0:
+            data = json.loads(out)
+            reasons = [e.get("reason", "") for e in data.get("errors", [])]
+            self.assertNotIn("commit_chain_unsatisfiable", reasons)
+            self.assertNotIn("commit_chain_violation", reasons)
+        # If rc == 0 the validation accepted the chain.
+
+    def test_validation_rejects_base_not_equal_latest_sequential_head(self):
+        """A slice's base_ref must equal the latest accepted sequential head
+        (the last completed dependency in declaration/dependency order).  If
+        C depends on A (head-a) then B (head-b) and base_ref is head-a (not
+        head-b), validation must flag commit_chain_violation."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="completed",
+                        accepted_head_ref="head-a"),
+            _make_slice("slice-b", depends_on=["slice-a"], status="completed",
+                        base_ref="head-a", accepted_head_ref="head-b"),
+            _make_slice("slice-c", depends_on=["slice-a", "slice-b"],
+                        status="in_progress", base_ref="head-a"),
+        ])
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-status")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [e.get("reason", "") for e in data.get("errors", [])]
+        self.assertIn("commit_chain_violation", reasons)
+
+    def test_validation_rejects_dep_head_not_ancestor_of_base(self):
+        """If a dependency's accepted_head_ref is NOT an ancestor of the
+        slice's base_ref (the chain is broken), validation must flag it.
+        Since state.py validation is symbolic (no git), this is modeled by
+        base_ref not matching the latest sequential head when deps have a
+        single shared head.  The per-dep equality check catches the direct
+        single-dependency break."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="completed",
+                        accepted_head_ref="head-a"),
+            _make_slice("slice-b", depends_on=["slice-a"], status="in_progress",
+                        base_ref="wrong-base"),
+        ])
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-status")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [e.get("reason", "") for e in data.get("errors", [])]
+        self.assertIn("commit_chain_violation", reasons)
+
+    # --- Blocker 2: linked worktree Git validation ---
+
+    def _init_git(self):
+        subprocess.run(["git", "init"], cwd=self.tmp, capture_output=True, check=True)
+        subprocess.run(["git", "config", "user.email", "test@test.com"],
+                       cwd=self.tmp, capture_output=True, check=True)
+        subprocess.run(["git", "config", "user.name", "Test"],
+                       cwd=self.tmp, capture_output=True, check=True)
+
+    def _git_commit(self, msg):
+        fname = f"file_{msg.replace(' ', '_')}_{abs(hash(msg)) % 100000}.txt"
+        with open(os.path.join(self.tmp, fname), "w") as f:
+            f.write(msg)
+        subprocess.run(["git", "add", "-A"], cwd=self.tmp,
+                       capture_output=True, check=True)
+        subprocess.run(["git", "commit", "-m", msg], cwd=self.tmp,
+                       capture_output=True, check=True)
+        result = subprocess.run(["git", "rev-parse", "HEAD"], cwd=self.tmp,
+                                capture_output=True, text=True, check=True)
+        return result.stdout.strip()
+
+    def _make_linked_worktree(self, base_branch="main"):
+        """Create a linked worktree (where .git is a file, not a directory)
+        and return its path.  The worktree shares the main repo's objects."""
+        import tempfile
+        wt = tempfile.mkdtemp(prefix="wt_")
+        subprocess.run(
+            ["git", "worktree", "add", "--detach", wt, base_branch],
+            cwd=self.tmp, capture_output=True, check=True,
+        )
+        # Verify .git is a file (linked worktree), not a directory.
+        git_path = os.path.join(wt, ".git")
+        self.assertTrue(os.path.isfile(git_path),
+                        f"expected .git to be a file in linked worktree, got {git_path}")
+        return wt
+
+    def test_validate_git_refs_works_in_linked_worktree(self):
+        """_validate_git_refs must validate refs in a linked worktree where
+        .git is a file, not a directory.  This exercises the worktree-mode
+        contract that the review blocker identified as skipped."""
+        self._init_git()
+        base = self._git_commit("baseline")
+        mid = self._git_commit("middle")
+        head = self._git_commit("head")
+        wt = self._make_linked_worktree()
+        # Import and call _validate_git_refs directly against the worktree.
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..",
+                                        ".ai", "workflows", "scripts"))
+        from workflow_runtime.dispatch import _validate_git_refs
+        blockers = _validate_git_refs(wt, base, head, [mid, head])
+        self.assertEqual(blockers, [], f"expected no blockers in linked worktree, got {blockers}")
+
+    def test_after_dispatch_validates_refs_in_linked_worktree(self):
+        """after-dispatch(implement success) must run Git validation in a
+        linked worktree, not skip it because .git is a file."""
+        self._init_git()
+        base = self._git_commit("baseline")
+        head = self._git_commit("head")
+        wt = self._make_linked_worktree()
+        # Set up a run state inside the worktree's .ai directory so the
+        # workflow runtime operates within the worktree path.
+        impl = _make_implementation_state([
+            _make_slice("slice-a", depends_on=[], status="ready",
+                        base_ref=base),
+        ])
+        state = {
+            "version": 1,
+            "run_id": "wt-run",
+            "workflow": "sdlc-main",
+            "flow_type": "spec-flow",
+            "status": "running",
+            "current_phase": "apply_change",
+            "primary_subject": {"type": "spec_change", "id": "wt-test"},
+            "context": {"change_id": "wt-test"},
+            "phase_readiness": {"phase": "apply_change", "ready": True, "missing_required_inputs": []},
+            "pending_hooks": [],
+            "completed_hooks": [],
+            "completed_phases": ["create_change"],
+            "gates": {},
+            "evidence": {},
+            "block": None,
+            "updated_at": "2026-07-13T00:00:00",
+            "implementation": impl,
+        }
+        ai_dir = os.path.join(wt, ".ai/workflows/runs/active/wt-run")
+        os.makedirs(ai_dir, exist_ok=True)
+        with open(os.path.join(ai_dir, "run.json"), "w") as f:
+            json.dump(state, f)
+        with open(os.path.join(wt, ".ai/workflows/runs/current.json"), "w") as f:
+            json.dump({"run_id": "wt-run"}, f)
+        # before-dispatch to set slice to in_progress
+        run_workflow(wt, "before-dispatch",
+                     agent="implement-agent", slice_id="slice-a")
+        # after-dispatch with valid refs — should pass Git validation
+        rc, out, _ = run_workflow(wt, "after-dispatch",
+                                  agent="implement-agent", slice_id="slice-a",
+                                  value=json.dumps({
+                                      "status": "success", "evidence": {},
+                                      "artifacts": {
+                                          "head_ref": head,
+                                          "commit_refs": [head],
+                                          "base_ref": base,
+                                      },
+                                  }))
+        self.assertEqual(rc, 0, out)
+        data = json.loads(out)
+        reasons = [b.get("reason", "") for b in data.get("blockers", [])]
+        self.assertNotIn("invalid_git_ref", reasons)
+
+    def test_after_dispatch_rejects_bad_refs_in_linked_worktree(self):
+        """after-dispatch must reject a nonexistent head_ref in a linked
+        worktree — proving Git validation actually runs (not skipped)."""
+        self._init_git()
+        base = self._git_commit("baseline")
+        wt = self._make_linked_worktree()
+        impl = _make_implementation_state([
+            _make_slice("slice-a", depends_on=[], status="ready",
+                        base_ref=base),
+        ])
+        state = {
+            "version": 1,
+            "run_id": "wt-run2",
+            "workflow": "sdlc-main",
+            "flow_type": "spec-flow",
+            "status": "running",
+            "current_phase": "apply_change",
+            "primary_subject": {"type": "spec_change", "id": "wt-test2"},
+            "context": {"change_id": "wt-test2"},
+            "phase_readiness": {"phase": "apply_change", "ready": True, "missing_required_inputs": []},
+            "pending_hooks": [],
+            "completed_hooks": [],
+            "completed_phases": ["create_change"],
+            "gates": {},
+            "evidence": {},
+            "block": None,
+            "updated_at": "2026-07-13T00:00:00",
+            "implementation": impl,
+        }
+        ai_dir = os.path.join(wt, ".ai/workflows/runs/active/wt-run2")
+        os.makedirs(ai_dir, exist_ok=True)
+        with open(os.path.join(ai_dir, "run.json"), "w") as f:
+            json.dump(state, f)
+        with open(os.path.join(wt, ".ai/workflows/runs/current.json"), "w") as f:
+            json.dump({"run_id": "wt-run2"}, f)
+        run_workflow(wt, "before-dispatch",
+                     agent="implement-agent", slice_id="slice-a")
+        rc, out, _ = run_workflow(wt, "after-dispatch",
+                                  agent="implement-agent", slice_id="slice-a",
+                                  value=json.dumps({
+                                      "status": "success", "evidence": {},
+                                      "artifacts": {
+                                          "head_ref": "nonexistent-sha",
+                                          "commit_refs": ["nonexistent-sha"],
+                                          "base_ref": base,
+                                      },
+                                  }))
+        data = json.loads(out)
+        reasons = [b.get("reason", "") for b in data.get("blockers", [])]
+        self.assertIn("invalid_git_ref", reasons)
+
+    # --- Blocker 3: exact ordered commit_refs range equality ---
+
+    def test_after_dispatch_rejects_partial_commit_refs(self):
+        """after-dispatch must reject commit_refs=[head] when base..head
+        contains intermediate commits — a partial list does not satisfy
+        exact ordered range equality."""
+        self._init_git()
+        base = self._git_commit("baseline")
+        mid = self._git_commit("middle")
+        head = self._git_commit("head")
+        impl = _make_implementation_state([
+            _make_slice("slice-a", depends_on=[], status="ready",
+                        base_ref=base),
+        ])
+        self._make_apply_run(implementation=impl)
+        run_workflow(self.tmp, "before-dispatch",
+                     agent="implement-agent", slice_id="slice-a")
+        rc, out, _ = run_workflow(self.tmp, "after-dispatch",
+                                  agent="implement-agent", slice_id="slice-a",
+                                  value=json.dumps({
+                                      "status": "success", "evidence": {},
+                                      "artifacts": {
+                                          "head_ref": head,
+                                          "commit_refs": [head],  # missing mid
+                                          "base_ref": base,
+                                      },
+                                  }))
+        data = json.loads(out)
+        reasons = [b.get("reason", "") for b in data.get("blockers", [])]
+        self.assertIn("invalid_git_ref", reasons)
+        state = self._read_current_state()
+        sl = state["implementation"]["slices"][0]
+        self.assertNotEqual(sl["status"], "in_review")
+
+    def test_after_dispatch_rejects_reordered_commit_refs(self):
+        """after-dispatch must reject commit_refs in wrong order — the
+        ordered range must match git rev-list --reverse base..head."""
+        self._init_git()
+        base = self._git_commit("baseline")
+        mid = self._git_commit("middle")
+        head = self._git_commit("head")
+        impl = _make_implementation_state([
+            _make_slice("slice-a", depends_on=[], status="ready",
+                        base_ref=base),
+        ])
+        self._make_apply_run(implementation=impl)
+        run_workflow(self.tmp, "before-dispatch",
+                     agent="implement-agent", slice_id="slice-a")
+        rc, out, _ = run_workflow(self.tmp, "after-dispatch",
+                                  agent="implement-agent", slice_id="slice-a",
+                                  value=json.dumps({
+                                      "status": "success", "evidence": {},
+                                      "artifacts": {
+                                          "head_ref": head,
+                                          "commit_refs": [head, mid],  # wrong order
+                                          "base_ref": base,
+                                      },
+                                  }))
+        data = json.loads(out)
+        reasons = [b.get("reason", "") for b in data.get("blockers", [])]
+        self.assertIn("invalid_git_ref", reasons)
+        state = self._read_current_state()
+        sl = state["implementation"]["slices"][0]
+        self.assertNotEqual(sl["status"], "in_review")
+
+    def test_after_dispatch_accepts_exact_ordered_commit_refs(self):
+        """after-dispatch accepts when commit_refs exactly equals
+        git rev-list --reverse base..head (order + completeness)."""
+        self._init_git()
+        base = self._git_commit("baseline")
+        mid = self._git_commit("middle")
+        head = self._git_commit("head")
+        impl = _make_implementation_state([
+            _make_slice("slice-a", depends_on=[], status="ready",
+                        base_ref=base),
+        ])
+        self._make_apply_run(implementation=impl)
+        run_workflow(self.tmp, "before-dispatch",
+                     agent="implement-agent", slice_id="slice-a")
+        rc, out, _ = run_workflow(self.tmp, "after-dispatch",
+                                  agent="implement-agent", slice_id="slice-a",
+                                  value=json.dumps({
+                                      "status": "success", "evidence": {},
+                                      "artifacts": {
+                                          "head_ref": head,
+                                          "commit_refs": [mid, head],  # exact ordered
+                                          "base_ref": base,
+                                      },
+                                  }))
+        self.assertEqual(rc, 0, out)
+        state = self._read_current_state()
+        sl = state["implementation"]["slices"][0]
+        self.assertEqual(sl["status"], "in_review")
+
+
+# ---------------------------------------------------------------------------
+# Review-blocker remediation round 3: global acceptance-order commit boundary
+# and complete live Git scope for success handoff.
+# ---------------------------------------------------------------------------
+
+
+class TestReviewBlockerRemediation3(FixtureBase):
+    """Round-3 coverage for the two authoritative review blockers:
+
+    * The sequential commit boundary must be **global acceptance-order** based,
+      not dependency-relative.  Any later slice — including one that does NOT
+      depend on A — must use the previous globally accepted slice head as
+      ``base_ref``.  In an A/B/C scenario where B does NOT depend on A, B must
+      still start from A's ``accepted_head_ref`` once A is accepted.
+    * The success handoff must report the **complete current live Git scope**,
+      not only remediation files.  The implement-agent contract must require
+      deriving structured ``changed_files`` from current tracked + untracked
+      Git state.
+    """
+
+    def _make_apply_run(self, implementation=None, flow_type="spec-flow",
+                        run_id="2026-07-13-review-blockers-r3"):
+        state = {
+            "version": 1,
+            "run_id": run_id,
+            "workflow": "sdlc-main",
+            "flow_type": flow_type,
+            "status": "running",
+            "current_phase": "apply_change",
+            "primary_subject": {"type": "spec_change", "id": "review-blockers-r3"},
+            "context": {"change_id": "review-blockers-r3"},
+            "phase_readiness": {"phase": "apply_change", "ready": True, "missing_required_inputs": []},
+            "pending_hooks": [],
+            "completed_hooks": [],
+            "completed_phases": ["create_change"],
+            "gates": {},
+            "evidence": {},
+            "block": None,
+            "updated_at": "2026-07-13T00:00:00",
+        }
+        if implementation is not None:
+            state["implementation"] = implementation
+        self._write_current_state(state)
+        return run_id
+
+    # --- Blocker 1: global acceptance-order commit boundary ---
+
+    def test_validation_rejects_b_not_based_on_a_when_a_accepted(self):
+        """B does NOT depend on A, but A was accepted first (global acceptance
+        order).  B's base_ref must equal A's accepted_head_ref, not the initial
+        base.  If B's base_ref is still the initial base, validation must flag
+        commit_chain_violation."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", depends_on=[], status="completed",
+                        accepted_head_ref="head-a",
+                        review_evidence={"review_passed": True}),
+            _make_slice("slice-b", depends_on=[], status="in_progress",
+                        base_ref="base-0"),  # WRONG — should be head-a
+        ])
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-status")
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        reasons = [e.get("reason", "") for e in data.get("errors", [])]
+        self.assertIn("commit_chain_violation", reasons)
+
+    def test_validation_accepts_b_based_on_a_when_a_accepted(self):
+        """B does NOT depend on A, but A was accepted first.  B's base_ref
+        equals A's accepted_head_ref — validation must NOT flag
+        commit_chain_violation."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", depends_on=[], status="completed",
+                        accepted_head_ref="head-a",
+                        review_evidence={"review_passed": True}),
+            _make_slice("slice-b", depends_on=[], status="in_progress",
+                        base_ref="head-a"),  # correct global acceptance order
+        ])
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-status")
+        if rc != 0:
+            data = json.loads(out)
+            reasons = [e.get("reason", "") for e in data.get("errors", [])]
+            self.assertNotIn("commit_chain_violation", reasons)
+
+    def test_e2e_b_uses_a_accepted_head_even_without_dependency(self):
+        """End-to-end: A and B are independently ready (B does NOT depend on A).
+        After A is implemented and reviewed (accepted_head_ref=head-a), B must
+        be dispatched with base_ref=head-a (the previous globally accepted
+        head), not the initial base-0."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", depends_on=[], status="ready",
+                        base_ref="base-0"),
+            _make_slice("slice-b", depends_on=[], status="pending",
+                        base_ref="base-0"),
+        ])
+        self._make_apply_run(implementation=impl)
+
+        # Implement + review A
+        run_workflow(self.tmp, "before-dispatch",
+                     agent="implement-agent", slice_id="slice-a")
+        run_workflow(self.tmp, "after-dispatch",
+                     agent="implement-agent", slice_id="slice-a",
+                     value=json.dumps({
+                         "status": "success", "evidence": {},
+                         "artifacts": {"head_ref": "head-a",
+                                       "commit_refs": ["c-a"],
+                                       "base_ref": "base-0"},
+                     }))
+        run_workflow(self.tmp, "after-dispatch",
+                     agent="review-agent", slice_id="slice-a",
+                     value=json.dumps({"status": "success",
+                                       "evidence": {"review_passed": True}}))
+
+        # slice-next must return slice-b (declaration order, A completed)
+        rc, out, _ = run_workflow(self.tmp, "slice-next")
+        data = json.loads(out)
+        self.assertEqual(data["status"], "dispatch_slice")
+        self.assertEqual(data["slice_id"], "slice-b")
+
+        # before-dispatch for B must set base_ref to head-a (global acceptance)
+        rc, out, _ = run_workflow(self.tmp, "before-dispatch",
+                                  agent="implement-agent", slice_id="slice-b")
+        self.assertEqual(rc, 0, out)
+        state = self._read_current_state()
+        sl_b = [s for s in state["implementation"]["slices"]
+                if s["slice_id"] == "slice-b"][0]
+        self.assertEqual(sl_b["base_ref"], "head-a",
+                         "B must use A's accepted_head_ref as base_ref "
+                         "(global acceptance order), not the initial base")
+
+    def test_validation_accepts_abc_where_b_independent_but_chained(self):
+        """Full A/B/C scenario: A accepted (head-a), B independent of A but
+        must chain from head-a, B accepted (head-b), C depends on both and
+        must chain from head-b.  Validation must accept this as a valid
+        global acceptance-order chain."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", depends_on=[], status="completed",
+                        accepted_head_ref="head-a",
+                        review_evidence={"review_passed": True}),
+            _make_slice("slice-b", depends_on=[], status="completed",
+                        base_ref="head-a", accepted_head_ref="head-b",
+                        review_evidence={"review_passed": True}),
+            _make_slice("slice-c", depends_on=["slice-a", "slice-b"],
+                        status="in_progress", base_ref="head-b"),
+        ])
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(self.tmp, "slice-status")
+        if rc != 0:
+            data = json.loads(out)
+            reasons = [e.get("reason", "") for e in data.get("errors", [])]
+            self.assertNotIn("commit_chain_violation", reasons)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

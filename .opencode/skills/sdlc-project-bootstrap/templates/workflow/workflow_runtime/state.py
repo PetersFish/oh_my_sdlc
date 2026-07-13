@@ -40,6 +40,11 @@ RUN_STATE_KEYS = {
     "updated_at",
 }
 
+# Optional keys that are recognized but not required on every run.
+# P0 sliced apply-change: implementation slice lifecycle state is optional;
+# absent on legacy runs, normalized in-memory to a single 'default' slice.
+OPTIONAL_RUN_STATE_KEYS = {"implementation"}
+
 
 # ---------------------------------------------------------------------------
 # Pointer I/O
@@ -487,3 +492,396 @@ def _archive_lightweight_superpowers_artifacts(root, state, agent_evidence):
         moved.append((src_rel, dst_rel))
 
     return {"moved": moved, "skipped": skipped, "already_archived": already_archived}
+
+
+# ---------------------------------------------------------------------------
+# P0 Sliced apply-change: implementation slice state model and validation
+# ---------------------------------------------------------------------------
+
+# Allowed values for slicing_assessment.status.
+VALID_SLICING_ASSESSMENT_STATUSES = {"not_required", "pending", "completed", "blocked"}
+
+# Allowed values for slicing_assessment.decision.
+VALID_SLICING_DECISIONS = {"single_slice", "multi_slice"}
+
+# Allowed values for aggregate_review_status.
+VALID_AGGREGATE_REVIEW_STATUSES = {"pending", "ready", "passed", "blocked"}
+
+# Allowed values for individual slice status.
+VALID_SLICE_STATUSES = {
+    "pending", "ready", "in_progress", "in_review",
+    "blocked", "completed", "cancelled",
+}
+
+# Reserved slice id for aggregate review scope.
+RESERVED_SLICE_IDS = {"aggregate"}
+
+# Only sequential execution is supported in P0.
+VALID_SLICE_STRATEGIES = {"sequential"}
+
+# Slice fields that must be present on every slice entry.
+SLICE_REQUIRED_FIELDS = {
+    "slice_id", "depends_on", "required", "status", "attempt_count",
+    "block", "base_ref", "head_ref", "accepted_head_ref", "commit_refs",
+    "implement_evidence", "review_evidence", "handoff_paths",
+}
+
+# Statuses that count as "active" (at most one may be active at a time).
+ACTIVE_SLICE_STATUSES = {"in_progress", "in_review"}
+
+
+def normalize_implementation_state(state):
+    """Return an in-memory normalized implementation block.
+
+    Legacy runs without ``implementation`` get a compatibility ``default``
+    slice with ``slicing_assessment.status=not_required``.  This never
+    mutates the persisted state file — it returns a fresh dict for callers
+    to use read-only.
+    """
+    impl = state.get("implementation")
+    if impl is None:
+        return {
+            "strategy": "sequential",
+            "slicing_assessment": {
+                "status": "not_required",
+                "decision": "single_slice",
+                "assessed_by": "",
+                "assessment_handoff_path": "",
+                "reasons": [],
+            },
+            "aggregate_review_status": "pending",
+            "active_slice_id": None,
+            "slices": [_make_default_slice()],
+        }
+    # Return a shallow copy so callers can't accidentally mutate state.
+    impl = dict(impl)
+    impl["slices"] = list(impl.get("slices", []))
+    return impl
+
+
+def _make_default_slice():
+    return {
+        "slice_id": "default",
+        "depends_on": [],
+        "required": True,
+        "status": "pending",
+        "attempt_count": 0,
+        "block": None,
+        "base_ref": "",
+        "head_ref": "",
+        "accepted_head_ref": "",
+        "commit_refs": [],
+        "implement_evidence": {},
+        "review_evidence": {},
+        "handoff_paths": [],
+    }
+
+
+def validate_implementation_state(impl):
+    """Validate an implementation block and return a list of error dicts.
+
+    Each error is ``{"reason": <code>, "message": <human>, "slice_ids": [...]}``.
+    """
+    errors = []
+
+    strategy = impl.get("strategy", "")
+    if strategy not in VALID_SLICE_STRATEGIES:
+        errors.append({
+            "reason": "invalid_strategy",
+            "message": f"strategy must be one of {sorted(VALID_SLICE_STRATEGIES)}, got {strategy!r}",
+            "slice_ids": [],
+        })
+
+    assessment = impl.get("slicing_assessment", {}) or {}
+    assessment_status = assessment.get("status", "")
+    if assessment_status not in VALID_SLICING_ASSESSMENT_STATUSES:
+        errors.append({
+            "reason": "invalid_assessment_status",
+            "message": f"slicing_assessment.status must be one of {sorted(VALID_SLICING_ASSESSMENT_STATUSES)}, got {assessment_status!r}",
+            "slice_ids": [],
+        })
+
+    decision = assessment.get("decision", "")
+    if decision and decision not in VALID_SLICING_DECISIONS:
+        errors.append({
+            "reason": "invalid_assessment_decision",
+            "message": f"slicing_assessment.decision must be one of {sorted(VALID_SLICING_DECISIONS)}, got {decision!r}",
+            "slice_ids": [],
+        })
+
+    agg_status = impl.get("aggregate_review_status", "")
+    if agg_status not in VALID_AGGREGATE_REVIEW_STATUSES:
+        errors.append({
+            "reason": "invalid_aggregate_review_status",
+            "message": f"aggregate_review_status must be one of {sorted(VALID_AGGREGATE_REVIEW_STATUSES)}, got {agg_status!r}",
+            "slice_ids": [],
+        })
+
+    slices = impl.get("slices", []) or []
+    if not slices:
+        errors.append({
+            "reason": "no_slices",
+            "message": "implementation.slices must contain at least one slice",
+            "slice_ids": [],
+        })
+        return errors
+
+    # Check required fields on each slice.
+    for sl in slices:
+        missing = SLICE_REQUIRED_FIELDS - set(sl.keys())
+        if missing:
+            errors.append({
+                "reason": "missing_slice_fields",
+                "message": f"slice {sl.get('slice_id', '?')!r} missing fields: {sorted(missing)}",
+                "slice_ids": [sl.get("slice_id", "")],
+            })
+
+    # Check slice status values.
+    for sl in slices:
+        status = sl.get("status", "")
+        if status not in VALID_SLICE_STATUSES:
+            errors.append({
+                "reason": "invalid_slice_status",
+                "message": f"slice {sl.get('slice_id', '?')!r} has invalid status {status!r}",
+                "slice_ids": [sl.get("slice_id", "")],
+            })
+
+    # Check for duplicate ids.
+    seen = {}
+    for sl in slices:
+        sid = sl.get("slice_id", "")
+        if sid in seen:
+            errors.append({
+                "reason": "duplicate_slice_id",
+                "message": f"duplicate slice_id: {sid!r}",
+                "slice_ids": [sid],
+            })
+        seen[sid] = True
+
+    # Check reserved ids.
+    for sl in slices:
+        sid = sl.get("slice_id", "")
+        if sid in RESERVED_SLICE_IDS:
+            errors.append({
+                "reason": "reserved_slice_id",
+                "message": f"slice_id {sid!r} is reserved and cannot be used",
+                "slice_ids": [sid],
+            })
+
+    # Build id set for dependency checks.
+    ids = set(seen.keys())
+
+    # Check unknown dependencies.
+    for sl in slices:
+        sid = sl.get("slice_id", "")
+        for dep in sl.get("depends_on", []) or []:
+            if dep not in ids:
+                errors.append({
+                    "reason": "unknown_dependency",
+                    "message": f"slice {sid!r} depends on unknown slice {dep!r}",
+                    "slice_ids": [sid],
+                })
+
+    # Check self-dependencies.
+    for sl in slices:
+        sid = sl.get("slice_id", "")
+        deps = sl.get("depends_on", []) or []
+        if sid in deps:
+            errors.append({
+                "reason": "self_dependency",
+                "message": f"slice {sid!r} depends on itself",
+                "slice_ids": [sid],
+            })
+
+    # Check for cycles via DFS.
+    cycle = _detect_cycle(slices)
+    if cycle:
+        errors.append({
+            "reason": "cyclic_dependency",
+            "message": f"cyclic dependency detected among slices: {' -> '.join(cycle)}",
+            "slice_ids": cycle,
+        })
+
+    # Check at most one active slice.
+    active = [sl.get("slice_id", "") for sl in slices if sl.get("status") in ACTIVE_SLICE_STATUSES]
+    if len(active) > 1:
+        errors.append({
+            "reason": "multiple_active_slices",
+            "message": f"multiple slices are active simultaneously: {active}",
+            "slice_ids": active,
+        })
+
+    # Check completed slices have accepted_head_ref.
+    for sl in slices:
+        if sl.get("status") == "completed":
+            if not sl.get("accepted_head_ref"):
+                errors.append({
+                    "reason": "completed_without_accepted_head_ref",
+                    "message": f"slice {sl.get('slice_id', '')!r} is completed but has no accepted_head_ref",
+                    "slice_ids": [sl.get("slice_id", "")],
+                })
+
+    # Check completed slices have review_evidence.
+    for sl in slices:
+        if sl.get("status") == "completed":
+            if not sl.get("review_evidence"):
+                errors.append({
+                    "reason": "completed_without_review_evidence",
+                    "message": f"slice {sl.get('slice_id', '')!r} is completed but has no review_evidence",
+                    "slice_ids": [sl.get("slice_id", "")],
+                })
+
+    # Check active_slice_id consistency: if any slice is in_progress/in_review,
+    # active_slice_id must match it; if none are active, active_slice_id must
+    # be None.
+    active_list = [sl for sl in slices if sl.get("status") in ACTIVE_SLICE_STATUSES]
+    active_slice_id = impl.get("active_slice_id")
+    if active_list:
+        expected_active = active_list[0].get("slice_id", "")
+        if active_slice_id != expected_active:
+            errors.append({
+                "reason": "active_slice_id_mismatch",
+                "message": f"active_slice_id is {active_slice_id!r} but active slice is {expected_active!r}",
+                "slice_ids": [expected_active],
+            })
+    else:
+        if active_slice_id is not None and active_slice_id != "":
+            errors.append({
+                "reason": "active_slice_id_mismatch",
+                "message": f"active_slice_id is {active_slice_id!r} but no slice is active",
+                "slice_ids": [active_slice_id],
+            })
+
+    # Check in_progress slices have a non-empty base_ref.
+    for sl in slices:
+        if sl.get("status") == "in_progress":
+            if not sl.get("base_ref"):
+                errors.append({
+                    "reason": "active_slice_missing_base_ref",
+                    "message": f"slice {sl.get('slice_id', '')!r} is in_progress but has no base_ref",
+                    "slice_ids": [sl.get("slice_id", "")],
+                })
+
+    # Check in_review slices have head_ref and commit_refs.
+    for sl in slices:
+        if sl.get("status") == "in_review":
+            if not sl.get("head_ref"):
+                errors.append({
+                    "reason": "in_review_missing_head_ref",
+                    "message": f"slice {sl.get('slice_id', '')!r} is in_review but has no head_ref",
+                    "slice_ids": [sl.get("slice_id", "")],
+                })
+            if not sl.get("commit_refs"):
+                errors.append({
+                    "reason": "in_review_missing_commit_refs",
+                    "message": f"slice {sl.get('slice_id', '')!r} is in_review but has no commit_refs",
+                    "slice_ids": [sl.get("slice_id", "")],
+                })
+
+    # Check sequential commit-chain invariant (global acceptance-order based):
+    # a slice's base_ref must equal the accepted_head_ref of the latest
+    # completed slice in declaration order across ALL slices — not just its
+    # own dependencies.  In a sequential A/B/C chain, earlier accepted heads
+    # are ancestors of the latest head; they need not equal base_ref.  Only
+    # the latest completed slice (last in declaration order among all
+    # completed slices that precede this slice) must match base_ref exactly.
+    # This means an independently-ready slice B (does NOT depend on A) must
+    # still chain from A's accepted_head_ref once A is accepted.
+    # Real ancestry is validated by Git in _validate_git_refs; this symbolic
+    # check enforces the single-contiguous-chain model on state alone.
+    for idx, sl in enumerate(slices):
+        if sl.get("status") not in ("in_progress", "in_review", "completed"):
+            continue
+        # Find the latest completed slice in declaration order that precedes
+        # this slice — this is the "previous globally accepted sequential head".
+        latest_completed = None
+        for j in range(idx):
+            prev_sl = slices[j]
+            if prev_sl.get("status") == "completed" and prev_sl.get("accepted_head_ref"):
+                latest_completed = prev_sl
+        if latest_completed is None:
+            continue
+        accepted = latest_completed.get("accepted_head_ref", "")
+        if not accepted:
+            continue
+        if sl.get("base_ref") and sl.get("base_ref") != accepted:
+            errors.append({
+                "reason": "commit_chain_violation",
+                "message": (
+                    f"slice {sl.get('slice_id', '')!r} base_ref "
+                    f"{sl.get('base_ref')!r} does not match the latest "
+                    f"accepted sequential head {accepted!r} (from "
+                    f"slice {latest_completed.get('slice_id', '')!r})"
+                ),
+                "slice_ids": [sl.get("slice_id", ""), latest_completed.get("slice_id", "")],
+            })
+
+    return errors
+
+
+def _detect_cycle(slices):
+    """Return the first cycle path found as a list of slice ids, or None."""
+    graph = {}
+    for sl in slices:
+        sid = sl.get("slice_id", "")
+        graph[sid] = [d for d in (sl.get("depends_on", []) or []) if d in {s.get("slice_id", "") for s in slices}]
+
+    WHITE, GRAY, BLACK = 0, 1, 2
+    color = {sid: WHITE for sid in graph}
+
+    def dfs(node, path):
+        color[node] = GRAY
+        path.append(node)
+        for neighbor in graph.get(node, []):
+            if color.get(neighbor, WHITE) == GRAY:
+                # Found a cycle — return the cycle portion.
+                idx = path.index(neighbor)
+                return path[idx:] + [neighbor]
+            if color.get(neighbor, WHITE) == WHITE:
+                result = dfs(neighbor, path)
+                if result:
+                    return result
+        path.pop()
+        color[node] = BLACK
+        return None
+
+    for sid in graph:
+        if color[sid] == WHITE:
+            result = dfs(sid, [])
+            if result:
+                return result
+    return None
+
+
+def slice_is_ready(sl, all_slices_by_id, active_slice_ids):
+    """Return True if a slice is ready to dispatch.
+
+    A slice is ready when:
+    - Its status is ``pending`` or ``ready``.
+    - All its dependencies are ``completed`` with ``accepted_head_ref``.
+    - No other slice is currently active.
+    """
+    status = sl.get("status", "")
+    if status not in ("pending", "ready"):
+        return False
+    if active_slice_ids:
+        return False
+    for dep in sl.get("depends_on", []) or []:
+        dep_sl = all_slices_by_id.get(dep)
+        if not dep_sl:
+            return False
+        if dep_sl.get("status") != "completed":
+            return False
+        if not dep_sl.get("accepted_head_ref"):
+            return False
+    return True
+
+
+def all_required_slices_completed(impl):
+    """Return True when every required slice is completed."""
+    slices = impl.get("slices", []) or []
+    return all(
+        sl.get("status") == "completed"
+        for sl in slices
+        if sl.get("required", True)
+    )

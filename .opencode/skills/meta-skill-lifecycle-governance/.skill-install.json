@@ -5,9 +5,9 @@
   "source_ref": "HEAD",
   "status": "stable",
   "target": "/Users/yuping/Documents/workspace/oh_my_skills/.opencode/skills/meta-skill-lifecycle-governance",
-  "installed_at": "2026-07-11T15:58:03.057030Z",
+  "installed_at": "2026-07-13T01:14:42.898385Z",
   "backport_policy": "review-required",
-  "payload_hash": "384ec55b1bb4ed21bee78857d5b31546a6e370d6a31097ef1716cd7f8946f13c",
+  "payload_hash": "91f61df060b9e92a462af9133bbd9ac069e6b365b736595dd49fc42d1da79e66",
   "files": [
     "SKILL.md",
     "evals/evals.json",

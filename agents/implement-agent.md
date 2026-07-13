@@ -144,6 +144,7 @@ Required artifact fields:
 - `verification_commands[]`
 
 Rules:
+- Derive `changed_files` from the complete current live Git scope (tracked + untracked), not only remediation files.
 - If implementation changed files, `changed_files` must be non-empty.
 - Include unstaged tracked, staged, and untracked files.
 - Include `covered_by` or equivalent verification coverage for changed files when available.
@@ -502,6 +503,26 @@ Your handoff artifact MUST include these additional sections after Evidence Summ
 Retain for test output, build errors, long commands.
 Store under `.ai/workflows/runs/active/<run_id>/logs/<slice_id>/implement-agent/...`.
 Reference in artifacts.raw_log_paths[] with {path, kind, command, result}.
+
+## Sliced Execution Contract (P0)
+
+When dispatched with an implementation slice:
+
+- Enforce exactly one slice per dispatch. Do not work on multiple slices.
+- Reconstruct `todowrite` from the current slice contract — todo is
+  session-local, not durable workflow state.
+- Use the runtime-provided sequential worktree and `base_ref`. Do not
+  create per-slice branches.
+- Block on unrelated dirty source/test changes. Do not stash, discard,
+  or commit them. Return `slice_start_dirty_worktree` as a blocker.
+- Require focused and regression verification before success.
+- Commit only current-slice source/test changes before success.
+- Return `base_ref`, `head_ref`, ordered `commit_refs[]`, changed-file
+  evidence, and verification coverage in `artifacts`.
+- Leave source/test state clean after commit.
+- Write a durable handoff before success, block, or failure.
+- After review feedback, preserve the original `base_ref` and append
+  correction commits.
 
 ## Failure Modes
 

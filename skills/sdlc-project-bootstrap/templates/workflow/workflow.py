@@ -183,6 +183,21 @@ from workflow_runtime.governance import (
     cmd_verify_foundations,
 )
 
+from workflow_runtime.slices import (
+    cmd_slice_status,
+    cmd_slice_next,
+    cmd_slice_block,
+    cmd_slice_resume,
+    cmd_slice_cancel,
+)
+
+from workflow_runtime.state import (
+    normalize_implementation_state,
+    validate_implementation_state,
+    slice_is_ready,
+    all_required_slices_completed,
+)
+
 from workflow_runtime.cli import (
     COMMANDS,
     main,

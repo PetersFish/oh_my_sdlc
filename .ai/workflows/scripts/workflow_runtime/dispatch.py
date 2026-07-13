@@ -8,6 +8,7 @@ import datetime
 import json
 import os
 import shutil
+import subprocess
 import sys
 from typing import Any, Dict, List
 
@@ -26,6 +27,10 @@ from workflow_runtime.state import (
     load_run_state,
     save_run_state,
     _archive_lightweight_superpowers_artifacts,
+    normalize_implementation_state,
+    validate_implementation_state,
+    slice_is_ready,
+    ACTIVE_SLICE_STATUSES,
 )
 from workflow_runtime.definitions import (
     load_workflow,
@@ -362,6 +367,163 @@ def cmd_before_dispatch(root, args):
                 "recommended_action": "ask_user_branch_finish_decision",
             })
 
+    # P0 Sliced apply-change: slice lifecycle validation for implement/review
+    # agents in apply_change phase when implementation state exists.
+    requested_slice_id = getattr(args, "slice_id", "") or ""
+    impl = state.get("implementation")
+    if impl is not None and phase == "apply_change" and canonical_agent in ("implement-agent", "review-agent"):
+        assessment_status = impl.get("slicing_assessment", {}).get("status", "not_required")
+        if canonical_agent == "implement-agent" and assessment_status == "pending":
+            blocker_reasons.append({
+                "reason": "slicing_assessment_pending",
+                "message": "implement dispatch rejected while slicing assessment is pending",
+                "recommended_action": "dispatch_plan_agent_for_slicing_assessment",
+            })
+        elif canonical_agent == "implement-agent" and assessment_status == "blocked":
+            blocker_reasons.append({
+                "reason": "slicing_assessment_blocked",
+                "message": "implement dispatch rejected because slicing assessment is blocked",
+                "recommended_action": "resolve_assessment_block",
+            })
+
+        # Check for active slices.
+        active_slices = [
+            s for s in impl.get("slices", [])
+            if s.get("status") in ACTIVE_SLICE_STATUSES
+        ]
+
+        # Aggregate review dispatch: slice_id 'aggregate' is a reserved id
+        # for the aggregate review scope.  It is not a real slice and must
+        # not be rejected as unknown_slice.  Review-agent may dispatch it
+        # only when aggregate_review_status is 'ready'.
+        if requested_slice_id == "aggregate" and canonical_agent == "review-agent":
+            agg_status = impl.get("aggregate_review_status", "pending")
+            if agg_status != "ready":
+                blocker_reasons.append({
+                    "reason": "aggregate_review_not_ready",
+                    "message": (
+                        f"aggregate review cannot be dispatched when "
+                        f"aggregate_review_status is {agg_status!r} (expected 'ready')"
+                    ),
+                    "recommended_action": "complete_required_slices_first",
+                })
+        elif requested_slice_id:
+            target_slice = None
+            for sl in impl.get("slices", []):
+                if sl.get("slice_id") == requested_slice_id:
+                    target_slice = sl
+                    break
+            if target_slice is None:
+                blocker_reasons.append({
+                    "reason": "unknown_slice",
+                    "message": f"slice {requested_slice_id!r} not found in implementation state",
+                    "recommended_action": "use a valid slice_id from slice-status",
+                })
+            elif canonical_agent == "implement-agent":
+                # Implement-agent requires the slice to be ready (pending is
+                # accepted only if dependencies are satisfied), no other slice
+                # active, and all dependencies completed with accepted_head_ref.
+                if active_slices and active_slices[0].get("slice_id") != requested_slice_id:
+                    blocker_reasons.append({
+                        "reason": "another_slice_active",
+                        "message": f"slice {active_slices[0].get('slice_id')!r} is currently {active_slices[0].get('status')!r}",
+                        "recommended_action": "wait for active slice to complete",
+                    })
+                elif target_slice.get("status") not in ("ready", "pending"):
+                    blocker_reasons.append({
+                        "reason": "slice_not_ready",
+                        "message": f"slice {requested_slice_id!r} status is {target_slice.get('status')!r}, expected 'ready' or 'pending'",
+                        "recommended_action": "use slice-next to find the next ready slice",
+                    })
+                else:
+                    # Check dependency readiness: all deps must be completed
+                    # with accepted_head_ref.
+                    by_id = {s.get("slice_id", ""): s for s in impl.get("slices", [])}
+                    deps_ok = True
+                    for dep in target_slice.get("depends_on", []) or []:
+                        dep_sl = by_id.get(dep)
+                        if not dep_sl:
+                            blocker_reasons.append({
+                                "reason": "slice_not_ready",
+                                "message": f"slice {requested_slice_id!r} depends on unknown slice {dep!r}",
+                                "recommended_action": "use slice-next to find the next ready slice",
+                            })
+                            deps_ok = False
+                            break
+                        if dep_sl.get("status") != "completed":
+                            blocker_reasons.append({
+                                "reason": "slice_not_ready",
+                                "message": f"slice {requested_slice_id!r} dependency {dep!r} is not completed (status: {dep_sl.get('status')!r})",
+                                "recommended_action": "use slice-next to find the next ready slice",
+                            })
+                            deps_ok = False
+                            break
+                        if not dep_sl.get("accepted_head_ref"):
+                            blocker_reasons.append({
+                                "reason": "slice_not_ready",
+                                "message": f"slice {requested_slice_id!r} dependency {dep!r} is completed but has no accepted_head_ref",
+                                "recommended_action": "use slice-next to find the next ready slice",
+                            })
+                            deps_ok = False
+                            break
+                    if deps_ok:
+                        # Verify this is the exact slice-next result (deterministic
+                        # runtime-owned selection). Only the first ready slice in
+                        # declaration order may be dispatched.
+                        active_ids = set(s.get("slice_id", "") for s in active_slices)
+                        first_ready = None
+                        for sl in impl.get("slices", []):
+                            if sl.get("status") == "cancelled":
+                                continue
+                            if slice_is_ready(sl, by_id, active_ids):
+                                first_ready = sl.get("slice_id", "")
+                                break
+                        if first_ready and first_ready != requested_slice_id:
+                            blocker_reasons.append({
+                                "reason": "slice_not_next",
+                                "message": (
+                                    f"slice {requested_slice_id!r} is not the "
+                                    f"runtime-selected next slice; slice-next "
+                                    f"returned {first_ready!r}"
+                                ),
+                                "recommended_action": "use slice-next to find the next ready slice",
+                            })
+            elif canonical_agent == "review-agent":
+                # Review-agent requires the slice to be in_review.
+                if target_slice.get("status") != "in_review":
+                    blocker_reasons.append({
+                        "reason": "slice_not_in_review",
+                        "message": f"slice {requested_slice_id!r} status is {target_slice.get('status')!r}, expected 'in_review'",
+                        "recommended_action": "dispatch implement-agent first to move slice to in_review",
+                    })
+        elif canonical_agent == "implement-agent":
+            # No slice_id provided.  When implementation state has explicit
+            # multi-slice state (more than one slice or a non-'default' slice),
+            # a slice_id is required — the runtime cannot guess which slice
+            # to dispatch.  Single-'default'-slice (legacy / single-slice)
+            # remains allowed without --slice-id for backward compatibility.
+            all_slices = impl.get("slices", []) or []
+            is_single_default = (
+                len(all_slices) == 1
+                and all_slices[0].get("slice_id") == "default"
+            )
+            if not is_single_default:
+                blocker_reasons.append({
+                    "reason": "missing_slice_id",
+                    "message": (
+                        "implement dispatch requires --slice-id when "
+                        "implementation state has multiple slices; use "
+                        "slice-next to find the next ready slice"
+                    ),
+                    "recommended_action": "use_slice_next_to_find_ready_slice",
+                })
+            elif active_slices:
+                blocker_reasons.append({
+                    "reason": "another_slice_active",
+                    "message": f"slice {active_slices[0].get('slice_id')!r} is currently {active_slices[0].get('status')!r}",
+                    "recommended_action": "wait for active slice to complete or specify its slice_id",
+                })
+
     if blocker_reasons:
         blocker = {
             "agent": agent,
@@ -394,6 +556,46 @@ def cmd_before_dispatch(root, args):
         dispatch_intent["slice_id"] = args.slice_id
 
     state.setdefault("evidence", {})["agent_phase"] = dispatch_intent
+
+    # P0 Sliced apply-change: before-dispatch(implement-agent) sets the
+    # target slice to in_progress and increments attempt_count.
+    # Global acceptance-order commit boundary: the target slice's base_ref
+    # is set to the latest completed slice's accepted_head_ref (in declaration
+    # order across ALL slices, not just dependencies) so that independently-
+    # ready slices chain from the previous globally accepted head.
+    if (
+        impl is not None
+        and phase == "apply_change"
+        and canonical_agent == "implement-agent"
+        and requested_slice_id
+    ):
+        all_slices = impl.get("slices", [])
+        # Find the latest completed slice in declaration order that precedes
+        # the target slice — the "previous globally accepted sequential head".
+        latest_accepted_head = ""
+        target_found = False
+        for sl in all_slices:
+            if sl.get("slice_id") == requested_slice_id:
+                target_found = True
+                break
+            if sl.get("status") == "completed" and sl.get("accepted_head_ref"):
+                latest_accepted_head = sl.get("accepted_head_ref", "")
+        if target_found and latest_accepted_head:
+            for sl in all_slices:
+                if sl.get("slice_id") == requested_slice_id:
+                    sl["status"] = "in_progress"
+                    sl["attempt_count"] = sl.get("attempt_count", 0) + 1
+                    sl["base_ref"] = latest_accepted_head
+                    impl["active_slice_id"] = requested_slice_id
+                    break
+        else:
+            for sl in all_slices:
+                if sl.get("slice_id") == requested_slice_id:
+                    sl["status"] = "in_progress"
+                    sl["attempt_count"] = sl.get("attempt_count", 0) + 1
+                    impl["active_slice_id"] = requested_slice_id
+                    break
+
     state["updated_at"] = _ts()
     save_run_state(root, state)
 
@@ -567,6 +769,125 @@ def _handoff_metadata_mismatch_blocker(metadata, expected):
 
 
 # ---------------------------------------------------------------------------
+# Git range validation helpers
+# ---------------------------------------------------------------------------
+
+def _run_git(root, args):
+    """Run a git command in root, capturing output. Returns (returncode, stdout, stderr)."""
+    result = subprocess.run(
+        ["git"] + list(args),
+        cwd=root,
+        capture_output=True,
+        text=True,
+    )
+    return result.returncode, result.stdout.strip(), result.stderr.strip()
+
+
+def _is_git_repo(root):
+    """Return True if root is inside a Git worktree (linked or normal).
+
+    A normal checkout has ``.git`` as a directory; a linked worktree has
+    ``.git`` as a file pointing at the real gitdir.  We detect both by
+    asking Git itself (``git rev-parse --git-dir``), which works regardless
+    of the ``.git`` entry shape.
+    """
+    if not root:
+        return False
+    rc, _, _ = _run_git(root, ["rev-parse", "--git-dir"])
+    return rc == 0
+
+
+def _validate_git_refs(root, base_ref, head_ref, commit_refs):
+    """Validate Git refs for existence, ancestry, contiguity, and range equality.
+
+    Returns a list of blocker dicts (empty = valid).
+    """
+    blockers = []
+    if not _is_git_repo(root):
+        # Not a git repo — skip git validation (non-git workspaces are allowed
+        # for test fixtures that don't use git).
+        return blockers
+
+    # 1. Existence: base_ref and head_ref must resolve to real commits.
+    for ref_name, ref_val in [("base_ref", base_ref), ("head_ref", head_ref)]:
+        if not ref_val:
+            continue
+        rc, _, _ = _run_git(root, ["cat-file", "-e", ref_val])
+        if rc != 0:
+            blockers.append({
+                "reason": "invalid_git_ref",
+                "message": f"{ref_name} {ref_val!r} does not exist in the git repository",
+                "recommended_action": "provide a valid git ref that resolves to a commit",
+            })
+            return blockers  # No point checking ancestry if refs don't exist.
+
+    # 2. Ancestry: head_ref must be a descendant of base_ref (or equal).
+    if base_ref and head_ref:
+        rc, _, _ = _run_git(root, ["merge-base", "--is-ancestor", base_ref, head_ref])
+        if rc != 0:
+            blockers.append({
+                "reason": "invalid_git_ref",
+                "message": (
+                    f"head_ref {head_ref!r} is not a descendant of "
+                    f"base_ref {base_ref!r} (ancestry violation)"
+                ),
+                "recommended_action": "ensure head_ref is built on top of base_ref",
+            })
+            return blockers
+
+    # 3. Exact ordered range equality: commit_refs must equal
+    # ``git rev-list --reverse base..head`` in order and completeness.
+    # A partial list (e.g. [head] when mid exists) or a reordered list must
+    # be rejected.  We compare the supplied list against the authoritative
+    # Git-derived ordered range.
+    if base_ref and head_ref and commit_refs:
+        # Normalize supplied refs to full SHAs for comparison.
+        normalized_supplied = []
+        for cref in commit_refs:
+            if not cref:
+                continue
+            rc, out, _ = _run_git(root, ["rev-parse", cref])
+            if rc != 0:
+                blockers.append({
+                    "reason": "invalid_git_ref",
+                    "message": f"commit_ref {cref!r} does not exist in the git repository",
+                    "recommended_action": "provide valid commit refs",
+                })
+                return blockers
+            normalized_supplied.append(out)
+
+        # Get the authoritative ordered range: git rev-list --reverse base..head
+        rc, out, _ = _run_git(root, ["rev-list", "--reverse", f"{base_ref}..{head_ref}"])
+        if rc != 0:
+            blockers.append({
+                "reason": "invalid_git_ref",
+                "message": (
+                    f"could not enumerate commits in range "
+                    f"{base_ref!r}..{head_ref!r}"
+                ),
+                "recommended_action": "ensure base_ref and head_ref are valid",
+            })
+            return blockers
+        expected = [line for line in out.splitlines() if line.strip()]
+
+        if normalized_supplied != expected:
+            blockers.append({
+                "reason": "invalid_git_ref",
+                "message": (
+                    f"commit_refs {normalized_supplied!r} do not match the "
+                    f"exact ordered range {expected!r} from "
+                    f"git rev-list --reverse {base_ref}..{head_ref}"
+                ),
+                "recommended_action": (
+                    "provide commit_refs that exactly match the ordered, "
+                    "contiguous commit range from base_ref to head_ref"
+                ),
+            })
+
+    return blockers
+
+
+# ---------------------------------------------------------------------------
 # After-dispatch command
 # ---------------------------------------------------------------------------
 
@@ -670,6 +991,119 @@ def cmd_after_dispatch(root, args):
     evidence = state.setdefault("evidence", {})
     evidence["agent_result"] = latest_result
     evidence.setdefault("agent_results", {}).setdefault(slice_id, {})[canonical_agent] = latest_result
+
+    # P0 Sliced apply-change: after-dispatch slice state transitions.
+    impl = state.get("implementation")
+    # Aggregate review is identified by slice_id == "aggregate" (reserved).
+    if (
+        impl is not None
+        and phase == "apply_change"
+        and canonical_agent == "review-agent"
+        and slice_id == "aggregate"
+    ):
+        # Aggregate review transition: ready -> passed (success) / blocked (failure).
+        agg_status = impl.get("aggregate_review_status", "pending")
+        if agent_status == "success" and not agent_blockers:
+            if agg_status == "ready":
+                impl["aggregate_review_status"] = "passed"
+            elif agg_status == "passed":
+                pass  # idempotent
+            else:
+                # Only allow aggregate pass from 'ready' state.
+                agent_blockers.append({
+                    "reason": "aggregate_review_not_ready",
+                    "message": f"aggregate review cannot pass from status {agg_status!r}",
+                    "recommended_action": "complete_required_slices_first",
+                })
+        else:
+            if agg_status == "ready":
+                impl["aggregate_review_status"] = "blocked"
+    elif (
+        impl is not None
+        and phase == "apply_change"
+        and slice_id and slice_id != "aggregate"
+    ):
+        slices = impl.get("slices", [])
+        target = None
+        for sl in slices:
+            if sl.get("slice_id") == slice_id:
+                target = sl
+                break
+        if target is not None:
+            if canonical_agent == "implement-agent" and agent_status == "success" and not agent_blockers:
+                # Validate Git refs before transitioning to in_review.
+                artifacts = agent_result.get("artifacts") or {}
+                head_ref = artifacts.get("head_ref") or ""
+                commit_refs = artifacts.get("commit_refs") or []
+                base_ref = artifacts.get("base_ref") or target.get("base_ref") or ""
+                ref_errors = []
+                if not head_ref:
+                    ref_errors.append("head_ref")
+                if not commit_refs or (
+                    isinstance(commit_refs, list) and len(commit_refs) == 0
+                ):
+                    ref_errors.append("commit_refs")
+                if not base_ref:
+                    ref_errors.append("base_ref")
+                if ref_errors:
+                    agent_blockers.append({
+                        "reason": "missing_git_refs",
+                        "message": (
+                            f"implement success cannot enter review with missing "
+                            f"Git refs: {', '.join(ref_errors)}"
+                        ),
+                        "recommended_action": "provide valid base_ref, head_ref, and commit_refs",
+                    })
+                else:
+                    # Validate Git refs against the actual repository: check
+                    # existence, ancestry (head descendant of base), and
+                    # contiguity/range-equality (all commit_refs within
+                    # base..head).  Non-git workspaces skip this check.
+                    git_blockers = _validate_git_refs(
+                        root, base_ref, head_ref, commit_refs
+                    )
+                    if git_blockers:
+                        agent_blockers.extend(git_blockers)
+                    else:
+                        # Implement success: move to in_review, record refs.
+                        target["status"] = "in_review"
+                        target["head_ref"] = head_ref
+                        target["commit_refs"] = list(commit_refs)
+                        if base_ref and not target.get("base_ref"):
+                            target["base_ref"] = base_ref
+                        target["implement_evidence"] = agent_evidence
+            elif canonical_agent == "review-agent" and agent_status == "success" and not agent_blockers:
+                # Validate head_ref before completing the slice.
+                head_ref = target.get("head_ref", "")
+                if not head_ref:
+                    agent_blockers.append({
+                        "reason": "missing_accepted_head_ref",
+                        "message": (
+                            f"review pass cannot complete slice {slice_id!r} "
+                            f"with empty head_ref/accepted_head_ref"
+                        ),
+                        "recommended_action": "re-implement slice with valid head_ref",
+                    })
+                else:
+                    # Review pass: complete the slice, record accepted_head_ref.
+                    target["status"] = "completed"
+                    target["accepted_head_ref"] = head_ref
+                    target["review_evidence"] = agent_evidence
+                    impl["active_slice_id"] = None
+                    # Recompute aggregate_review_status: if all required slices
+                    # are completed, transition to 'ready'.
+                    from workflow_runtime.state import all_required_slices_completed
+                    if all_required_slices_completed(impl):
+                        impl["aggregate_review_status"] = "ready"
+            elif canonical_agent == "review-agent" and agent_status != "success":
+                # Review rejection: preserve base_ref, move slice back to ready
+                # for re-implementation (base_ref is preserved, head may advance).
+                target["status"] = "ready"
+                impl["active_slice_id"] = None
+            elif canonical_agent == "implement-agent" and agent_status != "success":
+                # Implement failure: move slice back to ready for retry.
+                target["status"] = "ready"
+                impl["active_slice_id"] = None
 
     wf = load_workflow(root, state.get("workflow", "sdlc-main"))
     phase_def = None
@@ -785,6 +1219,15 @@ def cmd_after_dispatch(root, args):
         # implement-agent owns normal verification; route to review-agent next.
         next_cmd = ""
         recommended_next_action = "dispatch_review_agent"
+    elif canonical_agent == "review-agent" and slice_id and slice_id != "aggregate":
+        # Slice-level review (not aggregate): if not all required slices are
+        # completed, do not attempt complete-phase — continue to the next slice.
+        # The aggregate review (slice_id="aggregate") is the phase-completing
+        # worker for apply_change.
+        from workflow_runtime.state import all_required_slices_completed
+        if impl is not None and not all_required_slices_completed(impl):
+            next_cmd = ""
+            recommended_next_action = "dispatch_next_slice"
     elif canonical_agent == "roadmap-agent":
         # roadmap-agent is a lifecycle hook worker, not a phase worker.
         # Its after-dispatch should lead to hook completion flow, not

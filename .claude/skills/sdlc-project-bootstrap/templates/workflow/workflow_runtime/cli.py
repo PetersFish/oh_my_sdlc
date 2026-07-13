@@ -41,6 +41,13 @@ from workflow_runtime.governance import (
     cmd_verify_foundations,
     cmd_final_commit,
 )
+from workflow_runtime.slices import (
+    cmd_slice_status,
+    cmd_slice_next,
+    cmd_slice_block,
+    cmd_slice_resume,
+    cmd_slice_cancel,
+)
 
 
 COMMANDS = {
@@ -65,6 +72,11 @@ COMMANDS = {
     "before-dispatch",
     "after-dispatch",
     "final-commit",
+    "slice-status",
+    "slice-next",
+    "slice-block",
+    "slice-resume",
+    "slice-cancel",
 }
 
 
@@ -146,3 +158,13 @@ def main():
         cmd_after_dispatch(root, args)
     elif args.command == "final-commit":
         cmd_final_commit(root, args)
+    elif args.command == "slice-status":
+        cmd_slice_status(root, args)
+    elif args.command == "slice-next":
+        cmd_slice_next(root, args)
+    elif args.command == "slice-block":
+        cmd_slice_block(root, args)
+    elif args.command == "slice-resume":
+        cmd_slice_resume(root, args)
+    elif args.command == "slice-cancel":
+        cmd_slice_cancel(root, args)

@@ -320,6 +320,70 @@ fields rather than parsing handoff prose for paths.
 
 Plan-agent produces no raw logs (no commands executed).
 
+## Implementation Slicing Assessment
+
+When `planning_action=assess_implementation_slicing` or when existing
+apply-ready artifacts lack slice metadata, plan-agent MUST produce a
+slicing assessment.
+
+### Slicing Assessment Output
+
+```json
+{
+  "slicing_assessment": {
+    "decision": "single_slice|multi_slice|blocked",
+    "confidence": "high|medium|low",
+    "reasons": [],
+    "signals": {
+      "independent_behaviors": 0,
+      "dependency_layers": 0,
+      "expected_core_files": 0,
+      "cross_module_boundaries": 0,
+      "independent_verification_boundaries": 0,
+      "migration_or_compatibility_work": false,
+      "multiple_external_integrations": false,
+      "high_debug_uncertainty": false
+    },
+    "implementation_slices": []
+  }
+}
+```
+
+### Decision Rubric
+
+- **single_slice**: The change has one independent behavior, one
+  verification boundary, and no cross-module dependency layers. A valid
+  single-slice assessment materializes the required slice `default`.
+- **multi_slice**: The change has independently testable behaviors that
+  cross module boundaries or have dependency layers. Each slice must be
+  independently verifiable with a focused scope.
+- **blocked**: Low confidence or missing detail prevents assessment.
+  Return `blocked` with reasons; never use task numbering alone to define
+  slices.
+
+### Slice Contract
+
+Each multi-slice entry contains: `slice_id` (unique, stable, not
+`aggregate`), `title`, `task_refs`, `depends_on` (local, acyclic),
+`objective`, `scope.expected_paths`, `acceptance_criteria`,
+`verification_commands`, `required_context_paths`, `required` (boolean).
+
+### Assessment Rules
+
+- Read the full selected artifact set before assessment.
+- Ensure task coverage: every required task is covered exactly once unless
+  cross-cutting.
+- Ensure the dependency graph is acyclic.
+- Declaration order is stable and determines selection order.
+- Decomposition reorganizes work but does NOT redesign approved behavior.
+- Counts are heuristics, not hard thresholds.
+
+### Boundary
+
+plan-agent owns the slicing assessment decision. dev-orchestrator routes
+but does not decompose. implement-agent executes one slice. review-agent
+reviews one commit range or the aggregate range.
+
 ## Routing Outcomes
 
 | Outcome | status | recommended_next_action |

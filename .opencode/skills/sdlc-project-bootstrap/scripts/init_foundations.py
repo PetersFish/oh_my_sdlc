@@ -35,6 +35,7 @@ COPIES = [
     ("workflow/workflow_runtime/lifecycle.py", ".ai/workflows/scripts/workflow_runtime/lifecycle.py"),
     ("workflow/workflow_runtime/governance.py", ".ai/workflows/scripts/workflow_runtime/governance.py"),
     ("workflow/workflow_runtime/cli.py", ".ai/workflows/scripts/workflow_runtime/cli.py"),
+    ("workflow/workflow_runtime/slices.py", ".ai/workflows/scripts/workflow_runtime/slices.py"),
 ]
 
 

@@ -30,6 +30,7 @@ from workflow_runtime.state import (
     _move_run_to_history,
     _cancel_active_run,
     _missing_terminal_finish_agent_evidence,
+    normalize_implementation_state,
 )
 from workflow_runtime.definitions import (
     load_workflow,
@@ -538,6 +539,22 @@ def cmd_complete_phase(root, args):
         save_run_state(root, state)
         print(json.dumps(state, indent=2))
         sys.exit(1)
+
+    # P0 Sliced apply-change: aggregate review completion gate.
+    # apply_change completion requires aggregate_review_status == "passed"
+    # when implementation state exists.
+    if current == "apply_change" and state.get("implementation") is not None:
+        impl = normalize_implementation_state(state)
+        agg_status = impl.get("aggregate_review_status", "pending")
+        if agg_status != "passed":
+            print(json.dumps({
+                "error": (
+                    f"apply_change completion requires aggregate_review_status "
+                    f"'passed', got {agg_status!r}. Dispatch aggregate review "
+                    f"via slice-next and after-dispatch(review-agent, slice_id=aggregate)."
+                ),
+            }, indent=2))
+            sys.exit(1)
 
     # Evidence key validation
     evidence_keys = phase_def.get("evidence_keys", [])

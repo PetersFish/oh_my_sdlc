@@ -714,6 +714,29 @@ After final-commit returns success, inspect `residual_dirty_paths`. If any entry
 
 Do not run direct `git add`, `git commit`, or `git push`; final Git publishing is owned by `workflow.py final-commit`.
 
+## Sliced Apply-Change Orchestration (P0)
+
+When `apply_change` work has implementation slice metadata:
+
+1. Route `slicing_assessment_required` to plan-agent with
+   `planning_action=assess_implementation_slicing`.
+2. During `apply_change`, call `slice-next` and dispatch exactly one
+   returned slice.
+3. Forward the slice contract, exact `slice_id`, runtime context,
+   approved design artifacts, and direct dependency handoffs to
+   implement-agent.
+4. Wait for review-agent acceptance before requesting the next slice.
+5. When `slice-next` returns `dispatch_aggregate_review`, route
+   review-agent with aggregate scope.
+6. Only after aggregate review passes, complete `apply_change`.
+
+### P0 Prohibitions
+
+- NO technical decomposition by dev-orchestrator (plan-agent owns slicing).
+- NO parallel dispatch (P0 is strictly sequential).
+- NO per-slice branch creation (one governed branch/worktree).
+- NO integration slices (aggregate review is a review scope, not a slice).
+
 ## Parallel Dispatch
 
 Only split into parallel work when:
