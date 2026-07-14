@@ -11,13 +11,16 @@ Markdown artifacts have two distinct roles:
 
 Verification must distinguish these roles. Instructional prose should not create code-level tests. Machine-interpreted structure remains eligible for deterministic tests. Agent behavior regressions are represented by Eval cases when justified.
 
+The classification and Eval rules are shared across planning, implementation, review, orchestration, and finalization. They must therefore have one canonical implementation rather than being duplicated across multiple agent prompts.
+
 ## Goals
 
 - Prose-only Agent or Skill changes do not generate pytest or unittest cases.
 - Machine-interpreted Markdown remains structurally testable.
 - Code changes continue to use normal TDD and test-suite evolution.
 - Agent behavior failures use event-driven Eval coverage rather than prose-presence assertions.
-- `implement-agent` and `review-agent` make an explicit verification-type decision.
+- One shared Skill is the canonical source for Markdown verification classification and Eval policy.
+- Agents contain only the trigger for loading the shared Skill and their role-specific responsibilities.
 - Future prompt-related test growth stops without deleting historical tests in this change.
 
 ## Non-Goals
@@ -27,11 +30,38 @@ Verification must distinguish these roles. Instructional prose should not create
 - No general test-suite refactoring.
 - No weakening of permission, parser, schema, or sync validation.
 - No mandatory Eval for every Markdown edit.
-- No changes to derived-sync phase ownership beyond relying on P0.
+- No changes to derived-sync phase ownership beyond relying on the existing derived-sync phase-boundary design.
+- No duplication of the full shared policy in individual agent files.
 
 ## Decisions
 
-### 1. Verification Classification
+### 1. Shared Skill Is the Canonical Policy Source
+
+Create one canonical shared Skill:
+
+```text
+skills/markdown-verification-discipline/SKILL.md
+```
+
+The Skill owns the complete policy for:
+
+- verification classification;
+- instructional prose handling;
+- machine-interpreted Markdown handling;
+- executable code handling;
+- provider transformation handling;
+- event-driven Eval triggers;
+- Eval ownership and retention.
+
+The shared Skill is the only canonical implementation of Decisions 2–8 below.
+
+Agent prompts must not copy the full policy. They contain only:
+
+- when the Skill must be loaded;
+- which role-specific decision or verification action the agent owns;
+- which structured evidence fields the agent must produce or consume.
+
+### 2. Verification Classification
 
 Every change affecting Agent or Skill Markdown is classified as one or more of:
 
@@ -44,7 +74,7 @@ provider_transform
 
 The classification determines verification.
 
-### 2. Instructional Prose
+### 3. Instructional Prose
 
 Instructional prose includes:
 
@@ -77,7 +107,7 @@ Implementation evidence records:
 }
 ```
 
-### 3. Machine-Interpreted Markdown
+### 4. Machine-Interpreted Markdown
 
 Code tests remain required or permitted when Markdown contains behavior consumed by code, including:
 
@@ -104,7 +134,7 @@ Disallowed as the sole verification:
 assert "MUST NOT run command X" in markdown_body
 ```
 
-### 4. Executable Code
+### 5. Executable Code
 
 If a change includes executable code, normal test-suite evolution applies to that behavior. The implementation must decide whether to:
 
@@ -119,7 +149,7 @@ delete_obsolete_tests
 
 Markdown prose in the same change does not independently require prose-presence tests.
 
-### 5. Provider Transformations
+### 6. Provider Transformations
 
 Provider-specific transformation code is executable behavior and remains testable. Tests may cover:
 
@@ -132,7 +162,7 @@ Provider-specific transformation code is executable behavior and remains testabl
 
 The tests verify transformation behavior, not the semantic quality of the prompt prose.
 
-### 6. Event-Driven Eval
+### 7. Event-Driven Eval
 
 Eval cases are not generated for every Markdown edit. An Eval should be introduced when:
 
@@ -147,7 +177,7 @@ Ordinary wording changes, section reorganization, and explanatory additions do n
 
 Once a real failure becomes an Eval case, it should remain as regression coverage unless the supported behavior is removed.
 
-### 7. Eval Ownership
+### 8. Eval Ownership
 
 Eval creation is user-initiated or explicitly approved for normal prompt changes. Agents may recommend an Eval but must not automatically proliferate cases for low-risk prose edits.
 
@@ -175,51 +205,124 @@ For an approved failure-driven case:
 }
 ```
 
-### 8. Implement-Agent Rules
+### 9. Skill Loading Contract
+
+The shared policy is effective only when the relevant agents actually load it.
+
+The following agents must load `markdown-verification-discipline` when Agent or Skill Markdown is in scope:
+
+- `plan-agent`;
+- `implement-agent`;
+- `review-agent`.
+
+`dev-orchestrator` and `finish-agent` may rely on the approved classification passed through workflow evidence, but they must load the Skill when they need to create, override, or re-evaluate that classification.
+
+A bare prose reference such as “follow the Markdown verification rule” is insufficient. Agent instructions must use an explicit load requirement.
+
+### 10. Plan-Agent Rules
+
+`plan-agent` must:
+
+1. load `markdown-verification-discipline` when Agent or Skill Markdown is affected;
+2. classify the change;
+3. identify whether code tests are required;
+4. identify whether an Eval trigger exists;
+5. include the classification in planning artifacts and handoff evidence.
+
+It must not prescribe one new test per Markdown requirement.
+
+### 11. Implement-Agent Rules
 
 `implement-agent` must:
 
-1. classify changed Markdown;
-2. avoid prose-presence tests for instructional changes;
-3. run code tests only for executable or machine-interpreted behavior;
-4. record whether an Eval trigger exists;
-5. preserve normal focused and regression verification for code changes;
-6. use P0 deferred sync for canonical changes.
+1. load `markdown-verification-discipline` for Agent or Skill Markdown work;
+2. apply the approved classification;
+3. avoid prose-presence tests for instructional changes;
+4. run code tests only for executable or machine-interpreted behavior;
+5. record whether an Eval trigger exists;
+6. preserve normal focused and regression verification for code changes;
+7. rely on the existing derived-sync phase boundary for canonical changes.
 
 It must not claim TDD success for a prose-only change by adding a test that passes immediately.
 
-### 9. Review-Agent Rules
+### 12. Review-Agent Rules
 
-`review-agent` verifies:
+`review-agent` must:
 
-- classification is correct;
-- no unnecessary prose-presence test was introduced;
-- machine-interpreted changes have appropriate deterministic coverage;
-- code changes have appropriate behavioral tests;
-- an Eval was not omitted when explicitly required;
-- an Eval was not added without a meaningful trigger when the change is low risk.
+1. load `markdown-verification-discipline` when reviewing Agent or Skill Markdown changes;
+2. verify that classification is correct;
+3. verify that no unnecessary prose-presence test was introduced;
+4. verify that machine-interpreted changes have appropriate deterministic coverage;
+5. verify that code changes have appropriate behavioral tests;
+6. verify that an Eval was not omitted when explicitly required;
+7. verify that an Eval was not added without a meaningful trigger for low-risk prose edits.
 
 Review must not reject a prose-only change solely because no pytest case was added.
 
-### 10. Finish-Agent Rules
+### 13. Dev-Orchestrator Rules
 
-`finish-agent` runs final repository verification appropriate to the actual change set. For prose-only canonical changes, it performs derived synchronization and consistency checks under P0, but does not require new prompt prose tests.
+`dev-orchestrator` must preserve and forward:
+
+- `verification_classification`;
+- `eval_assessment`;
+- the shared Skill path or name when downstream re-evaluation is required.
+
+It must not independently duplicate the full policy or reinterpret the classification without loading the shared Skill.
+
+### 14. Finish-Agent Rules
+
+`finish-agent` runs final repository verification appropriate to the approved classification.
+
+For prose-only canonical changes, it performs derived synchronization and consistency checks under the existing derived-sync phase boundary, but does not require new prompt prose tests.
+
+If final repository state introduces executable or machine-interpreted changes not covered by the approved classification, finish-agent must block or request re-evaluation rather than silently broadening the verification type.
+
+### 15. AGENTS.md Routing Rule
+
+`AGENTS.md` contains only a concise routing rule:
+
+```text
+When planning, implementing, or reviewing Agent or Skill Markdown changes,
+load `markdown-verification-discipline` before deciding verification.
+```
+
+Detailed policy remains in the shared Skill.
+
+## Shared Skill Contract
+
+The Skill frontmatter must describe when it is required, including:
+
+- planning verification for Agent or Skill Markdown changes;
+- implementing such changes;
+- reviewing whether tests or Eval coverage are appropriate;
+- distinguishing instructional prose from machine-consumed Markdown.
+
+The Skill body contains Decisions 2–8 in operational form and defines the structured evidence examples used by agents.
+
+The Skill must not own derived synchronization, general test design, or broad implementation contract discipline. Those remain with their existing dedicated policies and Skills.
 
 ## Agent Changes
 
-- `implement-agent`: add verification classification and prohibit prose-presence test generation.
-- `review-agent`: review the selected verification type instead of requiring new tests.
-- `plan-agent`: identify whether requirements affect prose, machine structure, code, or provider transformation.
-- `dev-orchestrator`: forward verification classification and Eval decisions.
-- `finish-agent`: apply final verification without converting prose edits into code-test obligations.
+- `plan-agent`: add explicit shared-Skill loading trigger and classification output responsibility.
+- `implement-agent`: add explicit shared-Skill loading trigger and prohibit prose-presence test generation through the shared policy.
+- `review-agent`: add explicit shared-Skill loading trigger and verification-selection review responsibility.
+- `dev-orchestrator`: forward classification and Eval assessment without duplicating policy.
+- `finish-agent`: honor the approved classification during final verification.
+- `AGENTS.md`: add one short routing trigger.
 
 ## Affected Areas
 
-- canonical agent prompts
-- relevant SDLC documentation and templates
-- structured implementation and review evidence
-- wrapper/runtime schema only if evidence validation is implemented in code
-- distributed copies synchronized under P0
+- `skills/markdown-verification-discipline/SKILL.md`;
+- `agents/plan-agent.md`;
+- `agents/implement-agent.md`;
+- `agents/review-agent.md`;
+- `agents/dev-orchestrator.md`;
+- `agents/finish-agent.md`;
+- `AGENTS.md`;
+- relevant SDLC documentation and templates;
+- structured implementation and review evidence;
+- wrapper/runtime schema only if evidence validation is implemented in code;
+- distributed copies synchronized under the existing derived-sync phase boundary.
 
 Historical prompt-test deletion is handled by P2.
 
@@ -235,4 +338,10 @@ Historical prompt-test deletion is handled by P2.
 - A user-reported critical behavior failure can be retained as an Eval regression.
 - `review-agent` accepts valid prose-only changes without new tests.
 - Existing prompt tests are not bulk-deleted by this change.
-- P0 deferred-sync behavior remains authoritative for canonical changes.
+- Decisions 2–8 have one canonical implementation in `markdown-verification-discipline`.
+- Agent prompts do not duplicate the full shared policy.
+- Plan, implement, and review agents explicitly load the shared Skill when relevant.
+- `AGENTS.md` contains only the short routing trigger.
+- Dev-orchestrator forwards classification and Eval evidence without reimplementing the policy.
+- Finish-agent honors the approved classification.
+- Distributed Skill and agent copies remain synchronized through the existing finish-owned sync process.
