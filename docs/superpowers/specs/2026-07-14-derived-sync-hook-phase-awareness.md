@@ -43,6 +43,8 @@ This follow-up does not redesign sync ownership or add a derived-sync state mach
 - No general test-suite refactoring.
 - No change to `install_skill.py` no-op behavior.
 - No change to canonical-to-derived source ownership.
+- No support in this change for canonical Skill directory deletion or rename;
+  those operations require a separate distributed-removal contract.
 
 ## Decisions
 
@@ -96,6 +98,9 @@ generated_artifact_mixed_with_authored_commit
 unattributed_generated_drift
 unrelated_generated_drift
 missing_workflow_phase_context
+ambiguous_workflow_run_context
+workflow_checkout_mismatch
+unsupported_canonical_skill_removal
 ```
 
 ### 4. Review Scope Uses Authored Changes
@@ -130,6 +135,19 @@ Before final commit or workflow completion, `finish-agent` MUST:
 4. include generated changes in finish cleanup evidence;
 5. verify no unrelated dirty files remain.
 
+The workflow runtime MUST independently execute the read-only synchronization
+check before terminal movement. A worker-provided boolean such as
+`derived_artifacts_synced: true` is supporting evidence, not proof that the
+check ran or passed. Terminal movement MUST consume the actual check exit code
+and fail closed when the check cannot run.
+
+The terminal check root MUST follow the existing branch-finish decision and
+execution context. Use the surviving worktree for `keep_branch` or
+`create_pr`; use the control/main checkout only after `merge_local` has made
+the reviewed result available there or `discard` has removed it. A missing or
+contradictory target root must block rather than silently checking a different
+checkout.
+
 The finish-phase hook MUST reject completion when:
 
 - derived synchronization has not been run where required;
@@ -159,6 +177,24 @@ If no active workflow exists, existing non-workflow hook behavior remains unchan
 
 If an active workflow exists but its phase cannot be resolved safely, the hook should fail with an explicit context error rather than applying the wrong phase policy.
 
+#### Checkout-To-Run Binding
+
+The hook MUST bind the current Git checkout to exactly one workflow run before
+using phase-specific policy:
+
+1. resolve the current checkout root with Git;
+2. inspect existing active workflow state from the authoritative control root;
+3. match the checkout root against normalized run context, preferring
+   `context.worktree_path` for worktree-mode runs and the control repository
+   root for main-checkout runs;
+4. apply phase-specific policy only when exactly one active run matches;
+5. reject ambiguous matches, corrupt pointers, unreadable matching state, or a
+   run whose recorded worktree path contradicts the current checkout.
+
+An active run belonging to another worktree MUST NOT change the current
+checkout's hook policy. If no run matches the current checkout, existing
+non-workflow behavior applies even when unrelated active runs exist elsewhere.
+
 ### 7. Canonical Source Attribution
 
 Expected apply-phase drift may be allowed only when the repository can attribute it to a changed canonical source using existing synchronization ownership rules.
@@ -172,6 +208,59 @@ workflow templates -> installed/generated workflow copies
 ```
 
 Implementation should reuse existing sync discovery and mapping logic rather than create a second independent mapping table inside the hook.
+
+Attribution MUST be path-aware rather than suite-aware. The shared
+classification result must distinguish at least:
+
+```text
+staged_canonical_paths
+expected_derived_domains
+actual_dirty_generated_paths
+actual_staged_generated_paths
+detected_stale_generated_paths
+attributable_stale_generated_paths
+unattributed_generated_paths
+```
+
+Domain-level values such as `agents: true` or `workflows: true` are not enough
+to prove that every failing generated path belongs to the staged canonical
+change. Existing mappings such as `sync_templates.py`'s governed workflow file
+list and the existing Agent/Skill target rules must be exported or adapted as
+the shared source of truth.
+
+Git status alone is insufficient: a generated copy can be clean relative to
+`HEAD` yet stale relative to a canonical source committed earlier. The policy
+MUST consume path-level results from a full read-only derived synchronization
+check, partition every stale path into attributable or unattributed sets, and
+reject any unattributed stale path. Suppressing an entire failing Agent, Skill,
+or workflow suite is forbidden.
+
+The attribution contract MUST include all governed workflow runtime modules,
+not only `workflow.py` and `sdlc-main.yaml`.
+
+#### Index And Worktree Separation
+
+Pre-commit policy evaluates the commit represented by the Git index. It MUST:
+
+- derive authored canonical inputs from `git diff --cached`;
+- preserve rename and deletion status when collecting staged paths;
+- inspect the complete porcelain worktree state separately for generated-file
+  modifications and unrelated dirty paths;
+- never use a combined `git diff HEAD` path set as the authored commit scope;
+- avoid reading unstaged canonical content as if it were the staged content.
+
+Partial staging and additional unstaged canonical edits MUST NOT broaden the
+allowance granted to the staged commit.
+
+Canonical Skill directory deletion and rename are outside this change. The
+apply hook MUST fail with an explicit unsupported-operation reason rather than
+allowing a commit that the current finish sync cannot close.
+
+Recommended reason:
+
+```text
+unsupported_canonical_skill_removal
+```
 
 ### 8. No New Prompt Prose Tests
 
@@ -187,6 +276,29 @@ Executable tests are appropriate for:
 - finish-phase clean enforcement;
 - review change-set filtering implemented in code.
 
+Current review scope is agent-governed rather than enforced by a standalone
+runtime comparator. If reproduction confirms that stale but unwritten targets
+are already absent from Git-derived review scope, verification for that branch
+is an executable Git fixture plus manual inspection of the canonical agent
+contract. This specification does not require a new review-policy subsystem
+solely to make prompt behavior executable.
+
+### 9. Phase-Appropriate Regression Ordering
+
+Verification is split across the ownership boundary:
+
+- During `apply_change`, run focused and broad executable suites that do not
+  require generated copies to have already been synchronized. Repository-level
+  distribution-consistency tests that fail only because of expected phase
+  drift must be recorded as phase-deferred, not accepted as generally passing.
+- During finish cleanup, run write-producing synchronization, the read-only
+  check, every phase-deferred distribution-consistency test, and then the full
+  project regression.
+
+A failure may be phase-deferred only when its exact test id is known and the
+same test passes after finish-owned synchronization. Other failures remain
+ordinary implementation failures.
+
 ## Affected Areas
 
 Expected affected areas include:
@@ -194,6 +306,8 @@ Expected affected areas include:
 ```text
 Git hook or pre-commit validation code
 workflow phase resolution helpers
+checkout-to-run binding helpers
+staged-index and worktree status classification helpers
 review change-set validation code, if it currently includes expected derived drift
 finish terminal validation
 existing executable hook and workflow tests
@@ -206,6 +320,7 @@ The implementation must first locate the existing hook and sync mapping logic an
 
 - The existing 2026-07-13 derived-sync phase-boundary design remains the source of truth for sync ownership.
 - An authored canonical Agent or Skill change can be committed during `apply_change` without first synchronizing provider copies.
+- The apply allowance is based on staged index scope, not combined staged and unstaged changes.
 - Expected stale generated copies do not produce an apply-phase blocker.
 - Manually modified generated copies are rejected during implementation.
 - Generated files cannot be mixed into the authored implementation commit.
@@ -215,6 +330,15 @@ The implementation must first locate the existing hook and sync mapping logic an
 - Finish-agent performs write-producing synchronization after review.
 - Finish completion is blocked while derived drift remains unresolved.
 - Phase policy is resolved from workflow runtime state rather than commit metadata.
+- A checkout is bound to exactly one matching active run before phase policy is applied.
+- Active runs for other worktrees do not affect the current checkout.
+- Ambiguous, corrupt, or contradictory run binding fails closed.
+- Attribution reports concrete generated paths and detects unrelated drift within the same sync domain.
+- Governed `workflow_runtime/*.py` files participate in workflow attribution.
+- Canonical Skill deletion or rename is explicitly rejected as unsupported by this change.
 - Existing non-workflow hook behavior remains compatible.
+- Terminal movement executes and consumes an independent read-only sync check rather than trusting worker evidence alone.
+- Phase-deferred distribution tests pass after finish-owned synchronization, followed by a passing full regression.
 - No new derived-sync state machine, dry-run manifest, or target-planning contract is introduced.
-- Executable hook and review-policy tests pass.
+- Executable hook, attribution, phase-binding, and terminal-policy tests pass.
+- Review behavior is changed only if a reproduction demonstrates a real executable defect.
