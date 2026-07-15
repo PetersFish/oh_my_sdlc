@@ -216,12 +216,45 @@ def do_check(target: Path, json_output: bool = False) -> int:
     return overall
 
 
+def _target_relpath(target: Path, filename: str = "") -> str:
+    """Return a repository-relative path for a file inside ``target``.
+
+    When ``target`` is inside a Git repository, the path is relative to the
+    repo root (e.g. ``.opencode/agents/implement-agent.md``).  When the target
+    cannot be resolved to a repo root, falls back to ``target.name``.
+
+    ``filename`` is an optional filename appended to the target directory.
+    """
+    target_resolved = target.resolve()
+    # Discover the Git repo root from the target location
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(target_resolved), "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True,
+        )
+        if proc.returncode == 0 and proc.stdout.strip():
+            repo_root = Path(proc.stdout.strip()).resolve()
+            try:
+                rel_dir = target_resolved.relative_to(repo_root)
+            except ValueError:
+                rel_dir = Path(target_resolved.name)
+        else:
+            rel_dir = Path(target_resolved.name)
+    except Exception:
+        rel_dir = Path(target_resolved.name)
+    rel_prefix = rel_dir.as_posix() if rel_dir.as_posix() != "." else ""
+    if filename:
+        return f"{rel_prefix}/{filename}" if rel_prefix else filename
+    return rel_prefix
+
+
 def _stale_template_paths(target: Path) -> list[str]:
     """Return repository-relative stale agent paths for template drift.
 
     Compares canonical agents/ against ``target`` using normalized prompt
     content (ignoring activation-managed fields).  Reports each stale target
-    path as ``<target_rel>/<filename>``.
+    path as ``<repo_rel_target>/<filename>`` (e.g.
+    ``.opencode/agents/implement-agent.md``).
     """
     from agent_config_lib import (
         SKIP_NAMES,
@@ -258,7 +291,7 @@ def _stale_template_paths(target: Path) -> list[str]:
 
     for name, src_content in src_files.items():
         tgt_content = tgt_files.get(name)
-        rel = f"{target.name}/{name}" if target.name else name
+        rel = _target_relpath(target, name)
         if tgt_content is None:
             stale.append(rel)
         elif not normalized_prompt_compare(src_content, tgt_content):
@@ -266,13 +299,13 @@ def _stale_template_paths(target: Path) -> list[str]:
 
     for name in tgt_files:
         if name not in src_files:
-            rel = f"{target.name}/{name}" if target.name else name
+            rel = _target_relpath(target, name)
             stale.append(rel)
 
     # Target config check
     config_path = get_target_config_path(target)
     if not config_path.is_file():
-        stale.append(f"{target.name}/config/{MODEL_PROFILES_FILENAME}")
+        stale.append(_target_relpath(target, f"config/{MODEL_PROFILES_FILENAME}"))
 
     return sorted(stale)
 
@@ -323,13 +356,13 @@ def _stale_activation_paths(target: Path) -> list[str]:
             expected_model = resolve_effective_model(stem, config)
             expected_variant = resolve_effective_variant(stem, config)
         except ValueError:
-            rel = f"{target.name}/{entry.name}" if target.name else entry.name
+            rel = _target_relpath(target, entry.name)
             stale.append(rel)
             continue
         content = entry.read_text(encoding="utf-8")
         actual_model, actual_variant = _extract(content)
         if actual_model != expected_model or actual_variant != expected_variant:
-            rel = f"{target.name}/{entry.name}" if target.name else entry.name
+            rel = _target_relpath(target, entry.name)
             stale.append(rel)
 
     return sorted(stale)

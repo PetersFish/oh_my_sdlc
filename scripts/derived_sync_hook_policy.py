@@ -48,6 +48,22 @@ GENERATED_PREFIXES = (
     ".cursor/",
 )
 
+
+def _clean_git_env(extra: dict | None = None) -> dict:
+    """Build an environment for git subprocess calls that does not inherit
+    GIT_DIR or GIT_WORK_TREE from the parent process.
+
+    Pre-commit hooks may set ``GIT_DIR`` in the environment, which causes
+    ``git -C <path>`` to operate on the wrong repository.  Clearing these
+    variables ensures git commands use the working tree specified by ``-C``.
+    """
+    env = dict(os.environ)
+    for var in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_QUARANTINE_PATH"):
+        env.pop(var, None)
+    if extra:
+        env.update(extra)
+    return env
+
 # Agent distribution target suffixes.
 AGENT_TARGET_SUFFIXES = ("/agents",)
 
@@ -119,6 +135,11 @@ def _normalize_path(p: str) -> str:
 def _parse_porcelain_z(output: str) -> list[tuple[str, str]]:
     """Parse git status --porcelain=v1 -z output into (status, path) tuples.
 
+    The status field is the 2-character porcelain status code (XY format):
+    - First char (X): staged/index status
+    - Second char (Y): worktree status
+    A space means "no change" in that column.
+
     Handles renamed entries (status 'R' / 'C') with the form
     ``R  old\0new\0``.
     """
@@ -145,8 +166,7 @@ def _parse_porcelain_z(output: str) -> list[tuple[str, str]]:
             i += 1
             path = _normalize_path(path_field)
         if path:
-            status_clean = status.strip()
-            entries.append((status_clean, path))
+            entries.append((status, path))
     return entries
 
 
@@ -159,7 +179,7 @@ def discover_staged_entries(root: str | os.PathLike) -> list[tuple[str, str]]:
     root_path = Path(root).resolve()
     proc = subprocess.run(
         ["git", "-C", str(root_path), "diff", "--cached", "--name-status", "-z"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, env=_clean_git_env(),
     )
     if proc.returncode != 0:
         raise RuntimeError(
@@ -215,7 +235,7 @@ def discover_worktree_entries(root: str | os.PathLike) -> list[tuple[str, str]]:
     root_path = Path(root).resolve()
     proc = subprocess.run(
         ["git", "-C", str(root_path), "status", "--porcelain=v1", "-z"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, env=_clean_git_env(),
     )
     if proc.returncode != 0:
         raise RuntimeError(
@@ -232,7 +252,7 @@ def discover_worktree_entries(root: str | os.PathLike) -> list[tuple[str, str]]:
             ls_proc = subprocess.run(
                 ["git", "-C", str(root_path), "ls-files", "--others",
                  "--exclude-standard", dir_path],
-                capture_output=True, text=True,
+                capture_output=True, text=True, env=_clean_git_env(),
             )
             if ls_proc.returncode == 0:
                 for line in ls_proc.stdout.splitlines():
@@ -278,7 +298,7 @@ def _list_active_runs(root: str) -> list[tuple[str, dict]]:
 def _normalize_path_str(p: str | None) -> str:
     if not p:
         return ""
-    return os.path.normpath(p)
+    return os.path.realpath(p)
 
 
 def _run_matches_checkout(
@@ -328,6 +348,71 @@ def _run_matches_checkout(
     return False
 
 
+def _discover_control_roots(checkout_root: str) -> list[str]:
+    """Discover candidate control roots for a linked worktree checkout.
+
+    Uses ``git worktree list --porcelain`` to enumerate all worktrees of the
+    current repository.  The main checkout (worktree with no ``worktree``
+    field, or the first entry) is the control root where workflow run state
+    lives.
+
+    Returns a list of candidate control root paths, ordered with the main
+    checkout first.  Falls back to ``[checkout_root]`` when discovery fails or
+    the checkout is the main checkout itself.
+    """
+    checkout_norm = _normalize_path_str(checkout_root)
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(checkout_root), "worktree", "list", "--porcelain"],
+            capture_output=True, text=True, env=_clean_git_env(),
+        )
+        if proc.returncode != 0:
+            return [checkout_norm]
+    except Exception:
+        return [checkout_norm]
+
+    # Parse porcelain output: blocks separated by blank lines.
+    # Fields: worktree <path>\n (linked worktree) or bare <path> (main).
+    # Other fields: HEAD <sha>, branch <ref>, etc.
+    control_roots: list[str] = []
+    main_root: str | None = None
+    current_worktree: str | None = None
+    for line in proc.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            # End of block
+            if current_worktree:
+                if main_root is None:
+                    main_root = current_worktree
+                control_roots.append(current_worktree)
+                current_worktree = None
+            continue
+        if line.startswith("worktree "):
+            current_worktree = _normalize_path_str(line[len("worktree "):])
+        elif not line.startswith(("HEAD", "branch", "bare", "detached", "locked", "per-worktree")):
+            # Bare path line (main checkout has no "worktree " prefix in some
+            # git versions; the first line is the worktree path)
+            if current_worktree is None and "/" in line:
+                current_worktree = _normalize_path_str(line)
+
+    if current_worktree:
+        if main_root is None:
+            main_root = current_worktree
+        control_roots.append(current_worktree)
+
+    # The main checkout (first entry without a linked worktree marker) is the
+    # control root.  If the checkout_root itself is the main checkout, there's
+    # no separate control root to discover.
+    if main_root and _normalize_path_str(main_root) != checkout_norm:
+        # Put the main root first (it's the control root for linked worktrees)
+        result = [main_root]
+        for r in control_roots:
+            if _normalize_path_str(r) != _normalize_path_str(main_root):
+                result.append(r)
+        return result
+    return [checkout_norm]
+
+
 def resolve_phase(
     root: str | os.PathLike,
     control_root: str | os.PathLike | None = None,
@@ -337,27 +422,41 @@ def resolve_phase(
     Returns (phase, run_id).  When no active run matches the current checkout,
     returns (None, None) to preserve existing non-workflow behavior.
 
+    When ``control_root`` is None and ``root`` is a linked worktree, the
+    control root is auto-discovered via ``git worktree list --porcelain`` so
+    worktree-mode run state stored under the control root is reachable.
+
     Raises RuntimeError when:
       - an active run matches but has an unreadable phase;
       - multiple active runs match the same checkout (ambiguous context).
     """
-    root_path = os.path.normpath(str(root))
-    control_root_norm = os.path.normpath(str(control_root)) if control_root else None
+    root_path = os.path.realpath(str(root))
+    control_root_norm = os.path.realpath(str(control_root)) if control_root else None
 
     # Candidate roots to inspect for active runs.  For worktree-mode binding,
     # the state lives under the control root, not the worktree.
-    inspect_roots = []
+    # When control_root is not explicitly provided, auto-discover candidate
+    # control roots via git worktree list --porcelain.
     if control_root_norm:
-        inspect_roots.append(control_root_norm)
-    inspect_roots.append(root_path)
+        inspect_roots = [control_root_norm, root_path]
+    else:
+        discovered = _discover_control_roots(root_path)
+        inspect_roots = list(discovered)
+        # Always include the checkout root itself for main-checkout runs.
+        if root_path not in inspect_roots:
+            inspect_roots.append(root_path)
 
     matching: list[tuple[str, dict]] = []
     seen_run_ids: set[str] = set()
+    # Use the first discovered control root as the control_root for matching.
+    effective_control = control_root_norm or (
+        inspect_roots[0] if inspect_roots and inspect_roots[0] != root_path else None
+    )
     for inspect_root in inspect_roots:
         for run_id, state in _list_active_runs(inspect_root):
             if run_id in seen_run_ids:
                 continue
-            if _run_matches_checkout(state, root_path, control_root_norm):
+            if _run_matches_checkout(state, root_path, effective_control):
                 matching.append((run_id, state))
                 seen_run_ids.add(run_id)
 
@@ -394,6 +493,26 @@ def resolve_phase(
 def _is_generated_path(path: str) -> bool:
     """Return True if a path is under a generated distribution target."""
     return any(path.startswith(prefix) for prefix in GENERATED_PREFIXES)
+
+
+def _is_worktree_dirty(status: str) -> bool:
+    """Determine if a porcelain status indicates a worktree (unstaged) change.
+
+    The porcelain XY format has two columns: X (staged/index) and Y (worktree).
+    A space in Y means the worktree matches the index.  When Y is non-space,
+    the file is dirty in the worktree.  Untracked files (``??``) are always
+    dirty.  Single-character status strings (from unit tests) are treated as
+    worktree modifications.
+    """
+    if not status:
+        return False
+    stripped = status.strip()
+    if stripped == "??":
+        return True
+    if len(status) >= 2:
+        return status[1] != " "
+    # Single-char status (from unit tests): treat as worktree dirty
+    return bool(stripped)
 
 
 def _classify_canonical(staged_entries: list[tuple[str, str]]) -> tuple[list[str], list[str]]:
@@ -607,9 +726,15 @@ def evaluate_policy(
 
     canonical_paths, generated_paths = _classify_canonical(staged_entries)
 
-    # Classify generated paths from worktree entries (dirty generated files)
+    # Classify generated paths from worktree entries (dirty generated files).
+    # Only include files where the worktree column (Y, second char of the
+    # porcelain status) is non-space — those are actually dirty in the
+    # worktree, not just staged in the index.  When the status is a
+    # single-character string (from unit tests), treat it as a worktree
+    # modification.
     dirty_generated = [
-        path for status, path in worktree_entries if _is_generated_path(path)
+        path for status, path in worktree_entries
+        if _is_generated_path(path) and _is_worktree_dirty(status)
     ]
     # Staged generated (mixed into authored commit)
     staged_generated = generated_paths
@@ -667,11 +792,12 @@ def evaluate_policy(
         # modified/deleted generated files that might be unrelated drift.
         untracked_generated = [
             path for status, path in worktree_entries
-            if _is_generated_path(path) and status == "??"
+            if _is_generated_path(path) and status.strip() == "??"
         ]
         modified_generated = [
             path for status, path in worktree_entries
-            if _is_generated_path(path) and status != "??"
+            if _is_generated_path(path) and status.strip() != "??"
+            and _is_worktree_dirty(status)
         ]
 
         # Untracked generated files are always manual artifact changes.
@@ -812,25 +938,104 @@ def evaluate_policy(
 # CLI
 # ---------------------------------------------------------------------------
 
+def _run_sync_check_for_stale_paths(root: str) -> tuple[list[str], bool]:
+    """Run the aggregate read-only sync check and return stale generated paths.
+
+    Invokes ``scripts/sync_derived_artifacts.py --check --json`` (full mode)
+    and extracts paths from suite results that are under generated
+    distribution targets (``.opencode/``, ``.claude/``, ``.cursor/``).
+
+    Returns a tuple ``(stale_paths, evidence_ok)``:
+
+    - ``stale_paths``: deduplicated sorted list of generated stale paths.
+    - ``evidence_ok``: True only when the aggregate check executed
+      successfully and produced parseable structured output.  False when
+      the checker script is missing, the subprocess errors, stdout is
+      empty, the exit code is non-zero, or the JSON cannot be parsed.
+
+    Callers MUST check ``evidence_ok`` before treating an empty stale list
+    as "no generated drift exists."  An empty list with ``evidence_ok=False``
+    means the checker could not produce trustworthy path-level results, so
+    the policy must defer to existing hook checks rather than allowing.
+    """
+    sync_path = Path(root).resolve() / "scripts" / "sync_derived_artifacts.py"
+    if not sync_path.exists():
+        # Fall back to the module-level REPO_ROOT for the real repository.
+        sync_path = REPO_ROOT / "scripts" / "sync_derived_artifacts.py"
+    if not sync_path.exists():
+        return [], False
+    try:
+        proc = subprocess.run(
+            [sys.executable, str(sync_path),
+             "--root", str(root), "--check", "--json"],
+            capture_output=True, text=True, env=_clean_git_env(),
+        )
+    except Exception:
+        return [], False
+    if proc.returncode != 0:
+        return [], False
+    if not proc.stdout.strip():
+        return [], False
+    try:
+        report = json.loads(proc.stdout)
+    except (json.JSONDecodeError, ValueError):
+        return [], False
+
+    stale_generated: set[str] = set()
+    for suite in report.get("suites") or []:
+        for path in suite.get("stale_paths") or []:
+            if _is_generated_path(path):
+                stale_generated.add(path)
+    return sorted(stale_generated), True
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Phase-aware pre-commit hook policy for derived-artifact drift."
     )
     parser.add_argument("--root", default=".", help="repository checkout root path")
+    parser.add_argument("--control-root", default=None,
+                        help="control root for worktree-mode run state discovery "
+                             "(auto-discovered via git worktree list when omitted)")
     parser.add_argument("--json", action="store_true", help="emit structured JSON result")
     args = parser.parse_args()
 
     root = os.path.normpath(args.root)
+    control_root = os.path.normpath(args.control_root) if args.control_root else None
 
-    # Resolve phase from workflow runtime state
+    # Resolve phase from workflow runtime state.  When control_root is
+    # provided, use it explicitly; otherwise auto-discover candidate control
+    # roots via git worktree list --porcelain.
     try:
-        phase, run_id = resolve_phase(root)
+        phase, run_id = resolve_phase(root, control_root=control_root)
     except RuntimeError as exc:
         if args.json:
             print(json.dumps({"error": str(exc), "allowed": False}, indent=2))
         else:
             print(f"ERROR: {exc}", file=sys.stderr)
         return 1
+
+    # No active workflow phase: defer to existing hook checks (exit 2).
+    if phase is None:
+        if args.json:
+            print(json.dumps({
+                "allowed": True,
+                "reason": None,
+                "phase": None,
+                "run_id": None,
+                "defer": True,
+                "staged_canonical_paths": [],
+                "actual_dirty_generated_paths": [],
+                "actual_staged_generated_paths": [],
+                "detected_stale_generated_paths": [],
+                "attributable_stale_generated_paths": [],
+                "unattributed_generated_paths": [],
+                "details": {"defer": "no active workflow phase"},
+            }, indent=2))
+        else:
+            # Silent: existing hook checks handle the decision.
+            pass
+        return 2
 
     # Collect Git entries
     try:
@@ -843,25 +1048,74 @@ def main() -> int:
             print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
-    # For stale-path detection, we would run the full read-only sync check here.
-    # For now, the hook policy is a pure function of the provided inputs; the
-    # shell hook integration (Slice 3) will wire the sync check output.
-    detected_stale: list[str] = []
+    # Run the full read-only sync check to detect stale generated paths.
+    # This is the path-level stale detection the spec requires: Git status
+    # alone cannot tell if a clean generated copy is stale relative to a
+    # canonical source committed earlier.
+    #
+    # evidence_ok=False means the checker could not produce trustworthy
+    # structured stale-path results (script missing, subprocess error,
+    # non-zero exit, invalid JSON).  In that case an empty stale list does
+    # NOT mean "no generated drift exists" — the checker simply could not
+    # run.  We still call evaluate_policy for dirty/staged generated checks
+    # (which only need git status), but if the policy would ALLOW based on
+    # an empty stale list, we MUST defer to the existing hook checks (exit
+    # 2) rather than setting SKIP_DISTRIBUTION=1 and bypassing Rules 2-4.
+    detected_stale, evidence_ok = _run_sync_check_for_stale_paths(root)
 
-    result = evaluate_policy(
-        root=root,
-        staged_entries=staged_entries,
-        worktree_entries=worktree_entries,
-        detected_stale_generated_paths=detected_stale,
-        phase=phase,
-        run_id=run_id,
-    )
+    # evaluate_policy imports the sync module for path attribution.  When
+    # the module is missing (evidence_ok=False due to script absent), the
+    # import will fail.  Guard that so we can still defer cleanly.
+    try:
+        result = evaluate_policy(
+            root=root,
+            staged_entries=staged_entries,
+            worktree_entries=worktree_entries,
+            detected_stale_generated_paths=detected_stale,
+            phase=phase,
+            run_id=run_id,
+        )
+    except BaseException as exc:
+        if not evidence_ok:
+            # Sync module unavailable/unparseable and checker evidence
+            # unavailable: defer to existing hook checks so Rules 2-4 still
+            # run.  Catches BaseException (including SystemExit) because a
+            # broken sync module may call sys.exit() during import.
+            if args.json:
+                print(json.dumps({
+                    "allowed": True,
+                    "reason": None,
+                    "phase": phase,
+                    "run_id": run_id,
+                    "defer": True,
+                    "defer_reason": "sync_check_evidence_unavailable",
+                    "staged_canonical_paths": [],
+                    "actual_dirty_generated_paths": [],
+                    "actual_staged_generated_paths": [],
+                    "detected_stale_generated_paths": [],
+                    "attributable_stale_generated_paths": [],
+                    "unattributed_generated_paths": [],
+                    "details": {"defer": "aggregate sync check could not produce structured evidence"},
+                }, indent=2))
+            else:
+                print(
+                    "DEFER: sync check evidence unavailable; preserving existing checks",
+                    file=sys.stderr,
+                )
+            return 2
+        # Unexpected crash with evidence_ok=True — report error.
+        if args.json:
+            print(json.dumps({"error": str(exc), "allowed": False}, indent=2))
+        else:
+            print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
 
-    if args.json:
-        print(json.dumps(result.to_dict(), indent=2))
-    else:
-        if result.allowed:
-            print(f"OK: policy allows commit (phase={result.phase})")
+    # If the policy blocks (manual/mixed/unrelated/unattributed), reject
+    # immediately regardless of evidence_ok — these decisions come from git
+    # status, not from the sync check.
+    if not result.allowed:
+        if args.json:
+            print(json.dumps(result.to_dict(), indent=2))
         else:
             print(f"BLOCKED: {result.reason}", file=sys.stderr)
             if result.unattributed_generated_paths:
@@ -873,8 +1127,42 @@ def main() -> int:
             if result.actual_staged_generated_paths:
                 print(f"  staged generated: {', '.join(result.actual_staged_generated_paths)}",
                       file=sys.stderr)
+        return 1
 
-    return 0 if result.allowed else 1
+    # Policy allows.  If the sync check could not produce trustworthy
+    # evidence, an empty stale list is NOT proof that no generated drift
+    # exists.  Defer to the existing hook checks so Rules 2-4 still run
+    # instead of bypassing them (which would fail open on checker errors).
+    if not evidence_ok:
+        if args.json:
+            print(json.dumps({
+                "allowed": True,
+                "reason": None,
+                "phase": phase,
+                "run_id": run_id,
+                "defer": True,
+                "defer_reason": "sync_check_evidence_unavailable",
+                "staged_canonical_paths": result.staged_canonical_paths,
+                "actual_dirty_generated_paths": result.actual_dirty_generated_paths,
+                "actual_staged_generated_paths": result.actual_staged_generated_paths,
+                "detected_stale_generated_paths": result.detected_stale_generated_paths,
+                "attributable_stale_generated_paths": result.attributable_stale_generated_paths,
+                "unattributed_generated_paths": result.unattributed_generated_paths,
+                "details": {"defer": "aggregate sync check could not produce structured evidence"},
+            }, indent=2))
+        else:
+            print(
+                "DEFER: sync check evidence unavailable; preserving existing checks",
+                file=sys.stderr,
+            )
+        return 2
+
+    # Evidence OK and policy allows -> allow.
+    if args.json:
+        print(json.dumps(result.to_dict(), indent=2))
+    else:
+        print(f"OK: policy allows commit (phase={result.phase})")
+    return 0
 
 
 if __name__ == "__main__":

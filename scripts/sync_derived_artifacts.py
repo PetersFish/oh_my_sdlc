@@ -216,15 +216,68 @@ def _cmd(args: list[str]) -> dict:
     }
 
 
+def _extract_stale_paths(suite_name: str, parsed) -> list[str]:
+    """Extract normalized stale/drifted paths from a suite's JSON output.
+
+    Different suite types emit different JSON shapes:
+    - agent suites: ``{"stale_paths": [...]}``
+    - workflow suites: ``{"drifted": ["<live_rel> -> <tmpl_rel>", ...], "in_sync": [...]}``
+    - skill suites: ``[{"skill": ..., "distribution": ..., "changed": [...]}, ...]``
+    """
+    if not parsed:
+        return []
+    # Agent check: structured stale_paths field
+    if isinstance(parsed, dict) and "stale_paths" in parsed:
+        return list(parsed.get("stale_paths") or [])
+    # Workflow check: drifted entries like "<live_rel> -> <tmpl_rel>"
+    if isinstance(parsed, dict) and "drifted" in parsed:
+        paths: list[str] = []
+        for entry in parsed.get("drifted") or []:
+            if not isinstance(entry, str):
+                continue
+            # Workflow templates drift: "<live_rel> -> <tmpl_rel>"
+            # Workflow distributed drift: "<dist_dir_rel>/<tmpl_rel>"
+            if "->" in entry:
+                live_rel = entry.split(" -> ", 1)[0].strip()
+                if live_rel and not live_rel.startswith("canonical missing"):
+                    paths.append(live_rel)
+            elif entry.startswith("extra: "):
+                # Extra runtime file drift
+                paths.append(entry[len("extra: "):].strip())
+            else:
+                paths.append(entry.strip())
+        return paths
+    # Skill check: list of drift report dicts
+    if isinstance(parsed, list):
+        paths = []
+        for report in parsed:
+            if not isinstance(report, dict):
+                continue
+            skill = report.get("skill", "")
+            dist = report.get("distribution", "")
+            for changed in report.get("changed") or []:
+                if dist and changed:
+                    paths.append(f"{dist}/{skill}/{changed}")
+                elif changed:
+                    paths.append(changed)
+            for extra in report.get("only_distribution") or []:
+                if dist and extra:
+                    paths.append(f"{dist}/{skill}/{extra}")
+        return paths
+    return []
+
+
 def _workflow_check_suites(root: Path) -> list[dict]:
     return [
         {
             "name": "workflow_templates",
-            "command": [sys.executable, str(SYNC_TEMPLATES), "--root", str(root), "--check"],
+            "command": [sys.executable, str(SYNC_TEMPLATES), "--root", str(root), "--check", "--json"],
+            "parse_json": True,
         },
         {
             "name": "workflow_distributed",
-            "command": [sys.executable, str(SYNC_TEMPLATES), "--root", str(root), "--check-distributed"],
+            "command": [sys.executable, str(SYNC_TEMPLATES), "--root", str(root), "--check-distributed", "--json"],
+            "parse_json": True,
         },
     ]
 
@@ -234,18 +287,20 @@ def _agent_check_suites(root: Path) -> list[dict]:
     for target in AGENT_TARGETS:
         suites.append({
             "name": f"agents_{target.split('/')[0]}",
-            "command": [sys.executable, str(SETUP_AGENTS), "--target", str(root / target), "--check"],
+            "command": [sys.executable, str(SETUP_AGENTS), "--target", str(root / target), "--check", "--json"],
+            "parse_json": True,
         })
     return suites
 
 
 def _skill_check_suite(root: Path, skills: set[str] | None) -> dict:
-    cmd = [sys.executable, str(CHECK_SKILLS), "--root", str(root)]
+    cmd = [sys.executable, str(CHECK_SKILLS), "--root", str(root), "--json"]
     if skills is not None and skills:
         cmd += ["--skills", ",".join(sorted(skills))]
     return {
         "name": "skills",
         "command": cmd,
+        "parse_json": True,
     }
 
 
@@ -519,13 +574,25 @@ def run_aggregate(
     overall_rc = 0
     for suite in suites:
         result = _cmd(suite["command"])
-        results.append({
+        suite_result = {
             "name": suite["name"],
             "command": suite["command"],
             "returncode": result["returncode"],
             "stdout": result["stdout"],
             "stderr": result["stderr"],
-        })
+        }
+        # Parse JSON output from suites that emit structured reports so
+        # stale paths are surfaced for policy consumption.
+        if suite.get("parse_json") and result["stdout"].strip():
+            try:
+                parsed = json.loads(result["stdout"])
+                suite_result["parsed_json"] = parsed
+                suite_result["stale_paths"] = _extract_stale_paths(
+                    suite["name"], parsed,
+                )
+            except (json.JSONDecodeError, ValueError):
+                pass
+        results.append(suite_result)
         if result["returncode"] != 0:
             overall_rc = 1
 

@@ -785,5 +785,72 @@ class TestPathAwareClassification(unittest.TestCase):
                         f"workflow suites must be selected for {path}, got {suite_names}")
 
 
+class TestAgentCheckJsonSurfacing(unittest.TestCase):
+    """Agent check suites must use --json so the aggregate report surfaces
+    normalized stale agent target paths for policy consumption."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_aggregate_check_agent_suites_use_json_and_surface_stale_paths(self):
+        """Agent check suites must be invoked with --json so the aggregate
+        report surfaces normalized stale agent target paths for policy
+        consumption, not just a suite return code."""
+        calls = []
+
+        def fake_run(args, capture_output, text):
+            calls.append(args)
+            cmd_str = " ".join(args)
+            if "setup_agents.py" in cmd_str and "--json" in args:
+                report = {
+                    "target": "/tmp/.opencode/agents",
+                    "stale_paths": [".opencode/agents/implement-agent.md"],
+                    "template_drift_paths": [".opencode/agents/implement-agent.md"],
+                    "activation_drift_paths": [],
+                    "status": "drift",
+                    "returncode": 1,
+                }
+                return CompletedProcess(args, 1, json.dumps(report), "")
+            return CompletedProcess(args, 0, "OK", "")
+
+        with mock.patch.object(subprocess, "run", fake_run):
+            mod = _import_module()
+            rc, report = mod.run_aggregate(self.tmp, mode="check", json_output=True)
+
+        # Agent check commands must include --json
+        agent_check_cmds = [
+            cmd for cmd in calls
+            if "setup_agents.py" in " ".join(cmd) and "--check" in cmd
+        ]
+        self.assertGreater(len(agent_check_cmds), 0,
+                           "expected at least one agent check command")
+        for cmd in agent_check_cmds:
+            self.assertIn("--json", cmd,
+                          f"agent check command must include --json for structured "
+                          f"stale path reporting, got: {cmd}")
+        # The aggregate report must surface stale agent paths from the JSON
+        # output of agent check suites.
+        suites = report.get("suites", [])
+        agent_suites = [
+            s for s in suites if "agents" in s.get("name", "")
+        ]
+        self.assertGreater(len(agent_suites), 0,
+                           f"expected at least one agent suite in report, got: {suites}")
+        # At least one agent suite must expose stale_paths from the JSON output
+        any_suite_has_stale = any(
+            s.get("stale_paths") or s.get("parsed_stale_paths")
+            for s in agent_suites
+        )
+        self.assertTrue(
+            any_suite_has_stale,
+            f"agent suite reports must surface parsed stale_paths from JSON "
+            f"output, got suites: {agent_suites}",
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -17,9 +17,11 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
+import textwrap
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -631,6 +633,264 @@ class TestStagedAndWorktreeEntryCollection(unittest.TestCase):
         worktree = mod.discover_worktree_entries(self.tmp)
         self.assertTrue(any(path == "agents/baz.md" for _, path in staged))
         self.assertTrue(any(path == "agents/baz.md" for _, path in worktree))
+
+
+class TestCliWorktreeDiscovery(unittest.TestCase):
+    """The CLI must discover/bind worktree-mode run state from the control root
+    via --control-root and auto-discovery using git worktree list --porcelain."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        # Init a git repo with a worktree so git worktree list --porcelain
+        # returns at least one worktree entry.
+        subprocess.run(["git", "init"], capture_output=True, cwd=self.tmp)
+        subprocess.run(["git", "config", "user.email", "test@test.com"],
+                       capture_output=True, cwd=self.tmp)
+        subprocess.run(["git", "config", "user.name", "Test"],
+                       capture_output=True, cwd=self.tmp)
+        # Need at least one commit before adding a worktree
+        write_file(self.tmp, "README.md", "init\n")
+        subprocess.run(["git", "add", "README.md"], capture_output=True, cwd=self.tmp)
+        subprocess.run(
+            ["git", "commit", "-m", "init", "--no-verify"],
+            capture_output=True, cwd=self.tmp,
+        )
+        self.worktree_path = os.path.join(self.tmp, "feature-worktree")
+        subprocess.run(
+            ["git", "worktree", "add", self.worktree_path],
+            capture_output=True, cwd=self.tmp,
+        )
+        # Install a stub sync_derived_artifacts.py in the worktree that
+        # emits valid JSON with empty stale_paths so evidence_ok=True.
+        # Uses the shared stub that also provides classify_changes for
+        # import by evaluate_policy.
+        wt_scripts = os.path.join(self.worktree_path, "scripts")
+        os.makedirs(wt_scripts, exist_ok=True)
+        shutil.copy2(SCRIPT, os.path.join(wt_scripts, "derived_sync_hook_policy.py"))
+        # Copy setup_agents.py (imported by the policy module).
+        setup_agents_src = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "scripts", "setup_agents.py",
+        )
+        if os.path.exists(setup_agents_src):
+            shutil.copy2(setup_agents_src,
+                         os.path.join(wt_scripts, "setup_agents.py"))
+        stub_src = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "tests", "support", "stub_sync_derived.py",
+        )
+        shutil.copy2(stub_src,
+                     os.path.join(wt_scripts, "sync_derived_artifacts.py"))
+
+    def tearDown(self):
+        # Remove worktree to clean up
+        subprocess.run(
+            ["git", "worktree", "remove", self.worktree_path, "--force"],
+            capture_output=True, cwd=self.tmp,
+        )
+        import shutil
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_cli_control_root_arg_binds_worktree_run(self):
+        """CLI --control-root must discover worktree-mode run state stored
+        under the control root and bind it to the current checkout."""
+        mod = _import_module()
+        state = make_run_state(
+            run_id="2026-07-15-worktree-cli",
+            phase="apply_change",
+            execution_mode="worktree",
+            worktree_path=self.worktree_path,
+            control_root=self.tmp,
+        )
+        write_run_state(self.tmp, state)
+        # Run the CLI with --root <worktree> --control-root <control>
+        # --json mode; no staged files so policy should allow
+        result = subprocess.run(
+            [sys.executable, SCRIPT,
+             "--root", self.worktree_path,
+             "--control-root", self.tmp,
+             "--json"],
+            capture_output=True, text=True,
+        )
+        # Should succeed (allow) and bind the worktree run
+        self.assertEqual(
+            result.returncode, 0,
+            f"CLI should allow with no staged files, got rc={result.returncode}, "
+            f"stdout={result.stdout!r}, stderr={result.stderr!r}",
+        )
+        report = json.loads(result.stdout)
+        self.assertEqual(report.get("phase"), "apply_change")
+        self.assertEqual(report.get("run_id"), "2026-07-15-worktree-cli")
+
+    def test_cli_auto_discovers_control_root_via_worktree_list(self):
+        """When --control-root is not provided but the checkout is a linked
+        worktree, the CLI must auto-discover the control root via
+        ``git worktree list --porcelain`` and bind the worktree run."""
+        mod = _import_module()
+        state = make_run_state(
+            run_id="2026-07-15-worktree-auto",
+            phase="apply_change",
+            execution_mode="worktree",
+            worktree_path=self.worktree_path,
+            control_root=self.tmp,
+        )
+        write_run_state(self.tmp, state)
+        # Run the CLI with --root <worktree> but WITHOUT --control-root.
+        # The CLI must auto-discover the control root from git worktree list.
+        result = subprocess.run(
+            [sys.executable, SCRIPT,
+             "--root", self.worktree_path,
+             "--json"],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(
+            result.returncode, 0,
+            f"CLI should auto-discover control root and allow, "
+            f"got rc={result.returncode}, stdout={result.stdout!r}, "
+            f"stderr={result.stderr!r}",
+        )
+        report = json.loads(result.stdout)
+        self.assertEqual(report.get("phase"), "apply_change")
+        self.assertEqual(report.get("run_id"), "2026-07-15-worktree-auto")
+
+
+class TestSyncCheckEvidenceFailure(unittest.TestCase):
+    """When the aggregate sync check cannot produce structured stale-path
+    evidence (script missing, subprocess error, invalid JSON, or suite
+    failure without stale_paths), the policy MUST NOT treat an empty stale
+    list as "no drift exists" during apply_change.  Instead it must defer
+    (exit 2) so the hook preserves Rules 2-4 rather than skipping them.
+
+    This prevents the hook from failing open on operational/syntax/checker
+    errors in the distribution checks.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        subprocess.run(["git", "init"], capture_output=True, cwd=self.tmp)
+        subprocess.run(["git", "config", "user.email", "test@test.com"],
+                       capture_output=True, cwd=self.tmp)
+        subprocess.run(["git", "config", "user.name", "Test"],
+                       capture_output=True, cwd=self.tmp)
+        os.makedirs(os.path.join(self.tmp, "scripts"), exist_ok=True)
+        # Copy the real policy script.
+        shutil.copy2(SCRIPT, os.path.join(self.tmp, "scripts",
+                                          "derived_sync_hook_policy.py"))
+        # Copy setup_agents.py (imported by the policy module).
+        setup_agents_src = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "scripts", "setup_agents.py",
+        )
+        if os.path.exists(setup_agents_src):
+            shutil.copy2(setup_agents_src,
+                         os.path.join(self.tmp, "scripts", "setup_agents.py"))
+        # Initial commit so git operations work.
+        write_file(self.tmp, "README.md", "init\n")
+        subprocess.run(["git", "add", "README.md"], capture_output=True, cwd=self.tmp)
+        subprocess.run(
+            ["git", "commit", "-m", "init", "--no-verify"],
+            capture_output=True, cwd=self.tmp,
+        )
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _run_policy_cli(self):
+        """Run the policy CLI with --json and return the CompletedProcess."""
+        return subprocess.run(
+            [sys.executable, "scripts/derived_sync_hook_policy.py",
+             "--root", self.tmp, "--json"],
+            capture_output=True, text=True, cwd=self.tmp,
+        )
+
+    def test_checker_invalid_json_defers_instead_of_allowing(self):
+        """When sync_derived_artifacts.py emits invalid JSON, the policy must
+        defer (exit 2) during apply_change instead of allowing (exit 0)."""
+        # Create an active apply_change run.
+        state = make_run_state(phase="apply_change", control_root=self.tmp)
+        write_run_state(self.tmp, state)
+
+        # Stage a canonical agent change so the policy has something to
+        # evaluate.  This makes the scenario realistic: apply-phase work
+        # with attributable drift that should be allowed ONLY when the
+        # sync check produces trustworthy evidence.
+        write_file(self.tmp, "agents/foo.md", "content\n")
+        subprocess.run(["git", "add", "agents/foo.md"], capture_output=True,
+                       cwd=self.tmp)
+
+        # Install a sync_derived_artifacts.py that emits invalid JSON.
+        write_file(
+            self.tmp,
+            "scripts/sync_derived_artifacts.py",
+            textwrap.dedent("""\
+                #!/usr/bin/env python3
+                import sys
+                # Emit invalid JSON to simulate checker output corruption.
+                sys.stdout.write("THIS IS NOT JSON\\n")
+                sys.exit(0)
+            """),
+        )
+
+        result = self._run_policy_cli()
+        self.assertEqual(
+            result.returncode, 2,
+            f"invalid-JSON checker output must defer (exit 2) during "
+            f"apply_change, not allow (exit 0); got rc={result.returncode}\n"
+            f"stdout={result.stdout!r}\nstderr={result.stderr!r}",
+        )
+
+    def test_checker_nonzero_exit_defers_instead_of_allowing(self):
+        """When sync_derived_artifacts.py exits non-zero (suite failure), the
+        policy must defer (exit 2) during apply_change instead of allowing."""
+        # Create an active apply_change run.
+        state = make_run_state(phase="apply_change", control_root=self.tmp)
+        write_run_state(self.tmp, state)
+
+        # Stage a canonical agent change.
+        write_file(self.tmp, "agents/foo.md", "content\n")
+        subprocess.run(["git", "add", "agents/foo.md"], capture_output=True,
+                       cwd=self.tmp)
+
+        # Install a sync_derived_artifacts.py that fails (non-zero exit).
+        write_file(
+            self.tmp,
+            "scripts/sync_derived_artifacts.py",
+            textwrap.dedent("""\
+                #!/usr/bin/env python3
+                import sys
+                sys.exit(1)
+            """),
+        )
+
+        result = self._run_policy_cli()
+        self.assertEqual(
+            result.returncode, 2,
+            f"checker non-zero exit must defer (exit 2) during "
+            f"apply_change, not allow (exit 0); got rc={result.returncode}\n"
+            f"stdout={result.stdout!r}\nstderr={result.stderr!r}",
+        )
+
+    def test_checker_missing_defers_instead_of_allowing(self):
+        """When sync_derived_artifacts.py is missing entirely, the policy
+        must defer (exit 2) during apply_change instead of allowing."""
+        # Create an active apply_change run.
+        state = make_run_state(phase="apply_change", control_root=self.tmp)
+        write_run_state(self.tmp, state)
+
+        # Stage a canonical agent change.
+        write_file(self.tmp, "agents/foo.md", "content\n")
+        subprocess.run(["git", "add", "agents/foo.md"], capture_output=True,
+                       cwd=self.tmp)
+
+        # Do NOT install sync_derived_artifacts.py at all.
+        result = self._run_policy_cli()
+        self.assertEqual(
+            result.returncode, 2,
+            f"missing checker must defer (exit 2) during apply_change, "
+            f"not allow (exit 0); got rc={result.returncode}\n"
+            f"stdout={result.stdout!r}\nstderr={result.stderr!r}",
+        )
 
 
 if __name__ == "__main__":

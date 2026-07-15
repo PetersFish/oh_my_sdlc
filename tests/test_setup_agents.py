@@ -295,5 +295,86 @@ class TestCheckJsonOutput(unittest.TestCase):
         )
 
 
+class TestCheckJsonRepoRelativePaths(unittest.TestCase):
+    """--check --json must report repository-relative stale agent target paths
+    for project-level targets such as .opencode/agents, not just target.name."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        # Init a git repo so _target_relpath can discover the repo root
+        subprocess.run(["git", "init"], capture_output=True, cwd=self.tmp)
+        subprocess.run(["git", "config", "user.email", "test@test.com"],
+                       capture_output=True, cwd=self.tmp)
+        subprocess.run(["git", "config", "user.name", "Test"],
+                       capture_output=True, cwd=self.tmp)
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _setup_minimal_config(self, target_rel: str):
+        write_file(self.tmp, f"{target_rel}/config/model-profiles.yaml",
+                   "schema_version: 1\n"
+                   "defaults:\n"
+                   "  variant: medium\n"
+                   "profiles:\n"
+                   "  test:\n"
+                   "    model: openai/gpt-4\n"
+                   "agents:\n"
+                   "  test-agent:\n"
+                   "    profile: test\n")
+
+    def test_opencode_target_stale_paths_are_repo_relative(self):
+        """For target at .opencode/agents, stale paths must be
+        .opencode/agents/<file>.md, not agents/<file>.md."""
+        target_rel = ".opencode/agents"
+        self._setup_minimal_config(target_rel)
+        target = os.path.join(self.tmp, target_rel)
+        os.makedirs(target, exist_ok=True)
+        # Create a stale agent file (different body from canonical)
+        write_file(self.tmp, f"{target_rel}/test-agent.md",
+                   "---\nname: test-agent\nmode: subagent\n---\n# Different body\n")
+
+        result = subprocess.run(
+            [sys.executable, SCRIPT, "--target", target, "--check", "--json"],
+            capture_output=True, text=True,
+        )
+        self.assertTrue(result.stdout.strip(),
+                        f"--json must produce JSON output, got stdout={result.stdout!r}")
+        report = json.loads(result.stdout)
+        stale_paths = report.get("stale_paths", [])
+        self.assertTrue(stale_paths,
+                        f"expected stale paths for stale target, got report={report}")
+        for p in stale_paths:
+            self.assertTrue(
+                p.startswith(".opencode/agents/"),
+                f"stale path {p!r} must be repository-relative "
+                f"(.opencode/agents/...), not just agents/..."
+            )
+
+    def test_claude_target_stale_paths_are_repo_relative(self):
+        """For target at .claude/agents, stale paths must be
+        .claude/agents/<file>.md."""
+        target_rel = ".claude/agents"
+        self._setup_minimal_config(target_rel)
+        target = os.path.join(self.tmp, target_rel)
+        os.makedirs(target, exist_ok=True)
+        write_file(self.tmp, f"{target_rel}/test-agent.md",
+                   "---\nname: test-agent\nmode: subagent\n---\n# Different body\n")
+
+        result = subprocess.run(
+            [sys.executable, SCRIPT, "--target", target, "--check", "--json"],
+            capture_output=True, text=True,
+        )
+        report = json.loads(result.stdout)
+        stale_paths = report.get("stale_paths", [])
+        if stale_paths:
+            for p in stale_paths:
+                self.assertTrue(
+                    p.startswith(".claude/agents/"),
+                    f"stale path {p!r} must be repository-relative "
+                    f"(.claude/agents/...)"
+                )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
