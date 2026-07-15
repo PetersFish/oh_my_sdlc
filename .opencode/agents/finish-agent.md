@@ -40,7 +40,7 @@ permission:
     "openspec status*": allow
     "openspec list*": allow
     "openspec archive*": allow
-model: openai/gpt-5.4-mini
+model: opencode-go/deepseek-v4-pro
 variant: Default
 ---
 
