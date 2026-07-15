@@ -771,7 +771,7 @@ Provider copies under `.opencode/`, `.claude/`, and `.cursor/` are synchronized 
 
 ### Task 9: Run Focused and Full Regression
 
-- [ ] **Step 1: Run policy and hook tests**
+- [x] **Step 1: Run policy and hook tests**
 
 Include:
 
@@ -788,15 +788,15 @@ Include:
 - same-domain unrelated generated drift;
 - unsupported Skill deletion/rename rejection.
 
-- [ ] **Step 2: Run review validation tests**
+- [x] **Step 2: Run review validation tests**
 
 Include stale-unwritten and actual-generated-change scenarios.
 
-- [ ] **Step 3: Run finish/terminal tests**
+- [x] **Step 3: Run finish/terminal tests**
 
 Require clean sync closure.
 
-- [ ] **Step 4: Run apply-phase broad regression and record exact phase-deferred tests**
+- [x] **Step 4: Run apply-phase broad regression and record exact phase-deferred tests**
 
 Run the broad suite before finish sync. Any failure may be marked
 `phase_deferred` only when all of the following hold:
@@ -808,7 +808,7 @@ Run the broad suite before finish sync. Any failure may be marked
 
 All other failures block implementation.
 
-- [ ] **Step 5: Run existing derived sync suites**
+- [x] **Step 5: Run existing derived sync suites**
 
 At minimum include the existing suites for:
 
@@ -817,7 +817,7 @@ At minimum include the existing suites for:
 - skill installation/no-op behavior when touched indirectly;
 - wrapper/runtime validation affected by code changes.
 
-- [ ] **Step 6: Defer final full regression until finish synchronization**
+- [x] **Step 6: Defer final full regression until finish synchronization**
 
 Do not claim the repository-wide suite is green while expected derived copies
 are intentionally stale. Record the apply-phase result and exact deferred node
@@ -836,15 +836,15 @@ pass after synchronization before completion.
 
 ### Task 10: Review Scope and Finish Sync
 
-- [ ] **Step 1: Confirm implementation change set contains authored files only**
+- [x] **Step 1: Confirm implementation change set contains authored files only**
 
 Before review, provider copies must remain unchanged.
 
-- [ ] **Step 2: Review commit range or live authored scope**
+- [x] **Step 2: Review commit range or live authored scope**
 
 Confirm expected stale targets do not appear as synthesized changes.
 
-- [ ] **Step 3: Run finish-owned derived synchronization**
+- [x] **Step 3: Run finish-owned derived synchronization**
 
 Use repeated `--changed-file` arguments from the preserved reviewed authored
 change set for ordinary incremental synchronization. Do not rely solely on
@@ -852,12 +852,12 @@ change set for ordinary incremental synchronization. Do not rely solely on
 authored path set is unavailable, a sync-rule file changed, or classification
 requests full fallback.
 
-- [ ] **Step 4: Run final sync check**
+- [x] **Step 4: Run final sync check**
 
 Run full read-only `python3 scripts/sync_derived_artifacts.py --check --json`
 and require zero drift across every governed domain.
 
-- [ ] **Step 5: Rerun phase-deferred tests and full regression**
+- [x] **Step 5: Rerun phase-deferred tests and full regression**
 
 Rerun every exact node id recorded as `phase_deferred`, then run:
 
@@ -869,7 +869,7 @@ All phase-deferred tests and the full regression must pass before terminal
 completion, apart from separately documented accepted pre-existing/environment
 failures under the repository's existing contract.
 
-- [ ] **Step 6: Verify terminal repository state**
+- [x] **Step 6: Verify terminal repository state**
 
 Confirm:
 
@@ -904,23 +904,23 @@ Confirm:
 
 ## Completion Criteria
 
-- [ ] Existing derived-sync phase-boundary ownership remains unchanged.
-- [ ] Apply-phase authored commits allow attributable stale derived targets.
-- [ ] Apply hook rejects manual, mixed, unrelated, and unattributed generated changes.
-- [ ] Phase is resolved from existing workflow runtime state.
-- [ ] Current checkout is bound to exactly one matching active run; unrelated worktree runs are ignored and ambiguous matches fail closed.
-- [ ] Existing sync mapping logic is reused.
-- [ ] Staged index scope is separate from unstaged/untracked worktree scope.
-- [ ] Attribution is path-aware and detects unrelated drift within the same sync domain.
-- [ ] Governed `workflow_runtime/*.py` sources are classified consistently.
-- [ ] Canonical Skill directory deletion/rename is rejected as unsupported.
-- [ ] Review does not mismatch solely because unwritten generated targets are stale.
-- [ ] Review still rejects generated files actually changed during implementation.
-- [ ] Finish requires successful sync, clean check, and clean terminal state.
-- [ ] Terminal runtime executes the full read-only sync check and consumes its exit status.
-- [ ] Finish incremental selection uses preserved authored paths or safely falls back to full mode after the pre-cleanup commit.
-- [ ] Non-workflow hook behavior remains compatible.
-- [ ] No new derived-sync state machine or manifest exists.
-- [ ] No prompt prose-presence tests were added.
-- [ ] Exact phase-deferred distribution tests pass after finish sync.
-- [ ] Focused tests and full regression pass.
+- [x] Existing derived-sync phase-boundary ownership remains unchanged.
+- [x] Apply-phase authored commits allow attributable stale derived targets.
+- [x] Apply hook rejects manual, mixed, unrelated, and unattributed generated changes.
+- [x] Phase is resolved from existing workflow runtime state.
+- [x] Current checkout is bound to exactly one matching active run; unrelated worktree runs are ignored and ambiguous matches fail closed.
+- [x] Existing sync mapping logic is reused.
+- [x] Staged index scope is separate from unstaged/untracked worktree scope.
+- [x] Attribution is path-aware and detects unrelated drift within the same sync domain.
+- [x] Governed `workflow_runtime/*.py` sources are classified consistently.
+- [x] Canonical Skill directory deletion/rename is rejected as unsupported.
+- [x] Review does not mismatch solely because unwritten generated targets are stale.
+- [x] Review still rejects generated files actually changed during implementation.
+- [x] Finish requires successful sync, clean check, and clean terminal state.
+- [x] Terminal runtime executes the full read-only sync check and consumes its exit status.
+- [x] Finish incremental selection uses preserved authored paths or safely falls back to full mode after the pre-cleanup commit.
+- [x] Non-workflow hook behavior remains compatible.
+- [x] No new derived-sync state machine or manifest exists.
+- [x] No prompt prose-presence tests were added.
+- [x] Exact phase-deferred distribution tests pass after finish sync.
+- [x] Focused tests and full regression pass.
