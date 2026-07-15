@@ -4,6 +4,14 @@ Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-s
 
 **Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
 
+## Project Constitution
+
+`CONSTITUTION.md` defines the repository's highest-level architectural and engineering principles.
+
+Before planning or modifying workflow runtime, orchestration, agent contracts, state models, dispatch behavior, evidence handling, recovery logic, slicing, or governance code, read `CONSTITUTION.md` first.
+
+If a lower-level instruction conflicts with the Constitution, the Constitution governs unless the user explicitly requires otherwise.
+
 ## 1. Think Before Coding
 
 **Don't assume. Don't hide confusion. Surface tradeoffs.**
