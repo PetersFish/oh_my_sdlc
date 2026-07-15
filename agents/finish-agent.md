@@ -79,6 +79,17 @@ Generated derived-artifact changes are finish cleanup evidence, not
 implementation change-set evidence. `implement-agent` is forbidden from
 running write-producing sync during `apply_change`.
 
+### Incremental Sync Selection After Pre-Cleanup Commit
+
+After the pre-cleanup commit, `--changed-files-from-git` no longer
+contains the committed canonical authored paths, so it must not be used
+as the only selector. For incremental sync, pass the preserved reviewed
+authored paths through repeated `--changed-file` arguments. Use full mode
+(`--check` / `--fix` without `--changed-files-from-git`) when those paths
+are unavailable, a sync-rule file changed, or classification requests
+full fallback. Terminal enforcement always uses full read-only `--check`
+to detect unrelated drift in every governed domain.
+
 ## Tool Usage Policy
 
 - If the task depends on prior repo decisions or structural code
