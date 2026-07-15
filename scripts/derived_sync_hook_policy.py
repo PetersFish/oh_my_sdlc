@@ -948,10 +948,12 @@ def _run_sync_check_for_stale_paths(root: str) -> tuple[list[str], bool]:
     Returns a tuple ``(stale_paths, evidence_ok)``:
 
     - ``stale_paths``: deduplicated sorted list of generated stale paths.
-    - ``evidence_ok``: True only when the aggregate check executed
-      successfully and produced parseable structured output.  False when
-      the checker script is missing, the subprocess errors, stdout is
-      empty, the exit code is non-zero, or the JSON cannot be parsed.
+    - ``evidence_ok``: True when the aggregate check produced parseable
+      structured output.  A non-zero exit can still be trustworthy evidence
+      when it reports concrete ``stale_paths``; the aggregate checker exits
+      non-zero for ordinary drift.  False when the checker script is missing,
+      the subprocess errors, stdout is empty, JSON cannot be parsed, or a
+      non-zero exit lacks structured stale-path evidence.
 
     Callers MUST check ``evidence_ok`` before treating an empty stale list
     as "no generated drift exists."  An empty list with ``evidence_ok=False``
@@ -972,8 +974,6 @@ def _run_sync_check_for_stale_paths(root: str) -> tuple[list[str], bool]:
         )
     except Exception:
         return [], False
-    if proc.returncode != 0:
-        return [], False
     if not proc.stdout.strip():
         return [], False
     try:
@@ -986,7 +986,10 @@ def _run_sync_check_for_stale_paths(root: str) -> tuple[list[str], bool]:
         for path in suite.get("stale_paths") or []:
             if _is_generated_path(path):
                 stale_generated.add(path)
-    return sorted(stale_generated), True
+    stale_paths = sorted(stale_generated)
+    if proc.returncode != 0 and not stale_paths:
+        return [], False
+    return stale_paths, True
 
 
 def main() -> int:

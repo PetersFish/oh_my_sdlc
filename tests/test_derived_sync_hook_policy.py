@@ -841,8 +841,9 @@ class TestSyncCheckEvidenceFailure(unittest.TestCase):
         )
 
     def test_checker_nonzero_exit_defers_instead_of_allowing(self):
-        """When sync_derived_artifacts.py exits non-zero (suite failure), the
-        policy must defer (exit 2) during apply_change instead of allowing."""
+        """When sync_derived_artifacts.py exits non-zero without structured
+        stale-path evidence, the policy must defer (exit 2) during
+        apply_change instead of allowing."""
         # Create an active apply_change run.
         state = make_run_state(phase="apply_change", control_root=self.tmp)
         write_run_state(self.tmp, state)
@@ -870,6 +871,61 @@ class TestSyncCheckEvidenceFailure(unittest.TestCase):
             f"apply_change, not allow (exit 0); got rc={result.returncode}\n"
             f"stdout={result.stdout!r}\nstderr={result.stderr!r}",
         )
+
+    def test_checker_nonzero_exit_with_valid_json_allows_attributable_stale_path(self):
+        """A non-zero aggregate sync check can be ordinary drift evidence.
+
+        The aggregate checker returns non-zero when drift exists while still
+        emitting JSON with path-level stale evidence.  Apply-phase policy must
+        consume that structured evidence and allow when every stale generated
+        path is attributable to the staged canonical source.
+        """
+        state = make_run_state(phase="apply_change", control_root=self.tmp)
+        write_run_state(self.tmp, state)
+
+        write_file(self.tmp, "agents/foo.md", "content\n")
+        subprocess.run(["git", "add", "agents/foo.md"], capture_output=True,
+                       cwd=self.tmp)
+
+        write_file(
+            self.tmp,
+            "scripts/sync_derived_artifacts.py",
+            textwrap.dedent("""\
+                #!/usr/bin/env python3
+                import json
+                import sys
+                from types import SimpleNamespace
+
+                def classify_changes(paths):
+                    return SimpleNamespace(agents=True, skills=[], workflows=False)
+
+                if __name__ == "__main__":
+                    json.dump({
+                        "suites": [
+                            {
+                                "name": "agents",
+                                "status": "fail",
+                                "stale_paths": [".opencode/agents/foo.md"],
+                            }
+                        ]
+                    }, sys.stdout)
+                    sys.exit(1)
+            """),
+        )
+
+        result = self._run_policy_cli()
+        self.assertEqual(
+            result.returncode, 0,
+            f"non-zero drift exit with valid stale_paths JSON should allow "
+            f"attributable apply-phase drift; got rc={result.returncode}\n"
+            f"stdout={result.stdout!r}\nstderr={result.stderr!r}",
+        )
+        report = json.loads(result.stdout)
+        self.assertEqual(report.get("detected_stale_generated_paths"),
+                         [".opencode/agents/foo.md"])
+        self.assertEqual(report.get("attributable_stale_generated_paths"),
+                         [".opencode/agents/foo.md"])
+        self.assertEqual(report.get("unattributed_generated_paths"), [])
 
     def test_checker_missing_defers_instead_of_allowing(self):
         """When sync_derived_artifacts.py is missing entirely, the policy
