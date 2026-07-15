@@ -637,7 +637,7 @@ suite exists.
 - Modify: `tests/test_workflow.py`
 - Clarify: `agents/finish-agent.md` only if necessary
 
-- [ ] **Step 1: Inspect current finish sequence**
+- [x] **Step 1: Inspect current finish sequence**
 
 Confirm that finish currently performs:
 
@@ -659,7 +659,7 @@ paths, so it must not be used as the only selector. Finish must either:
 Terminal enforcement always uses full read-only `--check`, because terminal
 correctness must detect unrelated drift in every governed domain.
 
-- [ ] **Step 2: Add RED cases only for missing executable guarantees**
+- [x] **Step 2: Add RED cases only for missing executable guarantees**
 
 Required RED cases:
 
@@ -681,7 +681,7 @@ derived_artifact_drift_unresolved
 
 Reuse existing terminal reason conventions if a canonical equivalent already exists.
 
-- [ ] **Step 3: Require clean terminal state**
+- [x] **Step 3: Require clean terminal state**
 
 Finish completion must fail until:
 
@@ -709,11 +709,11 @@ missing or contradictory target root instead of falling back to the shell
 working directory. Add one focused test for each supported branch-finish root
 selection.
 
-- [ ] **Step 4: Avoid changing implementation ownership**
+- [x] **Step 4: Avoid changing implementation ownership**
 
 Do not make implement-agent sync or test generated copies. The fix must remain entirely in finish/terminal enforcement.
 
-- [ ] **Step 5: Run focused terminal tests**
+- [x] **Step 5: Run focused terminal tests**
 
 Use temporary executable fixtures or a fake sync script to prove the runtime
 actually invokes the command. A test that only supplies
@@ -741,7 +741,7 @@ terminal movement does not execute the check.
 - Modify if needed: `agents/implement-agent.md`
 - Derived copies: finish-owned synchronization
 
-- [ ] **Step 1: Keep existing phase-boundary wording authoritative**
+- [x] **Step 1: Keep existing phase-boundary wording authoritative**
 
 Do not duplicate the full specification in each agent.
 
@@ -755,13 +755,13 @@ For finish-agent, specify that incremental sync selection comes from preserved
 reviewed/authored paths, not only post-commit worktree discovery, and that full
 mode is required when those paths are unavailable.
 
-- [ ] **Step 2: Do not add prompt prose tests**
+- [x] **Step 2: Do not add prompt prose tests**
 
 Agent Markdown changes are instructional prose unless frontmatter or machine-read structure changes.
 
 Verification is inspection plus existing artifact syntax checks. Do not add `assertIn()` tests for the new wording.
 
-- [ ] **Step 3: Leave derived copies untouched during implementation and review**
+- [x] **Step 3: Leave derived copies untouched during implementation and review**
 
 Provider copies under `.opencode/`, `.claude/`, and `.cursor/` are synchronized by finish-agent according to the already implemented phase-boundary design.
 

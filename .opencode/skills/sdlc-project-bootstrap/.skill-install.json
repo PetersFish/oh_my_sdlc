@@ -5,9 +5,9 @@
   "source_ref": "HEAD",
   "status": "stable",
   "target": "/Users/yuping/Documents/workspace/oh_my_skills/.opencode/skills/sdlc-project-bootstrap",
-  "installed_at": "2026-07-15T08:55:25.164104Z",
+  "installed_at": "2026-07-15T17:19:18.170807Z",
   "backport_policy": "review-required",
-  "payload_hash": "24d0d0f5640c6e4876fbd50b0b6c0002724c518a271f6f94787948a530c3fcac",
+  "payload_hash": "e2379e057128b2189bc80762252c5f1e07ef1a8b706d6064fa2d8806794f5267",
   "files": [
     "SKILL.md",
     "scripts/init_foundations.py",

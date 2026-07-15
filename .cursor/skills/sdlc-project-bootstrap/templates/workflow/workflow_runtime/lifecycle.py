@@ -30,6 +30,7 @@ from workflow_runtime.state import (
     _move_run_to_history,
     _cancel_active_run,
     _missing_terminal_finish_agent_evidence,
+    _terminal_derived_artifact_drift,
     normalize_implementation_state,
     make_pending_implementation_state,
     make_slicing_assessment_block,
@@ -975,6 +976,16 @@ def cmd_advance(root, args):
                 sys.exit(1)
 
     if phase_def.get("terminal"):
+        finish_blocker = _missing_terminal_finish_agent_evidence(state)
+        if finish_blocker:
+            print(json.dumps(finish_blocker, indent=2))
+            sys.exit(1)
+
+        drift_blocker = _terminal_derived_artifact_drift(root, state)
+        if drift_blocker:
+            print(json.dumps(drift_blocker, indent=2))
+            sys.exit(1)
+
         state["current_phase"] = "done"
         save_run_state(root, state)
         print(json.dumps(state, indent=2))
@@ -1076,6 +1087,11 @@ def cmd_advance(root, args):
             print(json.dumps(finish_blocker, indent=2))
             sys.exit(1)
 
+        drift_blocker = _terminal_derived_artifact_drift(root, state)
+        if drift_blocker:
+            print(json.dumps(drift_blocker, indent=2))
+            sys.exit(1)
+
         state["status"] = "done"
         state = _move_run_to_history(root, state)
 
@@ -1167,6 +1183,11 @@ def cmd_done(root, args):
     finish_blocker = _missing_terminal_finish_agent_evidence(state)
     if finish_blocker:
         print(json.dumps(finish_blocker, indent=2))
+        sys.exit(1)
+
+    drift_blocker = _terminal_derived_artifact_drift(root, state)
+    if drift_blocker:
+        print(json.dumps(drift_blocker, indent=2))
         sys.exit(1)
 
     state["status"] = "done"
