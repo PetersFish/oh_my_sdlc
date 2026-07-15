@@ -566,7 +566,7 @@ Expected: all tests pass.
 - Modify: its existing review validation tests only under the same condition
 - Clarify: `agents/review-agent.md` only if executable behavior alone cannot express the contract
 
-- [ ] **Step 1: Add a failing review case**
+- [x] **Step 1: Add a failing review case**
 
 Scenario:
 
@@ -586,7 +586,7 @@ Use a temporary Git repository and assert that stale but unwritten target paths
 do not appear in `git diff`, `git diff --cached`, or untracked-file output. This
 is the executable proof when review scope remains agent-governed.
 
-- [ ] **Step 2: Retain rejection for actual generated modifications**
+- [x] **Step 2: Retain rejection for actual generated modifications**
 
 Add or preserve cases where generated files are:
 
@@ -597,13 +597,13 @@ Add or preserve cases where generated files are:
 
 These remain real change-set mismatches or generated-artifact violations.
 
-- [ ] **Step 3: Base comparison on actual Git changes**
+- [x] **Step 3: Base comparison on actual Git changes**
 
 Review validation must not synthesize expected generated targets into the change set.
 
 For sliced review, preserve the existing authoritative commit-range behavior. For live-worktree review, compare against files actually modified/staged/untracked according to the existing contract.
 
-- [ ] **Step 4: Make the smallest code change**
+- [x] **Step 4: Make the smallest code change**
 
 If current code is already correct and only the prompt wording is ambiguous, do not modify runtime code or tests. Clarify the canonical review-agent instruction without adding prose-presence tests.
 
@@ -611,7 +611,7 @@ Do not add a new runtime review comparator solely to satisfy a testability
 preference. Record the temporary-Git fixture result and manual canonical prompt
 inspection as the verification mode for this branch.
 
-- [ ] **Step 5: Run focused review tests**
+- [x] **Step 5: Run focused review tests**
 
 Confirm:
 
