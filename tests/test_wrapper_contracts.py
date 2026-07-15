@@ -1035,14 +1035,77 @@ class TestAgentFrontmatter(unittest.TestCase):
             "git status*",
             "git diff*",
             "git log*",
-            "git branch*",
-            "git worktree*",
+            "git show*",
+            "git rev-parse*",
+            "git ls-files*",
             "git check-ignore*",
+            "git branch --show-current*",
+            "git branch --list*",
+            "git branch -vv*",
+            "git worktree list*",
         ):
             self.assertEqual(
                 bash_rules.get(command),
                 "allow",
                 f"implement-agent missing observational git allow for {command}",
+            )
+
+    def test_implement_agent_allows_staging_and_commit(self):
+        fm = _read_agent_frontmatter(".opencode", "implement-agent")
+        bash_rules = fm["permission"].get("bash", {})
+        for command in ("git add *", "git commit", "git commit *"):
+            self.assertEqual(
+                bash_rules.get(command),
+                "allow",
+                f"implement-agent missing staging/commit allow for {command}",
+            )
+
+    def test_implement_agent_allows_log_inspection_commands(self):
+        fm = _read_agent_frontmatter(".opencode", "implement-agent")
+        bash_rules = fm["permission"].get("bash", {})
+        for command in ("head *", "tail *", "wc *"):
+            self.assertEqual(
+                bash_rules.get(command),
+                "allow",
+                f"implement-agent missing log inspection allow for {command}",
+            )
+
+    def test_implement_agent_does_not_allow_broad_git_branch_or_worktree(self):
+        fm = _read_agent_frontmatter(".opencode", "implement-agent")
+        bash_rules = fm["permission"].get("bash", {})
+        self.assertNotIn(
+            "git branch*", bash_rules,
+            "implement-agent must not have broad 'git branch*' allow rule",
+        )
+        self.assertNotIn(
+            "git worktree*", bash_rules,
+            "implement-agent must not have broad 'git worktree*' allow rule",
+        )
+
+    def test_implement_agent_does_not_allow_destructive_git_commands(self):
+        """implement-agent must not allow push/reset/clean/restore/rebase/merge/pull/fetch."""
+        fm = _read_agent_frontmatter(".opencode", "implement-agent")
+        bash_rules = fm["permission"].get("bash", {})
+        for command in (
+            "git push*",
+            "git reset*",
+            "git clean*",
+            "git restore*",
+            "git rebase*",
+            "git merge*",
+            "git pull*",
+            "git fetch*",
+            "git cherry-pick*",
+            "git switch*",
+            "git checkout*",
+            "git stash*",
+            "git tag*",
+            "git remote*",
+            "git config*",
+        ):
+            self.assertNotEqual(
+                bash_rules.get(command), "allow",
+                f"implement-agent must not allow destructive git command: {command}",
             )
 
     def test_finish_agent_allows_observational_git_completion_commands(self):
@@ -1481,6 +1544,35 @@ class TestAgentPromptBody(unittest.TestCase):
         body = self._read_agent_body("finish-agent")
         self.assertIn("owns write-producing derived-artifact sync", body,
                       "finish-agent must explicitly own write-producing derived sync")
+
+    def test_implement_agent_has_git_commit_ownership_section(self):
+        body = self._read_agent_body("implement-agent")
+        self.assertIn("Git Commit Ownership", body,
+                      "implement-agent must have a Git Commit Ownership section")
+        self.assertIn("MAY stage and commit implementation files only inside", body)
+        self.assertIn("Commit only files belonging to the current bounded slice", body)
+        self.assertIn("Prefer explicit path-scoped staging", body)
+        self.assertIn("Do not amend, reset, restore, clean, rebase, merge, cherry-pick", body)
+        self.assertIn("Do not commit lifecycle governance artifacts", body)
+        self.assertIn("include the resulting commit SHA in the handoff", body)
+
+    def test_implement_agent_forbids_tail_follow(self):
+        body = self._read_agent_body("implement-agent")
+        self.assertIn("tail -f", body,
+                      "implement-agent must mention tail -f restriction")
+        self.assertIn("follow", body.lower())
+        self.assertIn("must not replace", body)
+        self.assertIn("Read", body)
+        self.assertIn("CodeGraph", body)
+        self.assertIn("source-code exploration", body)
+
+    def test_implement_agent_documents_implementation_commit_field(self):
+        body = self._read_agent_body("implement-agent")
+        self.assertIn("implementation_commit", body,
+                      "implement-agent must document implementation_commit field")
+        self.assertIn('"created": true', body)
+        self.assertIn('"created": false', body)
+        self.assertIn("backwards-compatible", body)
 
 
 class TestExecutableRoutingTests(unittest.TestCase):

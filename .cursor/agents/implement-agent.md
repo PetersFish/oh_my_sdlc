@@ -26,12 +26,29 @@ permission:
     "python3 scripts/*": allow
     "python3 scripts/safe_delete.py *": allow
     "python3 skills/*": allow
+
+    "head *": allow
+    "tail *": allow
+    "wc *": allow
+
     "git status*": allow
     "git diff*": allow
     "git log*": allow
-    "git branch*": allow
-    "git worktree*": allow
+    "git show*": allow
+    "git rev-parse*": allow
+    "git ls-files*": allow
     "git check-ignore*": allow
+
+    "git branch --show-current*": allow
+    "git branch --list*": allow
+    "git branch -vv*": allow
+
+    "git worktree list*": allow
+
+    "git add *": allow
+    "git commit": allow
+    "git commit *": allow
+
     "openspec new change*": allow
     "openspec status*": allow
     "openspec instructions*": allow
@@ -86,6 +103,10 @@ Load these skills before acting:
 - If a preferred tool is unavailable, unindexed, or demonstrably
   insufficient, you MUST stop and return a blocker with remediation. You
   must not degrade to bash exploration.
+- `head`, `tail`, and `wc` may be used only for bounded inspection of
+  generated logs or command-output artifacts. They must not replace Read,
+  Grep, Glob, or CodeGraph for source-code exploration. Do not use follow
+  mode such as `tail -f`.
 
 ### CodeGraph Tool Names
 
@@ -108,6 +129,21 @@ they do not exist in this runtime.
 
 Before invoking CodeGraph, copy the exact tool name from this table. If the
 exact tool is unavailable, return a blocker instead of inventing an alias.
+
+## Git Commit Ownership
+
+- You MAY stage and commit implementation files only inside the dispatched
+  implementation worktree.
+- Commit only files belonging to the current bounded slice.
+- Before staging, inspect `git status --short` and the complete relevant diff.
+- Prefer explicit path-scoped staging when unrelated dirty paths exist.
+- Do not amend, reset, restore, clean, rebase, merge, cherry-pick, switch,
+  checkout, stash, tag, push, or modify Git configuration.
+- Do not commit lifecycle governance artifacts owned by the final-commit
+  protocol unless they are explicitly part of the dispatched implementation
+  slice.
+- If a commit is created, include the resulting commit SHA in the handoff
+  evidence.
 
 ## Inputs
 
@@ -216,7 +252,12 @@ Return JSON:
     ],
     "raw_log_paths": [
       {"path": "...", "kind": "pytest", "command": "...", "result": "pass"}
-    ]
+    ],
+    "implementation_commit": {
+      "created": true,
+      "sha": "<commit-sha>",
+      "message": "<commit-message>"
+    }
   },
   "blockers": [],
   "recommended_next_action": "dispatch_review_agent"
@@ -230,6 +271,23 @@ Return `success` only when ALL of the following are true:
 - Provider verification succeeded (for spec-flow).
 - No blockers remain.
 - Changed-file evidence is complete.
+
+`artifacts.implementation_commit` is optional and backwards-compatible.
+When no commit was created, return:
+```json
+{
+  "implementation_commit": {
+    "created": false
+  }
+}
+```
+A commit is not required for every apply-change dispatch. You may omit
+`implementation_commit` or report `created: false` when:
+- the current slice is not yet complete,
+- tests have not passed,
+- you return `blocked` or `failed`,
+- unrelated dirty files prevent a safe scoped commit, or
+- the orchestrator explicitly requested an uncommitted working tree.
 
 For lightweight-flow, normal handoff from implementation to review-agent is a
 successful result, not a blocker.
