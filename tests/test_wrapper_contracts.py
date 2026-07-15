@@ -398,6 +398,14 @@ class TestDesignArtifactPromptContracts(unittest.TestCase):
         content = (AGENTS_DIR / "plan-agent.md").read_text(encoding="utf-8")
         self.assertIn("primary_design_path", content)
 
+    def test_plan_agent_documents_slicing_assessment_schema(self):
+        body = (AGENTS_DIR / "plan-agent.md").read_text(encoding="utf-8")
+        self.assertIn('"task_coverage"', body)
+        self.assertIn('"task_refs"', body)
+        self.assertIn("top-level state-transition payload", body)
+        self.assertIn("Do not place it under `evidence`", body)
+        self.assertIn("discovery-only", body)
+
 
 class TestDevOrchestratorStartWithPlanHandoff(unittest.TestCase):
     """dev-orchestrator documents governed implementation from existing design artifacts."""

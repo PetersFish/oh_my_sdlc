@@ -356,6 +356,11 @@ must NOT:
 
 ```json
 {
+  "agent": "plan-agent",
+  "status": "success",
+  "phase": "apply_change",
+  "slice_id": "default",
+  "flow_type": "lightweight-flow",
   "slicing_assessment": {
     "decision": "single_slice|multi_slice|blocked",
     "confidence": "high|medium|low",
@@ -370,10 +375,33 @@ must NOT:
       "multiple_external_integrations": false,
       "high_debug_uncertainty": false
     },
-    "implementation_slices": []
-  }
+    "task_coverage": {
+      "phase-aware-policy-model": ["Task 3", "Task 4"]
+    },
+    "implementation_slices": [
+      {
+        "slice_id": "phase-aware-policy-model",
+        "title": "Reusable phase and drift policy model",
+        "task_refs": ["Task 3", "Task 4"],
+        "depends_on": [],
+        "objective": "One independently verifiable behavior.",
+        "scope": {"expected_paths": []},
+        "acceptance_criteria": [],
+        "verification_commands": [],
+        "required_context_paths": [],
+        "required": true
+      }
+    ]
+  },
+  "evidence": {},
+  "artifacts": {},
+  "blockers": [],
+  "recommended_next_action": "persist_slicing_assessment"
 }
 ```
+
+`slicing_assessment` is a top-level state-transition payload. Do not place it under `evidence`. `evidence` may explain why the assessment is valid, but it is
+not the authoritative source for workflow state changes.
 
 ### Decision Rubric
 
@@ -403,6 +431,9 @@ Each multi-slice entry contains: `slice_id` (unique, stable, not
 - Declaration order is stable and determines selection order.
 - Decomposition reorganizes work but does NOT redesign approved behavior.
 - Counts are heuristics, not hard thresholds.
+- Do not create implement-agent slices for discovery-only, baseline-only, or
+  contract-reading work that will not produce a valid implementation commit
+  range. Capture that work in assessment evidence or a handoff instead.
 
 ### Boundary
 

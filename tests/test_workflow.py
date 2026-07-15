@@ -9559,6 +9559,13 @@ def _make_slice(slice_id, depends_on=None, required=True, status="pending",
                 block=None):
     return {
         "slice_id": slice_id,
+        "title": "",
+        "task_refs": [],
+        "objective": "",
+        "scope": {},
+        "acceptance_criteria": [],
+        "verification_commands": [],
+        "required_context_paths": [],
         "depends_on": depends_on or [],
         "required": required,
         "status": status,
@@ -12491,17 +12498,27 @@ class TestAssessmentMaterialization(FixtureBase):
                 "implementation_slices": [
                     {
                         "slice_id": "slice-a",
+                        "title": "Slice A behavior",
+                        "task_refs": ["task-1"],
                         "depends_on": [],
-                        "required": True,
-                        "scope": "Implement core dispatch gate logic",
+                        "objective": "Implement slice A behavior.",
+                        "scope": {"expected_paths": ["scripts/dispatch.py"]},
+                        "acceptance_criteria": ["Slice A behavior works."],
                         "verification_commands": ["python3 -m pytest tests/ -k slice_a"],
+                        "required_context_paths": [],
+                        "required": True,
                     },
                     {
                         "slice_id": "slice-b",
+                        "title": "Slice B behavior",
+                        "task_refs": ["task-2"],
                         "depends_on": ["slice-a"],
-                        "required": True,
-                        "scope": "Implement state validation and materialization",
+                        "objective": "Implement slice B behavior.",
+                        "scope": {"expected_paths": ["scripts/state.py"]},
+                        "acceptance_criteria": ["Slice B behavior works."],
                         "verification_commands": ["python3 -m pytest tests/ -k slice_b"],
+                        "required_context_paths": [],
+                        "required": True,
                     },
                 ],
             },
@@ -12752,6 +12769,119 @@ class TestAssessmentMaterialization(FixtureBase):
         self.assertEqual(rc, 0, out)
         state = self._read_current_state()
         self.assertEqual(state["status"], "blocked")
+
+    def test_multi_assessment_persists_task_refs_and_task_coverage(self):
+        """Multi-slice assessment persists task_coverage and slice planning metadata."""
+        self._start_blocked_apply_run()
+        self._dispatch_remediation()
+        result = self._multi_assessment_result()
+        result["slicing_assessment"]["task_coverage"] = {
+            "slice-a": ["Task 1", "Task 2"],
+            "slice-b": ["Task 3"],
+        }
+        for sl in result["slicing_assessment"]["implementation_slices"]:
+            if sl["slice_id"] == "slice-a":
+                sl.update({
+                    "title": "Phase-aware policy model",
+                    "task_refs": ["Task 1", "Task 2"],
+                    "objective": "Reusable phase and drift policy model",
+                    "scope": {"expected_paths": ["scripts/foo.py"]},
+                    "acceptance_criteria": ["policy round-trips"],
+                    "verification_commands": ["python3 -m pytest tests/ -k slice_a"],
+                    "required_context_paths": ["docs/spec.md"],
+                })
+            elif sl["slice_id"] == "slice-b":
+                sl.update({
+                    "title": "Runtime state persistence",
+                    "task_refs": ["Task 3"],
+                    "objective": "Persist slice planning metadata",
+                    "scope": {"expected_paths": ["scripts/bar.py"]},
+                    "acceptance_criteria": ["metadata round-trips"],
+                    "verification_commands": ["python3 -m pytest tests/ -k slice_b"],
+                    "required_context_paths": ["docs/spec.md"],
+                })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="plan-agent",
+            phase="apply_change",
+            value=json.dumps(result),
+        )
+        self.assertEqual(rc, 0, out)
+        state = self._read_current_state()
+        impl = state["implementation"]
+        self.assertEqual(
+            impl["slicing_assessment"]["task_coverage"],
+            {"slice-a": ["Task 1", "Task 2"], "slice-b": ["Task 3"]},
+        )
+        slices = {sl["slice_id"]: sl for sl in impl["slices"]}
+        self.assertEqual(slices["slice-a"]["task_refs"], ["Task 1", "Task 2"])
+        self.assertEqual(slices["slice-a"]["title"], "Phase-aware policy model")
+        self.assertEqual(slices["slice-a"]["objective"], "Reusable phase and drift policy model")
+        self.assertEqual(slices["slice-a"]["acceptance_criteria"], ["policy round-trips"])
+        self.assertEqual(slices["slice-a"]["required_context_paths"], ["docs/spec.md"])
+        self.assertEqual(slices["slice-b"]["task_refs"], ["Task 3"])
+        self.assertEqual(slices["slice-b"]["title"], "Runtime state persistence")
+
+    def test_slicing_assessment_under_evidence_does_not_materialize(self):
+        """slicing_assessment under evidence is not authoritative; run stays blocked."""
+        self._start_blocked_apply_run()
+        self._dispatch_remediation()
+        result = self._single_assessment_result()
+        evidence_assessment = result.pop("slicing_assessment")
+        result["evidence"] = {"slicing_assessment": evidence_assessment}
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="plan-agent",
+            phase="apply_change",
+            value=json.dumps(result),
+        )
+        self.assertEqual(rc, 0, out)
+        state = self._read_current_state()
+        self.assertEqual(state["status"], "blocked")
+        self.assertEqual(state["block"]["type"], "slicing_assessment_required")
+        impl = state.get("implementation") or {}
+        self.assertEqual(impl.get("slices", []), [])
+        latest = state["evidence"]["agent_result"]
+        messages = [b.get("message", "") for b in latest.get("blockers", [])]
+        self.assertTrue(
+            any("missing_top_level_slicing_assessment" in m for m in messages),
+            f"expected missing_top_level_slicing_assessment in blocker messages: {messages}",
+        )
+
+    def test_materialization_rejects_slice_without_task_refs(self):
+        """Multi-slice assessment missing task_refs on a slice is rejected."""
+        self._start_blocked_apply_run()
+        self._dispatch_remediation()
+        result = self._multi_assessment_result()
+        result["slicing_assessment"]["implementation_slices"][0].pop("task_refs", None)
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="plan-agent",
+            phase="apply_change",
+            value=json.dumps(result),
+        )
+        self.assertEqual(rc, 0, out)
+        state = self._read_current_state()
+        self.assertEqual(state["status"], "blocked")
+
+    def test_materialization_rejects_discovery_only_slice(self):
+        """A slice with no expected_paths and no acceptance_criteria is discovery-only."""
+        self._start_blocked_apply_run()
+        self._dispatch_remediation()
+        result = self._multi_assessment_result()
+        # Make slice-a look discovery-only: empty expected_paths, empty acceptance_criteria
+        result["slicing_assessment"]["implementation_slices"][0]["scope"] = {"expected_paths": []}
+        result["slicing_assessment"]["implementation_slices"][0]["acceptance_criteria"] = []
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="plan-agent",
+            phase="apply_change",
+            value=json.dumps(result),
+        )
+        self.assertEqual(rc, 0, out)
+        state = self._read_current_state()
+        self.assertEqual(state["status"], "blocked")
+        self.assertEqual(state["block"]["type"], "slicing_assessment_required")
 
 
 # ---------------------------------------------------------------------------

@@ -521,7 +521,9 @@ VALID_SLICE_STRATEGIES = {"sequential"}
 
 # Slice fields that must be present on every slice entry.
 SLICE_REQUIRED_FIELDS = {
-    "slice_id", "depends_on", "required", "status", "attempt_count",
+    "slice_id", "title", "task_refs", "objective", "scope",
+    "acceptance_criteria", "verification_commands", "required_context_paths",
+    "depends_on", "required", "status", "attempt_count",
     "block", "base_ref", "head_ref", "accepted_head_ref", "commit_refs",
     "implement_evidence", "review_evidence", "handoff_paths",
 }
@@ -657,7 +659,16 @@ SIGNALS_REQUIRED_FIELDS = {
 
 # Required fields on slice contracts within a multi-slice assessment.
 MULTI_SLICE_REQUIRED_SLICE_FIELDS = {
-    "scope", "verification_commands",
+    "slice_id",
+    "title",
+    "task_refs",
+    "depends_on",
+    "objective",
+    "scope",
+    "acceptance_criteria",
+    "verification_commands",
+    "required_context_paths",
+    "required",
 }
 
 
@@ -729,6 +740,7 @@ def materialize_slicing_assessment(agent_result, handoff_path):
             "assessed_by": "plan-agent",
             "assessment_handoff_path": handoff_path,
             "reasons": reasons,
+            "task_coverage": dict(assessment.get("task_coverage") or {}),
         },
         "aggregate_review_status": "pending",
         "active_slice_id": None,
@@ -760,9 +772,9 @@ def _validate_multi_slice_contract(item):
             "missing_slice_contract_fields",
             {"slice_id": item.get("slice_id", "?"), "missing": sorted(missing)},
         )
-    # scope must be a non-empty string.
-    scope = item.get("scope", "")
-    if not isinstance(scope, str) or not scope.strip():
+    # scope must be a non-empty dict (per spec: {"expected_paths": [...]}).
+    scope = item.get("scope")
+    if not isinstance(scope, dict) or not scope:
         raise SlicingAssessmentError(
             "invalid_slice_scope",
             {"slice_id": item.get("slice_id", "?")},
@@ -772,6 +784,25 @@ def _validate_multi_slice_contract(item):
     if not isinstance(vc, list) or not vc:
         raise SlicingAssessmentError(
             "invalid_slice_verification_commands",
+            {"slice_id": item.get("slice_id", "?")},
+        )
+    task_refs = item.get("task_refs", [])
+    if not isinstance(task_refs, list) or not task_refs or not all(
+        isinstance(ref, str) and ref.strip() for ref in task_refs
+    ):
+        raise SlicingAssessmentError(
+            "invalid_slice_task_refs",
+            {"slice_id": item.get("slice_id", "?")},
+        )
+    # Reject discovery-only slices: scope has no expected_paths and the slice
+    # has no acceptance_criteria means the slice cannot produce or verify a
+    # valid implementation commit range (per spec Decision 6 / Scenario 5).
+    scope_dict = item.get("scope") or {}
+    expected_paths = scope_dict.get("expected_paths") if isinstance(scope_dict, dict) else None
+    acceptance_criteria = item.get("acceptance_criteria") or []
+    if not expected_paths and not acceptance_criteria:
+        raise SlicingAssessmentError(
+            "discovery_only_slice",
             {"slice_id": item.get("slice_id", "?")},
         )
 
@@ -787,6 +818,13 @@ def materialize_slice_contract(item):
         raise SlicingAssessmentError("reserved_slice_id", slice_id)
     return {
         "slice_id": slice_id,
+        "title": item.get("title", ""),
+        "task_refs": list(item.get("task_refs", []) or []),
+        "objective": item.get("objective", ""),
+        "scope": dict(item.get("scope") or {}),
+        "acceptance_criteria": list(item.get("acceptance_criteria", []) or []),
+        "verification_commands": list(item.get("verification_commands", []) or []),
+        "required_context_paths": list(item.get("required_context_paths", []) or []),
         "depends_on": list(item.get("depends_on", []) or []),
         "required": item.get("required", True),
         "status": "pending",
@@ -810,6 +848,13 @@ def required_slices(impl):
 def _make_default_slice():
     return {
         "slice_id": "default",
+        "title": "",
+        "task_refs": [],
+        "objective": "",
+        "scope": {},
+        "acceptance_criteria": [],
+        "verification_commands": [],
+        "required_context_paths": [],
         "depends_on": [],
         "required": True,
         "status": "pending",

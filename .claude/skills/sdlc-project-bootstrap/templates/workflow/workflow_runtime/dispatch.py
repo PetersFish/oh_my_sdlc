@@ -1082,6 +1082,11 @@ def cmd_after_dispatch(root, args):
     ):
         handoff_path = (agent_result.get("artifacts") or {}).get("handoff_path", "")
         try:
+            if "slicing_assessment" not in agent_result:
+                raise SlicingAssessmentError(
+                    "missing_top_level_slicing_assessment",
+                    {"hint": "slicing_assessment must be a top-level result field"},
+                )
             materialized = materialize_slicing_assessment(agent_result, handoff_path)
             # Validate the materialized state before persisting.
             errors = validate_implementation_state(materialized)
