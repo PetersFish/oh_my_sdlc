@@ -102,7 +102,7 @@ remains required but is not a substitute for this check.
 - Inspect: `tests/test_sync_derived_artifacts.py`
 - Inspect: `tests/test_workflow.py`
 
-- [ ] **Step 1: Load repository memory and required implementation disciplines**
+- [x] **Step 1: Load repository memory and required implementation disciplines**
 
 Load:
 
@@ -110,7 +110,7 @@ Load:
 - `implementation-contract-discipline`
 - `behavioral-test-design`
 
-- [ ] **Step 2: Identify the real pre-commit or validation entrypoint**
+- [x] **Step 2: Identify the real pre-commit or validation entrypoint**
 
 Record:
 
@@ -132,7 +132,7 @@ Baseline facts to confirm rather than rediscover:
 
 Do not design a new hook entrypoint until the existing one is located.
 
-- [ ] **Step 3: Identify authoritative workflow phase resolution**
+- [x] **Step 3: Identify authoritative workflow phase resolution**
 
 Locate the existing runtime API or state reader that determines:
 
@@ -148,7 +148,7 @@ Also record how `git worktree list --porcelain`, `context.control_root`, and
 `context.worktree_path` can bind the current checkout to a unique active run.
 An unrelated run in another worktree must not affect policy.
 
-- [ ] **Step 4: Identify canonical-to-derived classification logic**
+- [x] **Step 4: Identify canonical-to-derived classification logic**
 
 Locate the logic already used by:
 
@@ -170,7 +170,7 @@ Explicitly record the current mismatch between
 `workflow_runtime/*.py` paths must become recognized without copying the list
 into the hook policy module.
 
-- [ ] **Step 5: Identify review mismatch computation**
+- [x] **Step 5: Identify review mismatch computation**
 
 Trace where `review_change_set_mismatch` is produced and determine whether it compares:
 
@@ -182,7 +182,7 @@ Trace where `review_change_set_mismatch` is produced and determine whether it co
 If no executable comparator exists, record review enforcement as agent-governed
 and do not invent a runtime review subsystem.
 
-- [ ] **Step 6: Run current focused baseline tests**
+- [x] **Step 6: Run current focused baseline tests**
 
 Use existing test files discovered above. At minimum run the focused suites for:
 
@@ -195,7 +195,7 @@ Record exact commands and results before modifications.
 
 ### Task 2: Confirm the Remaining Reproduction
 
-- [ ] **Step 1: Create or reuse a temporary test fixture/repository state**
+- [x] **Step 1: Create or reuse a temporary test fixture/repository state**
 
 Model this scenario without modifying generated copies manually:
 
@@ -210,7 +210,7 @@ Create both main-checkout and linked-worktree variants. In the worktree
 variant, keep workflow state under the control root and record the feature
 checkout in `context.worktree_path`.
 
-- [ ] **Step 2: Verify current failure mode**
+- [x] **Step 2: Verify current failure mode**
 
 Demonstrate which current component blocks:
 
@@ -226,7 +226,7 @@ classifier.
 
 If the reported issue is already fully resolved, stop and return evidence instead of implementing speculative policy.
 
-- [ ] **Step 3: Capture the minimal failing contract**
+- [x] **Step 3: Capture the minimal failing contract**
 
 The RED condition must assert executable behavior, for example:
 
@@ -247,7 +247,7 @@ Do not add prompt string-presence tests.
 - Modify: `tests/test_sync_derived_artifacts.py`
 - Modify: `tests/test_setup_agents.py`
 
-- [ ] **Step 1: Add RED cases for apply-phase allowance**
+- [x] **Step 1: Add RED cases for apply-phase allowance**
 
 Cover:
 
@@ -266,7 +266,7 @@ Expected decision:
 allow
 ```
 
-- [ ] **Step 2: Add RED cases for apply-phase rejection**
+- [x] **Step 2: Add RED cases for apply-phase rejection**
 
 Cover distinct reasons:
 
@@ -287,7 +287,7 @@ policy must reject rather than allowing the entire domain.
 
 Use parameterization only when setup, execution path, and assertion shape are equivalent.
 
-- [ ] **Step 3: Add compatibility cases**
+- [x] **Step 3: Add compatibility cases**
 
 Cover:
 
@@ -305,7 +305,7 @@ Add a failing `setup_agents.py --check --json` case proving the report names
 the exact repository-relative stale Agent target rather than returning only a
 non-zero status or human-readable message.
 
-- [ ] **Step 4: Run focused tests and confirm RED**
+- [x] **Step 4: Run focused tests and confirm RED**
 
 Run:
 
@@ -329,7 +329,7 @@ Agent drift reporting do not yet exist; existing unaffected tests remain green.
 - Test: `tests/test_sync_derived_artifacts.py`
 - Test: `tests/test_setup_agents.py`
 
-- [ ] **Step 1: Define a small policy result**
+- [x] **Step 1: Define a small policy result**
 
 Use the repository's existing result conventions. Implement this result shape:
 
@@ -351,7 +351,7 @@ HookPolicyResult(
 
 Do not introduce a persisted runtime state.
 
-- [ ] **Step 2: Resolve lifecycle phase from runtime state**
+- [x] **Step 2: Resolve lifecycle phase from runtime state**
 
 Rules:
 
@@ -372,7 +372,7 @@ Implement checkout-to-run binding before phase selection:
 - reject multiple matching runs, corrupt matching state, and contradictory
   checkout context.
 
-- [ ] **Step 3: Reuse existing canonical attribution**
+- [x] **Step 3: Reuse existing canonical attribution**
 
 Feed changed/staged files into existing sync classification logic.
 
@@ -416,7 +416,7 @@ Invoke workflow and Skill checkers with their existing `--json` options. Add a
 repository-relative stale paths for template and activation drift. Do not parse
 plain-text `DRIFT` lines in the policy layer.
 
-- [ ] **Step 4: Distinguish stale from manually changed generated files**
+- [x] **Step 4: Distinguish stale from manually changed generated files**
 
 The policy must differentiate:
 
@@ -441,7 +441,7 @@ Combine Git status and sync-check evidence:
 - shared target attribution proves whether each stale path belongs to the
   staged canonical set.
 
-- [ ] **Step 5: Return stable diagnostic reasons**
+- [x] **Step 5: Return stable diagnostic reasons**
 
 Prefer the spec reasons when compatible with existing error conventions:
 
@@ -456,7 +456,7 @@ workflow_checkout_mismatch
 unsupported_canonical_skill_removal
 ```
 
-- [ ] **Step 6: Run focused policy tests and confirm GREEN**
+- [x] **Step 6: Run focused policy tests and confirm GREEN**
 
 Run:
 
@@ -483,7 +483,7 @@ Expected: all tests pass, including structured Agent drift-path reporting.
 - Use: `scripts/derived_sync_hook_policy.py`
 - Modify: `tests/test_precommit_hook.py`
 
-- [ ] **Step 1: Preserve ordinary checks**
+- [x] **Step 1: Preserve ordinary checks**
 
 The new allowance must not skip unrelated repository checks, including any existing validation for:
 
@@ -497,7 +497,7 @@ Invoke the Python policy before the existing distribution checks. The Python
 result decides whether expected apply-phase drift may bypass only the affected
 distribution-drift check; it must not short-circuit unrelated hook rules.
 
-- [ ] **Step 2: Apply allowance only during `apply_change`**
+- [x] **Step 2: Apply allowance only during `apply_change`**
 
 Allow the commit only when:
 
@@ -506,7 +506,7 @@ Allow the commit only when:
 - generated files are neither modified nor staged;
 - no unrelated drift exists.
 
-- [ ] **Step 3: Reject mixed authored/generated commits**
+- [x] **Step 3: Reject mixed authored/generated commits**
 
 A commit containing both canonical authored files and generated provider copies must fail during apply, even when generated content matches what sync would produce.
 
@@ -516,7 +516,7 @@ Base this decision on index status from `git diff --cached --name-status -z`.
 Do not continue the current whitespace-splitting `for f in $STAGED_FILES`
 pattern for the new policy path.
 
-- [ ] **Step 4: Produce actionable hook output**
+- [x] **Step 4: Produce actionable hook output**
 
 Error output must state:
 
@@ -526,7 +526,7 @@ Error output must state:
 
 Expected canonical drift must not print a warning that looks like a failure.
 
-- [ ] **Step 5: Add subprocess-level hook tests where practical**
+- [x] **Step 5: Add subprocess-level hook tests where practical**
 
 At least one representative integration test should execute the real hook/check entrypoint for:
 
@@ -545,7 +545,7 @@ Also execute the real hook for:
 
 Detailed permutations should remain in the lower-level policy tests.
 
-- [ ] **Step 6: Run hook-focused verification**
+- [x] **Step 6: Run hook-focused verification**
 
 Run:
 
