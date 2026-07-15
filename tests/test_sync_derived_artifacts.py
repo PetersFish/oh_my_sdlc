@@ -699,5 +699,91 @@ class TestDryRunMode(unittest.TestCase):
                            "non-dry-run fix must still invoke subprocesses")
 
 
+class TestPathAwareClassification(unittest.TestCase):
+    """Path-aware classification reusing existing sync mappings, including
+    governed workflow_runtime/*.py modules from sync_templates.GOVERNED."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_classify_workflow_runtime_module_is_workflow_domain(self):
+        """A governed workflow_runtime/*.py path must classify as workflow domain,
+        not skipped. Reuses sync_templates.GOVERNED."""
+        mod = _import_module()
+        affected = mod.classify_changes(
+            [".ai/workflows/scripts/workflow_runtime/state.py"]
+        )
+        self.assertTrue(affected.workflows,
+                        "workflow_runtime/state.py must classify as workflows domain")
+        self.assertFalse(affected.agents)
+        self.assertEqual(affected.skills, set())
+
+    def test_classify_all_governed_workflow_runtime_modules(self):
+        """Every governed workflow_runtime/*.py path from sync_templates.GOVERNED
+        must classify as workflow domain."""
+        # Import sync_templates to get the canonical governed list
+        import importlib.util
+        sync_templates_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "..", "skills", "sdlc-project-bootstrap", "scripts", "sync_templates.py",
+        )
+        spec = importlib.util.spec_from_file_location("sync_templates", sync_templates_path)
+        sync_templates = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(sync_templates)
+
+        mod = _import_module()
+        for live_rel, tmpl_rel in sync_templates.GOVERNED:
+            if "workflow_runtime/" not in live_rel:
+                continue
+            affected = mod.classify_changes([live_rel])
+            self.assertTrue(
+                affected.workflows,
+                f"{live_rel} must classify as workflows domain",
+            )
+
+    def test_classify_path_aware_agent_attribution(self):
+        """classify_changes must produce path-level results that enable
+        attributing stale derived paths to staged canonical sources."""
+        mod = _import_module()
+        affected = mod.classify_changes(["agents/implement-agent.md"])
+        self.assertTrue(affected.agents)
+        # The path-aware classifier must expose the staged canonical path
+        self.assertIn("agents/implement-agent.md", affected.staged_canonical_paths)
+
+    def test_classify_path_aware_skill_attribution(self):
+        """Skill canonical change must expose the staged path and skill name."""
+        mod = _import_module()
+        affected = mod.classify_changes(["skills/demo-skill/SKILL.md"])
+        self.assertIn("demo-skill", affected.skills)
+        self.assertIn("skills/demo-skill/SKILL.md", affected.staged_canonical_paths)
+
+    def test_classify_separates_staged_from_worktree(self):
+        """The classifier must accept separate staged and worktree path lists
+        and keep them separate (no combined set)."""
+        mod = _import_module()
+        staged = mod.classify_changes(["agents/implement-agent.md"])
+        # staged must only include agents/implement-agent.md
+        self.assertEqual(staged.staged_canonical_paths, ["agents/implement-agent.md"])
+
+    def test_classify_governed_workflow_consistent_with_incremental(self):
+        """The path-aware classifier, aggregate incremental selection, and hook
+        policy all produce the same workflow classification for a
+        workflow_runtime/*.py change."""
+        mod = _import_module()
+        path = ".ai/workflows/scripts/workflow_runtime/lifecycle.py"
+        # Path-aware classifier
+        affected = mod.classify_changes([path])
+        self.assertTrue(affected.workflows)
+        # Incremental selection must also run workflow suites
+        suites = mod._check_suites(self.tmp, affected)
+        suite_names = [s["name"] for s in suites]
+        self.assertTrue(any("workflow" in name for name in suite_names),
+                        f"workflow suites must be selected for {path}, got {suite_names}")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

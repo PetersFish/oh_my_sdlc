@@ -159,8 +159,14 @@ Rules:
 - Include `covered_by` or equivalent verification coverage for changed files when available.
 - If using a git worktree, report the exact `worktree_path` used for implementation.
 - Use `base_branch` for the human branch name (e.g. `main`) and `parent_ref`
-  for the exact baseline commit/ref (prefer a commit SHA).  Do not use the
-  ambiguous `base_ref` field in new artifacts.
+  for the exact baseline commit/ref (prefer a commit SHA).
+- For sliced apply_change dispatch, `before-dispatch` records `base_ref` on
+  the target slice (current HEAD for the first slice, previous
+  `accepted_head_ref` for subsequent slices).  Return it unchanged in
+  `artifacts.base_ref`.  After committing slice changes, set
+  `artifacts.head_ref` to the new commit SHA and `artifacts.commit_refs` to
+  the ordered list from `git rev-list --reverse base_ref..head_ref`.
+  Returning `success` without these three fields blocks entry to review.
 
 ## Output — Structured Evidence Envelope
 
@@ -185,6 +191,9 @@ Return JSON:
     "repo_root": "/path/to/repo",
     "base_branch": "main",
     "parent_ref": "<commit-sha-or-ref>",
+    "base_ref": "<base_ref-from-dispatch>",
+    "head_ref": "<new-commit-sha>",
+    "commit_refs": ["<ordered-commit-sha-list>"],
     "changed_files": [
       {
         "path": "path/to/file.py",

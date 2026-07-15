@@ -34,6 +34,7 @@ files change, incremental mode falls back to full behavior.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import os
 import subprocess
@@ -59,8 +60,30 @@ SKILL_TARGETS = (
     ".cursor/skills",
 )
 
+
+def _load_sync_templates_governed() -> set[str]:
+    """Import sync_templates.GOVERNED to reuse the canonical governed live path list.
+
+    Returns a set of live-relative paths (the first element of each GOVERNED
+    tuple).  Falls back to an empty set if sync_templates cannot be imported.
+    """
+    try:
+        spec = importlib.util.spec_from_file_location(
+            "_sync_templates_governed", str(SYNC_TEMPLATES)
+        )
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return {live_rel for live_rel, _tmpl_rel in mod.GOVERNED}
+    except Exception:
+        return set()
+
+
 # Governed live workflow files that trigger workflow template sync/distribution.
-GOVERNED_WORKFLOW_FILES = {
+# Reuse the canonical list from sync_templates.GOVERNED so every
+# workflow_runtime/*.py module is recognized.  The legacy two-entry set is
+# merged with the imported list; the imported list is authoritative.
+_GOVERNED_FROM_TEMPLATES = _load_sync_templates_governed()
+GOVERNED_WORKFLOW_FILES = _GOVERNED_FROM_TEMPLATES | {
     ".ai/workflows/scripts/workflow.py",
     ".ai/workflows/definitions/sdlc-main.yaml",
 }
@@ -78,7 +101,12 @@ SYNC_RULE_FILES = {
 
 
 class Affected:
-    """Affected-domain classification result for a change set."""
+    """Affected-domain classification result for a change set.
+
+    Path-aware fields (``staged_canonical_paths``, ``expected_derived_domains``)
+    support hook-policy attribution of stale generated targets to staged
+    canonical sources without duplicating the canonical mapping.
+    """
 
     def __init__(
         self,
@@ -88,6 +116,7 @@ class Affected:
         full: bool = False,
         skipped_paths: list[str] | None = None,
         reason: str | None = None,
+        staged_canonical_paths: list[str] | None = None,
     ) -> None:
         self.workflows = workflows
         self.agents = agents
@@ -95,6 +124,11 @@ class Affected:
         self.full = full
         self.skipped_paths = skipped_paths if skipped_paths is not None else []
         self.reason = reason
+        # Path-aware: the canonical paths that were classified, in input order.
+        # Used by the hook policy to attribute stale generated targets.
+        self.staged_canonical_paths = (
+            staged_canonical_paths if staged_canonical_paths is not None else []
+        )
 
     def to_report(self) -> dict:
         return {
@@ -103,6 +137,7 @@ class Affected:
             "skills": sorted(self.skills),
             "full": self.full,
             "skipped_paths": sorted(self.skipped_paths),
+            "staged_canonical_paths": sorted(self.staged_canonical_paths),
             "reason": self.reason,
         }
 
@@ -125,6 +160,8 @@ def classify_changes(changed_files: list[str]) -> Affected:
     """Classify changed paths into affected sync domains.
 
     Does not touch the filesystem so deleted files classify correctly.
+    Records each recognized canonical path in ``staged_canonical_paths`` for
+    path-aware attribution by the hook policy.
     """
     affected = Affected()
     for raw in changed_files:
@@ -139,14 +176,17 @@ def classify_changes(changed_files: list[str]) -> Affected:
                 affected.reason = f"sync-rule change: {p}"
             continue
 
-        # Governed live workflow files.
+        # Governed live workflow files (includes workflow_runtime/*.py via
+        # sync_templates.GOVERNED).
         if p in GOVERNED_WORKFLOW_FILES:
             affected.workflows = True
+            affected.staged_canonical_paths.append(p)
             continue
 
         # Canonical agent paths (not generated distribution copies).
         if p.startswith("agents/"):
             affected.agents = True
+            affected.staged_canonical_paths.append(p)
             continue
 
         # Canonical skill paths: skills/<skill-name>/...
@@ -154,6 +194,7 @@ def classify_changes(changed_files: list[str]) -> Affected:
             parts = p.split("/", 2)
             if len(parts) >= 2 and parts[1]:
                 affected.skills.add(parts[1])
+                affected.staged_canonical_paths.append(p)
                 continue
             # bare "skills/" without a name — ignored
             affected.skipped_paths.append(p)

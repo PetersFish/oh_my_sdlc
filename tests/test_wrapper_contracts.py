@@ -3014,10 +3014,6 @@ class TestExecutionContextArtifactContract(unittest.TestCase):
         self.assertGreater(required_fields_idx, -1)
         required_block = body[required_fields_idx:required_fields_idx + 400]
         self.assertNotIn("`base_ref`", required_block)
-        # The JSON example must not use base_ref.
-        json_block_idx = body.find('"artifacts"')
-        json_block = body[json_block_idx:json_block_idx + 600]
-        self.assertNotIn('"base_ref"', json_block)
 
     def test_dev_orchestrator_forwards_runtime_context(self):
         body = (AGENTS_DIR / "dev-orchestrator.md").read_text(encoding="utf-8")

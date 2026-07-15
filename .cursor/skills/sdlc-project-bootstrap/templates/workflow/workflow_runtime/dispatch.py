@@ -664,10 +664,20 @@ def cmd_before_dispatch(root, args):
                     impl["active_slice_id"] = requested_slice_id
                     break
         else:
+            # First slice (no prior completed slice): record current HEAD as
+            # base_ref so implement-agent can compute its commit range without
+            # guessing the base boundary.
+            current_head = ""
+            if _is_git_repo(root):
+                rc, head_out, _ = _run_git(root, ["rev-parse", "HEAD"])
+                if rc == 0 and head_out:
+                    current_head = head_out
             for sl in all_slices:
                 if sl.get("slice_id") == requested_slice_id:
                     sl["status"] = "in_progress"
                     sl["attempt_count"] = sl.get("attempt_count", 0) + 1
+                    if current_head and not sl.get("base_ref"):
+                        sl["base_ref"] = current_head
                     impl["active_slice_id"] = requested_slice_id
                     break
 

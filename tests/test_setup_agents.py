@@ -1,5 +1,6 @@
 """Behavior tests for scripts/setup_agents.py (aggregate setup)."""
 
+import json
 import os
 import shutil
 import subprocess
@@ -231,6 +232,67 @@ class TestSetupScript(unittest.TestCase):
             capture_output=True, text=True,
         )
         self.assertEqual(result.returncode, 0, f"check should pass: {result.stdout}")
+
+
+class TestCheckJsonOutput(unittest.TestCase):
+    """setup_agents.py --check --json reports concrete stale agent target paths."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.target = os.path.join(self.tmp, "target")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp)
+
+    def _setup_minimal_config(self):
+        write_file(self.tmp, "target/config/model-profiles.yaml",
+                   "schema_version: 1\n"
+                   "defaults:\n"
+                   "  variant: medium\n"
+                   "profiles:\n"
+                   "  test:\n"
+                   "    model: openai/gpt-4\n"
+                   "agents:\n"
+                   "  test-agent:\n"
+                   "    profile: test\n")
+
+    def test_check_json_reports_stale_agent_paths(self):
+        """--check --json must report concrete repository-relative stale agent
+        target paths, not just a non-zero status or human-readable message."""
+        self._setup_minimal_config()
+        os.makedirs(self.target, exist_ok=True)
+        # Create a target agent with drift (different body content than canonical)
+        write_file(self.tmp, "target/test-agent.md",
+                   "---\nname: test-agent\nmode: subagent\n---\n# Different body\n")
+
+        result = subprocess.run(
+            [sys.executable, SCRIPT, "--target", self.target, "--check", "--json"],
+            capture_output=True, text=True,
+        )
+        # Must output JSON on stdout
+        self.assertTrue(result.stdout.strip(),
+                        f"--json must produce JSON output, got stdout={result.stdout!r}")
+        report = json.loads(result.stdout)
+        # The report must include stale path entries (not just a boolean)
+        self.assertIsInstance(report, dict)
+        # Look for stale paths in the report — could be under "stale_paths",
+        # "drifted_paths", or similar
+        stale_paths = (
+            report.get("stale_paths")
+            or report.get("drifted_paths")
+            or report.get("drift")
+            or []
+        )
+        # If nested under a suite, flatten
+        if not stale_paths and "suites" in report:
+            for suite in report["suites"]:
+                if isinstance(suite, dict):
+                    stale_paths.extend(suite.get("stale_paths", []))
+                    stale_paths.extend(suite.get("drifted_paths", []))
+        self.assertTrue(
+            any("test-agent.md" in str(p) for p in stale_paths),
+            f"--check --json must report the stale test-agent.md path, got report={report}",
+        )
 
 
 if __name__ == "__main__":

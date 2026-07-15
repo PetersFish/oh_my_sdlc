@@ -10155,6 +10155,83 @@ class TestSliceDispatchLifecycle(FixtureBase):
         self.assertEqual(sl["attempt_count"], 1)
         self.assertEqual(state["implementation"]["active_slice_id"], "slice-a")
 
+    def test_before_dispatch_implement_sets_base_ref_to_head_for_first_slice(self):
+        """First-slice dispatch records current HEAD as base_ref in a git repo."""
+        subprocess.run(["git", "init"], cwd=self.tmp, capture_output=True, check=True)
+        subprocess.run(["git", "config", "user.email", "test@test.com"],
+                       cwd=self.tmp, capture_output=True, check=True)
+        subprocess.run(["git", "config", "user.name", "Test"],
+                       cwd=self.tmp, capture_output=True, check=True)
+        with open(os.path.join(self.tmp, "README"), "w") as f:
+            f.write("init\n")
+        subprocess.run(["git", "add", "-A"], cwd=self.tmp, capture_output=True, check=True)
+        subprocess.run(["git", "commit", "-m", "init"],
+                       cwd=self.tmp, capture_output=True, check=True)
+        head_sha = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=self.tmp, capture_output=True, text=True,
+        ).stdout.strip()
+
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="ready"),
+        ])
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="implement-agent",
+            slice_id="slice-a",
+        )
+        self.assertEqual(rc, 0, out)
+        state = self._read_current_state()
+        sl = state["implementation"]["slices"][0]
+        self.assertEqual(sl["status"], "in_progress")
+        self.assertEqual(sl["base_ref"], head_sha)
+
+    def test_before_dispatch_implement_skips_base_ref_in_non_git_workspace(self):
+        """Non-git workspace: base_ref stays empty, dispatch still succeeds."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="ready"),
+        ])
+        self._make_apply_run(implementation=impl)
+        rc, out, _ = run_workflow(
+            self.tmp, "before-dispatch",
+            agent="implement-agent",
+            slice_id="slice-a",
+        )
+        self.assertEqual(rc, 0, out)
+        state = self._read_current_state()
+        sl = state["implementation"]["slices"][0]
+        self.assertEqual(sl["status"], "in_progress")
+        self.assertEqual(sl["base_ref"], "")
+
+    def test_after_dispatch_implement_success_missing_refs_blocks(self):
+        """Implement success without base_ref/head_ref/commit_refs blocks review entry."""
+        impl = _make_implementation_state([
+            _make_slice("slice-a", status="in_progress", base_ref="base-1"),
+        ])
+        self._make_apply_run(implementation=impl)
+        agent_result = json.dumps({
+            "status": "success",
+            "evidence": {"focused_tests": [{"command": "pytest -k test", "result": "pass"}]},
+            "artifacts": {
+                "base_branch": "main",
+                "parent_ref": "base-1",
+            },
+        })
+        rc, out, _ = run_workflow(
+            self.tmp, "after-dispatch",
+            agent="implement-agent",
+            slice_id="slice-a",
+            value=agent_result,
+        )
+        self.assertEqual(rc, 0, out)
+        data = json.loads(out)
+        reasons = [b.get("reason", "") for b in data.get("blockers", [])]
+        self.assertIn("missing_git_refs", reasons)
+        state = self._read_current_state()
+        sl = state["implementation"]["slices"][0]
+        self.assertEqual(sl["status"], "in_progress")
+
     def test_before_dispatch_rejects_second_slice_while_one_in_progress(self):
         """Another slice cannot dispatch while one is in_progress."""
         impl = _make_implementation_state([

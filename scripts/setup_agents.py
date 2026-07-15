@@ -14,6 +14,7 @@ Modes:
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -172,8 +173,16 @@ def do_setup(target: Path, force: bool = False, dry_run: bool = False) -> int:
     return rc_activate
 
 
-def do_check(target: Path) -> int:
-    """Run install --check and activate --check. Exit 1 if either reports drift."""
+def do_check(target: Path, json_output: bool = False) -> int:
+    """Run install --check and activate --check. Exit 1 if either reports drift.
+
+    When ``json_output`` is True, emit a structured JSON report on stdout with
+    concrete repository-relative stale agent target paths for each failing
+    check, instead of only plain-text DRIFT lines.
+    """
+    if json_output:
+        return _do_check_json(target)
+
     overall = 0
 
     # Template drift check
@@ -207,6 +216,142 @@ def do_check(target: Path) -> int:
     return overall
 
 
+def _stale_template_paths(target: Path) -> list[str]:
+    """Return repository-relative stale agent paths for template drift.
+
+    Compares canonical agents/ against ``target`` using normalized prompt
+    content (ignoring activation-managed fields).  Reports each stale target
+    path as ``<target_rel>/<filename>``.
+    """
+    from agent_config_lib import (
+        SKIP_NAMES,
+        SKIP_SUFFIXES,
+        normalized_prompt_compare,
+    )
+
+    source = _canonical_source()
+    if not source.is_dir():
+        return []
+
+    stale: list[str] = []
+    src_files: dict[str, str] = {}
+    for entry in sorted(source.iterdir()):
+        if entry.name in SKIP_NAMES:
+            continue
+        if entry.name.endswith(SKIP_SUFFIXES):
+            continue
+        if entry.is_file() and entry.suffix == ".md":
+            src_files[entry.name] = entry.read_text(encoding="utf-8")
+
+    if not src_files:
+        return []
+
+    tgt_files: dict[str, str] = {}
+    if target.is_dir():
+        for entry in sorted(target.iterdir()):
+            if entry.name in SKIP_NAMES:
+                continue
+            if entry.name.endswith(SKIP_SUFFIXES):
+                continue
+            if entry.is_file() and entry.suffix == ".md":
+                tgt_files[entry.name] = entry.read_text(encoding="utf-8")
+
+    for name, src_content in src_files.items():
+        tgt_content = tgt_files.get(name)
+        rel = f"{target.name}/{name}" if target.name else name
+        if tgt_content is None:
+            stale.append(rel)
+        elif not normalized_prompt_compare(src_content, tgt_content):
+            stale.append(rel)
+
+    for name in tgt_files:
+        if name not in src_files:
+            rel = f"{target.name}/{name}" if target.name else name
+            stale.append(rel)
+
+    # Target config check
+    config_path = get_target_config_path(target)
+    if not config_path.is_file():
+        stale.append(f"{target.name}/config/{MODEL_PROFILES_FILENAME}")
+
+    return sorted(stale)
+
+
+def _stale_activation_paths(target: Path) -> list[str]:
+    """Return repository-relative stale agent paths for activation drift.
+
+    Compares effective model/variant from target config against rendered
+    frontmatter in each target agent markdown file.
+    """
+    config_path = get_target_config_path(target)
+    if not config_path.is_file():
+        return []
+
+    try:
+        config = load_model_profiles_config(config_path)
+    except ValueError:
+        return []
+
+    agent_names = set(config.get("agents", {}).keys())
+    if not agent_names:
+        return []
+
+    # Reuse the extraction helper from activate_agents_config.
+    import importlib.util
+    activate_path = Path(__file__).resolve().parent / "activate_agents_config.py"
+    spec = importlib.util.spec_from_file_location(
+        "_activate_for_check", str(activate_path)
+    )
+    activate_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(activate_mod)
+    _extract = activate_mod._extract_model_variant_from_markdown
+
+    stale: list[str] = []
+    if not target.is_dir():
+        return stale
+    for entry in sorted(target.iterdir()):
+        if entry.name in SKIP_NAMES:
+            continue
+        if entry.name.endswith(SKIP_SUFFIXES):
+            continue
+        if not entry.is_file() or entry.suffix != ".md":
+            continue
+        stem = entry.stem
+        if stem not in agent_names:
+            continue
+        try:
+            expected_model = resolve_effective_model(stem, config)
+            expected_variant = resolve_effective_variant(stem, config)
+        except ValueError:
+            rel = f"{target.name}/{entry.name}" if target.name else entry.name
+            stale.append(rel)
+            continue
+        content = entry.read_text(encoding="utf-8")
+        actual_model, actual_variant = _extract(content)
+        if actual_model != expected_model or actual_variant != expected_variant:
+            rel = f"{target.name}/{entry.name}" if target.name else entry.name
+            stale.append(rel)
+
+    return sorted(stale)
+
+
+def _do_check_json(target: Path) -> int:
+    """Structured JSON check report with concrete stale agent paths."""
+    stale_template = _stale_template_paths(target)
+    stale_activation = _stale_activation_paths(target)
+    overall = 1 if (stale_template or stale_activation) else 0
+    report = {
+        "target": str(target),
+        "stale_paths": sorted(set(stale_template) | set(stale_activation)),
+        "template_drift_paths": stale_template,
+        "activation_drift_paths": stale_activation,
+        "status": "drift" if overall else "ok",
+        "returncode": overall,
+    }
+    print(json.dumps(report, indent=2))
+    return overall
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Aggregate agent setup: install (template sync) then activate (render model/variant)."
@@ -220,6 +365,8 @@ def main() -> int:
                         help="force overwrite existing agent files during install")
     parser.add_argument("--check", action="store_true",
                         help="report template drift and activation drift, exit 1 on either")
+    parser.add_argument("--json", action="store_true",
+                        help="emit structured JSON report (use with --check)")
     parser.add_argument("--dry-run", action="store_true",
                         help="preview planned install and activation actions without writing files")
     args = parser.parse_args()
@@ -230,7 +377,7 @@ def main() -> int:
         target = _global_target()
 
     if args.check:
-        return do_check(target)
+        return do_check(target, json_output=args.json)
 
     return do_setup(target, force=args.force, dry_run=args.dry_run)
 
