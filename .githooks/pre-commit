@@ -108,22 +108,84 @@ if [ -f "$POLICY_TOOL" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Rule 1: live == canonical  (ALWAYS runs; not a generated-distribution check)
+# Rule 1: live == canonical
+#   When SKIP_DISTRIBUTION=0: ALWAYS runs (enforces live <-> canonical).
+#   When SKIP_DISTRIBUTION=1 (apply_change policy allowed): runs with
+#     phase-aware attribution.  Attributable drift (live governed workflow
+#     source staged, template clean-but-stale) is allowed; unattributed or
+#     manually-modified template drift is still blocked.
 # ---------------------------------------------------------------------------
-python3 "$SYNC_TOOL" --root "$REPO_ROOT" --check
-RET=$?
-if [ $RET -ne 0 ]; then
-    echo ""
-    echo "============================================"
-    echo "  COMMIT BLOCKED: Template drift detected"
-    echo "============================================"
-    echo ""
-    echo "Live .ai/workflows/ files differ from canonical skill templates."
-    echo "Run the following to sync live -> canonical, then re-commit:"
-    echo ""
-    echo "  python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py --root ."
-    echo ""
-    BLOCKED=1
+if [ $SKIP_DISTRIBUTION -eq 1 ]; then
+    # Phase-aware Rule 1: allow attributable live-template drift.
+    # The policy already confirmed we are in apply_change with attributable
+    # generated drift.  Now check whether Rule 1 drift is also attributable
+    # to staged live workflow source files.
+    TEMPLATE_REPORT=$(python3 "$SYNC_TOOL" --root "$REPO_ROOT" --check --json 2>/dev/null)
+    TEMPLATE_RC=$?
+    if [ $TEMPLATE_RC -ne 0 ]; then
+        # Drift exists — partition into attributable vs unattributed.
+        # Attributable: the live path is staged (being authored) and the
+        # template path is NOT manually modified (clean but stale).
+        # Unattributed: the live path is not staged, or the template was
+        # manually edited.
+        UNATTRIBUTED_TEMPLATE=$(echo "$TEMPLATE_REPORT" | python3 -c "
+import sys, json, subprocess
+report = json.load(sys.stdin)
+drifted = report.get('drifted', [])
+staged = set(subprocess.run(['git', 'diff', '--cached', '--name-only', '-z'],
+    capture_output=True, text=True).stdout.split('\\0'))
+unattributed = []
+for entry in drifted:
+    # entry format: 'live_path -> template_path'
+    parts = entry.split(' -> ', 1)
+    live_path = parts[0].strip()
+    template_path = parts[1].strip() if len(parts) > 1 else ''
+    if live_path not in staged:
+        unattributed.append(entry)
+    elif template_path:
+        # Check if template was manually modified (dirty in worktree)
+        status = subprocess.run(['git', 'status', '--porcelain', '--', template_path],
+            capture_output=True, text=True).stdout.strip()
+        if status:
+            unattributed.append(entry + ' (template manually modified)')
+if unattributed:
+    print('\\n'.join(unattributed))
+" 2>/dev/null)
+        if [ -n "$UNATTRIBUTED_TEMPLATE" ]; then
+            echo ""
+            echo "============================================"
+            echo "  COMMIT BLOCKED: Unattributed template drift"
+            echo "============================================"
+            echo ""
+            echo "Live .ai/workflows/ files differ from canonical templates in ways"
+            echo "not attributable to staged apply-phase workflow source changes:"
+            echo ""
+            echo "$UNATTRIBUTED_TEMPLATE"
+            echo ""
+            echo "Run the following to sync live -> canonical, then re-commit:"
+            echo ""
+            echo "  python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py --root ."
+            echo ""
+            BLOCKED=1
+        fi
+        # If all drift is attributable, allow (fall through without blocking).
+    fi
+else
+    python3 "$SYNC_TOOL" --root "$REPO_ROOT" --check
+    RET=$?
+    if [ $RET -ne 0 ]; then
+        echo ""
+        echo "============================================"
+        echo "  COMMIT BLOCKED: Template drift detected"
+        echo "============================================"
+        echo ""
+        echo "Live .ai/workflows/ files differ from canonical skill templates."
+        echo "Run the following to sync live -> canonical, then re-commit:"
+        echo ""
+        echo "  python3 skills/sdlc-project-bootstrap/scripts/sync_templates.py --root ."
+        echo ""
+        BLOCKED=1
+    fi
 fi
 
 # ---------------------------------------------------------------------------

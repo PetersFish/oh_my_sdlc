@@ -99,6 +99,30 @@ class FixtureBase(unittest.TestCase):
             f.write(content)
         return path
 
+    def _write_fake_sync_script(self, exit_code=0, payload=None, record_path=None):
+        """Install a fake derived-artifact sync checker in the fixture repo."""
+        if payload is None:
+            payload = {"status": "clean", "stale_paths": []}
+        if record_path is None:
+            record_path = os.path.join(self.tmp, "sync-invocation.json")
+        scripts_dir = os.path.join(self.tmp, "scripts")
+        os.makedirs(scripts_dir, exist_ok=True)
+        script_path = os.path.join(scripts_dir, "sync_derived_artifacts.py")
+        with open(script_path, "w", encoding="utf-8") as f:
+            f.write(
+                "#!/usr/bin/env python3\n"
+                "import json\n"
+                "import os\n"
+                "import sys\n"
+                f"record_path = {record_path!r}\n"
+                "with open(record_path, 'w', encoding='utf-8') as record:\n"
+                "    json.dump({'argv': sys.argv[1:], 'cwd': os.getcwd()}, record)\n"
+                f"print(json.dumps({payload!r}))\n"
+                f"sys.exit({exit_code})\n"
+            )
+        os.chmod(script_path, 0o755)
+        return script_path, record_path
+
     def _make_roadmap_item(self, item_id, status, openspec_change=None, spec_change=None, area="area1", completed_at=None, started_at=None, slug=None):
         items_dir = os.path.join(
             self.tmp, ".ai", "roadmap", "areas", area, "items"
@@ -473,6 +497,7 @@ class TestAdvanceGuarded(FixtureBase):
         self.assertIn("blocked", out.lower())
 
     def test_advance_to_done_does_not_recreate_active_run(self):
+        self._write_fake_sync_script()
         run_id = "2026-06-20-advance-done"
         state = {
             "version": 1,
@@ -756,6 +781,7 @@ class TestSubagentOwnedLifecycleCleanup(FixtureBase):
         repaired = json.loads(out)
         self.assertNotIn("memory_sync", repaired.get("pending_hooks", []))
 
+        self._write_fake_sync_script()
         rc, out, _ = run_workflow(self.tmp, "done")
         self.assertEqual(rc, 0)
         data = json.loads(out)
@@ -1101,6 +1127,7 @@ class TestPostArchiveHooks(FixtureBase):
         state.setdefault("evidence", {}).setdefault("agent_phase", {})["slice_id"] = "default"
         self._write_current_state(state)
 
+        self._write_fake_sync_script()
         rc, out3, _ = run_workflow(self.tmp, "done")
         self.assertEqual(rc, 0)
         data = json.loads(out3)
@@ -1315,6 +1342,7 @@ class TestResume(FixtureBase):
 class TestDone(FixtureBase):
     def _prepare_done_state(self):
         self._make_openspec_archive("done-test")
+        self._write_fake_sync_script()
         run_workflow(
             self.tmp, "start",
             subject_type="spec_change",
@@ -1908,6 +1936,7 @@ class TestGateLedger(FixtureBase):
         state.setdefault("evidence", {}).setdefault("agent_phase", {})["slice_id"] = "default"
         self._write_current_state(state)
 
+        self._write_fake_sync_script()
         rc, out, _ = run_workflow(self.tmp, "done")
         self.assertEqual(rc, 0)
         data = json.loads(out)
@@ -3712,6 +3741,7 @@ class TestConcurrentRuns(FixtureBase):
         state.setdefault("evidence", {}).setdefault("agent_phase", {})["slice_id"] = "default"
         self._write_current_state(state)
 
+        self._write_fake_sync_script()
         rc, out, _ = run_workflow(self.tmp, "done")
         self.assertEqual(rc, 0)
         data = json.loads(out)
@@ -7256,6 +7286,7 @@ class TestTerminalEvidenceValidation(FixtureBase):
     def _prepare_post_archive_done_state(self, change_id="terminal-evidence-demo"):
         """Prepare a run at post_archive_actions phase ready for done."""
         self._make_openspec_archive(change_id)
+        self._write_fake_sync_script(exit_code=0, payload={"status": "clean", "stale_paths": []})
         run_workflow(
             self.tmp, "start",
             subject_type="spec_change",
@@ -7279,6 +7310,12 @@ class TestTerminalEvidenceValidation(FixtureBase):
         ]
         state["status"] = "running"
         self._write_current_state(state)
+
+    def _assert_sync_check_invoked(self, record_path):
+        invocation = load_json(self.tmp, os.path.relpath(record_path, self.tmp))
+        self.assertIsNotNone(invocation)
+        self.assertEqual(invocation["argv"], ["--check", "--json"])
+        self.assertEqual(os.path.realpath(invocation["cwd"]), os.path.realpath(self.tmp))
 
     def _record_finish_agent_result(self, slice_id="default", status="success"):
         """Record a finish-agent result in agent_results via after-dispatch.
@@ -7358,6 +7395,71 @@ class TestTerminalEvidenceValidation(FixtureBase):
         data = json.loads(out)
         self.assertEqual(data["status"], "done")
 
+    def test_done_invokes_terminal_derived_sync_check_before_history_move(self):
+        """done must execute the read-only derived sync check before finalizing."""
+        self._prepare_post_archive_done_state()
+        self._record_finish_agent_result()
+        _, record_path = self._write_fake_sync_script(
+            exit_code=0,
+            payload={"status": "clean", "stale_paths": []},
+        )
+
+        rc, out, _ = run_workflow(self.tmp, "done")
+
+        self.assertEqual(rc, 0, out)
+        data = json.loads(out)
+        self.assertEqual(data["status"], "done")
+        self._assert_sync_check_invoked(record_path)
+
+    def test_done_refuses_terminal_move_when_sync_check_reports_drift(self):
+        """A non-zero terminal sync check with stale paths blocks finalization."""
+        self._prepare_post_archive_done_state()
+        self._record_finish_agent_result()
+        _, record_path = self._write_fake_sync_script(
+            exit_code=1,
+            payload={"status": "drift", "stale_paths": [".opencode/agents/finish-agent.md"]},
+        )
+
+        rc, out, _ = run_workflow(self.tmp, "done")
+
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["reason"], "derived_artifact_drift_unresolved")
+        self.assertIn(".opencode/agents/finish-agent.md", str(data))
+        self._assert_sync_check_invoked(record_path)
+        self.assertIsNotNone(self._read_current_state())
+
+    def test_done_refuses_when_finish_agent_claims_synced_but_check_reports_drift(self):
+        """finish-agent derived_artifacts_synced=True is insufficient alone."""
+        self._prepare_post_archive_done_state()
+        self._record_finish_agent_result()
+        state = self._read_current_state()
+        finish_result = state["evidence"]["agent_results"]["default"]["finish-agent"]
+        self.assertTrue(finish_result["evidence"]["derived_artifacts_synced"])
+        self._write_fake_sync_script(
+            exit_code=1,
+            payload={"status": "drift", "stale_paths": ["skills/example/SKILL.md"]},
+        )
+
+        rc, out, _ = run_workflow(self.tmp, "done")
+
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["reason"], "derived_artifact_drift_unresolved")
+
+    def test_done_refuses_when_sync_check_command_is_missing(self):
+        """Missing read-only check command blocks with an execution error."""
+        self._prepare_post_archive_done_state()
+        self._record_finish_agent_result()
+        os.remove(os.path.join(self.tmp, "scripts", "sync_derived_artifacts.py"))
+
+        rc, out, _ = run_workflow(self.tmp, "done")
+
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["reason"], "derived_artifact_drift_check_failed")
+        self.assertIn("sync_derived_artifacts.py", str(data))
+
     def test_advance_refuses_terminal_move_without_finish_agent_evidence(self):
         """advance to done must refuse terminal movement when finish-agent
         evidence is missing."""
@@ -7405,6 +7507,57 @@ class TestTerminalEvidenceValidation(FixtureBase):
         self.assertEqual(rc, 0)
         data = json.loads(out)
         self.assertEqual(data["status"], "done")
+
+    def test_advance_refuses_terminal_move_when_sync_check_reports_drift(self):
+        """advance into done must run the terminal derived sync check."""
+        self._prepare_post_archive_done_state()
+        self._record_finish_agent_result()
+        _, record_path = self._write_fake_sync_script(
+            exit_code=1,
+            payload={"status": "drift", "stale_paths": [".cursor/skills/example/SKILL.md"]},
+        )
+        state = self._read_current_state()
+        state["current_phase"] = "post_archive_actions"
+        state["status"] = "running"
+        state["pending_hooks"] = []
+        state["block"] = None
+        state["completed_phases"] = [
+            "input", "load_memory", "brainstorm", "decide_intent",
+            "create_change", "apply_change", "archive_change",
+            "post_archive_actions",
+        ]
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(self.tmp, "advance")
+
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["reason"], "derived_artifact_drift_unresolved")
+        self._assert_sync_check_invoked(record_path)
+
+    def test_advance_from_terminal_done_refuses_when_sync_check_reports_drift(self):
+        """The terminal phase_def path also enforces derived sync drift."""
+        self._prepare_post_archive_done_state()
+        self._record_finish_agent_result()
+        self._write_fake_sync_script(
+            exit_code=1,
+            payload={"status": "drift", "stale_paths": [".claude/agents/dev-orchestrator.md"]},
+        )
+        state = self._read_current_state()
+        state["current_phase"] = "done"
+        state["status"] = "running"
+        state["completed_phases"] = [
+            "input", "load_memory", "brainstorm", "decide_intent",
+            "create_change", "apply_change", "archive_change",
+            "post_archive_actions", "done",
+        ]
+        self._write_current_state(state)
+
+        rc, out, _ = run_workflow(self.tmp, "advance")
+
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertEqual(data["reason"], "derived_artifact_drift_unresolved")
 
     def test_terminal_validation_does_not_break_historical_runs(self):
         """Historical runs already in history without finish-agent evidence

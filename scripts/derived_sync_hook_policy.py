@@ -982,12 +982,17 @@ def _run_sync_check_for_stale_paths(root: str) -> tuple[list[str], bool]:
         return [], False
 
     stale_generated: set[str] = set()
+    any_non_generated_stale = False
     for suite in report.get("suites") or []:
         for path in suite.get("stale_paths") or []:
             if _is_generated_path(path):
                 stale_generated.add(path)
+            else:
+                any_non_generated_stale = True
     stale_paths = sorted(stale_generated)
     if proc.returncode != 0 and not stale_paths:
+        if any_non_generated_stale:
+            return stale_paths, True
         return [], False
     return stale_paths, True
 

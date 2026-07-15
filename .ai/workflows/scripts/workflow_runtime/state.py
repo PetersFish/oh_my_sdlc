@@ -9,6 +9,7 @@ import datetime
 import json
 import os
 import shutil
+import subprocess
 
 from workflow_runtime.core import (
     VALID_STATUSES,
@@ -319,6 +320,77 @@ def _missing_terminal_finish_agent_evidence(state):
         "agent": "finish-agent",
         "slice_id": relevant_slice_id,
         "candidate_slice_ids": candidate_slice_ids,
+    }
+
+
+def _terminal_derived_artifact_drift(root, state):
+    """Return a structured blocker if terminal derived artifacts are not clean.
+
+    Terminal completion independently executes the repository-wide read-only
+    derived artifact check.  Finish-agent evidence is useful provenance, but the
+    runtime must consume the actual checker exit code before moving an active
+    run to history.  The check is scoped to runs that completed archive cleanup,
+    matching ``_missing_terminal_finish_agent_evidence``.
+    """
+    completed = state.get("completed_phases", []) or []
+    requires_check = (
+        "archive_change" in completed or "post_archive_actions" in completed
+    )
+    if not requires_check:
+        return None
+
+    script_path = os.path.join(root, "scripts", "sync_derived_artifacts.py")
+    command = ["python3", script_path, "--check", "--json"]
+
+    if not os.path.isfile(script_path):
+        return {
+            "error": "terminal movement refused: derived artifact check command is missing",
+            "reason": "derived_artifact_drift_check_failed",
+            "command": command,
+            "script_path": script_path,
+        }
+
+    try:
+        result = subprocess.run(
+            command,
+            cwd=root,
+            capture_output=True,
+            text=True,
+        )
+    except OSError as exc:
+        return {
+            "error": "terminal movement refused: derived artifact check could not execute",
+            "reason": "derived_artifact_drift_check_failed",
+            "command": command,
+            "script_path": script_path,
+            "exception": str(exc),
+        }
+
+    try:
+        report = json.loads(result.stdout or "{}")
+    except json.JSONDecodeError:
+        return {
+            "error": "terminal movement refused: derived artifact check output was not valid JSON",
+            "reason": "derived_artifact_drift_check_failed",
+            "command": command,
+            "script_path": script_path,
+            "returncode": result.returncode,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+        }
+
+    if result.returncode == 0:
+        return None
+
+    stale_paths = report.get("stale_paths") or report.get("stale") or []
+    return {
+        "error": "terminal movement refused: derived artifact drift remains unresolved",
+        "reason": "derived_artifact_drift_unresolved",
+        "command": command,
+        "script_path": script_path,
+        "returncode": result.returncode,
+        "stale_paths": stale_paths,
+        "report": report,
     }
 
 

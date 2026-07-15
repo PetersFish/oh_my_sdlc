@@ -656,8 +656,51 @@ class TestPhaseAwareHookIntegration(unittest.TestCase):
         )
         combined = f"{stdout}\n{stderr}"
         self.assertIn(
-            "Template drift", combined,
+            "template drift", combined.lower(),
             f"output should mention live template drift (Rule 1), got: {combined!r}",
+        )
+
+    def test_apply_phase_allows_attributable_live_workflow_template_drift(self):
+        """During apply_change, when a governed live workflow source file is
+        staged and its canonical template is stale-but-untouched, the hook
+        MUST allow the commit (attributable Rule 1 drift).  The template will
+        be synced by finish-agent.
+
+        Scenario: active apply_change run, governed workflow_runtime/*.py
+        staged (live source), template clean-but-stale.  Hook should allow.
+        """
+        # Create an active apply_change workflow run
+        _write_run_state(self.tmp, "2026-07-15-test", phase="apply_change",
+                         control_root=self.tmp)
+
+        # Create a governed live workflow source file that matches its template
+        # (in_sync), then modify it.  Both the live and template paths must
+        # exist and be committed initially so that after modification the
+        # template is clean-but-stale.
+        live_path = ".ai/workflows/scripts/workflow_runtime/lifecycle.py"
+        template_path = ("skills/sdlc-project-bootstrap/templates/workflow/"
+                         "workflow_runtime/lifecycle.py")
+        initial_content = "# governed lifecycle module\n"
+
+        write_file(self.tmp, live_path, initial_content)
+        write_file(self.tmp, template_path, initial_content)
+        run_git(self.tmp, "add", live_path, template_path)
+        run_git(self.tmp, "commit", "--no-verify", "-m", "add governed file")
+
+        # Now modify the live source (apply-phase authored change)
+        open(os.path.join(self.tmp, live_path), "w", encoding="utf-8").write(
+            initial_content + "\n# apply-phase edit\n"
+        )
+        run_git(self.tmp, "add", live_path)
+
+        rc, stdout, stderr = self._run_hook()
+        # Attributable live template drift should be allowed during apply.
+        combined = f"{stdout}\n{stderr}"
+        self.assertEqual(
+            rc, 0,
+            f"attributable live workflow template drift should be allowed "
+            f"during apply_change; got rc={rc}\nstdout={stdout!r}\n"
+            f"stderr={stderr!r}",
         )
 
     def test_no_active_workflow_preserves_existing_behavior(self):
